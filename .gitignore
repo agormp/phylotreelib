@@ -1,0 +1,5 @@
+*.pyc
+__pycache__
+notebook_treelib.ipynb
+test_treelib.py
+treelib_manual.txt
