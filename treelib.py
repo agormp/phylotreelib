@@ -3346,7 +3346,7 @@ class Nexustreefile(Treefile):
         # (a second for loop should start where the first for-loop stopped iterating)
         # Optional argument "noreturn" is a boolean that controls whether iteration
         # should return a tree object (default, happens when noreturn==False),
-        # or whether nothing should be returned (happens when noreturn==True)
+        # or whether None should be returned (happens when noreturn==True)
         # Useful for skipping part of treefile as quickly as possible
 
         ####################################################################################
@@ -3472,7 +3472,7 @@ class Nexustreefile(Treefile):
                 raise StopIteration
             # Return tree object if requested
             if noreturn:
-                pass
+                return None
             else:
                 return Tree.from_string(treestring, self.transdict)
 
