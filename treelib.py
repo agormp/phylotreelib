@@ -121,7 +121,7 @@ def remove_comments(text, leftdelim, rightdelim=None):
             if unmatched_starts == 0:                   # End of comment region
                 prevpos = start + offset
             elif unmatched_starts == -1:                # Error: more right delims than left delims
-                raise Exception("Unmatched end-comment delimiter: {}".format(text[pos-5:pos+5]))
+                raise Exception("Unmatched end-comment delimiter: {}".format(text[prevpos-5:prevpos+5]))
 
     # Add parts of original text to the right of rightdelim (if present)
     if prevpos < len(text):
@@ -1723,7 +1723,10 @@ class Tree(object):
 
     def cluster_n(self, nclust):
         """Divides tree into 'nclust' clusters based on distance from root.
-           Returns list containing sets of leafnames unless requested to return basenodes"""
+
+           Returns tuple containing: list with sets of leafnames (one set per cluster)
+                                     list of basenodes of clusters
+                                     set containing all leaves that are put in clusters"""
 
         # Finds clusters by conceptually cutting across branches at height where there are nclust groups downstream of cutpoint
         # This essentially finds equally spaced clusters. Leafs that are upstream of cutpoint (closer to root) also form clusters of their own
@@ -2113,14 +2116,14 @@ class Tree(object):
 
         # If enforceN has not been requested: Find N clusters in addition to possible members of keeplist or the two most distant leaves
         if not enforceN:
-            clusters = self.cluster(nclust=nkeep)          # "clusters" is a list containing sets of leafnames
+            clusters = self.cluster_n(nclust=nkeep)[0]          # "clusters" is a list containing sets of leafnames
 
         # If enforceN: Iteratively find N, N-1, ... clusters until total retained number of leaves (including those in keeplist etc) is == N
         else:
             N = nkeep
             foundN = False
             while not foundN:
-                clusters = self.cluster(nclust=N)
+                clusters = self.cluster_n(nclust=N)[0]
                 coveredclusters = []
                 for cluster in clusters:
                     intersection = cluster & keepset
@@ -3281,7 +3284,10 @@ class Treefile(object):
     ########################################################################################
 
     def read_trees(self, discardprop=0.0):
-        """Reads all trees from file and returns as Tree_set object. Option to discard first discardprop fraction of trees (e.g., burnin)"""
+        """Reads trees from file and returns as Tree_set object. Can discard fraction of trees"""
+
+        # Avoid erroneous error message when running pylint ("self" is OK for iteration)
+        # pylint: disable=not-an-iterable
 
         treeset = Tree_set()
         for tree in self:
