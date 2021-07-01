@@ -8,14 +8,13 @@ import copy
 import functools
 import itertools
 import math
-import numpy as np
-import os
 import random
 import re
 import statistics
 import sys
-import time
 from io import StringIO
+import numpy as np
+
 
 
 #############################################################################################
@@ -3577,6 +3576,7 @@ class Dist_tree():
             njtree.setlength(newnode, nb2, dist2)
 
             # (2) Update distance matrix and list of remaining nodes
+            # Python note: I am changing distance matrix here - should I use copy fo I can re-use?
             remaining_nodes.remove(nb1)
             remaining_nodes.remove(nb2)
             for node in remaining_nodes:
@@ -3612,31 +3612,31 @@ class Dist_tree():
         """Computes UPGMA tree, returns Tree object"""
 
         # Depth of node = distance from leaf-level to node (i.e., depth of leaves = 0.0)
-        self.depth = {leaf:0.0 for leaf in self.leaves}
+        depth = {leaf:0.0 for leaf in self.leaves}
 
         # Construct star-tree. This will be resolved node by node during algorithm
         upgmatree = Tree.from_leaves(self.leaves)
         rootnode = upgmatree.root
 
         # Construct copy of distmatrix: this will be altered during run (original will remain unchanged so more trees can be made)
-        self.distmatcopy = copy.deepcopy(self.distmat)
+        distmatcopy = copy.deepcopy(self.distmat)
 
         # Main loop: continue merging nearest nodes, on tree and in distmat, until only two nodes left
-        while len(self.distmatcopy) > 1:
+        while len(distmatcopy) > 1:
             (dist, (node1, node2)) = self.distmatcopy.nearest()
 
             # insert new node below two nodes to be merged, unless only two nodes remain (in which case: use root node)
-            if len(self.distmatcopy) == 2:
+            if len(distmatcopy) == 2:
                 mergenode = rootnode
             else:
                 mergenode = upgmatree.insert_node(rootnode, [node1, node2])
 
-            self.depth[mergenode] = 0.5 * dist
-            dist1 = self.depth[mergenode] - self.depth[node1]
-            dist2 = self.depth[mergenode] - self.depth[node2]
+            depth[mergenode] = 0.5 * dist
+            dist1 = depth[mergenode] - depth[node1]
+            dist2 = depth[mergenode] - depth[node2]
             upgmatree.setlength(mergenode, node1, dist1)
             upgmatree.setlength(mergenode, node2, dist2)
-            self.distmatcopy.merge_nodes(node1, node2, mergenode)
+            distmatcopy.merge_nodes(node1, node2, mergenode)
 
         return upgmatree
 
