@@ -78,9 +78,9 @@ def remove_comments(text, leftdelim, rightdelim=None):
     # Sanity checks: delimiters can not be identical, and one cannot be substring of the other
     if leftdelim == rightdelim:
         raise Exception("Left and right delimiters are identical")
-    elif leftdelim in rightdelim:
+    if leftdelim in rightdelim:
         raise Exception("Left delimiter is substring of right delimiter")
-    elif rightdelim in leftdelim:
+    if rightdelim in leftdelim:
         raise Exception("Right delimiter is substring of left delimiter")
 
     # Preprocess delims for use in re etc
@@ -92,15 +92,14 @@ def remove_comments(text, leftdelim, rightdelim=None):
     # If text contains no starts (=> no comments): return un-altered text
     if not delimlist:
         return text
-    else:
-        delimlist.extend([(delim.start(), "stop") for delim in re.finditer(rightdelim, text)])
-        delimlist.sort()
+    delimlist.extend([(delim.start(), "stop") for delim in re.finditer(rightdelim, text)])
+    delimlist.sort()
 
     # Resolve issues with overlapping delimiters:
     tmplist = [delimlist[0]]
     for i in range(1, len(delimlist)):
-        (start1, delim1) = delimlist[i - 1]
-        (start2, delim2) = delimlist[i]
+        start1 = delimlist[i - 1][0]
+        start2 = delimlist[i][0]
         if start2 > start1 + len(leftdelim) - 1:    # If  next item does not overlap previous item
             tmplist.append(delimlist[i])
     delimlist = tmplist
@@ -131,24 +130,17 @@ def remove_comments(text, leftdelim, rightdelim=None):
 #############################################################################################
 #############################################################################################
 
-class Globals(object):
+class Globals():
     """Class containing globally used functions and labels."""
 
     # I'm not convinced this is the way to go. Module instead?"""
-
-    def xor(p, q):
-        if (p and not q) or (not p and q): return True
-        else: return False
-
-    xor = staticmethod(xor)
-
     # Global repository for bipartitions, to avoid redundant saving in topologies etc.
     biparts = {}
 
 #############################################################################################
 #############################################################################################
 
-class Branchstruct(object):
+class Branchstruct():
     """Class that emulates a struct. Keeps branch-related info"""
 
     # Always contains the fields "length" and "label".
@@ -163,7 +155,7 @@ class Branchstruct(object):
 #############################################################################################
 #############################################################################################
 
-class Topostruct(object):
+class Topostruct():
     """Class that emulates a struct. Keeps topology-related info"""
 
     # Contains the fields "count" and "treestring".
@@ -176,17 +168,12 @@ class Topostruct(object):
 #############################################################################################
 
 class TreeError(Exception):
-
-    def __init__(self, errormessage):
-        self.errormessage = errormessage
-
-    def __str__(self):
-        return self.errormessage
+    pass
 
 #############################################################################################
 #############################################################################################
 
-class Tree(object):
+class Tree():
     """Class representing basic phylogenetic tree object."""
 
     # Implementation note: Tree objects can be constructed from three different kinds of things:
@@ -2394,11 +2381,13 @@ class Tree(object):
             distsum = self.tree[root][kid1].length + self.tree[root][kid2].length
 
             # Deal with labels semi-intelligently
+            # If only one label set: use that. Otherwise pick lab1
             lab1 = self.tree[root][kid1].label
             lab2 = self.tree[root][kid2].label
-            # If only one label is set (xor True): use  that.
-            if Globals.xor(lab1, lab2):
-                lab = lab1 or lab2          # "or" returns first True value...
+            if lab1 != "" and lab2 == "":
+                lab = lab1
+            elif lab1 == ""  and lab2 != "":
+                lab = lab2
             else:
                 lab = lab1                  # If agree pick 1, if disagree: pick 1 randomly
 
@@ -3691,4 +3680,3 @@ if __name__ == "__main__":
 # plot over time:
 # mprof run treelib_devel.py
 # mprof plot
-
