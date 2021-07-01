@@ -7,7 +7,7 @@ NEXUS or Newick format, and to analyze and manipulate the trees in various ways.
 
 ## Availability
 
-The treelib.py module is available on GitHub: https://github.com/agormp/treelib.git
+The treelib.py module is available on GitHub: https://github.com/agormp/treelib
 
 ## Installation
 
