@@ -5,13 +5,17 @@ NEXUS or Newick format, and to analyze and manipulate the trees in various ways.
 
 ![Phylogenetic tree](images/tree_parts.png?raw=true "Title")
 
+## Availability
+
+The treelib.py module is available on GitHub: https://github.com/agormp/treelib.git
+
 ## Installation
 
 * Place `treelib.py` in a directory on your computer (for instance /Users/bob/Documents/pythonmodules/)
 * Add the path to this directory to the `PYTHONPATH` environment variable
 * The treelib.py module can now be imported in python scripts using:
 ```
-	import treelib
+import treelib
 ```
 
 ## Quick start example
@@ -219,8 +223,7 @@ List of  useful Tree object attributes:
 
 ### Methods for analyzing and altering tree objects.
 
-Tree objects also have a number of methods that can be used to analyze and alter them.
-These are listed below along with brief descriptions of use and functionality. In
+Tree objects also have a number of methods that can be used to analyze and alter them. In
 addition to what's mentioned below, treelib also contains additional methods, but
 these are mostly for internal use in treelib (not for application programming),
 and are subject to change if I come up with better implementations.
@@ -228,10 +231,10 @@ and are subject to change if I come up with better implementations.
 One example of using a tree object method is:
 
 ```
-genetic_distance = tree.nodedist("Man", "Chimpanzee")
+childnodes = tree.children(7)
 ```
 
-which finds the sum of branch lengths on the path connecting the two leaves "Man" and "Chimpanzee".
+which returns a set containing the node-IDs for the immediate descendants of node 7 (the nodes directly connected to node 7).
 
 A full list of classes and methods in treelib is at the end of this README
 
@@ -246,7 +249,7 @@ Example usage:
 try:
     tree.rootout(outgroup)
 except treelib.TreeError as err:
-    print("This error occurred: {}".format(err) )
+	print("This error occurred: {}".format(err) )
 ```
 
 Example usage 2:
