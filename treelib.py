@@ -3623,7 +3623,7 @@ class Dist_tree():
 
         # Main loop: continue merging nearest nodes, on tree and in distmat, until only two nodes left
         while len(distmatcopy) > 1:
-            (dist, (node1, node2)) = self.distmatcopy.nearest()
+            (dist, (node1, node2)) = distmatcopy.nearest()
 
             # insert new node below two nodes to be merged, unless only two nodes remain (in which case: use root node)
             if len(distmatcopy) == 2:
