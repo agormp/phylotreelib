@@ -1,8 +1,9 @@
 # Treelib: python module for manipulating and analyzing phylogenetic trees
 
 Using classes and methods in treelib.py it is possible to read treefiles in either
-NEXUS or Newick format (each file can contain one or more trees), and to analyze
-and manipulate the trees in various ways.
+NEXUS or Newick format, and to analyze and manipulate the trees in various ways.
+
+![Phylogenetic tree](images/tree_parts.png?raw=true "Title")
 
 ## Installation
 
