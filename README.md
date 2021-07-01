@@ -4,56 +4,84 @@ Using classes and methods in treelib.py it is possible to read treefiles in eith
 NEXUS or Newick format (each file can contain one or more trees), and to analyze
 and manipulate the trees in various ways.
 
+## Installation
+
+* Place `treelib.py` in a directory on your computer (for instance /Users/bob/Documents/pythonmodules/)
+* Add the path to this directory to the `PYTHONPATH` environment variable
+* The treelib.py module can now be imported in python scripts using:
+```
+	import treelib
+```
+
+## Quick start example
+
+Here is a script that will import treelib, read a NEXUS file, midpoint root the tree, find the node ID for the new rootnode,
+and finally print out the distance along the branches from the root to all tips in the tree:
+
+```python
+import treelib
+treefile = treelib.Nexustreefile("mytreefile.nexus")
+mytree = next(treefile)
+mytree.rootmid()
+rootnode = mytree.root
+for tip in mytree.leaves:
+	dist = mytree.nodedist(rootnode, tip)
+	print(dist)
+```
+
+## Using treelib
+
 The main idea is to construct a treefile object from text (e.g., obtained by
 reading a NEXUS or Newick treefile). Treefile objects contain tree objects, and
 can be iterated over. Tree objects have a number of methods that can be used to
 analyze or alter the tree in question.
 
-The treelib.py library file can be placed anywhere in the user's
-PYTHONPATH, or simply in the same directory as the calling script.
-
-## Constructing treefile objects
+### Constructing treefile objects
 
 Typically, treefile objects are constructed by reading a textfile containing a
 NEXUS or Newick format description of a tree. This is done as follows:
 
 Newick files:
-```python
-  treefile = treelib.Newicktreefile(filename)
+```
+treefile = treelib.Newicktreefile(filename)
 ```
 
 NEXUS files:
-```python
-  treefile = treelib.Nexustreefile(filename)
+```
+treefile = treelib.Nexustreefile(filename)
 ```
 
-## Constructing tree objects
+### Constructing tree objects
 
 Treefile objects contain tree objects. Tree objects are retrieved from treefile
 objects by iteration:
 
 Doing something to all trees in a treefile object:
-```python
-  for tree in treefile:
-      <do something with tree>
+```
+for tree in treefile:
+	<do something with tree>
 ```
 
-Getting just one tree from a treefile object:
-  tree = next(treefile)
+Getting a single tree from a treefile object:
+```
+tree = next(treefile)
+```
 
 A tree object can also be constructed directly from a string (where the string is a Newick formatted tree):
-  tree = treelib.Tree.from_string(mystring)
+```
+tree = treelib.Tree.from_string(mystring)
+```
 
 Tree objects consist of external nodes (leafs), which are identified by strings
 (e.g. "Chimpanzee"), and internal nodes, which are identified by integers
 (e.g., 5). Branches between nodes may have a label (string) and/or a branch
 length (float) associated with them.
 
-One functionality in treelib that is handy during debugging is that tree objects
-can be printed in fairly clear format using simply: "print(tree)". The resulting
+A textual representation of a tree objects can be obtained using: "print(tree)". The resulting
 output is a child-list representation of the tree followed by an alphabetical
 list of leafs, along these lines:
 
+```
 >>> print(tree)
 |------------------------------------------------------------------|
 |  Node  |              Child               |  Distance  |  Label  |
@@ -168,3 +196,293 @@ tetM_X75073_Neisseria_meningit
 tetM_X90939_Streptococcus_pneu
 tetM_X92947_Enterococcus_faeca
 tetO_AY190525_Campylobacter_je
+```
+
+### Attributes on Tree objects
+
+Tree objects have a number of attributes that contain useful information regarding the tree.
+
+One example of using a tree attribute is (assuming we have a Tree object named "tree"):
+
+```
+taxa = tree.leaves
+```
+
+List of  useful Tree object attributes:
+
+*	`.leaves` 	: Set of leaf names
+*	`.intnodes` 	: Set of internal node IDs
+*	`.nodes`		: Set of all nodes (= leafs + internal nodes)
+*	`.root`		: ID for root node (usually 0, but may change if re-rooted)
+
+
+### Methods for analyzing and altering tree objects.
+
+Tree objects also have a number of methods that can be used to analyze and alter them.
+These are listed below along with brief descriptions of use and functionality. In
+addition to what's mentioned below, treelib also contains additional methods, but
+these are mostly for internal use in treelib (not for application programming),
+and are subject to change if I come up with better implementations.
+
+One example of using a tree object method is:
+
+```
+genetic_distance = tree.nodedist("Man", "Chimpanzee")
+```
+
+which finds the sum of branch lengths on the path connecting the two leaves "Man" and "Chimpanzee".
+
+A full list of classes and methods in treelib is at the end of this README
+
+### Exceptions.
+
+Treelib has its own error class ("TreeError"), which may be handy for catching
+tree-related errors in your own program and dealing with it intelligently:
+
+Example usage:
+
+```
+try:
+    tree.rootout(outgroup)
+except treelib.TreeError as err:
+    print("This error occurred: {}".format(err) )
+```
+
+Example usage 2:
+
+```
+if nodename not in tree.nodes:
+	raise TreeError("Tree contains no leafs named {}".format(nodename))
+```
+
+
+### List of  methods in the Tree class
+
+
+```
+class Tree(builtins.object)
+ |  Class representing basic phylogenetic tree object.
+ |
+ |  Methods defined here:
+ |
+ |  __eq__(self, other)
+ |      Implements equality testing for Tree objects
+ |
+ |  __hash__(self)
+ |      Implements hashing for Tree objects, so they can be used as keys in dicts
+ |
+ |  __init__(self)
+ |      Initialize self.  See help(type(self)) for accurate signature.
+ |
+ |  __iter__(self)
+ |      Returns iterator object for Tree object. Yields subtrees with extra .basalbranch attribute (= basal branch struct)
+ |
+ |  __str__(self)
+ |      Prints a table of parent-child relationships in the tree including branch lengths and labels
+ |
+ |  add_branch(self, bipart, blen=0.0, label='')
+ |      Adds branch represented by bipartition to unresolved tree.
+ |
+ |  average_ancdist(self, leaflist, return_median=False)
+ |      Return average distance from leaves to their MRCA, measured along tree. Median can be requested
+ |
+ |  average_pairdist(self, leaflist, return_median=False)
+ |      Return average pairwise distance between leaves in leaflist, measured along tree. Median can be requested
+ |
+ |  bipdict(self)
+ |      Returns tree in the form of a "bipartition dictionary"
+ |
+ |  build_dist_dict(self)
+ |      Construct dictionary keeping track of all pairwise distances between nodes
+ |
+ |  build_parent_dict(self)
+ |      Forces construction of parent_dict enabling faster lookups (avoid function, use dict directly)
+ |
+ |  build_path_dict(self)
+ |      Construct dictionary keeping track of all pairwise paths between nodes
+ |
+ |  children(self, parent)
+ |      Returns set containing parent's immediate descendants
+ |
+ |  cladegrep(self, pattern, minsize=2)
+ |      Finds clades (monophyletic groups) where all leaves contain specified pattern
+ |
+ |  cluster_cut(self, cutoff)
+ |      Divides tree into clusters by conceptually cutting across tree at "cutoff" distance from root.
+ |      Returns list containing sets of leafnames
+ |
+ |  cluster_n(self, nclust, return_as_basenodes=False)
+ |      Divides tree into 'nclust' clusters based on distance from root.
+ |      Returns list containing sets of leafnames unless requested to return basenodes
+ |
+ |  deroot(self)
+ |      If root is at bifurcation: remove root node, connect adjacent nodes
+ |
+ |  diameter(self, return_leaves=False)
+ |      Return diameter: longest leaf-leaf distance along tree. If return_leaves is True: Return tuple with (maxdist, Leaf1, Leaf2)
+ |
+ |  figtree(self, printdist=True, printlabels=True, precision=6, colorlist=None, color='0000FF')
+ |      Returns figtree format tree as a string. Rudimentary - mostly for coloring leaves. Default color=blue
+ |
+ |  findMRCA(self, leafset)
+ |      Finds Most Recent Common Ancestor for the provided set of leaves
+ |
+ |  find_central_leaf(self, leaflist)
+ |      Finds central leaf for the provided list of leaves.
+ |      Defined as having approximately equal distance to the two farthest leaves in leaflist
+ |
+ |  find_common_leaf(self, leaflist)
+ |      Finds common leaf for the provided list of leaves.
+ |      Defined as having the smallest average distance to remaining leaves (= many close neighbors).
+ |
+ |  find_most_distant(self, node1, nodeset)
+ |      Finds node in nodeset that is most distant from node1
+ |
+ |  findbasenode(self, leafset)
+ |      Finds node that is at the base of all leaves in leafset.
+ |
+ |  getlabel(self, node1, node2)
+ |      Gets label on branch connecting node1 and node2
+ |
+ |  graft(self, other, node1, node2=None, blen1=0, blen2=0, graftlabel=None)
+ |      Graft other tree to self. Tree2 (other) intnodes renamed if names clash with those in tree1.
+ |      node1: node in tree1 (self) below which tree2 (other) will be grafted. Must be specified, cannot be root1
+ |      node2: node in tree2 (other) below which tree2 will be attached (defaul is root of tree2)
+ |      blen1: length of branch added to tree1 below graftpoint (lower of two newly created branches)
+ |      blen2: length of branch above graft point and below tree2 (upper of two newly created branches)
+ |      graftlabel: prepend value of "label" to leaf names on t2 (e.g: "graft_s1")
+ |
+ |  insert_node(self, parent, childnodes, branchlength=0, lab='')
+ |      Inserts an extra node between parent and children listed in childnodes list.
+ |
+ |      Length of inserted branch is 'branchlength' and defaults to zero. The node number
+ |      of the new node is returned
+ |
+ |  is_compatible_with(self, bipart)
+ |      Checks whether a given bipartition is compatible with the tree
+ |
+ |  is_resolved(self)
+ |      Checks whether tree is fully resolved (no polytomies)
+ |
+ |  leaflist(self)
+ |      Returns list of leaf names
+ |
+ |  length(self)
+ |      Returns tree length (sum of all branch lengths)
+ |
+ |  nameprune(self, sep='_', keep_pattern=None)
+ |      Prune leaves based on name redundancy: Find subtrees where all leaves have same start of name (up to first "_")
+ |
+ |  newick(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6)
+ |      Returns Newick format tree string representation of tree object
+ |
+ |  nexus(self, printdist=True, printlabels=True, precision=6)
+ |      Returns nexus format tree as a string
+ |
+ |  nodedepth(self, node)
+ |      Returns depth of node: distance from rightmost leaf-level to node (i.e., depth of rightmost leaf = 0.0)
+ |
+ |  nodedist(self, node1, node2=None)
+ |      Returns distance between node1 and node2 along tree (patristic distance)
+ |
+ |  nodepath(self, node1, node2)
+ |      Returns path between node1 and node2 along tree.
+ |
+ |  nodepath_fromdict(self, node1, node2)
+ |      Returns path between node1 and node2 along tree, from preconstructed path_dict
+ |
+ |  numberprune(self, nkeep, keeplist=None, keep_common_leaves=False, keep_most_distant=False, return_leaves=False, enforceN=False)
+ |      Prune tree so 'nkeep' leaves remain. Leaves are chosen to be approximately evenly spaced over tree.
+ |      "keeplist" can be used to specify leaves that _must_ be retained.
+ |      'keep_common_leaves' requests preferential retainment of leaves with many neighbors
+ |      (default is to keep leaves that are as equally spaced as possible)
+ |      'keep_most_distant' requests that the two most distant leaves in tree (which spread out the diameter) should be kept
+ |      'return_leaves': return selected leaves, but do not actually prune tree
+ |      'enforceN' enforce exactly N leaves in pruned tree (normally leaves in includelist and most distant are additional to N)
+ |
+ |  parent(self, node)
+ |      Returns parent of node
+ |
+ |  prune_maxlen(self, nkeep, return_leaves=False)
+ |      Prune tree so the remaining nkeep leaves spread out maximal percentage of branch length (max phylogenetic diversity)
+ |
+ |  remote_children(self, parent)
+ |      Returns set containing all leaves that are descendants of parent
+ |
+ |  remove_branch(self, node1, node2)
+ |      Removes branch connecting node1 and node2 (thereby creating polytomy)
+ |
+ |  remove_leaf(self, leaf)
+ |      Removes named leaf from tree, cleans up so remaining tree structure is sane
+ |
+ |  remove_leaves(self, leaflist)
+ |
+ |  rename_intnode(self, oldnum, newnum)
+ |      Changes number of one internal node
+ |
+ |  rename_leaf(self, oldname, newname, fixdups=False)
+ |      Changes name of one leaf. Automatically fixes duplicates if requested
+ |
+ |  reroot(self, node1, node2, polytomy=False, node1dist=0.0)
+ |      Places new root on branch between node1 and node2, node1dist from node1
+ |
+ |  resolve(self)
+ |      Randomly resolves multifurcating tree by by adding zero-length internal branches.
+ |
+ |  rootmid(self)
+ |      Performs midpoint rooting of tree
+ |
+ |  rootout(self, outgroup, polytomy=False)
+ |      Roots tree on outgroup
+ |
+ |  setlabel(self, node1, node2, label)
+ |      Sets label on branch connecting node1 and node2
+ |
+ |  setlength(self, node1, node2, length)
+ |      Sets length of branch connecting node1 and node2
+ |
+ |  shuffle_leaf_names(self)
+ |      Shuffles the names of all leaves
+ |
+ |  sorted_intnodes(self, deepfirst=True)
+ |      Returns sorted intnode list for breadth-first traversal of tree. Default is to place deep nodes first
+ |
+ |  spr(self, subtree_node, regraft_node)
+ |      Subtree Pruning and Regrafting.
+ |      subtree_node: basenode of subtree that will be pruned.
+ |      regraft_node: node in tree below which subtree will be grafted. Must be specified, cannot be root
+ |
+ |  subtree(self, basenode, return_basalbranch=False)
+ |      Returns subtree rooted at basenode as Tree object. Note: rooting matters! Note 2: basenode may be leaf!
+ |
+ |  topology(self)
+ |      Returns set of sets of sets representation of topology ("naked bipartitiondictionary")
+ |
+ |  transname(self, namefile)
+ |      Translate all leaf names using oldname/newname pairs in namefile
+ |
+ |  treedist(self, other, normalise=True, verbose=False)
+ |      Compute symmetric tree distance (Robinson Foulds) between self and other tree. Normalised measure returned by default
+ |
+ |  treesim(self, other, verbose=False)
+ |      Compute normalised symmetric similarity between self and other tree
+ |
+ |  ----------------------------------------------------------------------
+ |  Class methods defined here:
+ |
+ |  from_string(orig_treestring, transdict=None) from builtins.type
+ |      Constructor 1: Converts tree (string) in Newick format to internal representation
+ |
+ |  from_biplist(biplist) from builtins.type
+ |      Constructor 2: constructs Tree object from bipartition list
+ |
+ |  from_leaves(leaflist) from builtins.type
+ |      Constructor 3: construct star-tree object from list of leaves
+ |
+ |  randtree(leaflist=None, ntips=None, randomlen=False, name_prefix='s') from builtins.type
+ |      Constructor 4: Construct tree with random topology. Either list of leaf names OR number of tips must be specified
+ |
+ |  ----------------------------------------------------------------------
+
+```
+
