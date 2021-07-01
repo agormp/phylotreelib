@@ -485,7 +485,7 @@ class Tree(object):
             namelist = []
             for i in range(ntips):
                 name = "{prefix}{num:0{width}d}".format(prefix=name_prefix, num=i, width=ndigits)
-                namelist.append(  )
+                namelist.append( name )
             tree = cls.from_leaves(namelist)   # Star tree with given number of leaves
 
         tree.resolve()                         # Randomly resolve to bifurcating tree
