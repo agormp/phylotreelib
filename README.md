@@ -204,7 +204,7 @@ tetO_AY190525_Campylobacter_je
 
 ### Attributes on Tree objects
 
-Tree objects have a number of attributes that contain useful information regarding the tree.
+Tree objects have a number of attributes that contain information regarding the tree.
 
 One example of using a tree attribute is (assuming we have a Tree object named "tree"):
 
