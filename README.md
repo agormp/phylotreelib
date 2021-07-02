@@ -12,7 +12,7 @@ The treelib.py module is available on GitHub: https://github.com/agormp/treelib
 ## Installation
 
 * Place `treelib.py` in a directory on your computer (for instance /Users/bob/Documents/pythonmodules/)
-* Add the path to this directory to the `PYTHONPATH` environment variable
+* Add this directory to the `PYTHONPATH` environment variable
 * The treelib.py module can now be imported in python scripts using:
 ```
 import treelib
@@ -21,7 +21,7 @@ import treelib
 ## Quick start example
 
 Here is a script that will import treelib, read a NEXUS file, midpoint root the tree, find the node ID for the new rootnode,
-and finally print out the distance along the branches from the root to all tips in the tree:
+and finally print out the root-to-tip distance (measured along the branches) for all tips in the tree:
 
 ```python
 import treelib
