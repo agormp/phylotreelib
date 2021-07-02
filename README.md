@@ -20,14 +20,14 @@ import treelib
 
 ## Quick start example
 
-Here is a script that will import treelib, read a NEXUS file, midpoint root the tree, find the node ID for the new rootnode,
+Here is a script that will import treelib, read a NEXUS file, perform minimum variance rooting, find the node ID for the new rootnode,
 and finally print out the root-to-tip distance (measured along the branches) for all tips in the tree:
 
 ```python
 import treelib
 treefile = treelib.Nexustreefile("mytreefile.nexus")
 mytree = next(treefile)
-mytree.rootmid()
+mytree.rootminvar()
 rootnode = mytree.root
 for tip in mytree.leaves:
 	dist = mytree.nodedist(rootnode, tip)
