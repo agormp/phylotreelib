@@ -15,8 +15,6 @@ import sys
 from io import StringIO
 import numpy as np
 
-
-
 #############################################################################################
 #############################################################################################
 ##
@@ -142,6 +140,7 @@ class Globals():
 class Branchstruct():
     """Class that emulates a struct. Keeps branch-related info"""
 
+    # Python note: perhaps replace with dataclass, available since python 3.7
     # Always contains the fields "length" and "label".
     # If undefined, length is 0 (zero) and label is an empty string.
     # Different sets of fields may be added during computation.
@@ -157,6 +156,7 @@ class Branchstruct():
 class Topostruct():
     """Class that emulates a struct. Keeps topology-related info"""
 
+    # Python note: perhaps replace with dataclass, available since python 3.7
     # Contains the fields "count" and "treestring".
     def __init__(self, count=1, treestring=""):
         self.count = count
@@ -731,9 +731,9 @@ class Tree():
 
         try:
             return set(self.tree[parent].keys())
-        except KeyError:
+        except KeyError as e:
             msg = "Node %s is not an internal node" % parent
-            raise TreeError(msg)
+            raise TreeError(msg) from e
 
     #######################################################################################
 
@@ -777,8 +777,8 @@ class Tree():
         # Return parent
         try:
             return self.parent_dict[node]
-        except KeyError:
-            raise TreeError("Node {} does not exist".format(node))
+        except KeyError as e:
+            raise TreeError("Node {} does not exist".format(node)) from e
 
     #######################################################################################
 
@@ -854,12 +854,13 @@ class Tree():
         """Finds central leaf for the provided list of leaves.
         Defined as having approximately equal distance to the two farthest leaves in leaflist"""
 
+        nleaves = len(leaflist)
         #  Cluster has one member: return it (yeah, well...)
-        if len(leaflist) == 1:
+        if nleaves == 1:
             return leaflist[0]
 
         #  Cluster has two members: Pick the leaf farthest from root (would the opposite approach be more reasonable?)
-        if len(leaflist) == 2:
+        if nleaves == 2:
             if self.nodedist(leaflist[0]) > self.nodedist(leaflist[1]):
                 return leaflist[0]
             else:
@@ -872,9 +873,8 @@ class Tree():
         (d, L1, L2) = sub.diameter(return_leaves=True)
 
         # Find leaf having the smallest difference between its distance from L1 and L2 (leaf "halfway" between L1 and L2)
-        central_leaf = leaflist[0]
-        smallest_diff = abs(sub.nodedist(central_leaf, L1) - sub.nodedist(central_leaf, L2))
-        for leaf in leaflist[1:]:
+        smallest_diff = d       # Pick value certain to be larger than all dist differences
+        for leaf in leaflist:
             diff = abs(sub.nodedist(leaf, L1) - sub.nodedist(leaf, L2))
             if diff < smallest_diff:
                 central_leaf = leaf
@@ -887,12 +887,13 @@ class Tree():
         """Finds common leaf for the provided list of leaves.
         Defined as having the smallest average distance to remaining leaves (= many close neighbors)."""
 
+        nleaves = len(leaflist)
         #  Cluster has one member: return it (yeah, well...)
-        if len(leaflist) == 1:
+        if nleaves == 1:
             return leaflist[0]
 
         #  Cluster has two members: Pick the leaf farthest from root (would the opposite approach be more reasonable?)
-        if len(leaflist) == 2:
+        if nleaves == 2:
             if self.nodedist(leaflist[0]) > self.nodedist(leaflist[1]):
                 return leaflist[0]
             else:
@@ -900,18 +901,13 @@ class Tree():
 
         # Cluster has more than two members: Find leaf having the smallest average distance to remaining leaves
         # This will identify leaves that are part of denser sub-clusters (instead of single outliers)
-        basenode = self.findMRCA(set(leaflist))
-        sub = self.subtree(basenode)
-        (d, L1, L2) = sub.diameter(return_leaves=True)
-
-        # Find leaf having the smallest difference between its distance from L1 and L2 (leaf "halfway" between L1 and L2)
         dlist = []
         for leaf1 in leaflist:
             d = 0.0
             for leaf2 in leaflist:
                 if leaf1 != leaf2:
                     d += self.nodedist(leaf1, leaf2)
-            avedist = ( d / len(leaflist) ) - 1
+            avedist = d / ( nleaves - 1 )
             dlist.append((avedist, leaf1))
         dlist.sort()
         typical_leaf = dlist[0][1]
@@ -1064,8 +1060,8 @@ class Tree():
                 n = self.path_dict[n][node2]
                 path.append(n)
             return path
-        except AttributeError:
-            raise TreeError("The path dictionary has not been constructed. Cannot use nodepath_fromdict")
+        except AttributeError as e:
+            raise TreeError("The path dictionary has not been constructed. Cannot use nodepath_fromdict") from e
 
     #######################################################################################
 
@@ -1127,7 +1123,7 @@ class Tree():
         """Returns height of tree: Largest root-to-tip distance"""
         nodeset = self.leaves
         node1 = self.root
-        most_distant, maxdist = self.find_most_distant(node1, nodeset)
+        maxdist = self.find_most_distant(node1, nodeset)[1]
 
         return maxdist
 
@@ -2097,7 +2093,7 @@ class Tree():
 
         # If requested: Find and retain two most distant leaves in tree
         if keep_most_distant:
-            (maxdist, L1, L2) = self.diameter(return_leaves=True)
+            (_, L1, L2) = self.diameter(return_leaves=True)
             keepset.update((L1, L2))
 
         # If enforceN has not been requested: Find N clusters in addition to possible members of keeplist or the two most distant leaves
@@ -3098,7 +3094,7 @@ class SmallTreeSummary(object):
             freqbiplist.reverse()
 
             # Iterate over sorted list, adding most frequent, compatible bipartitions first
-            for (freq, bipart) in freqbiplist:
+            for _, bipart in freqbiplist:
                 if contree.is_compatible_with(bipart):
                     blen = bipdict[bipart].mean
                     if lab == "freq":
@@ -3157,9 +3153,7 @@ class BigTreeSummary(SmallTreeSummary):
             if self.outgroup:
                 try:
                     curtree.rootout(self.outgroup)
-                except TreeError as exc:
-                    # print("Warning: ", exc.msg)
-                    # print("Midpoint rooting used instead")
+                except TreeError:
                     curtree.rootmid()
 
             elif self.rootmid:
@@ -3337,9 +3331,9 @@ class Nexustreefile(Treefile):
     ########################################################################################
 
     def __init__(self, filename):
-        Treefile.__init__(self, filename)
-
         """Read past NEXUS file header, parse translate block if present"""
+
+        Treefile.__init__(self, filename)
 
         # Can be called with a file-object or any other object that supports
         # iteration by line ("for line in object:") while retaining state information
