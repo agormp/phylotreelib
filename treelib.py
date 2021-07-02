@@ -295,7 +295,7 @@ class Tree():
             # If nothing else matched then this must be a name or label
             # If previous part was simultaneously a right parenthesis or a leaf name, then the token
             # must be a branch label
-            elif prevpart == ")" or prevpart == "leafname":
+            elif prevpart in [")", "leafname"]:
                 child = node_stack[-1]
                 parent = node_stack[-2]
                 obj.tree[parent][child].label = part
@@ -453,14 +453,14 @@ class Tree():
         if leaflist is None and ntips is None:
             msg = "Must specify either list of leafnames or number of tips to create random tree"
             raise TreeError(msg)
-        elif leaflist is not None and ntips is not None:
+        if leaflist is not None and ntips is not None:
             msg = "Only specify either list of leafnames or number of tips to create random tree"\
                   " (not both)"
             raise TreeError(msg)
 
         # If leaflist given:
         #   construct startree using names, then resolve to random bifurcating topology
-        elif leaflist is not None and ntips is None:
+        if leaflist is not None and ntips is None:
             tree = cls.from_leaves(leaflist)
 
         # If ntips given:
@@ -490,7 +490,7 @@ class Tree():
 
         # Basal branch struct may contain useful information: e.g., label and length below subtree
         # Single node trees consisting of leaves are also considered subtrees (REMOVE????)
-        class Subtree_iterator(object):
+        class Subtree_iterator():
             def __init__(self, fulltree):
                 self.basenodes = fulltree.sorted_intnodes()
                 self.basenodes.extend(fulltree.leaflist())
@@ -504,12 +504,11 @@ class Tree():
             def __next__(self):
                 if self.i >= len(self.basenodes):
                     raise StopIteration
-                else:
-                    self.i += 1
-                    basenode = self.basenodes[self.i - 1]
-                    (subtree, basalbranch) = self.fulltree.subtree(basenode, return_basalbranch=True)
-                    subtree.basalbranch = basalbranch
-                    return subtree
+                self.i += 1
+                basenode = self.basenodes[self.i - 1]
+                (subtree, basalbranch) = self.fulltree.subtree(basenode, return_basalbranch=True)
+                subtree.basalbranch = basalbranch
+                return subtree
 
         return Subtree_iterator(self)
 
@@ -957,7 +956,7 @@ class Tree():
                 # Return basenode when bipartition has been found
                 if leafset == bipart1:
                     return node1
-                elif leafset==bipart2:
+                if leafset==bipart2:
                     return node2
 
         # If we fell off for loops, then leafset is incompatible with tree: panic
@@ -1156,6 +1155,7 @@ class Tree():
                 L3 = node2
 
         # Return requested result
+        # Python note: Bad idea to have varying return values. Decide on output and deal with it at other end
         if return_leaves:
             return (maxdist, L2, L3)
         else:
@@ -1190,7 +1190,7 @@ class Tree():
         if return_median:
             return statistics.median(distlist)
         else:
-            return sum(distlist) / len(distlist)
+            return statistics.mean(distlist)
 
     #######################################################################################
 
@@ -1205,7 +1205,7 @@ class Tree():
         if return_median:
             return statistics.median(distlist)
         else:
-            return sum(distlist) / len(distlist)
+            return statistics.mean(distlist)
 
     #######################################################################################
 
@@ -1494,15 +1494,19 @@ class Tree():
         n_nodes = n_leaves + len(self.intnodes)
 
         # If root is a bifurcation, and tree resolved, then n_nodes = 2 * n_leaves - 1
+        if (n_rootkids == 2) and (n_nodes < (2 * n_leaves - 1)):
+            return False
+
         # If root is a trifurcation ("basal polytomy"), and tree resolved, then n_nodes = 2 * n_leaves - 2
+        if (n_rootkids == 3) and (n_nodes < (2 * n_leaves - 2)):
+            return False
+
+        # If root has more than 3 kids, then tree is not resolved
         if n_rootkids > 3:
             return False
-        elif (n_rootkids == 2) and (n_nodes < (2 * n_leaves - 1)):
-            return False
-        elif (n_rootkids == 3) and (n_nodes < (2 * n_leaves - 2)):
-            return False
-        else:
-            return True
+
+        # If we made it this far, then tree is resolved
+        return True
 
     #######################################################################################
 
@@ -1635,6 +1639,8 @@ class Tree():
                 curlevel = nextlevel
             other.nodes = other.leaves | other.intnodes
 
+        # Python note: possibly bad idea to have different possible returnvalues.
+        # Simplify and deal with it at consumer end
         if return_basalbranch:
             return (other, basalbranch)
         else:
@@ -2138,6 +2144,7 @@ class Tree():
         else:
             discardset = self.leaves - keepset
             self.remove_leaves(discardset)
+            return None
 
     #######################################################################################
 
@@ -2202,13 +2209,13 @@ class Tree():
     def transname(self, namefile):
         """Translate all leaf names using oldname/newname pairs in namefile"""
 
-        transfile = open(namefile)
-        transdict = {}
-        for line in transfile:
-            words = line.split()
-            oldname = words[0]
-            newname = words[1]
-            transdict[oldname] = newname
+        with open(namefile, "r") as transfile:
+            transdict = {}
+            for line in transfile:
+                words = line.split()
+                oldname = words[0]
+                newname = words[1]
+                transdict[oldname] = newname
 
         # Create copy of original set of leaf names to avoid iterating over set while changing it
         orignames = copy.copy(self.leaves)
@@ -2229,13 +2236,12 @@ class Tree():
             if not fixdups:
                 msg = "Attempted to create duplicate leafname: %s" % newname
                 raise TreeError(msg)
-            else:
-                i = 1
+            i = 1
+            fixedname = newname + "_" + str(i)
+            while fixedname in self.leaves:
+                i += 1
                 fixedname = newname + "_" + str(i)
-                while fixedname in self.leaves:
-                    i += 1
-                    fixedname = newname + "_" + str(i)
-                newname = fixedname
+            newname = fixedname
 
         parent = self.parent(oldname)
         self.tree[parent][newname] = self.tree[parent][oldname]
@@ -2351,11 +2357,7 @@ class Tree():
     def treesim(self, other, verbose=False):
         """Compute normalised symmetric similarity between self and other tree"""
 
-        if verbose:
-            symdif, symdif_norm, n_shared, n_uniq1, n_uniq2, n_bip1, n_bip2 = self.treedist(other, verbose=True)
-        else:
-            symdif_norm = self.treedist(other)
-
+        symdif, symdif_norm, n_shared, n_uniq1, n_uniq2, n_bip1, n_bip2 = self.treedist(other, verbose=True)
         symsim_norm = 1.0 - symdif_norm
 
         if verbose:
@@ -2571,8 +2573,13 @@ class Tree():
 
         # Reroot on global minimum variance point
 
-        # If minparent is root: handle situation depending on minpardist and whether root is at multifurcation:
-        if minparent == self.root:
+        # If minparent is not root: remove old root and reroot using the minparent and minpardist already found:
+        if minparent != self.root:
+            self.deroot()
+            self.reroot(node1=minparent, node2=minchild, node1dist=minpardist)
+
+        # If minparent IS root: remove old root and reroot using the minparent and minpardist already found:
+        else:
             # Minpardst == 0: Do nothing. Current root is minimal variance root
             if minpardist == 0.0:
                 return
@@ -2586,18 +2593,13 @@ class Tree():
                     minpardist = minpardist + self.dist_dict[self.root][minparent]
                     self.deroot()
                     self.reroot(node1=minparent, node2=minchild, node1dist=minpardist)
-                    print("After: minvar:\t{}\nminparent:\t{}\nminchild:\t{}\nminpardist:{}".format(minvar, minparent, minchild, minpardist)) #DEBUG
-
                     return
+
                 # Multifurcation: old root will not be removed. Do not need to find new minparent.
                 else:
                     self.reroot(node1=minparent, node2=minchild, node1dist=minpardist)
                     return
 
-        # If minparent is NOT root: remove old root and reroot using the minparent and minpardist already found:
-        else:
-            self.deroot()
-            self.reroot(node1=minparent, node2=minchild, node1dist=minpardist)
 
     ########################################################################################
 
@@ -2675,8 +2677,9 @@ class Tree():
 
     def spr(self,subtree_node, regraft_node):
         """Subtree Pruning and Regrafting.
-                subtree_node: basenode of subtree that will be pruned.
-                regraft_node: node in tree below which subtree will be grafted. Must be specified, cannot be root"""
+
+            subtree_node: basenode of subtree that will be pruned.
+            regraft_node: node in tree below which subtree will be grafted. Must be specified, cannot be root"""
 
         # Subtree Prune: Create Tree object corresponding to subtree. Remove subtree from self (one leaf at a time)
         subtree = self.subtree(subtree_node)
@@ -2690,7 +2693,7 @@ class Tree():
 #############################################################################################
 #############################################################################################
 
-class Tree_set(object):
+class Tree_set():
     """Class for storing and manipulating a number of trees"""
 
     def __init__(self):
@@ -2767,7 +2770,7 @@ class Tree_set(object):
 #############################################################################################
 #############################################################################################
 
-class SmallTreeSummary(object):
+class SmallTreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
     def __init__(self, include_zeroterms=False):
@@ -3042,7 +3045,8 @@ class SmallTreeSummary(object):
             raise TreeError(msg)
 
         if cutoff < 0.5:
-            cutoff = 0.5        # Warn instead?
+            msg = "Consensus tree cutoff has to be at least 0.5"
+            raise TreeError(msg)
 
         # Construct dictionary of most frequent bipartitions.
         # Use bipart_cache if it already exists, if not then construct it first
@@ -3189,9 +3193,8 @@ class BigTreeSummary(SmallTreeSummary):
         if self.tree_count == 0:
             msg = "No trees added to summary object. Impossible to compute result."
             raise TreeError(msg)
-        else:
-            toporeport = []
 
+        toporeport = []
         for topology in self.toposummary:
             freq = self.toposummary[topology].count/self.tree_weight_sum
             treestring = self.toposummary[topology].treestring
@@ -3216,7 +3219,7 @@ class BigTreeSummary(SmallTreeSummary):
 ########################################################################################
 
 
-class Treefile(object):
+class Treefile():
     """Abstract base-class for representing tree file objects."""
 
     # Classes for specific formats inherit from this class and add extra stuff as needed.
@@ -3311,7 +3314,6 @@ class Newicktreefile(Treefile):
     ########################################################################################
 
     def __next__(self):
-
         treestring = self.get_treestring()
         if treestring is None:
             self.treefile.close()
@@ -3348,16 +3350,14 @@ class Nexustreefile(Treefile):
         def skip_comment(line):
             """Reads past a NEXUS comment"""
 
-            linebuffer = line
-
-            if linebuffer.count("[") > linebuffer.count("]"):
-                for line in self.treefile:
-                    linebuffer += line
-                    if linebuffer.count("[") == linebuffer.count("]"): break
+            if line.count("[") > line.count("]"):
+                for extraline in self.treefile:
+                    line += extraline
+                    if line.count("[") == line.count("]"): break
 
             # Now we should have an equal number of "[" and "]"
-            # Remove comments using method in utils module (also takes care of nested comments)
-            return remove_comments(linebuffer, leftdelim = "[", rightdelim="]")
+            # Remove comments
+            return remove_comments(line, leftdelim = "[", rightdelim="]")
 
         ####################################################################################
 
@@ -3454,21 +3454,21 @@ class Nexustreefile(Treefile):
         if treestring is None:
             self.treefile.close()
             raise StopIteration
-        else:
-            # remove comments in brackets if present
-            # remove leading "tree NAME =" (compiled regexp "tree_header_pattern")
-            treestring = remove_comments(treestring, leftdelim = "[", rightdelim="]")   #DEBUG: have to figure out how to deal with figtree comments!
-            treestring = self.tree_header_pattern.sub("", treestring)
+        # remove comments in brackets if present
+        # remove leading "tree NAME =" (compiled regexp "tree_header_pattern")
+        treestring = remove_comments(treestring, leftdelim = "[", rightdelim="]")   #DEBUG: does not deal with figtree comments!
+        treestring = self.tree_header_pattern.sub("", treestring)
 
-            # If "end;" statement has been reached: terminate for loop, do NOT return tree object
-            if self.end_pattern.search(treestring):
-                self.treefile.close()
-                raise StopIteration
-            # Return tree object if requested
-            if noreturn:
-                return None
-            else:
-                return Tree.from_string(treestring, self.transdict)
+        # If "end;" statement has been reached: terminate for loop, do NOT return tree object
+        if self.end_pattern.search(treestring):
+            self.treefile.close()
+            raise StopIteration
+
+        # Return tree object if requested
+        if noreturn:
+            return None
+        else:
+            return Tree.from_string(treestring, self.transdict)
 
 ########################################################################################
 ########################################################################################
