@@ -82,9 +82,8 @@ Tree objects consist of external nodes (leafs), which are identified by strings
 (e.g., 5). Branches between nodes may have a label (string) and/or a branch
 length (float) associated with them.
 
-A textual representation of a tree objects can be obtained using: "print(tree)". The resulting
-output is a child-list representation of the tree followed by an alphabetical
-list of leafs, along these lines:
+A textual representation of a tree object can be obtained using: "print(mytree)" (where mytree is the name of the tree object). The resulting
+output is a child-list representation of the tree followed by an alphabetical list of leafs, along these lines:
 
 ```
 >>> print(tree)
