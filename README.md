@@ -1,31 +1,31 @@
-# Treelib: python module for manipulating and analyzing phylogenetic trees
+# phylotreelib: python module for manipulating and analyzing phylogenetic trees
 
-Using classes and methods in treelib.py it is possible to read treefiles in either
+Using classes and methods in phylotreelib.py it is possible to read treefiles in either
 NEXUS or Newick format, and to analyze and manipulate the trees in various ways.
 
 ![Phylogenetic tree](images/tree_parts.png?raw=true "Title")
 
 ## Availability
 
-The treelib.py module is available on GitHub: https://github.com/agormp/treelib
+The phylotreelib.py module is available on GitHub: https://github.com/agormp/phylotreelib
 
 ## Installation
 
-* Place `treelib.py` in a directory on your computer (for instance /Users/bob/Documents/pythonmodules/)
+* Place `phylotreelib.py` in a directory on your computer (for instance /Users/bob/Documents/pythonmodules/)
 * Add this directory to the `PYTHONPATH` environment variable
-* The treelib.py module can now be imported in python scripts using:
+* The phylotreelib.py module can now be imported in python scripts using:
 ```
-import treelib
+import phylotreelib
 ```
 
 ## Quick start example
 
-Here is a script that will import treelib, read a NEXUS file, perform minimum variance rooting, find the node ID for the new rootnode,
+Here is a script that will import phylotreelib, read a NEXUS file, perform minimum variance rooting, find the node ID for the new rootnode,
 and finally print out the root-to-tip distance (measured along the branches) for all tips in the tree:
 
 ```python
-import treelib
-treefile = treelib.Nexustreefile("mytreefile.nexus")
+import phylotreelib
+treefile = phylotreelib.Nexustreefile("mytreefile.nexus")
 mytree = next(treefile)
 mytree.rootminvar()
 rootnode = mytree.root
@@ -34,7 +34,7 @@ for tip in mytree.leaves:
 	print(dist)
 ```
 
-## Using treelib
+## Using phylotreelib
 
 The main idea is to construct a treefile object from text (e.g., obtained by
 reading a NEXUS or Newick treefile). Treefile objects contain tree objects, and
@@ -48,12 +48,12 @@ NEXUS or Newick format description of a tree. This is done as follows:
 
 Newick files:
 ```
-treefile = treelib.Newicktreefile(filename)
+treefile = phylotreelib.Newicktreefile(filename)
 ```
 
 NEXUS files:
 ```
-treefile = treelib.Nexustreefile(filename)
+treefile = phylotreelib.Nexustreefile(filename)
 ```
 
 ### Constructing tree objects
@@ -74,7 +74,7 @@ tree = next(treefile)
 
 A tree object can also be constructed directly from a string (where the string is a Newick formatted tree):
 ```
-tree = treelib.Tree.from_string(mystring)
+tree = phylotreelib.Tree.from_string(mystring)
 ```
 
 Tree objects consist of external nodes (leafs), which are identified by strings
@@ -223,8 +223,8 @@ List of  useful Tree object attributes:
 ### Methods for analyzing and altering tree objects.
 
 Tree objects also have a number of methods that can be used to analyze and alter them. In
-addition to what's mentioned below, treelib also contains additional methods, but
-these are mostly for internal use in treelib (not for application programming),
+addition to what's mentioned below, phylotreelib also contains additional methods, but
+these are mostly for internal use in phylotreelib (not for application programming),
 and are subject to change if I come up with better implementations.
 
 One example of using a tree object method is:
@@ -235,11 +235,11 @@ childnodes = tree.children(7)
 
 which returns a set containing the node-IDs for the immediate descendants of node 7 (the nodes directly connected to node 7).
 
-A full list of classes and methods in treelib is at the end of this README
+A full list of classes and methods in phylotreelib is at the end of this README
 
 ### Exceptions.
 
-Treelib has its own error class ("TreeError"), which may be handy for catching
+phylotreelib has its own error class ("TreeError"), which may be handy for catching
 tree-related errors in your own program and dealing with it intelligently:
 
 Example usage:
@@ -247,7 +247,7 @@ Example usage:
 ```
 try:
     tree.rootout(outgroup)
-except treelib.TreeError as err:
+except phylotreelib.TreeError as err:
 	print("This error occurred: {}".format(err) )
 ```
 
