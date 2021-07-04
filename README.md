@@ -3,20 +3,15 @@
 Using classes and methods in phylotreelib.py it is possible to read treefiles in either
 NEXUS or Newick format, and to analyze and manipulate the trees in various ways.
 
-![Phylogenetic tree](images/tree_parts.png?raw=true "Title")
+![Phylogenetic tree](phylogenetictree.png?raw=true "Title")
 
 ## Availability
 
-The phylotreelib.py module is available on GitHub: https://github.com/agormp/phylotreelib
+The phylotreelib.py module is available on GitHub: https://github.com/agormp/phylotreelib and on PyPI: https://pypi.org/project/phylotreelib/
 
 ## Installation
 
-* Place `phylotreelib.py` in a directory on your computer (for instance /Users/bob/Documents/pythonmodules/)
-* Add this directory to the `PYTHONPATH` environment variable
-* The phylotreelib.py module can now be imported in python scripts using:
-```
-import phylotreelib
-```
+* pip3 install phylotreelib
 
 ## Quick start example
 
@@ -24,8 +19,8 @@ Here is a script that will import phylotreelib, read a NEXUS file, perform minim
 and finally print out the root-to-tip distance (measured along the branches) for all tips in the tree:
 
 ```python
-import phylotreelib
-treefile = phylotreelib.Nexustreefile("mytreefile.nexus")
+import phylotreelib as pt
+treefile = pt.Nexustreefile("mytreefile.nexus")
 mytree = next(treefile)
 mytree.rootminvar()
 rootnode = mytree.root
