@@ -2,5 +2,5 @@
 __pycache__
 notebook_treelib.ipynb
 .ipynb_checkpoints/
-test_treelib.py
+tests/test_treelib.py
 treelib_manual.txt
