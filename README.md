@@ -11,7 +11,9 @@ The phylotreelib.py module is available on GitHub: https://github.com/agormp/phy
 
 ## Installation
 
-* pip3 install phylotreelib
+```
+pip3 install phylotreelib
+```
 
 ## Quick start example
 
