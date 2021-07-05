@@ -4,3 +4,6 @@ notebook_treelib.ipynb
 .ipynb_checkpoints/
 tests/test_treelib.py
 treelib_manual.txt
+build/
+dist/
+phylotreelib.egg-info/
