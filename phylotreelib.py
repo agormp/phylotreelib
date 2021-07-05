@@ -352,8 +352,7 @@ class Tree():
         obj = cls()
 
         # Extract set of leaves
-        tmpbip = list(biplist.keys())[0]    # This is a set of two leaf name sets (a bipartition)
-        part1, part2 = tmpbip               # Get two sets
+        part1, part2 = next(iter(biplist.keys()))   # First key=set of two leaf name sets
         obj.leaves = part1 | part2          # Concatenate them to get all leafnames
         obj.intnodes = {0}                  # Will be built as we go along
         obj.root = 0                        # Root is node zero at start
@@ -375,25 +374,25 @@ class Tree():
             obj.tree[0][leaf]= Branchstruct()
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
-        for (bipart, branchstruct) in biplist.items():
-            bip1, bip2 = bipart
-            # If this bipartition represents external branch, then update relevant Branchstruct
+        for (bip1, bip2), branchstruct in biplist.items():
+
+            # If bipartition represents external branch: update relevant Branchstruct
             if len(bip1) == 1 or len(bip2) == 1:
                 if len(bip1) == 1:
-                    (leaf, ) = bip1             # A one-member tuple used for value unpacking (pop)
+                    (leaf, ) = bip1      # A one-member tuple used for value unpacking (pop)
                 else:
                     (leaf, ) = bip2
 
                 # Find parent, update branchstruct
-                for parent in obj.tree:
-                    if leaf in obj.tree[parent]:
+                for parent, childdict in obj.tree.items():
+                    if leaf in childdict:
                         obj.tree[parent][leaf] = branchstruct
                         break
 
             # If bipartition represents internal branch: add branch to tree, transfer Branchstruct
             else:
-                mrca1 = obj.findMRCA(bip1)
-                mrca2 = obj.findMRCA(bip2)
+                mrca1 = obj.find_mrca(bip1)
+                mrca2 = obj.find_mrca(bip2)
 
                 # Determine which group of leaves to move
                 # Note: one part of bipartition will necessarily have root as its MRCA
@@ -490,7 +489,7 @@ class Tree():
 
         # Basal branch struct may contain useful information: e.g., label and length below subtree
         # Single node trees consisting of leaves are also considered subtrees (REMOVE????)
-        class Subtree_iterator():
+        class SubtreeIterator():
             def __init__(self, fulltree):
                 self.basenodes = fulltree.sorted_intnodes()
                 self.basenodes.extend(fulltree.leaflist())
@@ -510,7 +509,7 @@ class Tree():
                 subtree.basalbranch = basalbranch
                 return subtree
 
-        return Subtree_iterator(self)
+        return SubtreeIterator(self)
 
     #######################################################################################
 
@@ -533,12 +532,12 @@ class Tree():
                 label = self.tree[node][kid].label
                 table.append([nodstr, kidstr, dist, label])
 
-        # Find widest string in each column (formatting of table could go into utils module...)
+        # Find widest string in each column
         maxwidth = [0]*4
-        for i in range(len(table)):
-            for j in range(4):
-                if len(table[i][j]) > maxwidth[j]:
-                    maxwidth[j] = len(table[i][j])
+        for row in table:
+            for i, word in enumerate(row):
+                if len(word) > maxwidth[i]:
+                    maxwidth[i] = len(word)
 
         totwidth = maxwidth[0]+maxwidth[1]+maxwidth[2]+maxwidth[3] + 19     # Flanking space
 
@@ -717,9 +716,9 @@ class Tree():
     def leaflist(self):
         """Returns list of leaf names sorted alphabetically"""
 
-        l = list(self.leaves)
-        l.sort()
-        return l
+        leafnamelist = list(self.leaves)
+        leafnamelist.sort()
+        return leafnamelist
 
     #####################################################################################
 
@@ -730,9 +729,9 @@ class Tree():
 
         try:
             return set(self.tree[parent].keys())
-        except KeyError as e:
+        except KeyError as err:
             msg = "Node %s is not an internal node" % parent
-            raise TreeError(msg) from e
+            raise TreeError(msg) from err
 
     #######################################################################################
 
@@ -776,8 +775,8 @@ class Tree():
         # Return parent
         try:
             return self.parent_dict[node]
-        except KeyError as e:
-            raise TreeError("Node {} does not exist".format(node)) from e
+        except KeyError as err:
+            raise TreeError("Node {} does not exist".format(node)) from err
 
     #######################################################################################
 
@@ -794,7 +793,7 @@ class Tree():
 
     #######################################################################################
 
-    def nearestNleaves(self, leaf1, N):
+    def nearest_n_leaves(self, leaf1, n_neighbors):
         """Returns set of N leaves closest to leaf along tree (patristic distance)"""
 
         # Python note: numpy.argsort may be faster, but difficult to include ties (n)
@@ -804,7 +803,7 @@ class Tree():
         distlist = self.nodedistlist(leaf1, leaflist)
         dist_leaf_list = list(zip(distlist, leaflist))          # List of (dist, leaf2) tuples
         dist_leaf_list.sort()                                   # Sort on distance (first item in tuple)
-        maxdist = dist_leaf_list[N-1][0]                        # Maximum distance to include
+        maxdist = dist_leaf_list[n_neighbors - 1][0]                        # Maximum distance to include
         nearest_leaves = set()
         for dist, leaf in dist_leaf_list:                       # Add all leaves with <= maxdist to set (may be more than N)
             if dist <= maxdist:
@@ -816,7 +815,7 @@ class Tree():
 
     #######################################################################################
 
-    def findMRCA(self, leafset):
+    def find_mrca(self, leafset):
         """Finds Most Recent Common Ancestor for the provided set of leaves"""
 
         if not leafset <= self.leaves:
@@ -867,14 +866,14 @@ class Tree():
 
         #  Cluster has more than two members: Find two most distant leafs in leaflist (leaves "spreading out" subtree)
         # and then find the leaf that has approximately the same distance to these two (interpreted as being in a sense halfway between them...)
-        basenode = self.findMRCA(set(leaflist))
+        basenode = self.find_mrca(set(leaflist))
         sub = self.subtree(basenode)
-        (d, L1, L2) = sub.diameter(return_leaves=True)
+        (dist, leaf1, leaf2) = sub.diameter(return_leaves=True)
 
-        # Find leaf having the smallest difference between its distance from L1 and L2 (leaf "halfway" between L1 and L2)
-        smallest_diff = d       # Pick value certain to be larger than all dist differences
+        # Find leaf having the smallest difference between its distance from leaf1 and leaf2 (leaf "halfway" between leaf1 and leaf2)
+        smallest_diff = dist       # Pick value certain to be larger than all dist differences
         for leaf in leaflist:
-            diff = abs(sub.nodedist(leaf, L1) - sub.nodedist(leaf, L2))
+            diff = abs(sub.nodedist(leaf, leaf1) - sub.nodedist(leaf, leaf2))
             if diff < smallest_diff:
                 central_leaf = leaf
                 smallest_diff = diff
@@ -1059,8 +1058,8 @@ class Tree():
                 n = self.path_dict[n][node2]
                 path.append(n)
             return path
-        except AttributeError as e:
-            raise TreeError("The path dictionary has not been constructed. Cannot use nodepath_fromdict") from e
+        except AttributeError as err:
+            raise TreeError("The path dictionary has not been constructed. Cannot use nodepath_fromdict") from err
 
     #######################################################################################
 
@@ -1131,33 +1130,33 @@ class Tree():
     def diameter(self, return_leaves=False):
         """Return diameter: longest leaf-leaf distance along tree. If return_leaves is True: Return tuple with (maxdist, Leaf1, Leaf2)"""
         # Find the two leaves having the largest pairwise distance. Neat, 2-step algorithm:
-        # (1) Pick random leaf, L1, find longest path to other leaf, L2
-        # (2) Starting at L2, find longest path, this is longest path in tree! (It's true...)
+        # (1) Pick random leaf, leaf1, find longest path to other leaf, leaf2
+        # (2) Starting at leaf2, find longest path, this is longest path in tree! (It's true...)
 
         # Local copy for faster lookup (necessary?)
         nodedist = self.nodedist
 
-        # Step 1: pick random leaf (L1) and find longest path to other leaf (L2)
-        L1 = next(iter(self.leaves))       # Get random leaf from set without popping it (this is ugly in python...)
+        # Step 1: pick random leaf (leaf1) and find longest path to other leaf (leaf2)
+        leaf1 = next(iter(self.leaves))       # Get random leaf from set without popping it (this is ugly in python...)
         maxdist = 0.0
         for node2 in self.leaves:
-            dist = nodedist(L1, node2)
+            dist = nodedist(leaf1, node2)
             if dist > maxdist:
                 maxdist = dist
-                L2 = node2
+                leaf2 = node2
 
-        # Step 2: Find longest path starting at L2, this is longest path in tree
+        # Step 2: Find longest path starting at leaf2, this is longest path in tree
         maxdist = 0.0
         for node2 in self.leaves:
-            dist = nodedist(L2, node2)
+            dist = nodedist(leaf2, node2)
             if dist > maxdist:
                 maxdist = dist
-                L3 = node2
+                leaf3 = node2
 
         # Return requested result
         # Python note: Bad idea to have varying return values. Decide on output and deal with it at other end
         if return_leaves:
-            return (maxdist, L2, L3)
+            return (maxdist, leaf2, leaf3)
         else:
             return maxdist
 
@@ -1198,7 +1197,7 @@ class Tree():
         """Return average distance from leaves to their MRCA, measured along tree. Median can be requested"""
         # Python note: better to return list of pair distances, which can then be averaged etc.
 
-        ancnode = self.findMRCA(set(leaflist))
+        ancnode = self.find_mrca(set(leaflist))
         distlist = []
         for leaf in leaflist:
             distlist.append(self.nodedist(leaf, ancnode))
@@ -1742,11 +1741,11 @@ class Tree():
 
         # Find nodeheights and number of emanating branches for all internal nodes
         nodeheightlist = []
-        for parent in self.tree:
+        for parent, kid_dict in self.tree.items():
             pheight = self.nodedist(parent)
-            nkids = len(self.tree[parent])
+            nkids = len(kid_dict)
             nodeheightlist.append((pheight, nkids))
-            for kid in self.tree[parent]:
+            for kid in kid_dict:
                 kheight = self.nodedist(kid)
                 self.tree[parent][kid].parent_height = pheight
                 self.tree[parent][kid].kid_height = kheight
@@ -1768,8 +1767,8 @@ class Tree():
         clusterlist = []                # list of sets of leaves (each set is one cluster)
         cluster_basenodes = []          # List of basenodes of clusters
         cluster_leaves = set()          # set containing all leaves that are put in clusters
-        for parent in self.tree:
-            for kid in self.tree[parent]:
+        for parent, kid_dict in self.tree.items():
+            for kid in kid_dict:
                 if self.tree[parent][kid].parent_height <= cutoff < self.tree[parent][kid].kid_height:
                     cluster = self.remote_children(kid)
                     clusterlist.append(cluster)
@@ -1866,8 +1865,8 @@ class Tree():
             raise TreeError("Bipartition is not compatible with tree: %s" % bipart)
 
         part1, part2 = bipart
-        mrca1 = self.findMRCA(part1)
-        mrca2 = self.findMRCA(part2)
+        mrca1 = self.find_mrca(part1)
+        mrca2 = self.find_mrca(part2)
 
         # Determine where to insert new node
         # In the special case of a star tree: add two new nodes, moving each half of bipartition
@@ -1965,6 +1964,8 @@ class Tree():
     ########################################################################################
 
     def remove_leaves(self, leaflist):
+        """Removes leaves in list from tree, cleans up so remaining tree structure is sane"""
+
         for leaf in leaflist:
             self.remove_leaf(leaf)
 
@@ -2041,7 +2042,7 @@ class Tree():
             self.rename_leaf(oldname, newname)
         else:
             # Find average distance from parent of basenode to leaves (median - use mean instead?)
-            mrca = self.findMRCA(leaflist)
+            mrca = self.find_mrca(leaflist)
             mrca_parent = self.parent(mrca)
             avdist = self.average_ancdist(leaflist, return_median=True) + self.nodedist(mrca, mrca_parent)
 
@@ -2084,14 +2085,14 @@ class Tree():
 
     #######################################################################################
 
-    def numberprune(self, nkeep, keeplist=None, keep_common_leaves=False, keep_most_distant=False, return_leaves=False, enforceN = False):
+    def numberprune(self, nkeep, keeplist=None, keep_common_leaves=False, keep_most_distant=False, return_leaves=False, enforce_n = False):
         """Prune tree so 'nkeep' leaves remain. Leaves are chosen to be approximately evenly spaced over tree.
         "keeplist" can be used to specify leaves that _must_ be retained.
         'keep_common_leaves' requests preferential retainment of leaves with many neighbors
         (default is to keep leaves that are as equally spaced as possible)
         'keep_most_distant' requests that the two most distant leaves in tree (which spread out the diameter) should be kept
         'return_leaves': return selected leaves, but do not actually prune tree
-        'enforceN' enforce exactly N leaves in pruned tree (normally leaves in includelist and most distant are additional to N)"""
+        'enforce_n' enforce exactly N leaves in pruned tree (normally leaves in includelist and most distant are additional to N)"""
 
         keepset = set()
         if keeplist:
@@ -2099,32 +2100,34 @@ class Tree():
 
         # If requested: Find and retain two most distant leaves in tree
         if keep_most_distant:
-            (_, L1, L2) = self.diameter(return_leaves=True)
-            keepset.update((L1, L2))
+            (_, leaf1, leaf2) = self.diameter(return_leaves=True)
+            keepset.update((leaf1, leaf2))
 
-        # If enforceN has not been requested: Find N clusters in addition to possible members of keeplist or the two most distant leaves
-        if not enforceN:
+        # If enforce_n has not been requested: Find N clusters in addition to possible members of keeplist or the two most distant leaves
+        if not enforce_n:
             clusters = self.cluster_n(nclust=nkeep)[0]          # "clusters" is a list containing sets of leafnames
 
-        # If enforceN: Iteratively find N, N-1, ... clusters until total retained number of leaves (including those in keeplist etc) is == N
+        # If enforce_n: Iteratively find N, N-1, ... clusters until total retained number of leaves
+        # (including those in keeplist etc) is == N
         else:
-            N = nkeep
-            foundN = False
-            while not foundN:
-                clusters = self.cluster_n(nclust=N)[0]
+            n_clusters = nkeep
+            found_n = False
+            while not found_n:
+                clusters = self.cluster_n(n_clusters)[0]
                 coveredclusters = []
                 for cluster in clusters:
                     intersection = cluster & keepset
                     if intersection:
                         coveredclusters.append(cluster)
-                Nretained = len(keepset) - len(coveredclusters) + len(clusters)
-                if Nretained == nkeep:
-                    foundN = True
+                n_retained = len(keepset) - len(coveredclusters) + len(clusters)
+                if n_retained == nkeep:
+                    found_n = True
                 else:
-                    N -= 1
+                    n_clusters -= 1
 
-            # We have now identified:   (1) The value of N that will result in the requested number of retained leaves
-            #                           (2) The clusters in which members of keepset are located. Remove these clusters before proceeding
+            # We have now identified:
+            #    (1) The value of N that will result in the requested number of retained leaves
+            #    (2) The clusters in which members of keepset are located. Remove these clusters before proceeding
             for cluster in coveredclusters:
                 clusters.remove(cluster)
 
@@ -2180,14 +2183,14 @@ class Tree():
                 for leaf in remote_children(child):
                     if nodedist(parent,leaf) > maxdist:
                         maxdist = nodedist(parent,leaf)
-                        n1, n2, keepleaf = parent, child, leaf
+                        node1, node2, keepleaf = parent, child, leaf
 
             # Add the found leaf to list of leaves. Remove the basal branch that was used from possible starting branches
             keep_leaves.add( keepleaf )
-            possible_branches = possible_branches - { (n1, n2) }
+            possible_branches = possible_branches - { (node1, node2) }
 
             # Update possible_branches and used branches based on newly added path
-            newpath = nodepath( n1, keepleaf )
+            newpath = nodepath( node1, keepleaf )
             for i in range( len(newpath) - 1 ):
                 parent, child1 = newpath[i], newpath[i+1]
                 used_branches.add( ( parent, child1 ) )
@@ -2482,11 +2485,11 @@ class Tree():
             raise TreeError("All branch lengths are zero - midpoint rooting not possible")
 
         # Find the two leaves having the largest pairwise distance.
-        (maxdist, L1, L2) = self.diameter(return_leaves = True)
+        (maxdist, leaf1, leaf2) = self.diameter(return_leaves = True)
         midway = maxdist/2.0
 
-        # Get path between L1 and L2
-        path = self.nodepath(L1, L2)
+        # Get path between leaf1 and leaf2
+        path = self.nodepath(leaf1, leaf2)
 
         # Find the branch that contains the midpoint of the tree:
         # Work backwards through path, stop when cumulated branch length exceeds midway
@@ -2540,7 +2543,7 @@ class Tree():
         minpardist = 0.0
 
         # Iterate over branches in tree, compute minimum variance point, and update overall minimum if relevant
-        # Names of intermediate variables set to match those in Mai paper
+        # Names of intermediate variables have been set to match those in Mai paper
         for u,parent in enumerate(intnodes):
             for child in self.children(parent):
                 v = nodes.index(child)
@@ -2611,7 +2614,7 @@ class Tree():
 
         # Find pair of internal nodes corresponding to ingroup:outgroup bipartition
         if type(outgroup) is str:       # if just a single name is given: protect string from iteration to single letters
-            outgroup = [outgroup]
+            outgroup = [outgroup]       # Python note: dont allow function to have different types in one argument!!!
         outgroup = frozenset(outgroup)
         ingroup = self.leaves - outgroup
         outbase = self.findbasenode(outgroup)
@@ -2693,7 +2696,7 @@ class Tree():
 #############################################################################################
 #############################################################################################
 
-class Tree_set():
+class TreeSet():
     """Class for storing and manipulating a number of trees"""
 
     def __init__(self):
@@ -2702,9 +2705,9 @@ class Tree_set():
     ########################################################################################
 
     def __getitem__(self, index):
-        """Implements indexing of treeset. Simple index returns single tree. Slice returns Tree_set object with selected subset of trees"""
+        """Implements indexing of treeset. Simple index returns single tree. Slice returns TreeSet object with selected subset of trees"""
         if isinstance(index, slice):
-            newtreeset = Tree_set()
+            newtreeset = TreeSet()
             newtreeset.treelist = self.treelist[index]
             return newtreeset
         else:
@@ -2724,14 +2727,14 @@ class Tree_set():
     ########################################################################################
 
     def addtreeset(self, treeset):
-        """Adds all trees in Tree_set object to this Tree_set object"""
+        """Adds all trees in TreeSet object to this TreeSet object"""
         for tree in treeset:
             self.addtree(tree)
 
     ########################################################################################
 
     def rootmid(self):
-        """Performs midpoint rooting on all trees in Tree_set"""
+        """Performs midpoint rooting on all trees in TreeSet"""
         for tree in self.treelist:
             tree.rootmid()
 
@@ -2895,7 +2898,7 @@ class SmallTreeSummary():
         """Return raw summary of all observed bipartitions"""
 
         # Results are stored in the dictionary built in add_tree. Keys are bipartitions,
-        # values are structs (classes) that contain a number of intermediate values.
+        # values are Branchstructs (classes) that contain a number of intermediate values.
         # Here I use these values to compute and add the fields "freq" (bipartition frequency),
         # and "sem" (standard error of the mean). "mean" (mean branch length) is already present
         # NOTE: I don't actually check if branch lengths are present. If not then mean=0 and sem=0
@@ -2904,8 +2907,8 @@ class SmallTreeSummary():
             raise TreeError(msg)
 
         # Compute (1) branch freq, (2) standard error of the mean of branch length.
-        for bipart in self.bipartsummary:
-            self.bipartsummary[bipart].freq = self.bipartsummary[bipart].SUMW/self.tree_weight_sum
+        for bipart, branchstruct in self.bipartsummary.items():
+            branchstruct.freq = branchstruct.SUMW/self.tree_weight_sum
 
             # If "include_zeroterms" is set, then branch length is considered to be zero in those trees
             # where the bipartition is absent, and these terms are included in the computation
@@ -2914,33 +2917,33 @@ class SmallTreeSummary():
                 n = self.tree_count
                 sumw = self.tree_weight_sum
                 # Correct the already computed mean, to account for missing zero terms
-                self.bipartsummary[bipart].mean = self.bipartsummary[bipart].mean*self.bipartsummary[bipart].SUMW/sumw
+                branchstruct.mean = branchstruct.mean*branchstruct.SUMW/sumw
             else:
-                n = self.bipartsummary[bipart].bip_count
-                sumw = self.bipartsummary[bipart].SUMW
-            T = self.bipartsummary[bipart].T
+                n = branchstruct.bip_count
+                sumw = branchstruct.SUMW
+            T = branchstruct.T
 
             # The variance (and standard error of the mean) is only defined if n>1.
             # If n==1 var and sem are arbitrarily set to 999999
             if n>1:
                 variance = T*n/((n-1)*sumw)         # Weighted variance (ordinary variance if all w=1)
-                self.bipartsummary[bipart].var = variance
-                self.bipartsummary[bipart].sem = math.sqrt(variance)/math.sqrt(n)    # Standard error of the mean
+                branchstruct.var = variance
+                branchstruct.sem = math.sqrt(variance)/math.sqrt(n)    # Standard error of the mean
             else:
-                self.bipartsummary[bipart].var = 999999
-                self.bipartsummary[bipart].sem = 999999
+                branchstruct.var = 999999
+                branchstruct.sem = 999999
 
             # Save bipartition to cache if its frequency is>cache_minimum
             # This cache is the basis for constructing consensus trees, and it is therefore assumed
             # that an allcompat tree can be fully resolved using only bipartitions in this cache.
             # If cache_minimum is 0.01 then this is probably almost always true, but I don't know!!!!
             # Only relevant fields are saved
-            if self.bipartsummary[bipart].freq > self.cache_minimum:
+            if branchstruct.freq > self.cache_minimum:
                 self.bipart_cache[bipart]=Branchstruct()
-                self.bipart_cache[bipart].mean = self.bipartsummary[bipart].mean
-                self.bipart_cache[bipart].var = self.bipartsummary[bipart].var
-                self.bipart_cache[bipart].sem = self.bipartsummary[bipart].sem
-                self.bipart_cache[bipart].freq = self.bipartsummary[bipart].freq
+                self.bipart_cache[bipart].mean = branchstruct.mean
+                self.bipart_cache[bipart].var = branchstruct.var
+                self.bipart_cache[bipart].sem = branchstruct.sem
+                self.bipart_cache[bipart].freq = branchstruct.freq
 
         # Set flag indicating that bipartsummary has been processed
         # (meaning that freq+var has been computed, and that bipart_cache has been constructed)
@@ -3000,9 +3003,7 @@ class SmallTreeSummary():
         leaflist = sorted(self.leaves)
 
         position_dict = {}
-        for i in range(len(leaflist)):
-            leaf = leaflist[i]
-            position = i
+        for position, leaf in enumerate(leaflist):
             position_dict[leaf] = position
 
         # Loop over all bipartitions in raw_result, build formatted result list in process
@@ -3251,7 +3252,8 @@ class Treefile():
         if ";" not in self.buffer:           # Only read on if end of treestring not reached
             for line in self.treefile:
                 stringlist.append(line)
-                if ";" in line: break
+                if ";" in line:
+                    break
 
         treestring = "".join(stringlist)
 
@@ -3269,12 +3271,12 @@ class Treefile():
     ########################################################################################
 
     def read_trees(self, discardprop=0.0):
-        """Reads trees from file and returns as Tree_set object. Can discard fraction of trees"""
+        """Reads trees from file and returns as TreeSet object. Can discard fraction of trees"""
 
         # Avoid erroneous error message when running pylint ("self" is OK for iteration)
         # pylint: disable=not-an-iterable
 
-        treeset = Tree_set()
+        treeset = TreeSet()
         for tree in self:
             treeset.addtree(tree)
         if discardprop > 0:
@@ -3353,7 +3355,8 @@ class Nexustreefile(Treefile):
             if line.count("[") > line.count("]"):
                 for extraline in self.treefile:
                     line += extraline
-                    if line.count("[") == line.count("]"): break
+                    if line.count("[") == line.count("]"):
+                        break
 
             # Now we should have an equal number of "[" and "]"
             # Remove comments
@@ -3479,7 +3482,7 @@ class Nexustreefile(Treefile):
 ########################################################################################
 ########################################################################################
 
-class Dist_tree():
+class DistTree():
     """Class for constructing trees using distance based methods"""
 
     # Can be constructed from either alignment or distance matrix, so class has two
