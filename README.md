@@ -3,7 +3,7 @@
 Using classes and methods in phylotreelib.py it is possible to read treefiles in either
 NEXUS or Newick format, and to analyze and manipulate the trees in various ways.
 
-![](https://github.com/agormp/phylotreelib/blob/master/phylogenetictree.png?raw=true)
+![](https://github.com/agormp/phylotreelib/raw/master/phylogenetictree.png?raw=true)
 
 ## Availability
 
