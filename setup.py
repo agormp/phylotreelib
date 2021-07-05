@@ -10,7 +10,7 @@ README = (HERE / "README.md").read_text()
 # This call to setup() does all the work
 setup(
     name="phylotreelib",
-    version="1.3.0",
+    version="1.3.1",
     description="Analyze and manipulate phylogenetic trees",
     long_description=README,
     long_description_content_type="text/markdown",
