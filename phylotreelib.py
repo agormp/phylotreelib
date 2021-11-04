@@ -1576,7 +1576,7 @@ class Tree():
             parent = node2
             child = node1
         else:
-            msg = "There is no branch connecting node %s and %s" % (node1, node2)
+            msg = "There is no branch connecting node {} and {}".format(node1, node2)
             raise TreeError(msg)
 
         self.tree[parent][child].length = length
