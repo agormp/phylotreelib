@@ -3700,16 +3700,16 @@ class DistTree():
 
         # Construct copy of distmatrix:
         # this will be altered during run. Original will remain unchanged so more trees can be made
-        distmatcopy = copy.deepcopy(self.distmat)
+        # distmatcopy = copy.deepcopy(self.distmat)
 
         # Main loop:
         # continue merging nearest nodes, on tree and in distmat, until only two nodes left
-        while len(distmatcopy) > 1:
-            (dist, (node1, node2)) = distmatcopy.nearest()
+        while len(self.distmat) > 1:
+            (dist, (node1, node2)) = self.distmat.nearest()
 
             # insert new node below two nodes to be merged
             # unless only two nodes remain (in which case: use root node)
-            if len(distmatcopy) == 2:
+            if len(self.distmat) == 2:
                 mergenode = rootnode
             else:
                 mergenode = upgmatree.insert_node(rootnode, [node1, node2])
@@ -3719,7 +3719,7 @@ class DistTree():
             dist2 = depth[mergenode] - depth[node2]
             upgmatree.setlength(mergenode, node1, dist1)
             upgmatree.setlength(mergenode, node2, dist2)
-            distmatcopy.merge_nodes(node1, node2, mergenode)
+            self.distmat.merge_nodes(node1, node2, mergenode)
 
         return upgmatree
 
