@@ -3564,6 +3564,276 @@ class Nexustreefile(Treefile):
 ###################################################################################################
 ###################################################################################################
 
+class Distmatrix(object):
+    """Class representing distance matrix for set of taxa. Methods for computing trees from matrix"""
+
+    def __init__(self, distmat=None):
+        self.dmat = {}              # Keys: frozenset({name1,name2}), Values: dist
+        self.names = set()
+        self.clusterdict = {}
+
+    ###############################################################################################
+
+    @classmethod
+    def from_alignment(cls, alignment, dist="pdist"):
+        """Construct Distmatrix object from alignment object"""
+
+        # Decide which method to use for computing distance
+        # Maybe dict of functions? (But then have to construct each time so maybe not...)
+        if dist == "hamming":
+            distmethod = seqlib.Sequence.hamming
+        elif dist == "pdist":
+            distmethod = seqlib.Sequence.pdist
+        elif dist == "hamming_ignoregaps":
+            distmethod = seqlib.Sequence.hamming_ignoregaps
+        elif dist == "pdist_ignoregaps":
+            distmethod = seqlib.Sequence.pdist_ignoregaps
+        else:
+            raise SeqError("Unknown distance measure: %s" % dist)
+
+        self = cls()
+
+        # Compute dists, construct distance matrix
+        for s1, s2 in itertools.combinations(self, 2):
+            dist = distmethod(s1,s2)
+            self.setdist(s1.name, s2.name, dist)
+
+        return self
+
+    #######################################################################################
+
+    @classmethod
+    def from_phylip_stringlist(cls, dmat_list):
+        """Constructs Distmatrix object from list of strings corresponding to the lines of a PHYLIP square distance matrix"""
+
+        # Format should be similar to below:
+        # This is what you would get from readlines() on a PHYLIP distance matrix file
+        # Python note: I am assuming format is correct. Should probably test
+        # ['8    ',
+        #  'DRB3_0101  0.000 0.210 0.440 0.285 0.724 0.836 0.775 0.532',
+        #  'DRB3_0201  0.210 0.000 0.314 0.120 0.492 0.634 0.703 0.325',
+        #  'DRB3_0301  0.440 0.314 0.000 0.206 0.517 0.566 0.649 0.614',
+        #  'DRB3_03021 0.285 0.120 0.206 0.000 0.486 0.612 0.613 0.334',
+        #  'DRB3_0501  0.724 0.492 0.517 0.486 0.000 0.106 0.717 0.546',
+        #  'DRB3_0504  0.836 0.634 0.566 0.612 0.106 0.000 0.740 0.686',
+        #  'DRB3_0701  0.775 0.703 0.649 0.613 0.717 0.740 0.000 0.582',
+        #  'DRB3_0801  0.532 0.325 0.614 0.334 0.546 0.686 0.582 0.000']
+
+        self = cls()
+
+        # Construct list of names, and 2D list of values
+        names = []
+        values = []
+        for line in dmat_list[1:]:
+            words = line.split()
+            names.append(words[0])
+            values.append(words[1:])
+
+        for i,j in itertools.combinations(range(len(names)), 2):
+            self.setdist(names[i], names[j], float(values[i][j]))
+
+        return self
+
+    #######################################################################################
+
+    @classmethod
+    def from_distdict(cls, distdict):
+        """Construct Distmatrix object from dictionary of {(name1, name2):dist}"""
+
+        # Note: Should add more careful parsing and error checking at some point: check all pairs are accounted for!
+        # Note: key can be any immutable iterable with two names (frozenset, tuple)
+        self = cls()
+        for ((name1, name2), dist) in distdict.items():
+            self.setdist(name1, name2, dist)
+        return self
+
+    #######################################################################################
+
+    def __str__(self):
+        """Returns distance matrix as string"""
+
+        # Format of output like this:
+        ##        S5    s1  s2  s3  s4
+        ##        0.0   0.625   0.625   0.5 0.5
+        ##        0.625 0.0 0.25    0.75    0.75
+        ##        0.625 0.25    0.0 0.75    0.75
+        ##        0.5   0.75    0.75    0.0 0.25
+        ##        0.5   0.75    0.75    0.25    0.0
+        namelist = sorted(list(self.names))
+        tmplist = []
+
+        # Header line: all names in order, tab separated
+        for name in namelist:
+            tmplist.append(str(name))
+            tmplist.append("\t")
+        tmplist.pop()
+        tmplist.append("\n")
+
+        # Body of matrix. Same order as nameline
+        for name1 in namelist:
+            for name2 in namelist:
+                tmplist.append(str(self.getdist(name1,name2)))
+                tmplist.append("\t")
+            tmplist.pop()
+            tmplist.append("\n")
+
+        return "".join(tmplist)
+
+    #######################################################################################
+
+    def setdist(self, name1, name2, dist):
+        """Sets distance between taxa with names name1 and name2"""
+
+        self.dmat[frozenset({name1,name2})] = float(dist)
+        self.names.add(name1)
+        self.names.add(name2)
+
+    #######################################################################################
+
+    def getdist(self, name1, name2):
+        """Returns distance between taxa with names name1 and name2"""
+
+        # If value not in dictionary: return 0.0 (especially relevant for diagonal entries)
+        try:
+            return self.dmat[frozenset({name1,name2})]
+        except KeyError:
+            return 0.0
+
+    #######################################################################################
+
+    def nearest(self):
+        """Returns tuple of (dist, frozenset({name1,name2})) for the nearest names in distmatrix"""
+
+        name_pair = min(self.dmat, key=self.dmat.get)
+        dist = self.dmat[name_pair]
+        return (dist, name_pair)
+
+    ###############################################################################################
+
+    def nj(self):
+        """Computes neighbor joining tree, returns Tree object"""
+
+        # Construct star-tree. This will be resolved node by node during algorithm
+        njtree = Tree.from_leaves(self.names)
+        rootnode = njtree.root
+
+        # Local copy of leaflist for keeping track of (as yet) unclustered nodes
+        remaining_nodes = list(self.names)
+
+        # Compute "udists": summed dist to all other nodes
+        udist = dict.fromkeys(self.names, 0.0)  # Initialize dict: keys are leaves, vals are 0.0
+        for n1, n2 in itertools.combinations(self.names, 2):
+            dist = self.getdist(n1, n2)
+            udist[n1] += dist
+            udist[n2] += dist
+
+        # Avoid dot-notation to speed up execution
+        d = self.getdist
+        u = udist
+
+        # Main loop: continue merging nearest neighbors until only two nodes left
+        while len(remaining_nodes) > 2:
+
+            nnodes = len(remaining_nodes)
+            n_minus_2 = nnodes - 2            # Move computation out of loop to save time
+            smallest = None
+
+            # Find nearest neighbors according to nj-dist:
+            # njdist = (n-2) * d(n1, n2) - u(n1) - u(n2)
+            for i in range(nnodes):
+                n1 = remaining_nodes[i]
+                u1 = u[n1]                    # Move lookup out of loop to save time
+                for j in range(i+1, nnodes):
+                    n2 = remaining_nodes[j]
+                    njdist = n_minus_2 * d(n1, n2) - u1 - u[n2]
+
+                    # If "smallest" is not defined: set to current values
+                    # If "smallest" is defined and njdist < smallest: update values
+                    if (not smallest) or (njdist < smallest):
+                        smallest = njdist
+                        nb1, nb2 = n1, n2
+
+            # Connect two nearest nodes
+
+            # (1) Update tree, compute length of branches from new node to merged nodes
+            newnode = njtree.insert_node(rootnode, [nb1, nb2])
+            dist1 = 0.5 * d(nb1, nb2) + 0.5 * (u[nb1] - u[nb2]) / (nnodes - 2)
+            dist2 = 0.5 * d(nb1, nb2) + 0.5 * (u[nb2] - u[nb1]) / (nnodes - 2)
+            njtree.setlength(newnode, nb1, dist1)
+            njtree.setlength(newnode, nb2, dist2)
+
+            # (2) Update distance matrix and list of remaining nodes
+            # Python note: I am changing distance matrix here - should I use copy so I can re-use?
+            remaining_nodes.remove(nb1)
+            remaining_nodes.remove(nb2)
+            for node in remaining_nodes:
+                dist = 0.5 * (d(nb1, node) + d(nb2, node) - d(nb1, nb2))
+                self.setdist(newnode, node, dist)
+            remaining_nodes.append(newnode)
+
+            # (3) Update summed dists
+            # For each node compute change from previous value and alter accordingly
+            # Note: only nodes in "remaining_nodes" are considered, but "distmat" may contain more
+            udist[newnode] = 0.0
+            for node in remaining_nodes:
+
+                # Add current value to new entry for "new"
+                newdist = d(node, newnode)
+                udist[newnode] += newdist
+
+                # Update old entry for "node"
+                diff = newdist - d(node, nb1) - d(node, nb2)
+                udist[node] += diff
+
+        # After loop. Set length of branch conecting final two nodes
+        n1, n2 = remaining_nodes[0], remaining_nodes[1]
+        dist = d(n1, n2)
+        njtree.deroot()
+        njtree.setlength(n1, n2, dist)
+
+        return njtree
+
+    #######################################################################################
+
+    def merge_nodes(self, node1, node2, newnode=None):
+        """Merges the named nodes into one. Updates distmatrix so dists involving clusters are averaged over all component dists"""
+
+        # First time: initialize clusterdict so each seqname points to set containing itself (each seq is its own cluster)
+        if not self.clusterdict:
+            self.clusterdict = {name:{name} for name in self.names}
+
+        # Construct suitable name for new cluster if one was not provided
+        if not newnode:
+            newnode = "%s_%s" % (node1, node2)
+
+        # Add newnode to clusterdict, and set it to point to union of what node1 and node2 points to
+        # (NB: node1 and/or node2 may either be simple nodes, pointing to themselves, or merged nodes pointing to sets of nodes)
+        self.clusterdict[newnode] = self.clusterdict[node1] | self.clusterdict[node2]
+
+        # Update list of active names: remove node1 and node2, add newnode
+        self.names.add(newnode)
+        self.names.remove(node1)
+        self.names.remove(node2)
+
+        # For each node in distmat (except newnode itself): compute distance between node and newnode, add to distmat and sortedlist
+        # Distance is found by averaging distances between the sets of cluster components in node and newnode respectively
+        newnodeleafs = self.clusterdict[newnode]
+        for oldnode in self.names - {newnode}:
+            oldnodeleafs = self.clusterdict[oldnode]
+            sumdist = 0.0
+            for leaf1 in oldnodeleafs:
+                for leaf2 in newnodeleafs:
+                    sumdist += self.dmat[frozenset({leaf1, leaf2})]
+            avdist = sumdist / (len(oldnodeleafs) * len(newnodeleafs))
+            self.dmat[frozenset({newnode, oldnode})] = avdist
+            self.sorted.append((avdist, frozenset({newnode, oldnode})))
+        self.sorted.sort()
+
+
+
+###################################################################################################
+###################################################################################################
+
 class DistTree():
     """Class for constructing trees using distance based methods"""
 
