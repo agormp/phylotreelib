@@ -3565,7 +3565,7 @@ class Nexustreefile(Treefile):
 ###################################################################################################
 
 class Distmatrix(object):
-    """Class representing distance matrix for set of taxa. Methods for computing trees from matrix"""
+    """Class representing distance matrix for set of taxa. Knows hot to compute trees"""
 
     def __init__(self, distmat=None):
         self.dmat = {}              # Keys: frozenset({name1,name2}), Values: dist
@@ -3684,7 +3684,7 @@ class Distmatrix(object):
     def setdist(self, name1, name2, dist):
         """Sets distance between taxa with names name1 and name2"""
 
-        self.dmat[frozenset({name1,name2})] = float(dist)
+        self.dmat[frozenset({name1,name2})] = dist
         self.names.add(name1)
         self.names.add(name2)
 
