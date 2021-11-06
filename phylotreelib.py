@@ -3567,9 +3567,9 @@ class Nexustreefile(Treefile):
 class Distmatrix(object):
     """Class representing distance matrix for set of taxa. Knows hot to compute trees"""
 
-    def __init__(self, distmat=None):
-        self.dmat = {}              # Keys: frozenset({name1,name2}), Values: dist
-        self.names = set()
+    def __init__(self):
+        self.dmat = {}
+        self.names = []
         self.clusterdict = {}
 
     ###############################################################################################
@@ -3593,8 +3593,11 @@ class Distmatrix(object):
 
         self = cls()
 
-        # Compute dists, construct distance matrix
-        for s1, s2 in itertools.combinations(self, 2):
+        self.names = alignment.seqnamelist
+        self.initialize_dmat(self.names)
+
+        # Compute dists, add to distance matrix
+        for s1, s2 in itertools.combinations(alignment, 2):
             dist = distmethod(s1,s2)
             self.setdist(s1.name, s2.name, dist)
 
@@ -3622,16 +3625,18 @@ class Distmatrix(object):
         self = cls()
 
         # Construct list of names, and 2D list of values
-        names = []
+        namelist = []
         values = []
         for line in dmat_list[1:]:
             words = line.split()
-            names.append(words[0])
+            namelist.append(words[0])
             values.append(words[1:])
 
-        for i,j in itertools.combinations(range(len(names)), 2):
-            self.setdist(names[i], names[j], float(values[i][j]))
+        self.names = namelist
+        self.initialize_dmat(self.names)
 
+        for i,j in itertools.combinations(range(len(namelist)), 2):
+            self.setdist(namelist[i], namelist[j], float(values[i][j]))
         return self
 
     #######################################################################################
@@ -3643,6 +3648,14 @@ class Distmatrix(object):
         # Note: Should add more careful parsing and error checking at some point: check all pairs are accounted for!
         # Note: key can be any immutable iterable with two names (frozenset, tuple)
         self = cls()
+
+        names = set()
+        for (n1, n2) in distdict.keys():
+             names.add(n1)
+             names.add(n2)
+        self.names = list(names)
+        self.initialize_dmat(self.names)
+
         for ((name1, name2), dist) in distdict.items():
             self.setdist(name1, name2, dist)
         return self
@@ -3681,32 +3694,40 @@ class Distmatrix(object):
 
     #######################################################################################
 
+    def initialize_dmat(self, namelist):
+        """Sets up data structure for keeping distance info"""
+
+        self.dmat = {}
+        # for n1, n2 in itertools.combinations(namelist, 2):
+        #     dmat[(n1,n2)] = 0.0
+        #     dmat[(n2,n1)] = 0.0
+
+    #######################################################################################
+
     def setdist(self, name1, name2, dist):
         """Sets distance between taxa with names name1 and name2"""
 
-        self.dmat[frozenset({name1,name2})] = dist
-        self.names.add(name1)
-        self.names.add(name2)
+        self.dmat[(name1,name2)] = dist
+        self.dmat[(name2,name1)] = dist
 
     #######################################################################################
 
     def getdist(self, name1, name2):
         """Returns distance between taxa with names name1 and name2"""
 
-        # If value not in dictionary: return 0.0 (especially relevant for diagonal entries)
         try:
-            return self.dmat[frozenset({name1,name2})]
+            return self.dmat[(name1,name2)]
         except KeyError:
             return 0.0
 
     #######################################################################################
 
     def nearest(self):
-        """Returns tuple of (dist, frozenset({name1,name2})) for the nearest names in distmatrix"""
+        """Returns tuple of (name1, name2, dist) for the nearest names in distmatrix"""
 
-        name_pair = min(self.dmat, key=self.dmat.get)
-        dist = self.dmat[name_pair]
-        return (dist, name_pair)
+        n1,n2 = min(self.dmat, key=self.dmat.get)
+        dist = self.dmat[(n1,n2)]
+        return (n1, n2, dist)
 
     ###############################################################################################
 
