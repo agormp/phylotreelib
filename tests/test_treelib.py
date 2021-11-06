@@ -942,9 +942,8 @@ class dist_tree_construction(TreeTestBase):
         """Verify that nj method produces correct trees for list of distance matrices"""
         for i in range(len(self.treestringlist)):
             inputtree = pt.Tree.from_string(self.treestringlist[i])
-            dmat = seqlib.Distmatrix.from_distdict(self.dmatlist[i])
-            disttree = pt.DistTree.from_distmat(dmat)
-            njtree = disttree.nj()
+            dmat = pt.Distmatrix.from_distdict(self.dmatlist[i])
+            njtree = dmat.nj()
             # print("\n#####\n")
             # print(njtree)
             # print(inputtree)
