@@ -3697,10 +3697,8 @@ class Distmatrix(object):
     def initialize_dmat(self, namelist):
         """Sets up data structure for keeping distance info"""
 
-        self.dmat = {}
-        # for n1, n2 in itertools.combinations(namelist, 2):
-        #     dmat[(n1,n2)] = 0.0
-        #     dmat[(n2,n1)] = 0.0
+        for name in namelist:
+            self.dmat[(name,name)] = 0.0
 
     #######################################################################################
 
@@ -3715,10 +3713,7 @@ class Distmatrix(object):
     def getdist(self, name1, name2):
         """Returns distance between taxa with names name1 and name2"""
 
-        try:
-            return self.dmat[(name1,name2)]
-        except KeyError:
-            return 0.0
+        return self.dmat[(name1,name2)]
 
     #######################################################################################
 
