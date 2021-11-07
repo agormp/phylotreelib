@@ -3785,7 +3785,6 @@ class Distmatrix(object):
             for node in remaining_nodes:
                 dist = 0.5 * (d(nb1, node) + d(nb2, node) - d(nb1, nb2))
                 self.setdist(newnode, node, dist)
-            remaining_nodes.append(newnode)
 
             # (3) Update summed dists
             # For each node compute change from previous value and alter accordingly
@@ -3800,6 +3799,9 @@ class Distmatrix(object):
                 # Update old entry for "node"
                 diff = newdist - d(node, nb1) - d(node, nb2)
                 udist[node] += diff
+
+            # (4) Add new node to list of remaining nodes
+            remaining_nodes.append(newnode)
 
         # After loop. Set length of branch conecting final two nodes
         n1, n2 = remaining_nodes[0], remaining_nodes[1]
