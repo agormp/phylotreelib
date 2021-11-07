@@ -3599,7 +3599,8 @@ class Distmatrix(object):
         # Compute dists, add to distance matrix
         for s1, s2 in itertools.combinations(alignment, 2):
             dist = distmethod(s1,s2)
-            self.setdist(s1.name, s2.name, dist)
+            self.dmat[(s1.name, s2.name)] = dist
+            self.dmat[(s2.name, s1.name)] = dist
 
         return self
 
@@ -3636,7 +3637,9 @@ class Distmatrix(object):
         self.initialize_dmat(self.names)
 
         for i,j in itertools.combinations(range(len(namelist)), 2):
-            self.setdist(namelist[i], namelist[j], float(values[i][j]))
+            dist = float(values[i][j])
+            self.dmat[namelist[i], namelist[j]] = dist
+            self.dmat[namelist[j], namelist[i]] = dist
         return self
 
     #######################################################################################
@@ -3657,7 +3660,8 @@ class Distmatrix(object):
         self.initialize_dmat(self.names)
 
         for ((name1, name2), dist) in distdict.items():
-            self.setdist(name1, name2, dist)
+            self.dmat[name1, name2] = dist
+            self.dmat[name2, name1] = dist
         return self
 
     #######################################################################################
@@ -3702,21 +3706,6 @@ class Distmatrix(object):
 
     #######################################################################################
 
-    def setdist(self, name1, name2, dist):
-        """Sets distance between taxa with names name1 and name2"""
-
-        self.dmat[(name1,name2)] = dist
-        self.dmat[(name2,name1)] = dist
-
-    #######################################################################################
-
-    def getdist(self, name1, name2):
-        """Returns distance between taxa with names name1 and name2"""
-
-        return self.dmat[(name1,name2)]
-
-    #######################################################################################
-
     def nearest(self):
         """Returns tuple of (name1, name2, dist) for the nearest names in distmatrix"""
 
@@ -3736,15 +3725,17 @@ class Distmatrix(object):
         # Local copy of leaflist for keeping track of (as yet) unclustered nodes
         remaining_nodes = list(self.names)
 
+        # Set self.dmat attribute directly, not using function
+        # Avoid dot-notation to speed up execution
+        dmat = self.dmat
+
         # Compute "udists": summed dist to all other nodes
         udist = dict.fromkeys(self.names, 0.0)  # Initialize dict: keys are leaves, vals are 0.0
         for n1, n2 in itertools.combinations(self.names, 2):
-            dist = self.getdist(n1, n2)
+            dist = dmat[(n1, n2)]
             udist[n1] += dist
             udist[n2] += dist
 
-        # Avoid dot-notation to speed up execution
-        d = self.getdist
         u = udist
 
         # Main loop: continue merging nearest neighbors until only two nodes left
@@ -3761,7 +3752,7 @@ class Distmatrix(object):
                 u1 = u[n1]                    # Move lookup out of loop to save time
                 for j in range(i+1, nnodes):
                     n2 = remaining_nodes[j]
-                    njdist = n_minus_2 * d(n1, n2) - u1 - u[n2]
+                    njdist = n_minus_2 * dmat[(n1, n2)] - u1 - u[n2]
 
                     # If "smallest" is not defined: set to current values
                     # If "smallest" is defined and njdist < smallest: update values
@@ -3773,8 +3764,8 @@ class Distmatrix(object):
 
             # (1) Update tree, compute length of branches from new node to merged nodes
             newnode = njtree.insert_node(rootnode, [nb1, nb2])
-            dist1 = 0.5 * d(nb1, nb2) + 0.5 * (u[nb1] - u[nb2]) / (nnodes - 2)
-            dist2 = 0.5 * d(nb1, nb2) + 0.5 * (u[nb2] - u[nb1]) / (nnodes - 2)
+            dist1 = 0.5 * dmat[(nb1, nb2)] + 0.5 * (u[nb1] - u[nb2]) / (nnodes - 2)
+            dist2 = 0.5 * dmat[(nb1, nb2)] + 0.5 * (u[nb2] - u[nb1]) / (nnodes - 2)
             njtree.setlength(newnode, nb1, dist1)
             njtree.setlength(newnode, nb2, dist2)
 
@@ -3783,8 +3774,9 @@ class Distmatrix(object):
             remaining_nodes.remove(nb1)
             remaining_nodes.remove(nb2)
             for node in remaining_nodes:
-                dist = 0.5 * (d(nb1, node) + d(nb2, node) - d(nb1, nb2))
-                self.setdist(newnode, node, dist)
+                dist = 0.5 * (dmat[(nb1, node)] + dmat[(nb2, node)] - dmat[(nb1, nb2)])
+                self.dmat[newnode, node] = dist
+                self.dmat[node, newnode] = dist
 
             # (3) Update summed dists
             # For each node compute change from previous value and alter accordingly
@@ -3793,11 +3785,11 @@ class Distmatrix(object):
             for node in remaining_nodes:
 
                 # Add current value to new entry for "new"
-                newdist = d(node, newnode)
+                newdist = dmat[(node, newnode)]
                 udist[newnode] += newdist
 
                 # Update old entry for "node"
-                diff = newdist - d(node, nb1) - d(node, nb2)
+                diff = newdist - dmat[(node, nb1)] - dmat[(node, nb2)]
                 udist[node] += diff
 
             # (4) Add new node to list of remaining nodes
@@ -3805,7 +3797,7 @@ class Distmatrix(object):
 
         # After loop. Set length of branch conecting final two nodes
         n1, n2 = remaining_nodes[0], remaining_nodes[1]
-        dist = d(n1, n2)
+        dist = dmat[(n1, n2)]
         njtree.deroot()
         njtree.setlength(n1, n2, dist)
 
