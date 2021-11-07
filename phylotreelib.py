@@ -3713,10 +3713,7 @@ class Distmatrix(object):
     def getdist(self, name1, name2):
         """Returns distance between taxa with names name1 and name2"""
 
-        try:
-            return self.dmat[(name1,name2)]
-        except KeyError:
-            return 0.0
+        return self.dmat[(name1,name2)]
 
     #######################################################################################
 
