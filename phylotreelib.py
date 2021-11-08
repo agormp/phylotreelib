@@ -3755,9 +3755,14 @@ class Distmatrix(object):
 
                     # If "smallest" is not defined: set to current values
                     # If "smallest" is defined and njdist < smallest: update values
-                    if (not smallest) or (njdist < smallest):
+                    try:
+                        if njdist < smallest:
+                            smallest = njdist
+                            nb1, nb2 = n1, n2
+                    except TypeError:
                         smallest = njdist
                         nb1, nb2 = n1, n2
+
 
             # Connect two nearest nodes
 
