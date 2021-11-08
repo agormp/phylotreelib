@@ -3747,8 +3747,7 @@ class Distmatrix(object):
 
             # Find nearest neighbors according to nj-dist:
             # njdist = (n-2) * d(n1, n2) - u(n1) - u(n2)
-            for i in range(nnodes):
-                n1 = remaining_nodes[i]
+            for i,n1 in enumerate(remaining_nodes):
                 u1 = u[n1]                    # Move lookup out of loop to save time
                 for j in range(i+1, nnodes):
                     n2 = remaining_nodes[j]
@@ -3775,8 +3774,8 @@ class Distmatrix(object):
             remaining_nodes.remove(nb2)
             for node in remaining_nodes:
                 dist = 0.5 * (dmat[(nb1, node)] + dmat[(nb2, node)] - dmat[(nb1, nb2)])
-                self.dmat[newnode, node] = dist
-                self.dmat[node, newnode] = dist
+                self.dmat[(newnode, node)] = dist
+                self.dmat[(node, newnode)] = dist
 
             # (3) Update summed dists
             # For each node compute change from previous value and alter accordingly
