@@ -3568,9 +3568,11 @@ class Distmatrix(object):
     """Class representing distance matrix for set of taxa. Knows hot to compute trees"""
 
     def __init__(self):
-        self.dmat = {}
-        self.names = []
-        self.clusterdict = {}
+        self.dmat = None
+        self.namelist = None
+        self.n = None
+        self.name2index = None
+        self.index2name = None
 
     ###############################################################################################
 
@@ -3593,53 +3595,51 @@ class Distmatrix(object):
 
         self = cls()
 
-        self.names = alignment.seqnamelist
-        self.initialize_dmat(self.names)
+        self.namelist = alignment.seqnamelist
+        self.n = len(self.namelist)
+        self.name2index = dict(zip(self.namelist, range(self.n)))   # Do I need both?
+        self.index2name = dict(zip(range(self.n), self.namelist))
+        self.dmat = np.zeroes(nseq,nseq)
 
         # Compute dists, add to distance matrix
         for s1, s2 in itertools.combinations(alignment, 2):
             dist = distmethod(s1,s2)
-            self.dmat[(s1.name, s2.name)] = dist
-            self.dmat[(s2.name, s1.name)] = dist
+            self.setdist(s1.name, s2.name, dist)
 
         return self
 
     #######################################################################################
 
     @classmethod
-    def from_phylip_stringlist(cls, dmat_list):
-        """Constructs Distmatrix object from list of strings corresponding to the lines of a PHYLIP square distance matrix"""
-
-        # Format should be similar to below:
-        # This is what you would get from readlines() on a PHYLIP distance matrix file
-        # Python note: I am assuming format is correct. Should probably test
-        # ['8    ',
-        #  'DRB3_0101  0.000 0.210 0.440 0.285 0.724 0.836 0.775 0.532',
-        #  'DRB3_0201  0.210 0.000 0.314 0.120 0.492 0.634 0.703 0.325',
-        #  'DRB3_0301  0.440 0.314 0.000 0.206 0.517 0.566 0.649 0.614',
-        #  'DRB3_03021 0.285 0.120 0.206 0.000 0.486 0.612 0.613 0.334',
-        #  'DRB3_0501  0.724 0.492 0.517 0.486 0.000 0.106 0.717 0.546',
-        #  'DRB3_0504  0.836 0.634 0.566 0.612 0.106 0.000 0.740 0.686',
-        #  'DRB3_0701  0.775 0.703 0.649 0.613 0.717 0.740 0.000 0.582',
-        #  'DRB3_0801  0.532 0.325 0.614 0.334 0.546 0.686 0.582 0.000']
+    def from_phylip_string(cls, dmat_string, n=None):
+        """Constructs Distmatrix object from string corresponding to PHYLIP square distance matrix"""
 
         self = cls()
 
-        # Construct list of names, and 2D list of values
-        namelist = []
-        values = []
-        for line in dmat_list[1:]:
-            words = line.split()
-            namelist.append(words[0])
-            values.append(words[1:])
+        # Detect number of entries from string header, if n = None
+        # Python note: I am assuming correct format - should perhaps test
+        if n is None:
+            parts = dmat_string.partition("\n")
+            self.n = int(parts[0])
+        else:
+            self.n = n
 
-        self.names = namelist
-        self.initialize_dmat(self.names)
+        # Use numpy genfromtxt method for building numpy array from string
+        # This method requires input to be file-like, so StringIO is used
+        string_file = StringIO(dmat_string)
+        self.dmat = np.genfromtxt(string_file, skip_header=1, usecols=range(1, self.n + 1))
 
-        for i,j in itertools.combinations(range(len(namelist)), 2):
-            dist = float(values[i][j])
-            self.dmat[namelist[i], namelist[j]] = dist
-            self.dmat[namelist[j], namelist[i]] = dist
+        # Parse string to also get rownames (numpy object only has integer indices)
+        # Construct dictionary attributes with {numpy_index:name} and {name:numpy_index}
+        self.namelist = []
+        lines = dmat_string.splitlines()
+        for line in lines[1:]:
+            parts = line.split(maxsplit=1)
+            self.namelist.append(parts[0])
+
+        self.name2index = dict(zip(self.namelist, range(self.n)))
+        self.index2name = dict(zip(range(self.n), self.namelist))
+
         return self
 
     #######################################################################################
@@ -3648,6 +3648,7 @@ class Distmatrix(object):
     def from_distdict(cls, distdict):
         """Construct Distmatrix object from dictionary of {(name1, name2):dist}"""
 
+        # DEBUG; have not yet tested this code
         # Note: Should add more careful parsing and error checking at some point: check all pairs are accounted for!
         # Note: key can be any immutable iterable with two names (frozenset, tuple)
         self = cls()
@@ -3656,12 +3657,14 @@ class Distmatrix(object):
         for (n1, n2) in distdict.keys():
              names.add(n1)
              names.add(n2)
-        self.names = list(names)
-        self.initialize_dmat(self.names)
+        self.namelist = sorted(list(names))
+        self.n = len(self.namelist)
+        self.dmat = np.zeroes((self.n, self.n))
+        self.name2index = dict(zip(self.namelist, range(self.n)))
+        self.index2name = dict(zip(range(self.n), self.namelist))
 
         for ((name1, name2), dist) in distdict.items():
-            self.dmat[name1, name2] = dist
-            self.dmat[name2, name1] = dist
+            self.setdist(name1, name2, dist)
         return self
 
     #######################################################################################
@@ -3698,20 +3701,23 @@ class Distmatrix(object):
 
     #######################################################################################
 
-    def initialize_dmat(self, namelist):
-        """Sets up data structure for keeping distance info"""
+    def getdist(self, name1, name2):
+        """Returns distance between named entries"""
 
-        for name in namelist:
-            self.dmat[(name,name)] = 0.0
+        i1 = self.name2index[name1]
+        i2 = self.name2index[name2]
+        dist = self.dmat[i1, i2]
+        return dist
 
     #######################################################################################
 
-    def nearest(self):
-        """Returns tuple of (name1, name2, dist) for the nearest names in distmatrix"""
+    def setdist(self, name1, name2, dist):
+        """Sets distance between named entries"""
 
-        n1,n2 = min(self.dmat, key=self.dmat.get)
-        dist = self.dmat[(n1,n2)]
-        return (n1, n2, dist)
+        i1 = self.name2index(name1)
+        i2 = self.name2index(name2)
+        self.dmat[i1, i2] = dist
+        self.dmat[i2, i1] = dist
 
     ###############################################################################################
 
@@ -3719,91 +3725,71 @@ class Distmatrix(object):
         """Computes neighbor joining tree, returns Tree object"""
 
         # Construct star-tree. This will be resolved node by node during algorithm
-        njtree = Tree.from_leaves(self.names)
+        njtree = Tree.from_leaves(self.namelist)
         rootnode = njtree.root
 
-        # Local copy of leaflist for keeping track of (as yet) unclustered nodes
-        remaining_nodes = list(self.names)
-
-        # Set self.dmat attribute directly, not using function
-        # Avoid dot-notation to speed up execution
-        dmat = self.dmat
-
-        # Compute "udists": summed dist to all other nodes
-        udist = dict.fromkeys(self.names, 0.0)  # Initialize dict: keys are leaves, vals are 0.0
-        for n1, n2 in itertools.combinations(self.names, 2):
-            dist = dmat[(n1, n2)]
-            udist[n1] += dist
-            udist[n2] += dist
-
-        u = udist
+        # Local copies of object attributes that can be changed during algorithm
+        dmat = self.dmat.copy()
+        remaining_nodes = self.namelist.copy()
+        name2ix = self.name2index.copy()
+        ix2name = self.index2name.copy()
 
         # Main loop: continue merging nearest neighbors until only two nodes left
         while len(remaining_nodes) > 2:
+            n = len(remaining_nodes)
 
-            nnodes = len(remaining_nodes)
-            n_minus_2 = nnodes - 2            # Move computation out of loop to save time
-            smallest = None
+            # Compute njdist = (n-2) * d(n1, n2) - udist(n1) - udist(n2)
+            udist = np.nansum(dmat, axis=0)         # udist = summed dist to all other nodes. Ignore nan
+            udist_col = udist.reshape(self.n, 1)    # column vector version of udist
+            njdist = (n - 2) * dmat
+            njdist -= udist                   # subtract udist vector from all rows, in-place
+            njdist -= udist_col               # subtract udist vector from all cols, in-place
 
-            # Find nearest neighbors according to nj-dist:
-            # njdist = (n-2) * d(n1, n2) - u(n1) - u(n2)
-            for i,n1 in enumerate(remaining_nodes):
-                u1 = u[n1]                    # Move lookup out of loop to save time
-                for j in range(i+1, nnodes):
-                    n2 = remaining_nodes[j]
-                    njdist = n_minus_2 * dmat[(n1, n2)] - u1 - u[n2]
+            # Find closest neighbors according to njdist
+            np.fill_diagonal(njdist, np.nan)   # set diagonal to nan (so it wont be min)
+            flat_ix = np.nanargmin(njdist)     # Ignore nans on diagonal and in discarded rows/cols
+            i1, i2 = np.unravel_index(flat_ix, njdist.shape)
+            nb1 = ix2name[i1]
+            nb2 = ix2name[i2]
 
-                    # If "smallest" is not defined: set to current values
-                    # If "smallest" is defined and njdist < smallest: update values
-                    try:
-                        if njdist < smallest:
-                            smallest = njdist
-                            nb1, nb2 = n1, n2
-                    except TypeError:
-                        smallest = njdist
-                        nb1, nb2 = n1, n2
-
-
-            # Connect two nearest nodes
-
-            # (1) Update tree, compute length of branches from new node to merged nodes
+            # Connect two nearest nodes on tree (insert new node below them)
+            dist_12 = dmat[i1,i2]
+            udist_1 = udist[i1]
+            udist_2 = udist[i2]
             newnode = njtree.insert_node(rootnode, [nb1, nb2])
-            dist1 = 0.5 * dmat[(nb1, nb2)] + 0.5 * (u[nb1] - u[nb2]) / (nnodes - 2)
-            dist2 = 0.5 * dmat[(nb1, nb2)] + 0.5 * (u[nb2] - u[nb1]) / (nnodes - 2)
+            dist1 = 0.5 * dist_12 + 0.5 * (udist_1 - udist_2) / (n - 2)
+            dist2 = 0.5 * dist_12 + 0.5 * (udist_2 - udist_1) / (n - 2)
             njtree.setlength(newnode, nb1, dist1)
             njtree.setlength(newnode, nb2, dist2)
 
-            # (2) Update distance matrix and list of remaining nodes
-            # Python note: I am changing distance matrix here - should I use copy so I can re-use?
+            # Update distance matrix.
+            # Remove two merged entries (row and col), replace by row and col for newnode
+            # Removal is here done by setting values to nan (i2),
+            # or by overwriting previous values with new node (i1)
+            dist_new = 0.5 * (dmat[i1,:] + dmat[i2,:] - dist_12) # distvector from new
+            dmat[i1, :] = dist_new
+            dmat[:, i1] = dist_new
+            dmat[i2, :] = np.nan
+            dmat[:, i2] = np.nan
+
+            # Update lists and dicts keeping track of current nodes and their names
+            # Note: new node's name will here be
+            remaining_nodes.append(newnode)
             remaining_nodes.remove(nb1)
             remaining_nodes.remove(nb2)
-            for node in remaining_nodes:
-                dist = 0.5 * (dmat[(nb1, node)] + dmat[(nb2, node)] - dmat[(nb1, nb2)])
-                self.dmat[(newnode, node)] = dist
-                self.dmat[(node, newnode)] = dist
-
-            # (3) Update summed dists
-            # For each node compute change from previous value and alter accordingly
-            # Note: only nodes in "remaining_nodes" are considered, but "distmat" may contain more
-            udist[newnode] = 0.0
-            for node in remaining_nodes:
-
-                # Add current value to new entry for "new"
-                newdist = dmat[(node, newnode)]
-                udist[newnode] += newdist
-
-                # Update old entry for "node"
-                diff = newdist - dmat[(node, nb1)] - dmat[(node, nb2)]
-                udist[node] += diff
-
-            # (4) Add new node to list of remaining nodes
-            remaining_nodes.append(newnode)
+            del name2ix[nb1]
+            del name2ix[nb2]
+            del ix2name[i2]
+            ix2name[i1] = newnode
+            name2ix[newnode] = i1
 
         # After loop. Set length of branch conecting final two nodes
-        n1, n2 = remaining_nodes[0], remaining_nodes[1]
-        dist = dmat[(n1, n2)]
-        njtree.deroot()
-        njtree.setlength(n1, n2, dist)
+        nb1, nb2 = remaining_nodes[0], remaining_nodes[1]
+        i1 = name2ix[nb1]
+        i2 = name2ix[nb2]
+        dist = dmat[i1, i2]
+        njtree.deroot()        # Necessary?
+        njtree.setlength(nb1, nb2, dist)
 
         return njtree
 
