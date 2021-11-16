@@ -14,6 +14,7 @@ import statistics
 import sys
 from io import StringIO
 import numpy as np
+import bottleneck as bn
 
 ###################################################################################################
 ###################################################################################################
@@ -3721,6 +3722,7 @@ class Distmatrix(object):
 
     ###############################################################################################
 
+    #@profile
     def nj(self):
         """Computes neighbor joining tree, returns Tree object"""
 
@@ -3766,11 +3768,9 @@ class Distmatrix(object):
             # Remove two merged entries (row and col), replace by row and col for newnode
             # Removal is here done by setting values to nan (i2),
             # or by overwriting previous values with new node (i1)
-            dist_new = 0.5 * (dmat[i1,:] + dmat[i2,:] - dist_12) # distvector from new
-            dmat[i1, :] = dist_new
-            dmat[:, i1] = dist_new
-            dmat[i2, :] = np.nan
-            dmat[:, i2] = np.nan
+            dist_new = 0.5 * (dmat[i1] + dmat[i2] - dist_12) # distvector from new
+            dmat[i1] = dmat[:, i1] = dist_new
+            dmat[i2] = dmat[:, i2] = np.nan
 
             # Update lists and dicts keeping track of current nodes and their names
             # Note: new node's name will here be
@@ -3792,6 +3792,43 @@ class Distmatrix(object):
         njtree.setlength(nb1, nb2, dist)
 
         return njtree
+
+    ###############################################################################################
+
+    def upgma(self):
+        """Computes UPGMA tree, returns Tree object"""
+
+        # Depth of node = distance from leaf-level to node (i.e., depth of leaves = 0.0)
+        depth = {leaf:0.0 for leaf in self.leaves}
+
+        # Construct star-tree. This will be resolved node by node during algorithm
+        upgmatree = Tree.from_leaves(self.leaves)
+        rootnode = upgmatree.root
+
+        # Construct copy of distmatrix:
+        # this will be altered during run. Original will remain unchanged so more trees can be made
+        # distmatcopy = copy.deepcopy(self.distmat)
+
+        # Main loop:
+        # continue merging nearest nodes, on tree and in distmat, until only two nodes left
+        while len(self.distmat) > 1:
+            (dist, (node1, node2)) = self.distmat.nearest()
+
+            # insert new node below two nodes to be merged
+            # unless only two nodes remain (in which case: use root node)
+            if len(self.distmat) == 2:
+                mergenode = rootnode
+            else:
+                mergenode = upgmatree.insert_node(rootnode, [node1, node2])
+
+            depth[mergenode] = 0.5 * dist
+            dist1 = depth[mergenode] - depth[node1]
+            dist2 = depth[mergenode] - depth[node2]
+            upgmatree.setlength(mergenode, node1, dist1)
+            upgmatree.setlength(mergenode, node2, dist2)
+            self.distmat.merge_nodes(node1, node2, mergenode)
+
+        return upgmatree
 
     #######################################################################################
 
@@ -3861,137 +3898,6 @@ class DistTree():
         self.distmat = distmatrix
         self.leaves = self.distmat.getnames()
         return self
-
-    ###############################################################################################
-
-    def nj(self):
-        """Computes neighbor joining tree, returns Tree object"""
-
-        # Implementation node: Maybe this should be written to resemble UPGMA method below, i.e.,
-        # place responsibility for merging distances etc in distmatrix object, instead of here?
-
-        # Construct star-tree. This will be resolved node by node during algorithm
-        njtree = Tree.from_leaves(self.leaves)
-        rootnode = njtree.root
-
-        # Local copy of leaflist for keeping track of (as yet) unclustered nodes
-        remaining_nodes = self.leaves[:]
-
-        # Compute "udists": summed dist to all other nodes
-        nodes = list(self.distmat.getnames())
-        nnodes = len(nodes)
-        udist = dict.fromkeys(nodes, 0.0)  # Initialize dict: keys are leaves, vals are 0.0
-        for i in range(nnodes):
-            n1 = nodes[i]
-            for j in range(i+1, nnodes):
-                n2 = nodes[j]
-                dist = self.distmat.getdist(n1, n2)
-                udist[n1] += dist
-                udist[n2] += dist
-
-        # Avoid dot-notation to speed up execution
-        distmat = self.distmat
-        d = self.distmat.getdist
-        u = udist
-
-        # Main loop: continue merging nearest neighbors until only two nodes left
-        while len(remaining_nodes) > 2:
-
-            nnodes = len(remaining_nodes)
-            n_minus_2 = nnodes - 2            # Move computation out of loop to save time
-            smallest = None
-
-            # Find nearest neighbors according to nj-dist:
-            # njdist = (n-2) * d(n1, n2) - u(n1) - u(n2)
-            for i in range(nnodes):
-                n1 = remaining_nodes[i]
-                u1 = u[n1]                    # Move lookup out of loop to save time
-                for j in range(i+1, nnodes):
-                    n2 = remaining_nodes[j]
-                    njdist = n_minus_2 * d(n1, n2) - u1 - u[n2]
-
-                    # If "smallest" is not defined: set to current values
-                    # If "smallest" is defined and njdist < smallest: update values
-                    if (not smallest) or (njdist < smallest):
-                        smallest = njdist
-                        nb1, nb2 = n1, n2
-
-            # Connect two nearest nodes
-
-            # (1) Update tree, compute length of branches from new node to merged nodes
-            newnode = njtree.insert_node(rootnode, [nb1, nb2])
-            dist1 = 0.5 * d(nb1, nb2) + 0.5 * (u[nb1] - u[nb2]) / (nnodes - 2)
-            dist2 = 0.5 * d(nb1, nb2) + 0.5 * (u[nb2] - u[nb1]) / (nnodes - 2)
-            njtree.setlength(newnode, nb1, dist1)
-            njtree.setlength(newnode, nb2, dist2)
-
-            # (2) Update distance matrix and list of remaining nodes
-            # Python note: I am changing distance matrix here - should I use copy fo I can re-use?
-            remaining_nodes.remove(nb1)
-            remaining_nodes.remove(nb2)
-            for node in remaining_nodes:
-                dist = 0.5 * (d(nb1, node) + d(nb2, node) - d(nb1, nb2))
-                distmat.setdist(newnode, node, dist)
-            remaining_nodes.append(newnode)
-
-            # (3) Update summed dists
-            # For each node compute change from previous value and alter accordingly
-            # Note: only nodes in "remaining_nodes" are considered, but "distmat" may contain more
-            udist[newnode] = 0.0
-            for node in remaining_nodes:
-
-                # Add current value to new entry for "new"
-                newdist = d(node, newnode)
-                udist[newnode] += newdist
-
-                # Update old entry for "node"
-                diff = newdist - d(node, nb1) - d(node, nb2)
-                udist[node] += diff
-
-        # After loop. Set length of branch conecting final two nodes
-        n1, n2 = remaining_nodes[0], remaining_nodes[1]
-        dist = d(n1, n2)
-        njtree.deroot()
-        njtree.setlength(n1, n2, dist)
-
-        return njtree
-
-    ###############################################################################################
-
-    def upgma(self):
-        """Computes UPGMA tree, returns Tree object"""
-
-        # Depth of node = distance from leaf-level to node (i.e., depth of leaves = 0.0)
-        depth = {leaf:0.0 for leaf in self.leaves}
-
-        # Construct star-tree. This will be resolved node by node during algorithm
-        upgmatree = Tree.from_leaves(self.leaves)
-        rootnode = upgmatree.root
-
-        # Construct copy of distmatrix:
-        # this will be altered during run. Original will remain unchanged so more trees can be made
-        # distmatcopy = copy.deepcopy(self.distmat)
-
-        # Main loop:
-        # continue merging nearest nodes, on tree and in distmat, until only two nodes left
-        while len(self.distmat) > 1:
-            (dist, (node1, node2)) = self.distmat.nearest()
-
-            # insert new node below two nodes to be merged
-            # unless only two nodes remain (in which case: use root node)
-            if len(self.distmat) == 2:
-                mergenode = rootnode
-            else:
-                mergenode = upgmatree.insert_node(rootnode, [node1, node2])
-
-            depth[mergenode] = 0.5 * dist
-            dist1 = depth[mergenode] - depth[node1]
-            dist2 = depth[mergenode] - depth[node2]
-            upgmatree.setlength(mergenode, node1, dist1)
-            upgmatree.setlength(mergenode, node2, dist2)
-            self.distmat.merge_nodes(node1, node2, mergenode)
-
-        return upgmatree
 
 ###################################################################################################
 ###################################################################################################
