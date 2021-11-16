@@ -7,3 +7,4 @@ build/
 dist/
 phylotreelib.egg-info/
 notes/
+.ztr-directory
