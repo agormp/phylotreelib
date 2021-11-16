@@ -3660,7 +3660,7 @@ class Distmatrix(object):
              names.add(n2)
         self.namelist = sorted(list(names))
         self.n = len(self.namelist)
-        self.dmat = np.zeroes((self.n, self.n))
+        self.dmat = np.zeros((self.n, self.n))
         self.name2index = dict(zip(self.namelist, range(self.n)))
         self.index2name = dict(zip(range(self.n), self.namelist))
 
@@ -3715,10 +3715,9 @@ class Distmatrix(object):
     def setdist(self, name1, name2, dist):
         """Sets distance between named entries"""
 
-        i1 = self.name2index(name1)
-        i2 = self.name2index(name2)
-        self.dmat[i1, i2] = dist
-        self.dmat[i2, i1] = dist
+        i1 = self.name2index[name1]
+        i2 = self.name2index[name2]
+        self.dmat[i1, i2] = self.dmat[i2, i1] = dist
 
     ###############################################################################################
 
@@ -3769,8 +3768,8 @@ class Distmatrix(object):
             # Removal is here done by setting values to nan (i2),
             # or by overwriting previous values with new node (i1)
             dist_new = 0.5 * (dmat[i1] + dmat[i2] - dist_12) # distvector from new
-            dmat[i1] = dmat[:, i1] = dist_new
-            dmat[i2] = dmat[:, i2] = np.nan
+            dmat[i1] = dmat[:,i1] = dist_new
+            dmat[i2] = dmat[:,i2] = np.nan
 
             # Update lists and dicts keeping track of current nodes and their names
             # Note: new node's name will here be
