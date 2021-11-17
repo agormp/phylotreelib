@@ -3680,7 +3680,7 @@ class Distmatrix(object):
         ##        0.625 0.25    0.0 0.75    0.75
         ##        0.5   0.75    0.75    0.0 0.25
         ##        0.5   0.75    0.75    0.25    0.0
-        namelist = sorted(list(self.names))
+        namelist = sorted(list(self.namelist))
         tmplist = []
 
         # Header line: all names in order, tab separated
@@ -3794,7 +3794,83 @@ class Distmatrix(object):
 
     ###############################################################################################
 
+    #@profile
     def upgma(self):
+        """Computes UPGMA tree, returns Tree object"""
+
+        # Construct UPGMA-tree. This will be resolved node by node during algorithm
+        upgmatree = Tree.from_leaves(self.namelist)
+        rootnode = upgmatree.root
+
+        # Local copies of object attributes that can be changed during algorithm
+        dmat = self.dmat.copy()
+        remaining_nodes = self.namelist.copy()
+        name2ix = self.name2index.copy()
+        ix2name = self.index2name.copy()
+
+        # Dictionary keeping track of number of leaves in each cluster (initially leaves are clusters of 1):
+        n = len(remaining_nodes)
+        clus_size = dict.fromkeys(range(n), 1)      # Number of leaves in cluster (initially 1)
+        depth = dict.fromkeys(range(n), 0.0)        # Depth of node (leaves = 0)
+
+        # Dictionary keeping track of depth of nodes: leaves have depth 0.0
+
+        # Main loop: continue merging nearest nodes until only two nodes left
+        while len(remaining_nodes) > 2:
+
+            # Find closest neighbors
+            np.fill_diagonal(dmat, np.nan)  # set diagonal temporarily to nan (so it wont be min)
+            flat_ix = np.nanargmin(dmat)    # Ignore nans on diagonal and in discarded rows/cols
+            np.fill_diagonal(dmat, 0.0)     # Re-set diagonal to 0.0 so later computations are OK
+            i1, i2 = np.unravel_index(flat_ix, dmat.shape)
+            n1 = ix2name[i1]
+            n2 = ix2name[i2]
+
+            # Connect two nearest nodes on tree (insert new node below them)
+            newnode = upgmatree.insert_node(rootnode, [n1, n2])
+            depth_12 = dmat[i1,i2]/2
+            dist_new1 = depth_12 - depth[i1]
+            dist_new2 = depth_12 - depth[i2]
+            upgmatree.setlength(newnode, n1, dist_new1)
+            upgmatree.setlength(newnode, n2, dist_new2)
+
+            # Update distance matrix
+            # Remove two merged entries (row and col), replace by row and col for newnode
+            # Removal is here done by setting values to nan (i2),
+            # or by overwriting previous values with new node (i1)
+            dist_new = (clus_size[i1] * dmat[i1] + clus_size[i2] * dmat[i2]) / (clus_size[i1] + clus_size[i2])
+            dmat[i1] = dmat[:,i1] = dist_new
+            dmat[i2] = dmat[:,i2] = np.nan
+
+            # Update lists and dicts keeping track of current nodes and their names
+            remaining_nodes.append(newnode)
+            remaining_nodes.remove(n1)
+            remaining_nodes.remove(n2)
+            del name2ix[n1]
+            del name2ix[n2]
+            del ix2name[i2]
+            ix2name[i1] = newnode
+            name2ix[newnode] = i1
+            clus_size[i1] = clus_size[i1] + clus_size[i2]
+            del clus_size[i2]
+            depth[i1] = depth_12
+            del depth[i2]
+
+        # After loop. Set length of branch conecting final two nodes
+        n1, n2 = remaining_nodes[0], remaining_nodes[1]
+        i1 = name2ix[n1]
+        i2 = name2ix[n2]
+        depth_12 = dmat[i1,i2]/2
+        dist_new1 = depth_12 - depth[i1]
+        dist_new2 = depth_12 - depth[i2]
+        upgmatree.setlength(rootnode, n1, dist_new1)
+        upgmatree.setlength(rootnode, n2, dist_new2)
+
+        return upgmatree
+
+    ###############################################################################################
+
+    def upgma_old(self):
         """Computes UPGMA tree, returns Tree object"""
 
         # Depth of node = distance from leaf-level to node (i.e., depth of leaves = 0.0)
