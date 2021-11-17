@@ -927,9 +927,9 @@ class dist_tree_construction(TreeTestBase):
 
     def setUp(self):
         """Set up distance matrix and corresponding tree string for testing"""
-        self.treestringlist = ["((A:13.0,B:4.0):2.0,(C:4.0,D:10.0):2.0);",
+        self.njtreestringlist = ["((A:13.0,B:4.0):2.0,(C:4.0,D:10.0):2.0);",
                                 "((A:2,(B:1.5,C:1):3.2):4.1,(D:1.2,(E:2.7,F:3.1):5):5.2);"]
-        self.dmatlist = [{("A","B"):17, ("A","C"):21, ("A","D"):27,
+        self.njdmatlist = [{("A","B"):17, ("A","C"):21, ("A","D"):27,
                             ("B","C"):12, ("B","D"):18,
                             ("C","D"):14},
                         {("A","B"):6.7, ("A","C"):6.2, ("A","D"):12.5, ("A","E"):19, ("A","F"):19.4,
@@ -937,17 +937,34 @@ class dist_tree_construction(TreeTestBase):
                             ("C","D"):14.7, ("C","E"):21.2, ("C","F"):21.6,
                             ("D","E"):8.9, ("D","F"):9.3,
                             ("E","F"):5.8}]
+        self.upgmatreelist = ["(((A:8.500,B:8.500):2.500,E:11.000):5.500,(C:14.000,D:14.000):2.500);",
+                              "((A:1.500,B:1.500):3.750,(C:2.000,D:2.000):3.250);"]
+        self.upgmadmatlist = [
+                                {("A","B"):17, ("A","C"):21, ("A","D"):31, ("A","E"):23,
+                                               ("B","C"):30, ("B","D"):34, ("B","E"):21,
+                                                             ("C","D"):28, ("C","E"):39,
+                                                                          ("D","E"):43},
+                                {("A","B"):3, ("A","C"):11, ("A","D"):11,
+                                              ("B","C"):10, ("B","D"):10,
+                                                            ("C","D"):4}
+                            ]
 
     def test_nj(self):
         """Verify that nj method produces correct trees for list of distance matrices"""
-        for i in range(len(self.treestringlist)):
-            inputtree = pt.Tree.from_string(self.treestringlist[i])
-            dmat = pt.Distmatrix.from_distdict(self.dmatlist[i])
+        for i in range(len(self.njtreestringlist)):
+            inputtree = pt.Tree.from_string(self.njtreestringlist[i])
+            dmat = pt.Distmatrix.from_distdict(self.njdmatlist[i])
             njtree = dmat.nj()
-            # print("\n#####\n")
-            # print(njtree)
-            # print(inputtree)
             self.assertEqual(njtree, inputtree)
+
+    def test_upgma(self):
+        """Verify that upgma method produces correct trees for list of distance matrices"""
+        for i in range(len(self.upgmatreelist)):
+            inputtree = pt.Tree.from_string(self.upgmatreelist[i])
+            dmat = pt.Distmatrix.from_distdict(self.upgmadmatlist[i])
+            upgma = dmat.upgma()
+            self.assertEqual(upgma, inputtree)
+
 
 ########################################################################################
 ########################################################################################
