@@ -3133,11 +3133,9 @@ class SmallTreeSummary():
 
         # Construct dictionary of most frequent bipartitions.
         # Use bipart_cache if it already exists, if not then construct it first
-        if self.bipart_processed:
-            bipdict = copy.deepcopy(self.bipart_cache)
-        else:
+        if not self.bipart_processed:
             self.bipart_result()
-            bipdict = copy.deepcopy(self.bipart_cache)
+        bipdict = self.bipart_cache
 
         # Initialize new bipdict for keeping relevant bipartitions
         conbipdict = {}
@@ -3625,10 +3623,10 @@ class Distmatrix(object):
         else:
             self.n = n
 
-        # Use numpy genfromtxt method for building numpy array from string
+        # Use numpy loadtxt method for building numpy array from string
         # This method requires input to be file-like, so StringIO is used
         string_file = StringIO(dmat_string)
-        self.dmat = np.genfromtxt(string_file, skip_header=1, usecols=range(1, self.n + 1))
+        self.dmat = np.loadtxt(string_file, skiprows=1, usecols=range(1, self.n + 1))
 
         # Parse string to also get rownames (numpy object only has integer indices)
         # Construct dictionary attributes with {numpy_index:name} and {name:numpy_index}
