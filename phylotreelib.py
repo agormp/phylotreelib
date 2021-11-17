@@ -3610,6 +3610,23 @@ class Distmatrix(object):
     #######################################################################################
 
     @classmethod
+    def from_numpy_array(cls, nparray, namelist, n):
+        """Construct Distmatrix object from numpy array and corresponding list of names"""
+
+        self = cls()
+
+        # List of names is supposed to be in same order as indices in numpy 2D array
+        self.namelist = namelist
+        self.n = n
+        self.dmat = nparray
+        self.name2index = dict(zip(self.namelist, range(n)))
+        self.index2name = dict(zip(range(n), self.namelist))
+
+        return self
+
+    #######################################################################################
+
+    @classmethod
     def from_phylip_string(cls, dmat_string, n=None):
         """Constructs Distmatrix object from string corresponding to PHYLIP square distance matrix"""
 
@@ -3805,13 +3822,11 @@ class Distmatrix(object):
         remaining_nodes = self.namelist.copy()
         name2ix = self.name2index.copy()
         ix2name = self.index2name.copy()
-
-        # Dictionary keeping track of number of leaves in each cluster (initially leaves are clusters of 1):
         n = len(remaining_nodes)
+
+        # Dicts keeping track of node depths and cluster sizes
         clus_size = dict.fromkeys(range(n), 1)      # Number of leaves in cluster (initially 1)
         depth = dict.fromkeys(range(n), 0.0)        # Depth of node (leaves = 0)
-
-        # Dictionary keeping track of depth of nodes: leaves have depth 0.0
 
         # Main loop: continue merging nearest nodes until only two nodes left
         while len(remaining_nodes) > 2:
