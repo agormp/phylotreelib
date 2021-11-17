@@ -3872,37 +3872,6 @@ class Distmatrix(object):
 ###################################################################################################
 ###################################################################################################
 
-class DistTree():
-    """Class for constructing trees using distance based methods"""
-
-    # Can be constructed from either alignment or distance matrix, so class has two
-    # alternate constructors
-    def __init__(self):
-        pass
-
-    ###############################################################################################
-
-    @classmethod
-    def from_alignment(cls, alignment, dist="pdist"):
-        """Constructor 1: constructs distance tree constructor from alignment object"""
-        self = cls()
-        self.distmat = alignment.distmatrix(dist)
-        self.leaves = alignment.getnames()
-        return self
-
-    ###############################################################################################
-
-    @classmethod
-    def from_distmat(cls, distmatrix):
-        """Constructor 2: constructs distance tree constructor from distance matrix object"""
-        self = cls()
-        self.distmat = distmatrix
-        self.leaves = self.distmat.getnames()
-        return self
-
-###################################################################################################
-###################################################################################################
-
 
 # # Placeholder: Insert test code here and run module in standalone mode
 def main():
