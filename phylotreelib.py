@@ -3699,6 +3699,7 @@ class Distmatrix(object):
         tmplist = []
 
         # Header line: all names in order, tab separated
+        tmplist.append("\t\t")
         for name in namelist:
             tmplist.append(str(name))
             tmplist.append("\t")
@@ -3707,6 +3708,8 @@ class Distmatrix(object):
 
         # Body of matrix. Same order as nameline
         for name1 in namelist:
+            tmplist.append(name1)
+            tmplist.append("\t")
             for name2 in namelist:
                 tmplist.append(str(self.getdist(name1,name2)))
                 tmplist.append("\t")
@@ -3813,11 +3816,11 @@ class Distmatrix(object):
     def upgma(self):
         """Computes UPGMA tree, returns Tree object"""
 
-        # Construct UPGMA-tree. This will be resolved node by node during algorithm
+        # Construct star-tree. This will be resolved node by node during algorithm
         upgmatree = Tree.from_leaves(self.namelist)
         rootnode = upgmatree.root
 
-        # Local copies of object attributes that can be changed during algorithm
+        # Local copies of Distmatrix object attributes that can be changed during algorithm
         dmat = self.dmat.copy()
         remaining_nodes = self.namelist.copy()
         name2ix = self.name2index.copy()
@@ -3828,14 +3831,18 @@ class Distmatrix(object):
         clus_size = dict.fromkeys(range(n), 1)      # Number of leaves in cluster (initially 1)
         depth = dict.fromkeys(range(n), 0.0)        # Depth of node (leaves = 0)
 
+        # List keeping track of minimum value (and its index) in each row
+        # Should lead to O(n^2) instead of O(n^3) time complexity (see Felsenstein)
+        np.fill_diagonal(dmat, np.inf)              # set diagonal to inf (so it wont be min)
+        min_colix = np.argmin(dmat, axis=1)         # col-index of smallest value in each row
+        min_rowval = dmat[np.arange(n), min_colix]  # smallest value in each row
+
         # Main loop: continue merging nearest nodes until only two nodes left
         while len(remaining_nodes) > 2:
 
             # Find closest neighbors
-            np.fill_diagonal(dmat, np.nan)  # set diagonal temporarily to nan (so it wont be min)
-            flat_ix = np.nanargmin(dmat)    # Ignore nans on diagonal and in discarded rows/cols
-            np.fill_diagonal(dmat, 0.0)     # Re-set diagonal to 0.0 so later computations are OK
-            i1, i2 = np.unravel_index(flat_ix, dmat.shape)
+            i1 = np.argmin(min_rowval)          # row index for overall smallest value
+            i2 = min_colix[i1]                  # corresponding column index
             n1 = ix2name[i1]
             n2 = ix2name[i2]
 
@@ -3849,11 +3856,30 @@ class Distmatrix(object):
 
             # Update distance matrix
             # Remove two merged entries (row and col), replace by row and col for newnode
-            # Removal is here done by setting values to nan (i2),
+            # Removal is here done by setting values to inf (i2),
             # or by overwriting previous values with new node (i1)
             dist_new = (clus_size[i1] * dmat[i1] + clus_size[i2] * dmat[i2]) / (clus_size[i1] + clus_size[i2])
             dmat[i1] = dmat[:,i1] = dist_new
-            dmat[i2] = dmat[:,i2] = np.nan
+            dmat[i2] = dmat[:,i2] = np.inf
+
+            # Update lists keeping track of smallest value:
+            # For each row in dmat:
+            #       if smallest value was previously in one of removed cols: find new min
+            #       else if new value (in dist_new) smaller than previous: replace
+            #       set i2 rowinfo to inf so it will not be minimum (= delete info)
+            # This complicated approach is O(n) where checking entire dmat would be O(n^2), so worth it
+            for i in range(self.n):
+                prev_min_colix = min_colix[i]
+                if  prev_min_colix in {i1, i2}:                 # Previous minimum has been changed by merge:
+                    new_min_colix = np.argmin(dmat[i])          # find new minimum on this row of dmat
+                    min_colix[i] = new_min_colix
+                    min_rowval[i] = dmat[i,new_min_colix]
+                else:
+                    prev_val = min_rowval[i]
+                    new_val = dist_new[i]
+                    if prev_val > new_val:
+                        min_rowval[i] = new_val
+                        min_colix[i] = i1
 
             # Update lists and dicts keeping track of current nodes and their names
             remaining_nodes.append(newnode)
