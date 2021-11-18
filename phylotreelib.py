@@ -3664,7 +3664,6 @@ class Distmatrix(object):
     def from_distdict(cls, distdict):
         """Construct Distmatrix object from dictionary of {(name1, name2):dist}"""
 
-        # DEBUG; have not yet tested this code
         # Note: Should add more careful parsing and error checking at some point: check all pairs are accounted for!
         # Note: key can be any immutable iterable with two names (frozenset, tuple)
         self = cls()
@@ -3868,9 +3867,10 @@ class Distmatrix(object):
             #       else if new value (in dist_new) smaller than previous: replace
             #       set i2 rowinfo to inf so it will not be minimum (= delete info)
             # This complicated approach is O(n) where checking entire dmat would be O(n^2), so worth it
+            merged_indexes = {i1,i2}
             for i in range(self.n):
                 prev_min_colix = min_colix[i]
-                if  prev_min_colix in {i1, i2}:                 # Previous minimum has been changed by merge:
+                if  prev_min_colix in merged_indexes:                 # Previous minimum has been changed by merge:
                     new_min_colix = np.argmin(dmat[i])          # find new minimum on this row of dmat
                     min_colix[i] = new_min_colix
                     min_rowval[i] = dmat[i,new_min_colix]
