@@ -565,11 +565,13 @@ class Tree():
 
     ###############################################################################################
 
-    def __eq__(self, other):
+    def __eq__(self, other, blenprecision=0.005):
         """Implements equality testing for Tree objects"""
 
         # Two trees are identical if they have the same leaves, the same topology
-        # and the same branchlengths (NB: floating point comparison). Branch labels are ignored
+        # and the same branchlengths. Branch labels are ignored
+        # NB: floating point comparison of relative difference.
+        # Precision chosen based on empirical comparison between own and PHYLIP tree (...)
         if self.leaves != other.leaves:
             return False
         if self.topology() != other.topology():
@@ -580,7 +582,7 @@ class Tree():
             len1 = bipself[bipart].length
             len2 = bipother[bipart].length
             if len1 != 0 and len2 != 0:
-                if (abs(len1 - len2) / len1) > 0.0000001:       # Floating point comparison
+                if (abs(len1 - len2) / len1) > blenprecision:   # Floating point comparison of relative diff
                     return False
 
         # If we made it this far without returning, then Tree objects must be identical
@@ -2386,6 +2388,10 @@ class Tree():
         """Compute symmetric tree distance (Robinson Foulds) between self and other tree.
         Normalised measure returned by default"""
 
+        # Check that trees are comparable (have identical leaf sets)
+        if self.leaves != other.leaves:
+            raise TreeError("Can't compute treedist: two trees have different leaf sets")
+
         # Find set of bipartitions in each tree
         # Recall that: Names of leafs on one side of a branch are represented as an immutable set.
         # A bipartition is represented as an immutable set of two such (complementary) sets
@@ -3738,7 +3744,7 @@ class Distmatrix(object):
 
     ###############################################################################################
 
-    @profile
+    #@profile
     def nj(self):
         """Computes neighbor joining tree, returns Tree object"""
 
