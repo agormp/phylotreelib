@@ -3738,7 +3738,7 @@ class Distmatrix(object):
 
     ###############################################################################################
 
-    #@profile
+    @profile
     def nj(self):
         """Computes neighbor joining tree, returns Tree object"""
 
@@ -3811,7 +3811,6 @@ class Distmatrix(object):
 
     ###############################################################################################
 
-    #@profile
     def upgma(self):
         """Computes UPGMA tree, returns Tree object"""
 
@@ -3868,18 +3867,15 @@ class Distmatrix(object):
             #       set i2 rowinfo to inf so it will not be minimum (= delete info)
             # This complicated approach is O(n) where checking entire dmat would be O(n^2), so worth it
             merged_indexes = {i1,i2}
-            for i in range(self.n):
-                prev_min_colix = min_colix[i]
-                if  prev_min_colix in merged_indexes:                 # Previous minimum has been changed by merge:
-                    new_min_colix = np.argmin(dmat[i])          # find new minimum on this row of dmat
+            for i, (prev_mincol, prev_val, new_val) in enumerate( zip( min_colix, min_rowval, dist_new ) ):
+                if  prev_mincol in merged_indexes:          # Previous minimum has been changed by merge:
+                    new_min_colix = np.argmin(dmat[i])      # find new minimum on this row of dmat
                     min_colix[i] = new_min_colix
                     min_rowval[i] = dmat[i,new_min_colix]
                 else:
-                    prev_val = min_rowval[i]
-                    new_val = dist_new[i]
                     if prev_val > new_val:
-                        min_rowval[i] = new_val
                         min_colix[i] = i1
+                        min_rowval[i] = new_val
 
             # Update lists and dicts keeping track of current nodes and their names
             remaining_nodes.append(newnode)
