@@ -3753,28 +3753,30 @@ class Distmatrix(object):
         rootnode = njtree.root
 
         # Local copies of object attributes that can be changed during algorithm
+        # Note: unresolved_nodes maps indices from dmat to actual names
+        # dmat and unresolved_nodes are updated during algorithm to always be in sync
         dmat = self.dmat.copy()
-        remaining_nodes = self.namelist.copy()
-        name2ix = self.name2index.copy()
-        ix2name = self.index2name.copy()
+        unresolved_nodes = self.namelist.copy()
 
         # Main loop: continue merging nearest neighbors until only two nodes left
-        while len(remaining_nodes) > 2:
-            n = len(remaining_nodes)
+        while len(unresolved_nodes) > 2:
+            n = len(unresolved_nodes)
 
             # Compute njdist = (n-2) * d(n1, n2) - udist(n1) - udist(n2)
-            udist = np.nansum(dmat, axis=0)         # udist = summed dist to all other nodes. Ignore nan
-            udist_col = udist.reshape(self.n, 1)    # column vector version of udist
+            udist = dmat.sum(axis=0)          # udist = summed dist to all other nodes.
+            udist_col = udist.reshape(n, 1)   # column vector version of udist
             njdist = (n - 2) * dmat
             njdist -= udist                   # subtract udist vector from all rows, in-place
             njdist -= udist_col               # subtract udist vector from all cols, in-place
 
             # Find closest neighbors according to njdist
-            np.fill_diagonal(njdist, np.nan)   # set diagonal to nan (so it wont be min)
-            flat_ix = np.nanargmin(njdist)     # Ignore nans on diagonal and in discarded rows/cols
+            np.fill_diagonal(njdist, np.inf)  # set diagonal to inf (so it wont be min)
+            flat_ix = np.argmin(njdist)
             i1, i2 = np.unravel_index(flat_ix, njdist.shape)
-            nb1 = ix2name[i1]
-            nb2 = ix2name[i2]
+            if i1 > i2:                       # Ensure i1 < i2 (used below)
+                i1, i2 = i2, i1
+            nb1 = unresolved_nodes[i1]
+            nb2 = unresolved_nodes[i2]
 
             # Connect two nearest nodes on tree (insert new node below them)
             dist_12 = dmat[i1,i2]
@@ -3787,30 +3789,21 @@ class Distmatrix(object):
             njtree.setlength(newnode, nb2, dist2)
 
             # Update distance matrix.
-            # Remove two merged entries (row and col), replace by row and col for newnode
-            # Removal is here done by setting values to nan (i2),
-            # or by overwriting previous values with new node (i1)
+            # Remove 2 merged entries (rows and cols), add 1 new row and col for newnode
+            # Removal is done by deleting row and column i2, and writing new node to i1
             dist_new = 0.5 * (dmat[i1] + dmat[i2] - dist_12) # distvector from new
             dmat[i1] = dmat[:,i1] = dist_new
-            dmat[i2] = dmat[:,i2] = np.nan
+            dmat = np.delete(dmat, i2, axis=0)
+            dmat = np.delete(dmat, i2, axis=1)
 
-            # Update lists and dicts keeping track of current nodes and their names
-            # Note: new node's name will here be
-            remaining_nodes.append(newnode)
-            remaining_nodes.remove(nb1)
-            remaining_nodes.remove(nb2)
-            del name2ix[nb1]
-            del name2ix[nb2]
-            del ix2name[i2]
-            ix2name[i1] = newnode
-            name2ix[newnode] = i1
+            # Update list of unresolved nodes
+            unresolved_nodes[i1] = newnode
+            del unresolved_nodes[i2]         # Note: all indices >=i2 are shifted same as array
 
         # After loop. Set length of branch conecting final two nodes
-        nb1, nb2 = remaining_nodes[0], remaining_nodes[1]
-        i1 = name2ix[nb1]
-        i2 = name2ix[nb2]
-        dist = dmat[i1, i2]
-        njtree.deroot()        # Necessary?
+        nb1, nb2 = unresolved_nodes[0], unresolved_nodes[1]
+        dist = dmat[0, 1]
+        njtree.deroot()
         njtree.setlength(nb1, nb2, dist)
 
         return njtree
