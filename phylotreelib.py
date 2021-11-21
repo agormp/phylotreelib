@@ -14,7 +14,6 @@ import statistics
 import sys
 from io import StringIO
 import numpy as np
-import bottleneck as bn
 
 ###################################################################################################
 ###################################################################################################
@@ -3744,7 +3743,6 @@ class Distmatrix(object):
 
     ###############################################################################################
 
-    #@profile
     def nj(self):
         """Computes neighbor joining tree, returns Tree object"""
 
