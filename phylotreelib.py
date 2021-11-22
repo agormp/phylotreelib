@@ -2,7 +2,6 @@
 # Anders Gorm Pedersen
 # Section for Bioinformatics, DTU Health Technology, Technical University of Denmark
 # agpe@dtu.dk
-# Requires Python 3.0+
 
 import copy
 import functools
@@ -3914,30 +3913,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-###################################################################################################
-##  Code for function profiling:
-    # import cProfile
-    # cProfile.run('main()', 'mainprofile')
-    #
-##    In separate window do:
-##    >>> import pstats
-##    >>> p = pstats.Stats('mainprofile')
-##    >>> p.sort_stats('time').print_stats(10)
-###################################################################################################
-#
-# line_profiler:
-# 1) Add @profile decorator just above def statement for function(s?) you would like to be profiled
-# 2) Run these commands in shell:
-#     kernprof -l treelib_devel.py
-#     /usr/local/bin/python3 -m line_profiler treelib_devel.py.lprof
-###################################################################################################
-#
-# Memory profiler:
-# 1) Add @profile decorator just above def statement for function(s?) you would like to be profiled
-# 2) /usr/local/bin/python3 -m memory_profiler treelib_devel.py
-#
-# plot over time:
-# mprof run treelib_devel.py
-# mprof plot
-###################################################################################################
