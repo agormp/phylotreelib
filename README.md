@@ -46,15 +46,11 @@ for tip in mytree.leaves:
 
 ## Using phylotreelib
 
-The main idea is to construct a treefile object from text (e.g., obtained by
-reading a NEXUS or Newick treefile). Treefile objects contain Tree objects, and
-can be iterated over. Tree objects have a number of methods that can be used to
-analyze or alter the tree in question.
+Typically, phylotreelib will be used for analysing one or more trees that have been read from a textfile. This is done by first constructing a Nexus or Newick treefile object (by providing a file name), and then retrieving Tree objects from this treefile object. Tree objects then have a number of methods that can be used to analyse or alter the tree in question.
 
 ### Constructing treefile objects
 
-Typically, treefile objects are constructed by reading a textfile containing a
-NEXUS or Newick format description of a tree. This is done as follows:
+Treefile objects are constructed by providing the name of a properly formatted textfile to either the Newicktreefile or Nexustreefile constructors:
 
 Newick files:
 ```
@@ -68,7 +64,7 @@ treefile = phylotreelib.Nexustreefile(filename)
 
 ### Constructing Tree objects
 
-Tree objects can be constructed either directly (using one of the 4 alternative constructors), or the can be retrieved from Treefile objects by iteration.
+Tree objects can be constructed either directly (using one of several possible alternative constructors), or they can be retrieved from Treefile objects by iteration.
 
 #### Getting Tree objects from a treefile (NEXUS or Newick format)
 
@@ -85,7 +81,7 @@ tree = next(treefile)
 
 #### Constructing Tree object from string
 
-Tree objects can also be constructed directly from a string (where the string is a Newick formatted tree):
+Tree objects can be constructed directly from a string (where the string is a Newick formatted tree):
 ```
 tree = phylotreelib.Tree.from_string(mystring)
 ```
@@ -99,7 +95,7 @@ tree = phylotreelib.Tree.from_leaves(leaflist)
 
 #### Constructing Tree object with random topology and branch lengths
 
-It is possible to construct Tree objects with random tree topology (e.g. for purposes where you need a null distribution of some tree-related measure) using the randtree constructor:
+It is possible to construct Tree objects with random tree topology, e.g. for purposes where you need a null distribution of some tree-related measure, using the randtree constructor:
 ```
 tree = phylotreelib.Tree.randtree(leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
 ```
@@ -116,7 +112,7 @@ length (float) associated with them.
 A textual representation of a Tree object can be obtained using: "print(mytree)" (where mytree is the name of the Tree object). The resulting output is a child-list representation of the tree followed by an alphabetical list of leafs, along these lines:
 
 ```
->>> print(tree)
+>>> print(mytree)
 |------------------------------------------------------------------|
 |  Node  |              Child               |  Distance  |  Label  |
 |------------------------------------------------------------------|
