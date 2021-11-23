@@ -68,8 +68,9 @@ treefile = phylotreelib.Nexustreefile(filename)
 
 ### Constructing Tree objects
 
-Treefile objects contain Tree objects. Tree objects are retrieved from treefile
-objects by iteration:
+Tree objects can be constructed either directly (using one of the 4 alternative constructors), or the can be retrieved from Treefile objects by iteration.
+
+#### Getting Tree objects from a treefile (NEXUS or Newick format)
 
 Doing something to all trees in a treefile object:
 ```
@@ -82,10 +83,30 @@ Getting a single tree from a treefile object:
 tree = next(treefile)
 ```
 
-A Tree object can also be constructed directly from a string (where the string is a Newick formatted tree):
+#### Constructing Tree object from string
+
+Tree objects can also be constructed directly from a string (where the string is a Newick formatted tree):
 ```
 tree = phylotreelib.Tree.from_string(mystring)
 ```
+
+#### Constructing Tree object from list of leaf names
+
+Tree objects (with a star topology) can be constructed from a list of leaf names:
+```
+tree = phylotreelib.Tree.from_leaves(leaflist)
+```
+
+#### Constructing Tree object with random topology and branch lengths
+
+It is possible to construct Tree objects with random tree topology (e.g. for purposes where you need a null distribution of some tree-related measure) using the randtree constructor:
+```
+tree = phylotreelib.Tree.randtree(leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
+```
+
+Either a list of names or the number of tips can be specified as a way of setting the size of the tree. If the function parameter randomlen is True then branches will get random lengths drawn from a lognormal distribution.
+
+### Structure of Tree objects
 
 Tree objects consist of external nodes (leaves), which are identified by strings
 (e.g. "Chimpanzee"), and internal nodes, which are identified by integers
