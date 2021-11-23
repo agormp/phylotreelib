@@ -2854,7 +2854,7 @@ class TreeSet():
 ###################################################################################################
 ###################################################################################################
 
-class SmallTreeSummary():
+class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
     def __init__(self, include_zeroterms=False):
@@ -3203,17 +3203,17 @@ class SmallTreeSummary():
 ###################################################################################################
 ###################################################################################################
 
-class BigTreeSummary(SmallTreeSummary):
+class BigTreeSummary(TreeSummary):
     """Class summarizing bipartitions, branch lengths, and topologies from many trees"""
 
-    # Does everything SmallTreeSummary does and also keeps track of topologies
+    # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in STS)
 
     def __init__(self, include_zeroterms=False, outgroup=None, rootmid=False):
         """TreeSummary constructor. Initializes relevant data structures"""
 
         # Most stuff done by superclass constructor
-        SmallTreeSummary.__init__(self, include_zeroterms)
+        TreeSummary.__init__(self, include_zeroterms)
 
         # This is where topology information is kept
         self.toposummary = {}
@@ -3231,7 +3231,7 @@ class BigTreeSummary(SmallTreeSummary):
         """Add tree to treesummary, update all summaries"""
 
         # Superclass method takes care of updating n_trees and all bipart-related info
-        SmallTreeSummary.add_tree(self, curtree, weight)
+        TreeSummary.add_tree(self, curtree, weight)
 
         # If topology has never been seen before, then add it and initialize count
         # If topology HAS been seen before then update count
@@ -3260,7 +3260,7 @@ class BigTreeSummary(SmallTreeSummary):
 
         # Superclass method takes care of updating tree_count, tree_weight_sum, and
         # bipartsummary, and also unsets self.bipart_processed flag
-        SmallTreeSummary.update(self, treesummary)
+        TreeSummary.update(self, treesummary)
 
         # Merge "treesummary.toposummary" with "self.toposummary"
         topsum = treesummary.toposummary
