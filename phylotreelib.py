@@ -3583,6 +3583,8 @@ class Distmatrix(object):
     def from_alignment(cls, alignment, dist="pdist"):
         """Construct Distmatrix object from alignment object"""
 
+        import sequencelib as seqlib  # Should probably move to top of module, but expensive
+
         # Decide which method to use for computing distance
         # Maybe dict of functions? (But then have to construct each time so maybe not...)
         if dist == "hamming":
