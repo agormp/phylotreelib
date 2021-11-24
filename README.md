@@ -32,7 +32,7 @@ python3 -m pip install phylotreelib
 * Methods for computing consensus trees from sets of input trees, which also yield information on the frequencies of clades and topologies, and on the distribution of branch lengths for bipartitions
 * Library has been optimized for high speed and low memory consumption
 
-## Quick start examples
+## Quick start usage examples
 
 The code below will import phylotreelib, open a NEXUS file, retrieve one Tree object from the file, perform minimum-variance rooting, find the node ID for the new rootnode,
 and finally print out the name and root-to-tip distance (measured along the branches) for all leaves in the tree:
@@ -46,6 +46,76 @@ rootnode = mytree.root
 for tip in mytree.leaves:
 	dist = mytree.nodedist(rootnode, tip)
 	print("{}\t{}"format(tip,dist))
+```
+
+-----
+
+The code below constructs a Tree object from a Newick formatted string and then prints the string representation of the tree (using the Tree object's __str__() method).
+
+```python
+import phylotreelib as pt
+mytree = pt.Tree.from_string("(Orangutan:4, (Gorilla:3, (Human:2, (Chimpanzee:1, Bonobo:1):1):1):1);")
+print(mytree)
+```
+
+Output:
+
+```
+|----------------------------------------------|
+|  Node  |    Child     |  Distance  |  Label  |
+|----------------------------------------------|
+|     0  |           1  |         1  |         |
+|     0  |   Orangutan  |         4  |         |
+|     1  |           2  |         1  |         |
+|     1  |     Gorilla  |         3  |         |
+|     2  |           3  |         1  |         |
+|     2  |       Human  |         2  |         |
+|     3  |      Bonobo  |         1  |         |
+|     3  |  Chimpanzee  |         1  |         |
+|----------------------------------------------|
+
+5 Leafs:
+----------
+Bonobo
+Chimpanzee
+Gorilla
+Human
+Orangutan
+```
+
+-----
+
+The code below opens a Nexus-formatted file with multiple trees, constructs a Treesummary object, extracts all Tree objects from the file by iterating over the file while adding the trees to the Treesummary object. Then a majority rule consensus tree is computed from the Treesummary object, the tree is midpoint rooted, and finally written in Newick format to the output file "contree.newick"
+
+```python
+import phylotreelib as pt
+beastfile = pt.Nexustreefile("BEAST_samples.trees")
+treesummary = pt.TreeSummary()
+for tree in beastfile:
+    treesummary.add_tree(tree)
+consensus_tree = treesummary.contree()
+consensus_tree.rootmid()
+with open("contree.newick", "w") as outfile:
+    outfile.write(consensus_tree.newick())
+```
+
+-----
+
+The code below opens a Newick file, retrieves one Tree object from the file, and the finds the 5 leaves that are closest (measured along the branches) to the leaf labeled "nitrificans".
+
+```python
+import phylotreelib as pt
+treefile = pt.Newicktreefile("Commamox.newick")
+tree = next(treefile)
+print(tree.nearest_n_leaves("nitrificans", 5))
+```
+
+Output:
+
+```python
+{'A2', 'AAUMBR1', 'CG24B', 'inopinata', 'nitrosa'}
+In [141]:
+
 ```
 
 ## Using phylotreelib
