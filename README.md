@@ -1,5 +1,8 @@
 # phylotreelib: python library for analyzing and manipulating phylogenetic trees
 
+![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=brightgreen&left_text=Downloads
+)
+
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
 
 ![](https://github.com/agormp/phylotreelib/raw/master/phylogenetictree.png?raw=true)
@@ -25,7 +28,7 @@ python3 -m pip install phylotreelib
 * Trees can be grafted to each other, or a subtree can be moved using subtree pruning and regrafting (SPR)
 * Method for computing the distance between two trees (Robinson-Foulds, and derived normalised measures; returns information about number of unique and shared bipartitions)
 * The Distmatrix class contains methods for building trees from distance matrices (or sequence alignments)
-*  Methods for computing consensus trees from sets of input trees, which also yield information on the frequencies of clades and topologies, and on the distribution of branch lengths for bipartitions
+* Methods for computing consensus trees from sets of input trees, which also yield information on the frequencies of clades and topologies, and on the distribution of branch lengths for bipartitions
 * Library has been optimized for high speed and low memory consumption
 
 ## Quick start examples
