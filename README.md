@@ -54,7 +54,7 @@ The code below constructs a Tree object from a Newick formatted string and then 
 
 ```python
 import phylotreelib as pt
-mytree = pt.Tree.from_string("(Orangutan:4, (Gorilla:3, (Human:2, (Chimpanzee:1, Bonobo:1):1):1):1);")
+mytree = pt.Tree.from_string("(Gorilla:3, (Human:2, (Chimpanzee:1, Bonobo:1):1):1);")
 print(mytree)
 ```
 
@@ -65,22 +65,19 @@ Output:
 |  Node  |    Child     |  Distance  |  Label  |
 |----------------------------------------------|
 |     0  |           1  |         1  |         |
-|     0  |   Orangutan  |         4  |         |
+|     0  |     Gorilla  |         3  |         |
 |     1  |           2  |         1  |         |
-|     1  |     Gorilla  |         3  |         |
-|     2  |           3  |         1  |         |
-|     2  |       Human  |         2  |         |
-|     3  |      Bonobo  |         1  |         |
-|     3  |  Chimpanzee  |         1  |         |
+|     1  |       Human  |         2  |         |
+|     2  |      Bonobo  |         1  |         |
+|     2  |  Chimpanzee  |         1  |         |
 |----------------------------------------------|
 
-5 Leafs:
+4 Leafs:
 ----------
 Bonobo
 Chimpanzee
 Gorilla
 Human
-Orangutan
 ```
 
 -----
