@@ -45,12 +45,25 @@ mytree.rootminvar()
 rootnode = mytree.root
 for tip in mytree.leaves:
 	dist = mytree.nodedist(rootnode, tip)
-	print("{}\t{}"format(tip,dist))
+	print("{:<10s}\t{:.2f}".format(tip,dist))
+```
+
+Output:
+
+```
+nitrificans	1879.84
+Is79A3    	1878.95
+GWW4      	1877.47
+.
+.
+.
+A2        	1879.84
+communis  	1878.95
 ```
 
 -----
 
-The code below constructs a Tree object from a Newick formatted string and then prints the string representation of the tree (using the Tree object's __str__() method).
+The code below constructs a Tree object from a Newick formatted string and then prints the string representation of the tree (using the Tree object's \_\_str\_\_() method).
 
 ```python
 import phylotreelib as pt
@@ -82,7 +95,7 @@ Human
 
 -----
 
-The code below opens a Nexus-formatted file with multiple trees, constructs a Treesummary object, extracts all Tree objects from the file by iterating over the file while adding the trees to the Treesummary object. Then a majority rule consensus tree is computed from the Treesummary object, the tree is midpoint rooted, and finally written in Newick format to the output file "contree.newick"
+The code below opens a Nexus-formatted file with multiple trees, constructs a Treesummary object, and then extracts all Tree objects from the file by iterating over the file while adding the trees to the Treesummary object. Then a majority rule consensus tree is computed from the Treesummary object, the tree is midpoint rooted, and the resulting tree is finally written in Newick format to the output file "contree.newick"
 
 ```python
 import phylotreelib as pt
@@ -98,7 +111,7 @@ with open("contree.newick", "w") as outfile:
 
 -----
 
-The code below opens a Newick file, retrieves one Tree object from the file, and the finds the 5 leaves that are closest (measured along the branches) to the leaf labeled "nitrificans".
+The code below opens a Newick file, retrieves one Tree object from the file, and then finds the 5 leaves that are closest (measured along the branches) to the leaf labeled "nitrificans".
 
 ```python
 import phylotreelib as pt
@@ -111,8 +124,6 @@ Output:
 
 ```python
 {'A2', 'AAUMBR1', 'CG24B', 'inopinata', 'nitrosa'}
-In [141]:
-
 ```
 
 ## Using phylotreelib
