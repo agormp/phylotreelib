@@ -115,7 +115,7 @@ The code below opens a Newick file, retrieves one Tree object from the file, and
 
 ```python
 import phylotreelib as pt
-treefile = pt.Newicktreefile("Commamox.newick")
+treefile = pt.Newicktreefile("Comammox.newick")
 tree = next(treefile)
 print(tree.nearest_n_leaves("nitrificans", 5))
 ```
