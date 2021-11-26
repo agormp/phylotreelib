@@ -3307,14 +3307,12 @@ class Treefile():
     # Classes for specific formats inherit from this class and add extra stuff as needed.
     # NOTE: i am opening files in "read text" with encoding UTF-8. Will this work across platforms?
 
-    def __init__(self, filename=None, ishandle=False, data=None):
+    def __init__(self, filename=None, data=None):
 
-        # Special filename "-" indicates stdin.
-        # Read all data from stdin, place it in virtual (RAM) file, use that instead of real file
-        if ishandle:
-            self.treefile = StringIO(data)
-        elif filename == "-":
-            data = sys.stdin.read()
+        num_args = (filename is not None) + (data is not None)
+        if num_args != 1:
+            raise TreeError("Treefile __init__ requires either filename or data (not both)")
+        elif data:
             self.treefile = StringIO(data)
         else:
             self.treefile = open(filename, mode="rt", encoding="UTF-8")
@@ -3374,8 +3372,8 @@ class Treefile():
 class Newicktreefile(Treefile):
     """Class representing Newick tree file. Iteration returns tree-objects"""
 
-    def __init__(self, filename, ishandle=False, data=None):
-        Treefile.__init__(self, filename, ishandle, data)
+    def __init__(self, filename=None, data=None):
+        Treefile.__init__(self, filename, data)
         # HACK!!! Minimal file format check:
         # Read first three lines in file, check whether any of them contains "#NEXUS".
         # If so then this is presumably NOT a Newick file (but a nexus file...) => exit.
@@ -3415,10 +3413,10 @@ class Nexustreefile(Treefile):
 
     ###############################################################################################
 
-    def __init__(self, filename):
+    def __init__(self, filename=None, data=None):
         """Read past NEXUS file header, parse translate block if present"""
 
-        Treefile.__init__(self, filename)
+        Treefile.__init__(self, filename, data)
 
         # Can be called with a file-object or any other object that supports
         # iteration by line ("for line in object:") while retaining state information
