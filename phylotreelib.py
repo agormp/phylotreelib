@@ -1355,7 +1355,7 @@ class Tree():
 
     ###############################################################################################
 
-    def figtree(self, printdist=True, printlabels=True, precision=6,
+    def figtree(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6,
                 colorlist=None, color="0000FF"):
         """Returns figtree format tree as a string"""
 
@@ -1377,7 +1377,7 @@ class Tree():
         stringlist.append("\nbegin trees;\n\ttree nexus_tree = ")
 
         # Add newick tree string
-        stringlist.append(self.newick(printdist, printlabels, precision))
+        stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision))
 
         # Add footer
         stringlist.append("\nend;\n")
