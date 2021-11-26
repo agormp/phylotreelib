@@ -791,7 +791,7 @@ class Tree():
         try:
             return self.parent_dict[node]
         except KeyError as err:
-            raise TreeError("Node {} does not exist".format(node)) from err
+            raise TreeError("Node {} does not exist (as a key in parent_dict)".format(node)) from err
 
     ###############################################################################################
 
@@ -1683,6 +1683,10 @@ class Tree():
         blen1: length of branch added to tree1 below graftpoint (lower of two newly created branches)
         blen2: length of branch above graft point and below tree2 (upper of two newly created branches)
         graftlabel: prepend value of "label" to leaf names on t2 (e.g: "graft_s1")"""
+
+        # Check that node1 is not root in tree1 (self)
+        if node1 == self.root:
+            raise TreeError("It is not possible to graft other tree below root-node: {}".format(node1))
 
         # Add new intnode on branch in tree1 where tree2 is to be grafted
         parent1 = self.parent(node1)
