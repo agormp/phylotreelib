@@ -10,6 +10,7 @@ import copy
 import tempfile
 import os
 import itertools
+from io import StringIO
 
 ###################################################################################################
 ###################################################################################################
@@ -489,7 +490,7 @@ class TreeOutput(TreeTestBase):
 
     # NOTE: I am also testing string output in the iteration class. Drop this?
 
-    def test_newick_sanity(self):
+    def test_newick_output(self):
         """Sanity check: check consistency between Tree.from_string() and newick()"""
         for instring in self.treedata.values():
             mytree = pt.Tree.from_string(instring)
@@ -497,7 +498,16 @@ class TreeOutput(TreeTestBase):
             mytree2 = pt.Tree.from_string(outstring)
             self.assertEqual(mytree, mytree2)
 
-# Implement nexus test? Or merely check consistency with nexusfile reader?
+    # def test_nexus_output(self):
+    #     """Sanity check: check consistency between Tree.from_string() and newick()"""
+    #     for instring in self.treedata.values():
+    #         mytree = pt.Tree.from_string(instring)
+    #         outstring = mytree.nexus()
+    #         ne
+    #         nexusfile = pt.Nexustreefile(
+    #         mytree2 = pt.Tree.from_string(outstring)
+    #         self.assertEqual(mytree, mytree2)
+
 
 ########################################################################################
 ########################################################################################
