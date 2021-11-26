@@ -200,119 +200,76 @@ A textual representation of a Tree object can be obtained using: "print(mytree)"
 
 ```
 >>> print(mytree)
-|------------------------------------------------------------------|
-|  Node  |              Child               |  Distance  |  Label  |
-|------------------------------------------------------------------|
-|     0  |  tetM_AF333235_Clostridium_diff  |  0.045404  |         |
-|     0  |                         9830414  |  0.003285  |         |
-|     0  |                         9830359  |  0.001099  |         |
-|     0  |                               1  |  0.018480  |   1.00  |
-|     1  |                              24  |  0.007180  |   1.00  |
-|     1  |                               2  |  0.026523  |   1.00  |
-|    24  |                         9830470  |  0.001096  |         |
-|    24  |                         9830409  |  0.000563  |         |
-|     2  |                               3  |  0.016300  |   0.77  |
-|     2  |  tetO_AY190525_Campylobacter_je  |  0.565353  |         |
-|     3  |                              17  |  0.007065  |   0.82  |
-|     3  |                               4  |  0.006912  |   1.00  |
-|    17  |                              18  |  0.004701  |   1.00  |
-|    17  |                              19  |  0.001937  |   0.87  |
-|     4  |                               5  |  0.003834  |   1.00  |
-|     4  |                               6  |  0.007932  |   1.00  |
-|    18  |  tetM_X90939_Streptococcus_pneu  |  0.000804  |         |
-|    18  |   tetM_AF376746rc_Streptococcus  |  0.001385  |         |
-|    19  |                              20  |  0.001780  |   0.98  |
-|    19  |                              21  |  0.007687  |   0.97  |
-|     5  |                           20028  |  0.001084  |         |
-|     5  |                           18854  |  0.000562  |         |
-|     6  |  tetM_U58986_Gardnerella_vagina  |  0.007218  |         |
-|     6  |                               7  |  0.010529  |   1.00  |
-|    20  |  tetM_AJ580978_Streptococcus_mi  |  0.004311  |         |
-|    20  |  tetM_AJ580977_Streptococcus_mi  |  0.002311  |         |
-|    21  |  tetM_L12242_Neisseria_gonorrho  |  0.001760  |         |
-|    21  |                              22  |  0.011284  |   1.00  |
-|     7  |  tetM_L12241_Neisseria_gonorrho  |  0.001992  |         |
-|     7  |                               8  |  0.008244  |   1.00  |
-|     8  |                               9  |  0.006822  |   1.00  |
-|     8  |  tetM_U58985_Gardnerella_vagina  |  0.000684  |         |
-|    22  |  tetM_X04388_Enterococcus_faeca  |  0.000610  |         |
-|    22  |                              23  |  0.002168  |   1.00  |
-|     9  |                              10  |  0.002313  |   1.00  |
-|     9  |                              12  |  0.001110  |   0.83  |
-|    23  |                           20074  |  0.000577  |         |
-|    23  |  tetM_AB054984_Clostridium_sept  |  0.002784  |         |
-|    10  |                           20032  |  0.000537  |         |
-|    10  |                              11  |  0.002783  |   1.00  |
-|    10  |  tetM_X92947_Enterococcus_faeca  |  0.001092  |         |
-|    10  |                         9830090  |  0.000543  |         |
-|    10  |                         9830498  |  0.000536  |         |
-|    10  |  tetM_M85225_Enterococcus_faeca  |  0.000536  |         |
-|    10  |  tetM_U09422_Enterococcus_faeca  |  0.000541  |         |
-|    10  |                         9830479  |  0.000547  |         |
-|    10  |                           18836  |  0.000542  |         |
-|    10  |                           15109  |  0.000540  |         |
-|    10  |                         9830457  |  0.000536  |         |
-|    10  |                         9830491  |  0.000537  |         |
-|    12  |                              16  |  0.001123  |   0.99  |
-|    12  |                              13  |  0.005133  |   1.00  |
-|    12  |                              14  |  0.002217  |   1.00  |
-|    16  |  tetM_ABO39845_Erysipelothrix_r  |  0.000567  |         |
-|    16  |  tetM_AF329848_Clostridium_perf  |  0.000547  |         |
-|    11  |  tetM_X56353_Enterococcus_faeca  |  0.000559  |         |
-|    11  |  tetM_AJ580976_Streptococcus_or  |  0.004525  |         |
-|    13  |  tetM_U08812_Ureaplasma_urealyt  |  0.004481  |         |
-|    13  |  tetM_X75073_Neisseria_meningit  |  0.001664  |         |
-|    13  |  tetM_AOE14233_Streptococcus_ag  |  0.000558  |         |
-|    13  |  tetM_AF440277_Lactobacillus_pl  |  0.001113  |         |
-|    14  |   tetM_AF491293_Bacillus_cereus  |  0.000589  |         |
-|    14  |                              15  |  0.022849  |   1.00  |
-|    15  |  tetM_M21136_Staphylococcus_aur  |  0.001704  |         |
-|    15  |  tetM_APO03359rc_Staphylococcus  |  0.000573  |         |
-|------------------------------------------------------------------|
+|-------------------------------------------------|
+|  Node  |     Child     |   Distance   |  Label  |
+|-------------------------------------------------|
+|     0  |      lmo0024  |   0.0246752  |         |
+|     0  |            1  |    0.972917  |   1.00  |
+|     0  |      lin0023  |   0.0627209  |         |
+|     1  |     SMU_1957  |     1.02145  |         |
+|     1  |            2  |    0.219277  |   0.83  |
+|     2  |           17  |    0.234726  |   0.98  |
+|     2  |            3  |    0.089033  |   0.81  |
+|    17  |      CPE0323  |    0.595102  |         |
+|    17  |      CPE2630  |    0.889163  |         |
+|     3  |            4  |    0.246187  |   0.86  |
+|     3  |           14  |    0.284347  |   1.00  |
+|     4  |            5  |    0.124892  |   0.99  |
+|     4  |            7  |    0.285426  |   0.85  |
+|    14  |           16  |    0.862141  |   1.00  |
+|    14  |           15  |    0.458832  |   1.00  |
+|     5  |  Bsu_COG3716  |    0.574712  |         |
+|     5  |            6  |    0.276761  |   1.00  |
+|     7  |            8  |   0.0462592  |   0.55  |
+|     7  |     SMU_1879  |     0.22478  |         |
+|     7  |         Lme1  |     0.29347  |         |
+|    16  |          Sag  |    0.300177  |         |
+|    16  |      CPE1463  |    0.178835  |         |
+|    15  |      lmo2000  |     0.10323  |         |
+|    15  |      lin2108  |   0.0582161  |         |
+|     6  |      lmo0781  |   0.0465803  |         |
+|     6  |      lin0774  |   0.0163573  |         |
+|     8  |            9  |   0.0570041  |   0.82  |
+|     8  |         Lls_  |    0.318751  |         |
+|     9  |           10  |   0.0290423  |   0.70  |
+|     9  |       LJ0505  |    0.256245  |         |
+|    10  |         Lme2  |     1.73392  |         |
+|    10  |           11  |   0.0534659  |   0.54  |
+|    10  |          Lpl  |    0.183936  |         |
+|    10  |           13  |    0.107465  |   0.99  |
+|    11  |       EF0022  |   0.0951663  |         |
+|    11  |           12  |    0.122973  |   0.92  |
+|    13  |      CPE0823  |    0.176274  |         |
+|    13  |          CAC  |    0.113429  |         |
+|    12  |      lin0145  |  0.00949095  |         |
+|    12  |      lmo0098  |   0.0119641  |         |
+|-------------------------------------------------|
 
-41 Leafs:
-------------------------------
-15109
-18836
-18854
-20028
-20032
-20074
-9830090
-9830359
-9830409
-9830414
-9830457
-9830470
-9830479
-9830491
-9830498
-tetM_AB054984_Clostridium_sept
-tetM_ABO39845_Erysipelothrix_r
-tetM_AF329848_Clostridium_perf
-tetM_AF333235_Clostridium_diff
-tetM_AF376746rc_Streptococcus
-tetM_AF440277_Lactobacillus_pl
-tetM_AF491293_Bacillus_cereus
-tetM_AJ580976_Streptococcus_or
-tetM_AJ580977_Streptococcus_mi
-tetM_AJ580978_Streptococcus_mi
-tetM_AOE14233_Streptococcus_ag
-tetM_APO03359rc_Staphylococcus
-tetM_L12241_Neisseria_gonorrho
-tetM_L12242_Neisseria_gonorrho
-tetM_M21136_Staphylococcus_aur
-tetM_M85225_Enterococcus_faeca
-tetM_U08812_Ureaplasma_urealyt
-tetM_U09422_Enterococcus_faeca
-tetM_U58985_Gardnerella_vagina
-tetM_U58986_Gardnerella_vagina
-tetM_X04388_Enterococcus_faeca
-tetM_X56353_Enterococcus_faeca
-tetM_X75073_Neisseria_meningit
-tetM_X90939_Streptococcus_pneu
-tetM_X92947_Enterococcus_faeca
-tetO_AY190525_Campylobacter_je
+23 Leafs:
+-----------
+Bsu_COG3716
+CAC
+CPE0323
+CPE0823
+CPE1463
+CPE2630
+EF0022
+LJ0505
+Lls_
+Lme1
+Lme2
+Lpl
+SMU_1879
+SMU_1957
+Sag
+lin0023
+lin0145
+lin0774
+lin2108
+lmo0024
+lmo0098
+lmo0781
+lmo2000
 ```
 
 ### Attributes on Tree objects
