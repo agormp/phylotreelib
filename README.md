@@ -6,7 +6,7 @@ https://static.pepy.tech/personalized-badge/phylotreelib?     period=total&units
 
 
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/phylotreelib)
-![](https://img.shields.io/badge/version-1.4.1-blue)
+![](https://img.shields.io/badge/version-1.4.2-blue)
 
 
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
