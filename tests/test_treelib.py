@@ -498,16 +498,14 @@ class TreeOutput(TreeTestBase):
             mytree2 = pt.Tree.from_string(outstring)
             self.assertEqual(mytree, mytree2)
 
-    # def test_nexus_output(self):
-    #     """Sanity check: check consistency between Tree.from_string() and newick()"""
-    #     for instring in self.treedata.values():
-    #         mytree = pt.Tree.from_string(instring)
-    #         outstring = mytree.nexus()
-    #         ne
-    #         nexusfile = pt.Nexustreefile(
-    #         mytree2 = pt.Tree.from_string(outstring)
-    #         self.assertEqual(mytree, mytree2)
-
+    def test_nexus_output(self):
+        """Check that output from nexus() can be parsed by Nexustreefile()"""
+        for instring in self.treedata.values():
+            mytree = pt.Tree.from_string(instring)
+            nexus_string = mytree.nexus()
+            nexusfile = pt.Nexustreefile(data=nexus_string)
+            mytree2 = next(nexusfile)
+            self.assertEqual(mytree, mytree2)
 
 ########################################################################################
 ########################################################################################
