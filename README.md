@@ -1,4 +1,9 @@
 # phylotreelib: python library for analyzing and manipulating phylogenetic trees
+[![Downloads](https://static.pepy.tech/personalized-badge/pypi-command-line?period=total&units=none&left_color=black&right_color=blue&left_text=Total)](https://pepy.tech/project/pypi-command-line)
+
+https://static.pepy.tech/personalized-badge/pypi-command-line?period=total&units=none&left_color=black&right_color=blue&left_text=Total
+https://static.pepy.tech/personalized-badge/phylotreelib?     period=total&units=none&left_color=black&right_color=green&left_text=PyPI%20Downloads)
+
 
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/phylotreelib)
 ![](https://img.shields.io/badge/version-1.4.1-blue)
@@ -470,7 +475,7 @@ CLASSES
      |      Return diameter: longest leaf-leaf distance along tree.
      |      If return_leaves is True: Return tuple with (maxdist, Leaf1, Leaf2)
      |
-     |  figtree(self, printdist=True, printlabels=True, precision=6, colorlist=None, color='0000FF')
+     |  figtree(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6, colorlist=None, color='0000FF')
      |      Returns figtree format tree as a string
      |
      |  find_central_leaf(self, leaflist)
@@ -537,7 +542,7 @@ CLASSES
      |  newick(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6)
      |      Returns Newick format tree string representation of tree object
      |
-     |  nexus(self, printdist=True, printlabels=True, precision=6)
+     |  nexus(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6)
      |      Returns nexus format tree as a string
      |
      |  nodedepth(self, node)
@@ -664,14 +669,15 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
 
+
     class Treefile(builtins.object)
-     |  Treefile(filename=None, ishandle=False, data=None)
+     |  Treefile(filename=None, data=None)
      |
      |  Abstract base-class for representing tree file objects.
      |
      |  Methods defined here:
      |
-     |  __init__(self, filename=None, ishandle=False, data=None)
+     |  __init__(self, filename=None, data=None)
      |      Initialize self.  See help(type(self)) for accurate signature.
      |
      |  get_treestring(self)
@@ -689,8 +695,9 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
 
+
     class Newicktreefile(Treefile)
-     |  Newicktreefile(filename, ishandle=False, data=None)
+     |  Newicktreefile(filename=None, data=None)
      |
      |  Class representing Newick tree file. Iteration returns tree-objects
      |
@@ -701,7 +708,7 @@ CLASSES
      |
      |  Methods defined here:
      |
-     |  __init__(self, filename, ishandle=False, data=None)
+     |  __init__(self, filename=None, data=None)
      |      Initialize self.  See help(type(self)) for accurate signature.
      |
      |  __iter__(self)
@@ -727,7 +734,7 @@ CLASSES
      |      list of weak references to the object (if defined)
 
     class Nexustreefile(Treefile)
-     |  Nexustreefile(filename)
+     |  Nexustreefile(filename=None, data=None)
      |
      |  Class representing Nexus tree file. Iteration returns tree object or None
      |
@@ -738,7 +745,7 @@ CLASSES
      |
      |  Methods defined here:
      |
-     |  __init__(self, filename)
+     |  __init__(self, filename=None, data=None)
      |      Read past NEXUS file header, parse translate block if present
      |
      |  __iter__(self)
@@ -763,45 +770,6 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
 
-    class TreeSet(builtins.object)
-     |  Class for storing and manipulating a number of trees
-     |
-     |  Methods defined here:
-     |
-     |  __getitem__(self, index)
-     |      Implements indexing of treeset.
-     |
-     |      Simple index returns single tree.
-     |      Slice returns TreeSet object with selected subset of trees
-     |
-     |  __init__(self)
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  __len__(self)
-     |
-     |  addtree(self, tree)
-     |      Adds Tree object to Treeset object
-     |
-     |  addtreeset(self, treeset)
-     |      Adds all trees in TreeSet object to this TreeSet object
-     |
-     |  newick(self, printdist=True, printlabels=True)
-     |      Returns newick format tree as a string
-     |
-     |  nexus(self, printdist=True, printlabels=True)
-     |      Returns nexus format tree as a string
-     |
-     |  rootmid(self)
-     |      Performs midpoint rooting on all trees in TreeSet
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
 
     class TreeSummary(builtins.object)
      |  TreeSummary(include_zeroterms=False)
@@ -839,6 +807,7 @@ CLASSES
      |
      |  __weakref__
      |      list of weak references to the object (if defined)
+
 
     class BigTreeSummary(TreeSummary)
      |  BigTreeSummary(include_zeroterms=False, outgroup=None, rootmid=False)
@@ -888,6 +857,7 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
 
+
     class Distmatrix(builtins.object)
      |  Class representing distance matrix for set of taxa. Knows hot to compute trees
      |
@@ -935,6 +905,7 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
 
+
     class Globals(builtins.object)
      |  Class containing globally used functions and labels.
      |
@@ -950,6 +921,7 @@ CLASSES
      |  Data and other attributes defined here:
      |
      |  biparts = {}
+
 
     class Branchstruct(builtins.object)
      |  Branchstruct(length=0.0, label='')
@@ -969,6 +941,7 @@ CLASSES
      |
      |  __weakref__
      |      list of weak references to the object (if defined)
+
 
     class Topostruct(builtins.object)
      |  Topostruct(count=1, treestring='')
@@ -1057,6 +1030,48 @@ CLASSES
      |  __traceback__
      |
      |  args
+
+
+    class TreeSet(builtins.object)
+     |  Class for storing and manipulating a number of trees
+     |
+     |  Methods defined here:
+     |
+     |  __getitem__(self, index)
+     |      Implements indexing of treeset.
+     |
+     |      Simple index returns single tree.
+     |      Slice returns TreeSet object with selected subset of trees
+     |
+     |  __init__(self)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  __len__(self)
+     |
+     |  addtree(self, tree)
+     |      Adds Tree object to Treeset object
+     |
+     |  addtreeset(self, treeset)
+     |      Adds all trees in TreeSet object to this TreeSet object
+     |
+     |  newick(self, printdist=True, printlabels=True)
+     |      Returns newick format tree as a string
+     |
+     |  nexus(self, printdist=True, printlabels=True)
+     |      Returns nexus format tree as a string
+     |
+     |  rootmid(self)
+     |      Performs midpoint rooting on all trees in TreeSet
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
 
 
 FUNCTIONS
