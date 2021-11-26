@@ -446,6 +446,11 @@ class Tree():
     def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
         """Constructor 4: tree with random topology from list of leaf names OR number of tips"""
 
+        # Implementation note: random trees are constructed by randomly resolving star-tree
+        # Should perhaps use actual bifurcating process to generate random trees instead?
+        # At least when adding branch lengths (otherwise distribution of brlens on tree will
+        # be quite different from real trees, thus biasing statistical inference
+
         if leaflist is None and ntips is None:
             msg = "Must specify either list of leafnames or number of tips to create random tree"
             raise TreeError(msg)
@@ -1334,14 +1339,14 @@ class Tree():
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, precision=6):
+    def nexus(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6):
         """Returns nexus format tree as a string"""
 
         # Construct header
         stringlist = ["#NEXUS\n\nbegin trees;\n   tree nexus_tree = "]
 
         # Add newick tree string
-        stringlist.append(self.newick(printdist, printlabels, precision))
+        stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision))
 
         # Add footer
         stringlist.append("\nend;\n")
@@ -2763,6 +2768,7 @@ class Tree():
 
         # Subtree Prune:
         # Create Tree object corresponding to subtree. Remove subtree from self one leaf at a time
+        # Python note: should check that regraft node is in self after removing subtree
         subtree = self.subtree(subtree_node)
         for leaf in self.remote_children(subtree_node):
             self.remove_leaf(leaf)
