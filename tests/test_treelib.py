@@ -488,10 +488,10 @@ class PathMethods(TreeTestBase):
 class TreeOutput(TreeTestBase):
     """Tests of stringoutput"""
 
-    # NOTE: I am also testing string output in the iteration class. Drop this?
+    # NOTE: I am also testing string output in the iteration class.
 
     def test_newick_output(self):
-        """Sanity check: check consistency between Tree.from_string() and newick()"""
+        """Sanity check: check that output from newick() can be parsed by Tree.from_string()"""
         for instring in self.treedata.values():
             mytree = pt.Tree.from_string(instring)
             outstring = mytree.newick()
@@ -506,6 +506,21 @@ class TreeOutput(TreeTestBase):
             nexusfile = pt.Nexustreefile(data=nexus_string)
             mytree2 = next(nexusfile)
             self.assertEqual(mytree, mytree2)
+
+    def test_contree_nexus_output(self):
+        """Check that nexus output from result of contree can be parsed by Nexustreefile"""
+
+        # Generate 10 random trees with same leaf names, compute consensus tree
+        # This function only checks that nexus string can be parsed, not that
+        # contree is correct
+        treesummary = pt.TreeSummary()
+        for i in range(10):
+            tree = pt.Tree.randtree(ntips=50, name_prefix="test_")
+            treesummary.add_tree(tree)
+        contree = treesummary.contree()
+        nexus_string = contree.nexus()
+        nexusfile = pt.Nexustreefile(data=nexus_string)
+        mytree = next(nexusfile)
 
 ########################################################################################
 ########################################################################################
