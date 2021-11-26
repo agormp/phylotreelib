@@ -10,6 +10,7 @@ import copy
 import tempfile
 import os
 import itertools
+import random
 from io import StringIO
 
 ###################################################################################################
@@ -510,15 +511,25 @@ class TreeOutput(TreeTestBase):
     def test_contree_nexus_output(self):
         """Check that nexus output from result of contree can be parsed by Nexustreefile"""
 
-        # Generate 10 random trees with same leaf names, compute consensus tree
-        # This function only checks that nexus string can be parsed, not that
-        # contree is correct
+        # Generate a random tree, create 10 variants using random spr, compute consensus tree
+        # This function only checks that nexus string can be parsed, not that contree is correct
         treesummary = pt.TreeSummary()
+        rand_tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
         for i in range(10):
-            tree = pt.Tree.randtree(ntips=50, name_prefix="test_")
+            tree = copy.deepcopy(rand_tree)
+            most_distant, maxdist = tree.find_most_distant(tree.root, tree.leaves)
+            parent = tree.parent(most_distant)
+            grandparent = tree.parent(parent)
+            subtree_leaves = tree.remote_children(grandparent)
+            rest_leaves = tree.leaves - subtree_leaves
+            try:
+                regraft_node = random.choice(list(rest_leaves))
+            except:
+                print(rest_leaves)
+            tree.spr(grandparent, regraft_node)
             treesummary.add_tree(tree)
         contree = treesummary.contree()
-        nexus_string = contree.nexus()
+        nexus_string = contree.nexus(print_leaflabels=False)
         nexusfile = pt.Nexustreefile(data=nexus_string)
         mytree = next(nexusfile)
 
