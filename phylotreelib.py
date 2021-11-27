@@ -3349,6 +3349,17 @@ class Treefile():
 
     ###############################################################################################
 
+    def read_tree(self):
+        """Reads one tree from file and returns as Tree object. Returns None when exhausted file"""
+
+        try:
+            tree = next(self)
+            return tree
+        except StopIteration:
+            return None
+
+    ###############################################################################################
+
     def read_trees(self, discardprop=0.0):
         """Reads trees from file and returns as TreeSet object. Can discard fraction of trees"""
 
