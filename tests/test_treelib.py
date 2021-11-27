@@ -504,7 +504,7 @@ class TreeOutput(TreeTestBase):
         for instring in self.treedata.values():
             mytree = pt.Tree.from_string(instring)
             nexus_string = mytree.nexus()
-            nexusfile = pt.Nexustreefile(data=nexus_string)
+            nexusfile = pt.Nexustreefile(filecontent=nexus_string)
             mytree2 = next(nexusfile)
             self.assertEqual(mytree, mytree2)
 
@@ -530,7 +530,7 @@ class TreeOutput(TreeTestBase):
             treesummary.add_tree(tree)
         contree = treesummary.contree()
         nexus_string = contree.nexus(print_leaflabels=False)
-        nexusfile = pt.Nexustreefile(data=nexus_string)
+        nexusfile = pt.Nexustreefile(filecontent=nexus_string)
         mytree = next(nexusfile)
 
 ########################################################################################
