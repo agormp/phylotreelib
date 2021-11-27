@@ -40,7 +40,7 @@ and finally print out the name and root-to-tip distance (measured along the bran
 ```python
 import phylotreelib as pt
 treefile = pt.Nexustreefile("mytreefile.nexus")
-mytree = treefile.read_tree()
+mytree = treefile.readtree()
 mytree.rootminvar()
 rootnode = mytree.root
 for tip in mytree.leaves:
@@ -116,7 +116,7 @@ The code below opens a Newick file, reads one Tree object from the file, and the
 ```python
 import phylotreelib as pt
 treefile = pt.Newicktreefile("Comammox.newick")
-tree = treefile.read_tree()
+tree = treefile.readtree()
 print(tree.nearest_n_leaves("nitrificans", 5))
 ```
 
