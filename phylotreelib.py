@@ -2811,6 +2811,32 @@ class TreeSet():
 
     ###############################################################################################
 
+    def __iter__(self):
+        """Returns fresh iterator object allowing iteration over Treeset (which is itself an iterable)"""
+        return self.TreeSetIterator(self)
+
+    ###############################################################################################
+
+    class TreeSetIterator():
+
+        def __init__(self, treeset):
+            self.treelist = treeset.treelist
+            self.i = 0
+            self.max = len(treeset.treelist)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            if self.i < self.max:
+                next_tree = self.treelist[self.i]
+                self.i += 1
+                return next_tree
+            else:
+                raise StopIteration
+
+    ###############################################################################################
+
     def addtree(self, tree):
         """Adds Tree object to Treeset object"""
         self.treelist.append(tree)
