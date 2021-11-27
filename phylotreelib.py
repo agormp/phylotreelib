@@ -3307,13 +3307,13 @@ class Treefile():
     # Classes for specific formats inherit from this class and add extra stuff as needed.
     # NOTE: i am opening files in "read text" with encoding UTF-8. Will this work across platforms?
 
-    def __init__(self, filename=None, data=None):
+    def __init__(self, filename=None, filecontent=None):
 
-        num_args = (filename is not None) + (data is not None)
+        num_args = (filename is not None) + (filecontent is not None)
         if num_args != 1:
-            raise TreeError("Treefile __init__ requires either filename or data (not both)")
-        elif data:
-            self.treefile = StringIO(data)
+            raise TreeError("Treefile __init__ requires either filename or filecontent (not both)")
+        elif filecontent:
+            self.treefile = StringIO(filecontent)
         else:
             self.treefile = open(filename, mode="rt", encoding="UTF-8")
 
@@ -3372,8 +3372,8 @@ class Treefile():
 class Newicktreefile(Treefile):
     """Class representing Newick tree file. Iteration returns tree-objects"""
 
-    def __init__(self, filename=None, data=None):
-        Treefile.__init__(self, filename, data)
+    def __init__(self, filename=None, filecontent=None):
+        Treefile.__init__(self, filename, filecontent)
         # HACK!!! Minimal file format check:
         # Read first three lines in file, check whether any of them contains "#NEXUS".
         # If so then this is presumably NOT a Newick file (but a nexus file...) => exit.
@@ -3413,18 +3413,10 @@ class Nexustreefile(Treefile):
 
     ###############################################################################################
 
-    def __init__(self, filename=None, data=None):
+    def __init__(self, filename=None, filecontent=None):
         """Read past NEXUS file header, parse translate block if present"""
 
-        Treefile.__init__(self, filename, data)
-
-        # Can be called with a file-object or any other object that supports
-        # iteration by line ("for line in object:") while retaining state information
-        # (a second for loop should start where the first for-loop stopped iterating)
-        # Optional argument "noreturn" is a boolean that controls whether iteration
-        # should return a tree object (default, happens when noreturn==False),
-        # or whether None should be returned (happens when noreturn==True)
-        # Useful for skipping part of treefile as quickly as possible
+        Treefile.__init__(self, filename, filecontent)
 
         ###########################################################################################
 
