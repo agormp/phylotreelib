@@ -1,7 +1,7 @@
 # phylotreelib: python library for analyzing and manipulating phylogenetic trees
 
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/phylotreelib)
-![](https://img.shields.io/badge/version-1.4.3-blue)
+![](https://img.shields.io/badge/version-1.5.0-blue)
 
 
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
@@ -34,13 +34,13 @@ python3 -m pip install phylotreelib
 
 ## Quick start usage examples
 
-The code below will import phylotreelib, open a NEXUS file, retrieve one Tree object from the file, perform minimum-variance rooting, find the node ID for the new rootnode,
+The code below will import phylotreelib, open a NEXUS file, read one Tree object from the file, perform minimum-variance rooting, find the node ID for the new rootnode,
 and finally print out the name and root-to-tip distance (measured along the branches) for all leaves in the tree:
 
 ```python
 import phylotreelib as pt
 treefile = pt.Nexustreefile("mytreefile.nexus")
-mytree = next(treefile)
+mytree = treefile.read_tree()
 mytree.rootminvar()
 rootnode = mytree.root
 for tip in mytree.leaves:
@@ -111,12 +111,12 @@ with open("contree.newick", "w") as outfile:
 
 -----
 
-The code below opens a Newick file, retrieves one Tree object from the file, and then finds the 5 leaves that are closest (measured along the branches) to the leaf labeled "nitrificans".
+The code below opens a Newick file, reads one Tree object from the file, and then finds the 5 leaves that are closest (measured along the branches) to the leaf labeled "nitrificans".
 
 ```python
 import phylotreelib as pt
 treefile = pt.Newicktreefile("Comammox.newick")
-tree = next(treefile)
+tree = treefile.read_tree()
 print(tree.nearest_n_leaves("nitrificans", 5))
 ```
 
@@ -128,61 +128,76 @@ Output:
 
 ## Using phylotreelib
 
-Typically, phylotreelib will be used for analysing one or more trees that have been read from a textfile. This is done by first constructing a Nexus or Newick treefile object (by providing a file name), and then retrieving Tree objects from this treefile object. Tree objects then have a number of methods that can be used to analyse or alter the tree in question.
+Typically, phylotreelib will be used for analysing one or more trees that have been read from a textfile in Newick or Nexus format.
 
-### Constructing treefile objects
+### Opening a treefile
 
-Treefile objects are constructed by providing the name of a properly formatted textfile to either the Newicktreefile or Nexustreefile constructors:
+To open a Newick format file:
 
-Newick files:
 ```
 treefile = phylotreelib.Newicktreefile(filename)
 ```
 
-NEXUS files:
+To open a Nexus format file:
+
 ```
 treefile = phylotreelib.Nexustreefile(filename)
 ```
 
-### Constructing Tree objects
+These commands will return a file object with methods for reading the contents of the file.
 
-Tree objects can be constructed either directly (using one of several possible alternative constructors), or they can be retrieved from Treefile objects by iteration.
+### Reading one or more trees from a treefile
 
-#### Getting Tree objects from a treefile (NEXUS or Newick format)
+To read one tree from an opened treefile:
 
-Doing something to all trees in a treefile object:
+```
+tree = treefile.readtree()
+```
+
+This returns a Tree object, which has methods for analysing and manipulating the tree (itself). By calling readtree() repeatedly, you can read additional trees from the file. The `readtree()` method returns `None` when all trees have been read.
+
+The `readtrees()` method returns all the trees in the file in the form of a Treeset object. Treeset objects contains a list of Tree objects and has methods for rooting and outputting all trees in the collection:
+
+```
+treeset = treefile.readtrees()
+```
+
+It is also possible to retrieve all the trees from an open treefile one at a time by looping over the file:
+
 ```
 for tree in treefile:
 	<do something with tree>
 ```
 
-Getting a single tree from a treefile object:
-```
-tree = next(treefile)
-```
+### Constructing Tree objects directly
+
+Instead of reading a tree from a file, you can also construct Tree objects using one of the 3 alternative constructors in the Tree class.
 
 #### Constructing Tree object from string
 
 Tree objects can be constructed directly from a string (where the string is a Newick formatted tree):
+
 ```
 tree = phylotreelib.Tree.from_string(mystring)
 ```
 
-#### Constructing Tree object from list of leaf names
+#### Constructing Tree object with star-tree topology from list of leaf names
 
 Tree objects (with a star topology) can be constructed from a list of leaf names:
+
 ```
 tree = phylotreelib.Tree.from_leaves(leaflist)
 ```
 
 #### Constructing Tree object with random topology and branch lengths
 
-It is possible to construct Tree objects with random tree topology, e.g. for purposes where you need a null distribution of some tree-related measure, using the randtree constructor:
+It is possible to construct Tree objects with random tree topology using the randtree constructor:
+
 ```
 tree = phylotreelib.Tree.randtree(leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
 ```
 
-Either a list of names or the number of tips can be specified as a way of setting the size of the tree. If the function parameter randomlen is True then branches will get random lengths drawn from a lognormal distribution.
+Either a list of names (`leaflist`) or the number of tips (`ntips`) can be specified as a way of setting the size of the tree. If the function argument `randomlen` is True then branches will get random lengths drawn from a lognormal distribution.
 
 ### Structure of Tree objects
 
@@ -287,10 +302,7 @@ List of useful Tree object attributes:
 
 ### Methods for analyzing and altering Tree objects.
 
-Tree objects also have a number of methods that can be used to analyze and alter them. In
-addition to what's mentioned below, phylotreelib also contains additional methods, but
-these are mostly for internal use in phylotreelib (not for application programming),
-and are subject to change if I come up with better implementations.
+Tree objects also have a number of methods that can be used to analyze and alter them.
 
 One example of using a Tree object method is:
 
@@ -304,8 +316,8 @@ A full list of classes and methods in phylotreelib is at the end of this README
 
 ### Exceptions.
 
-phylotreelib has its own error class ("TreeError"), which may be handy for catching
-tree-related errors in your own program and dealing with it intelligently:
+phylotreelib has its own error class ("TreeError"), which can be used for raising and catching
+tree-related errors in your own program and dealing with errors intelligently:
 
 Example usage:
 
@@ -336,7 +348,7 @@ if nodename not in tree.nodes:
 
 ### Help for all classes and methods in phylotreelib
 
-(Output from pydoc on module, sorted in order of relevance for application programming)
+(Output from pydoc on module, classes listed in alphabetical order)
 
 ```
 Help on module phylotreelib:
@@ -345,7 +357,9 @@ NAME
     phylotreelib - Classes and methods for analyzing, manipulating, and building phylogenetic trees
 
 CLASSES
+    builtins.Exception(builtins.BaseException)
         TreeError
+    builtins.object
         Branchstruct
         Distmatrix
         Globals
@@ -357,6 +371,235 @@ CLASSES
         Treefile
             Newicktreefile
             Nexustreefile
+
+    class BigTreeSummary(TreeSummary)
+     |  BigTreeSummary(include_zeroterms=False, outgroup=None, rootmid=False)
+     |
+     |  Class summarizing bipartitions, branch lengths, and topologies from many trees
+     |
+     |  Method resolution order:
+     |      BigTreeSummary
+     |      TreeSummary
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, include_zeroterms=False, outgroup=None, rootmid=False)
+     |      TreeSummary constructor. Initializes relevant data structures
+     |
+     |  add_tree(self, curtree, weight=1.0)
+     |      Add tree to treesummary, update all summaries
+     |
+     |  topo_report(self)
+     |      Returns list of [freq, treestring] lists
+     |
+     |  update(self, treesummary)
+     |      Merge this class with other treesummary
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from TreeSummary:
+     |
+     |  bipart_report(self, includeleaves=True, minfreq=0.05)
+     |      Return processed, almost directly printable, summary of all observed bipartitions
+     |
+     |  bipart_result(self)
+     |      Return raw summary of all observed bipartitions
+     |
+     |  bipart_to_string(self, bipartition, position_dict)
+     |      Takes bipartition (set of two leaf sets) and returns string representation
+     |
+     |  contree(self, cutoff=0.5, allcompat=False, lab='freq')
+     |      Returns a consensus tree built from selected bipartitions
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from TreeSummary:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+    class Branchstruct(builtins.object)
+     |  Branchstruct(length=0.0, label='')
+     |
+     |  Class that emulates a struct. Keeps branch-related info
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, length=0.0, label='')
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+    class Distmatrix(builtins.object)
+     |  Class representing distance matrix for set of taxa. Knows hot to compute trees
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  __str__(self)
+     |      Returns distance matrix as string
+     |
+     |  getdist(self, name1, name2)
+     |      Returns distance between named entries
+     |
+     |  nj(self)
+     |      Computes neighbor joining tree, returns Tree object
+     |
+     |  setdist(self, name1, name2, dist)
+     |      Sets distance between named entries
+     |
+     |  upgma(self)
+     |      Computes UPGMA tree, returns Tree object
+     |
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |
+     |  from_alignment(alignment, dist='pdist') from builtins.type
+     |      Construct Distmatrix object from alignment object
+     |
+     |  from_distdict(distdict) from builtins.type
+     |      Construct Distmatrix object from dictionary of {(name1, name2):dist}
+     |
+     |  from_numpy_array(nparray, namelist, n) from builtins.type
+     |      Construct Distmatrix object from numpy array and corresponding list of names
+     |
+     |  from_phylip_string(dmat_string, n=None) from builtins.type
+     |      Constructs Distmatrix object from string corresponding to PHYLIP square distance matrix
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+    class Globals(builtins.object)
+     |  Class containing globally used functions and labels.
+     |
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  biparts = {}
+
+    class Newicktreefile(Treefile)
+     |  Newicktreefile(filename=None, filecontent=None)
+     |
+     |  Class representing Newick tree file. Iteration returns tree-objects
+     |
+     |  Method resolution order:
+     |      Newicktreefile
+     |      Treefile
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, filename=None, filecontent=None)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  __iter__(self)
+     |
+     |  __next__(self)
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from Treefile:
+     |
+     |  get_treestring(self)
+     |      Return next tree-string
+     |
+     |  read_tree(self)
+     |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
+     |
+     |  read_trees(self, discardprop=0.0)
+     |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from Treefile:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+    class Nexustreefile(Treefile)
+     |  Nexustreefile(filename=None, filecontent=None)
+     |
+     |  Class representing Nexus tree file. Iteration returns tree object or None
+     |
+     |  Method resolution order:
+     |      Nexustreefile
+     |      Treefile
+     |      builtins.object
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, filename=None, filecontent=None)
+     |      Read past NEXUS file header, parse translate block if present
+     |
+     |  __iter__(self)
+     |
+     |  __next__(self, noreturn=False)
+     |
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from Treefile:
+     |
+     |  get_treestring(self)
+     |      Return next tree-string
+     |
+     |  read_tree(self)
+     |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
+     |
+     |  read_trees(self, discardprop=0.0)
+     |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from Treefile:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+    class Topostruct(builtins.object)
+     |  Topostruct(count=1, treestring='')
+     |
+     |  Class that emulates a struct. Keeps topology-related info
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, count=1, treestring='')
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
 
     class Tree(builtins.object)
      |  Class representing basic phylogenetic tree object.
@@ -621,300 +864,6 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
 
-
-    class Treefile(builtins.object)
-     |  Treefile(filename=None, data=None)
-     |
-     |  Abstract base-class for representing tree file objects.
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, filename=None, data=None)
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  get_treestring(self)
-     |      Return next tree-string
-     |
-     |  read_trees(self, discardprop=0.0)
-     |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-
-    class Newicktreefile(Treefile)
-     |  Newicktreefile(filename=None, data=None)
-     |
-     |  Class representing Newick tree file. Iteration returns tree-objects
-     |
-     |  Method resolution order:
-     |      Newicktreefile
-     |      Treefile
-     |      builtins.object
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, filename=None, data=None)
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  __iter__(self)
-     |
-     |  __next__(self)
-     |
-     |  ----------------------------------------------------------------------
-     |  Methods inherited from Treefile:
-     |
-     |  get_treestring(self)
-     |      Return next tree-string
-     |
-     |  read_trees(self, discardprop=0.0)
-     |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors inherited from Treefile:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-    class Nexustreefile(Treefile)
-     |  Nexustreefile(filename=None, data=None)
-     |
-     |  Class representing Nexus tree file. Iteration returns tree object or None
-     |
-     |  Method resolution order:
-     |      Nexustreefile
-     |      Treefile
-     |      builtins.object
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, filename=None, data=None)
-     |      Read past NEXUS file header, parse translate block if present
-     |
-     |  __iter__(self)
-     |
-     |  __next__(self, noreturn=False)
-     |
-     |  ----------------------------------------------------------------------
-     |  Methods inherited from Treefile:
-     |
-     |  get_treestring(self)
-     |      Return next tree-string
-     |
-     |  read_trees(self, discardprop=0.0)
-     |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors inherited from Treefile:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-
-    class TreeSummary(builtins.object)
-     |  TreeSummary(include_zeroterms=False)
-     |
-     |  Class summarizing bipartitions and branch lengths (but not topologies) from many trees
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, include_zeroterms=False)
-     |      TreeSummary constructor. Initializes relevant data structures
-     |
-     |  add_tree(self, curtree, weight=1.0)
-     |      Add tree object to treesummary, update all relevant summaries
-     |
-     |  bipart_report(self, includeleaves=True, minfreq=0.05)
-     |      Return processed, almost directly printable, summary of all observed bipartitions
-     |
-     |  bipart_result(self)
-     |      Return raw summary of all observed bipartitions
-     |
-     |  bipart_to_string(self, bipartition, position_dict)
-     |      Takes bipartition (set of two leaf sets) and returns string representation
-     |
-     |  contree(self, cutoff=0.5, allcompat=False, lab='freq')
-     |      Returns a consensus tree built from selected bipartitions
-     |
-     |  update(self, treesummary)
-     |      Merge this class with external treesummary
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-
-    class BigTreeSummary(TreeSummary)
-     |  BigTreeSummary(include_zeroterms=False, outgroup=None, rootmid=False)
-     |
-     |  Class summarizing bipartitions, branch lengths, and topologies from many trees
-     |
-     |  Method resolution order:
-     |      BigTreeSummary
-     |      TreeSummary
-     |      builtins.object
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, include_zeroterms=False, outgroup=None, rootmid=False)
-     |      TreeSummary constructor. Initializes relevant data structures
-     |
-     |  add_tree(self, curtree, weight=1.0)
-     |      Add tree to treesummary, update all summaries
-     |
-     |  topo_report(self)
-     |      Returns list of [freq, treestring] lists
-     |
-     |  update(self, treesummary)
-     |      Merge this class with other treesummary
-     |
-     |  ----------------------------------------------------------------------
-     |  Methods inherited from TreeSummary:
-     |
-     |  bipart_report(self, includeleaves=True, minfreq=0.05)
-     |      Return processed, almost directly printable, summary of all observed bipartitions
-     |
-     |  bipart_result(self)
-     |      Return raw summary of all observed bipartitions
-     |
-     |  bipart_to_string(self, bipartition, position_dict)
-     |      Takes bipartition (set of two leaf sets) and returns string representation
-     |
-     |  contree(self, cutoff=0.5, allcompat=False, lab='freq')
-     |      Returns a consensus tree built from selected bipartitions
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors inherited from TreeSummary:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-
-    class Distmatrix(builtins.object)
-     |  Class representing distance matrix for set of taxa. Knows hot to compute trees
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self)
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  __str__(self)
-     |      Returns distance matrix as string
-     |
-     |  getdist(self, name1, name2)
-     |      Returns distance between named entries
-     |
-     |  nj(self)
-     |      Computes neighbor joining tree, returns Tree object
-     |
-     |  setdist(self, name1, name2, dist)
-     |      Sets distance between named entries
-     |
-     |  upgma(self)
-     |      Computes UPGMA tree, returns Tree object
-     |
-     |  ----------------------------------------------------------------------
-     |  Class methods defined here:
-     |
-     |  from_alignment(alignment, dist='pdist') from builtins.type
-     |      Construct Distmatrix object from alignment object
-     |
-     |  from_distdict(distdict) from builtins.type
-     |      Construct Distmatrix object from dictionary of {(name1, name2):dist}
-     |
-     |  from_numpy_array(nparray, namelist, n) from builtins.type
-     |      Construct Distmatrix object from numpy array and corresponding list of names
-     |
-     |  from_phylip_string(dmat_string, n=None) from builtins.type
-     |      Constructs Distmatrix object from string corresponding to PHYLIP square distance matrix
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-
-    class Globals(builtins.object)
-     |  Class containing globally used functions and labels.
-     |
-     |  Data descriptors defined here:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-     |
-     |  ----------------------------------------------------------------------
-     |  Data and other attributes defined here:
-     |
-     |  biparts = {}
-
-
-    class Branchstruct(builtins.object)
-     |  Branchstruct(length=0.0, label='')
-     |
-     |  Class that emulates a struct. Keeps branch-related info
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, length=0.0, label='')
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-
-    class Topostruct(builtins.object)
-     |  Topostruct(count=1, treestring='')
-     |
-     |  Class that emulates a struct. Keeps topology-related info
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, count=1, treestring='')
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
-     |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
-
-
     class TreeError(builtins.Exception)
      |  Method resolution order:
      |      TreeError
@@ -983,7 +932,6 @@ CLASSES
      |
      |  args
 
-
     class TreeSet(builtins.object)
      |  Class for storing and manipulating a number of trees
      |
@@ -997,6 +945,9 @@ CLASSES
      |
      |  __init__(self)
      |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  __iter__(self)
+     |      Returns fresh iterator object allowing iteration over Treeset (which is itself an iterable)
      |
      |  __len__(self)
      |
@@ -1023,8 +974,76 @@ CLASSES
      |
      |  __weakref__
      |      list of weak references to the object (if defined)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |
+     |  TreeSetIterator = <class 'phylotreelib.TreeSet.TreeSetIterator'>
 
+    class TreeSummary(builtins.object)
+     |  TreeSummary(include_zeroterms=False)
+     |
+     |  Class summarizing bipartitions and branch lengths (but not topologies) from many trees
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, include_zeroterms=False)
+     |      TreeSummary constructor. Initializes relevant data structures
+     |
+     |  add_tree(self, curtree, weight=1.0)
+     |      Add tree object to treesummary, update all relevant summaries
+     |
+     |  bipart_report(self, includeleaves=True, minfreq=0.05)
+     |      Return processed, almost directly printable, summary of all observed bipartitions
+     |
+     |  bipart_result(self)
+     |      Return raw summary of all observed bipartitions
+     |
+     |  bipart_to_string(self, bipartition, position_dict)
+     |      Takes bipartition (set of two leaf sets) and returns string representation
+     |
+     |  contree(self, cutoff=0.5, allcompat=False, lab='freq')
+     |      Returns a consensus tree built from selected bipartitions
+     |
+     |  update(self, treesummary)
+     |      Merge this class with external treesummary
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
 
+    class Treefile(builtins.object)
+     |  Treefile(filename=None, filecontent=None)
+     |
+     |  Abstract base-class for representing tree file objects.
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self, filename=None, filecontent=None)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  get_treestring(self)
+     |      Return next tree-string
+     |
+     |  read_tree(self)
+     |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
+     |
+     |  read_trees(self, discardprop=0.0)
+     |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
 
 FUNCTIONS
     escape_metachars(text, metachars='.^$*+?{}[]\\|()')
