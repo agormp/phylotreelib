@@ -3385,7 +3385,7 @@ class Treefile():
 
     ###############################################################################################
 
-    def read_tree(self):
+    def readtree(self):
         """Reads one tree from file and returns as Tree object. Returns None when exhausted file"""
 
         try:
@@ -3396,7 +3396,7 @@ class Treefile():
 
     ###############################################################################################
 
-    def read_trees(self, discardprop=0.0):
+    def readtrees(self, discardprop=0.0):
         """Reads trees from file and returns as TreeSet object. Can discard fraction of trees"""
 
         # Avoid erroneous error message when running pylint ("self" is OK for iteration)
