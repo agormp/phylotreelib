@@ -285,8 +285,8 @@ class TreeIteration(TreeTestBase):
 class TreeRead(TreeTestBase):
     """Tests methods for reading (not iterating) trees from treefiles"""
 
-    def test_read_tree_newick(self):
-        """Test that read_tree returns correct trees and None when Newickfile exhausted"""
+    def test_readtree_newick(self):
+        """Test that readtree returns correct trees and None when Newickfile exhausted"""
 
         # First: construct treefile
         fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
@@ -306,18 +306,18 @@ class TreeRead(TreeTestBase):
         ntrees = len(treelist)
         treefile = pt.Newicktreefile(filename)
         for i in range(ntrees):
-            tree = treefile.read_tree()
+            tree = treefile.readtree()
             self.assertEqual(tree, treelist[i])
 
         # Check that None is returned when file is exhausted
-        value = treefile.read_tree()
+        value = treefile.readtree()
         self.assertIsNone(value)
 
         # Clean up
         os.remove(filename)
 
-    def test_read_tree_nexus(self):
-        """Test that read_tree returns correct trees and None when Newickfile exhausted"""
+    def test_readtree_nexus(self):
+        """Test that readtree returns correct trees and None when Newickfile exhausted"""
 
         # First: construct treefile
         fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
@@ -337,18 +337,18 @@ class TreeRead(TreeTestBase):
         ntrees = len(treelist)
         treefile = pt.Nexustreefile(filename)
         for i in range(ntrees):
-            tree = treefile.read_tree()
+            tree = treefile.readtree()
             self.assertEqual(tree, treelist[i])
 
         # Check that None is returned when file is exhausted
-        value = treefile.read_tree()
+        value = treefile.readtree()
         self.assertIsNone(value)
 
         # Clean up
         os.remove(filename)
 
-    def test_read_trees_newick(self):
-        """Test that read_trees (plural) returns correct trees from Newickfile"""
+    def test_readtrees_newick(self):
+        """Test that readtrees (plural) returns correct trees from Newickfile"""
 
         # First: construct treefile
         fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
@@ -363,18 +363,18 @@ class TreeRead(TreeTestBase):
         filehandle.write(trees.newick())
         filehandle.close()
 
-        # Secondly: read all trees from treefile in one go using read_trees()
+        # Secondly: read all trees from treefile in one go using readtrees()
         # check that read trees correspond to written trees
         treefile = pt.Newicktreefile(filename)
-        treeset_from_file = treefile.read_trees()
+        treeset_from_file = treefile.readtrees()
         for origtree, readtree in zip(treelist, treeset_from_file):
             self.assertEqual(origtree, readtree)
 
         # Clean up
         os.remove(filename)
 
-    def test_read_trees_nexus(self):
-        """Test that read_trees (plural) returns correct trees from Nexusfile"""
+    def test_readtrees_nexus(self):
+        """Test that readtrees (plural) returns correct trees from Nexusfile"""
 
         # First: construct treefile
         fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
@@ -389,10 +389,10 @@ class TreeRead(TreeTestBase):
         filehandle.write(trees.nexus())
         filehandle.close()
 
-        # Secondly: read all trees from treefile in one go using read_trees()
+        # Secondly: read all trees from treefile in one go using readtrees()
         # check that read trees correspond to written trees
         treefile = pt.Nexustreefile(filename)
-        treeset_from_file = treefile.read_trees()
+        treeset_from_file = treefile.readtrees()
         for origtree, readtree in zip(treelist, treeset_from_file):
             self.assertEqual(origtree, readtree)
 
