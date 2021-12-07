@@ -3614,115 +3614,41 @@ class Distmatrix(object):
         self.name2index = None
         self.index2name = None
 
-    ###############################################################################################
-
-    @classmethod
-    def from_alignment(cls, alignment, dist="pdist"):
-        """Construct Distmatrix object from alignment object"""
-
-        import sequencelib as seqlib  # Should probably move to top of module, but expensive
-
-        # Decide which method to use for computing distance
-        # Maybe dict of functions? (But then have to construct each time so maybe not...)
-        if dist == "hamming":
-            distmethod = seqlib.Sequence.hamming
-        elif dist == "pdist":
-            distmethod = seqlib.Sequence.pdist
-        elif dist == "hamming_ignoregaps":
-            distmethod = seqlib.Sequence.hamming_ignoregaps
-        elif dist == "pdist_ignoregaps":
-            distmethod = seqlib.Sequence.pdist_ignoregaps
-        else:
-            raise SeqError("Unknown distance measure: %s" % dist)
-
-        self = cls()
-
-        self.namelist = alignment.seqnamelist
-        self.n = len(self.namelist)
-        self.name2index = dict(zip(self.namelist, range(self.n)))   # Do I need both?
-        self.index2name = dict(zip(range(self.n), self.namelist))
-        self.dmat = np.zeroes(nseq,nseq)
-
-        # Compute dists, add to distance matrix
-        for s1, s2 in itertools.combinations(alignment, 2):
-            dist = distmethod(s1,s2)
-            self.setdist(s1.name, s2.name, dist)
-
-        return self
-
-    #######################################################################################
-
-    @classmethod
-    def from_numpy_array(cls, nparray, namelist, n):
-        """Construct Distmatrix object from numpy array and corresponding list of names"""
-
-        self = cls()
-
-        # List of names is supposed to be in same order as indices in numpy 2D array
-        self.namelist = namelist
-        self.n = n
-        self.dmat = nparray
-        self.name2index = dict(zip(self.namelist, range(n)))
-        self.index2name = dict(zip(range(n), self.namelist))
-
-        return self
-
-    #######################################################################################
-
-    @classmethod
-    def from_phylip_string(cls, dmat_string, n=None):
-        """Constructs Distmatrix object from string corresponding to PHYLIP square distance matrix"""
-
-        self = cls()
-
-        # Detect number of entries from string header, if n = None
-        # Python note: I am assuming correct format - should perhaps test
-        if n is None:
-            parts = dmat_string.partition("\n")
-            self.n = int(parts[0])
-        else:
-            self.n = n
-
-        # Use numpy loadtxt method for building numpy array from string
-        # This method requires input to be file-like, so StringIO is used
-        string_file = StringIO(dmat_string)
-        self.dmat = np.loadtxt(string_file, skiprows=1, usecols=range(1, self.n + 1))
-
-        # Parse string to also get rownames (numpy object only has integer indices)
-        # Construct dictionary attributes with {numpy_index:name} and {name:numpy_index}
-        self.namelist = []
-        lines = dmat_string.splitlines()
-        for line in lines[1:]:
-            parts = line.split(maxsplit=1)
-            self.namelist.append(parts[0])
-
-        self.name2index = dict(zip(self.namelist, range(self.n)))
-        self.index2name = dict(zip(range(self.n), self.namelist))
-
-        return self
-
     #######################################################################################
 
     @classmethod
     def from_distdict(cls, distdict):
-        """Construct Distmatrix object from dictionary of {(name1, name2):dist}"""
+        """Construct Distmatrix object from nested dictionary of dists: distdict[name1][name2] = dist"""
 
         # Note: Should add more careful parsing and error checking at some point: check all pairs are accounted for!
-        # Note: key can be any immutable iterable with two names (frozenset, tuple)
         self = cls()
-
-        names = set()
-        for (n1, n2) in distdict.keys():
-             names.add(n1)
-             names.add(n2)
-        self.namelist = sorted(list(names))
+        self.namelist = sorted(list(distdict.keys()))
         self.n = len(self.namelist)
         self.dmat = np.zeros((self.n, self.n))
         self.name2index = dict(zip(self.namelist, range(self.n)))
         self.index2name = dict(zip(range(self.n), self.namelist))
 
-        for ((name1, name2), dist) in distdict.items():
+        for name1, name2 in itertools.combinations(self.namelist,2):
+            dist = distdict[name1][name2]
             self.setdist(name1, name2, dist)
+
+        return self
+
+    #######################################################################################
+
+    @classmethod
+    def from_numpy_array(cls, nparray, namelist):
+        """
+        Construct Distmatrix object from numpy array and corresponding list of names
+        Names in namelist must be in same order as indices in numpy 2D array
+        """
+        self = cls()
+        self.namelist = namelist
+        self.n = len(namelist)
+        self.dmat = nparray
+        self.name2index = dict(zip(self.namelist, range(self.n)))
+        self.index2name = dict(zip(range(self.n), self.namelist))
+
         return self
 
     #######################################################################################
