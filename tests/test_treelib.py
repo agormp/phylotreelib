@@ -7,6 +7,7 @@
 import phylotreelib as pt
 import unittest
 import copy
+import csv
 import tempfile
 import os
 import itertools
@@ -1083,34 +1084,52 @@ class dist_tree_construction(TreeTestBase):
         """Set up distance matrices and corresponding tree strings for testing"""
         self.njtreestringlist = ["((A:13.0,B:4.0):2.0,(C:4.0,D:10.0):2.0);",
                                 "((A:2,(B:1.5,C:1):3.2):4.1,(D:1.2,(E:2.7,F:3.1):5):5.2);"]
-        self.njdmatlist = [{("A","B"):17, ("A","C"):21, ("A","D"):27,
-                            ("B","C"):12, ("B","D"):18,
-                            ("C","D"):14},
-                        {("A","B"):6.7, ("A","C"):6.2, ("A","D"):12.5, ("A","E"):19, ("A","F"):19.4,
-                            ("B","C"):2.5, ("B","D"):15.2, ("B","E"):21.7, ("B","F"):22.1,
-                            ("C","D"):14.7, ("C","E"):21.2, ("C","F"):21.6,
-                            ("D","E"):8.9, ("D","F"):9.3,
-                            ("E","F"):5.8}]
+        self.njdmatlist = [
+                        {
+                            "A": {"B":17, "C":21, "D":27},
+                            "B": {"A":17, "C":12, "D":18},
+                            "C": {"A":21, "B":12, "D":14},
+                            "D": {"A":27, "B":18, "C":14}
+                        },
+                        {
+                            "A": {"B":6.7,  "C":6.2,  "D":12.5, "E":19,   "F":19.4},
+                            "B": {"A":6.7,  "C":2.5,  "D":15.2, "E":21.7, "F":22.1},
+                            "C": {"A":6.2,  "B":2.5,  "D":14.7, "E":21.2, "F":21.6},
+                            "D": {"A":12.5, "B":15.2, "C":14.7, "E":8.9,  "F":9.3},
+                            "E": {"A":19,   "B":21.7, "C":21.2, "D":8.9,  "F":5.8},
+                            "F": {"A":19.4, "B":22.1, "C":21.6, "D":9.3,  "E":5.8}
+                         }
+                     ]
         self.upgmatreelist = ["(((A:8.500,B:8.500):2.500,E:11.000):5.500,(C:14.000,D:14.000):2.500);",
                               "((A:1.500,B:1.500):3.750,(C:2.000,D:2.000):3.250);"]
         self.upgmadmatlist = [
-                                {("A","B"):17, ("A","C"):21, ("A","D"):31, ("A","E"):23,
-                                               ("B","C"):30, ("B","D"):34, ("B","E"):21,
-                                                             ("C","D"):28, ("C","E"):39,
-                                                                          ("D","E"):43},
-                                {("A","B"):3, ("A","C"):11, ("A","D"):11,
-                                              ("B","C"):10, ("B","D"):10,
-                                                            ("C","D"):4}
+                                {
+                                    "A":{"B":17, "C":21, "D":31, "E":23},
+                                    "B":{"A":17, "C":30, "D":34, "E":21},
+                                    "C":{"A":21, "B":30, "D":28, "E":39},
+                                    "D":{"A":31, "B":34, "C":28, "E":43},
+                                    "E":{"A":23, "B":21, "C":39, "D":43}
+                                },
+                                {
+                                    "A":{"B":3,  "C":11, "D":11},
+                                    "B":{"A":3,  "C":10, "D":10},
+                                    "C":{"A":11, "B":10, "D":4},
+                                    "D":{"A":11, "B":10, "C":4}
+                                }
                             ]
 
         # Apparently necessary to set basepath like this when readin data files for test
         testdir_path = os.path.dirname(__file__)
-        dmat_fname = os.path.join(testdir_path, 'large_phylip_distmatrix.txt')
+        dmat_fname = os.path.join(testdir_path, 'large_distmat.tsv')
         njtree_fname = os.path.join(testdir_path, 'large_njtree.txt')
         upgmatree_fname = os.path.join(testdir_path, 'large_upgmatree.txt')
 
         with open(dmat_fname) as infile:
-            self.phylipstring = infile.read()
+            reader = csv.DictReader(infile, delimiter="\t")
+            dictlist = []
+            for rowdict in reader:
+                dictlist.append(rowdict)
+            self.large_distdict = dict(zip(reader.fieldnames, dictlist))
         with open(njtree_fname) as infile:
             self.largephylip_njtree = infile.read()
         with open(upgmatree_fname) as infile:
@@ -1124,7 +1143,7 @@ class dist_tree_construction(TreeTestBase):
             njtree = dmat.nj()
             self.assertEqual(njtree, inputtree)
         inputtree = pt.Tree.from_string(self.largephylip_njtree)
-        dmat = pt.Distmatrix.from_phylip_string(self.phylipstring)
+        dmat = pt.Distmatrix.from_distdict(self.large_distdict)
         njtree = dmat.nj()
         self.assertEqual(njtree, inputtree)
 
@@ -1134,9 +1153,9 @@ class dist_tree_construction(TreeTestBase):
             inputtree = pt.Tree.from_string(self.upgmatreelist[i])
             dmat = pt.Distmatrix.from_distdict(self.upgmadmatlist[i])
             upgma = dmat.upgma()
-            self.assertEqual(upgma, inputtree)
+            self.assertEqual(upgma, inputtree,  msg='\n  i: {}\n  upgma:\n{}\n  input:\n{}'.format(i, upgma, inputtree))
         inputtree = pt.Tree.from_string(self.largephylip_upgmatree)
-        dmat = pt.Distmatrix.from_phylip_string(self.phylipstring)
+        dmat = pt.Distmatrix.from_distdict(self.large_distdict)
         upgmatree = dmat.upgma()
         self.assertEqual(upgmatree, inputtree)
 
