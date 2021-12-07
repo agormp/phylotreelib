@@ -28,7 +28,7 @@ python3 -m pip install phylotreelib
 * Nodes can be inserted or deleted while keeping the rest of the tree structure sane, leaves can be renamed, branch lengths can be set
 * Trees can be grafted to each other, or a subtree can be moved using subtree pruning and regrafting (SPR)
 * Method for computing the distance between two trees (Robinson-Foulds, and derived normalised measures; returns information about number of unique and shared bipartitions)
-* The Distmatrix class contains methods for building trees from distance matrices (or sequence alignments)
+* The Distmatrix class contains methods for building trees from distance matrices
 * Methods for computing consensus trees from sets of input trees, which also yield information on the frequencies of clades and topologies, and on the distribution of branch lengths for bipartitions
 * Library has been optimized for high speed and low memory consumption
 
@@ -126,9 +126,23 @@ Output:
 {'A2', 'AAUMBR1', 'CG24B', 'inopinata', 'nitrosa'}
 ```
 
+-----
+
+The code below opens a fasta file containing a set of aligned DNA sequences and reads the aligned sequences (using classes and methods from the [sequencelib](https://github.com/agormp/sequencelib) library), constructs a nested dictionary containing all pairwise sequence distances, constructs a Distmatrix object from this dictionary, and computes a neighbor joining tree from the distance matrix.
+
+```python
+import phylotreelib as pt
+import sequencelib as seqlib
+seqfile = seqlib.Seqfile("myalignment.fasta")
+seqs = seqfile.read_alignment()
+distdict = seqs.distdict()
+dmat = pt.Distmatrix.from_distdict(distdict)
+mytree = dmat.nj()
+```
+
 ## Using phylotreelib
 
-Typically, phylotreelib will be used for analysing one or more trees that have been read from a textfile in Newick or Nexus format.
+Typically, phylotreelib will be used for analysing (or manipulating) one or more trees that have been read from a textfile in Newick or Nexus format. Reading a tree from file will return a Tree object, which has methods for interrogating or altering itself (e.g. `mytree.rootmid()` will midpoint root the Tree object `mytree`).
 
 ### Opening a treefile
 
@@ -156,13 +170,13 @@ tree = treefile.readtree()
 
 This returns a Tree object, which has methods for analysing and manipulating the tree (itself). By calling readtree() repeatedly, you can read additional trees from the file. The `readtree()` method returns `None` when all trees have been read.
 
-The `readtrees()` method returns all the trees in the file in the form of a Treeset object. Treeset objects contains a list of Tree objects and has methods for rooting and outputting all trees in the collection:
+The `readtrees()` method returns all the trees in the file in the form of a Treeset object. Treeset objects contains a list of Tree objects and has methods for rooting and outputting all trees in the collection. Iterating over a Treeset object returns Tree objects.
 
 ```
 treeset = treefile.readtrees()
 ```
 
-It is also possible to retrieve all the trees from an open treefile one at a time by looping over the file:
+It is also possible to retrieve all the trees from an open treefile one at a time by iterating directly over the file (useful for minimizing memory consumptiom when handling files with many trees):
 
 ```
 for tree in treefile:
