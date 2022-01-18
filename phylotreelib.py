@@ -3752,7 +3752,7 @@ class Distmatrix(object):
 
             # Update distance matrix.
             # Remove 2 merged entries (rows and cols), add 1 new row and col for newnode
-            # Removal is done by deleting row and column i2, and writing new node to i1
+            # Removal is done by deleting row and column i2, and overwriting i1 by new node
             dist_new = 0.5 * (dmat[i1] + dmat[i2] - dist_12) # distvector from new
             dmat[i1] = dmat[:,i1] = dist_new
             dmat = np.delete(dmat, i2, axis=0)
