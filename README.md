@@ -64,6 +64,7 @@ communis  	1878.95
 
 -----
 
+### Construct tree from Newick string, print tabular representation
 The code below constructs a Tree object from a Newick formatted string and then prints the string representation of the tree (using the Tree object's \_\_str\_\_() method).
 
 ```python
@@ -96,6 +97,7 @@ Human
 
 -----
 
+### Read multiple trees from Nexus file, construct consensus tree, write in Newick format
 The code below opens a Nexus-formatted file with multiple trees, constructs a Treesummary object, and then extracts all Tree objects from the file by iterating over the file while adding the trees to the Treesummary object. Then a majority rule consensus tree is computed from the Treesummary object, the tree is midpoint rooted, and the resulting tree is finally written in Newick format to the output file "contree.newick"
 
 ```python
@@ -112,6 +114,7 @@ with open("contree.newick", "w") as outfile:
 
 -----
 
+# Read tree from file, find close neighbours of specified leaf
 The code below opens a Newick file, reads one Tree object from the file, and then finds the 5 leaves that are closest (measured along the branches) to the leaf labeled "nitrificans".
 
 ```python
@@ -129,6 +132,7 @@ Output:
 
 -----
 
+# Read DNA alignment, construct Neighbor Joining tree
 The code below opens a fasta file containing a set of aligned DNA sequences and reads the aligned sequences (using classes and methods from the [sequencelib](https://github.com/agormp/sequencelib) library), constructs a nested dictionary containing all pairwise sequence distances, constructs a Distmatrix object from this dictionary, and computes a neighbor joining tree from the distance matrix.
 
 ```python
