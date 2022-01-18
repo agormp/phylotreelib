@@ -114,7 +114,7 @@ with open("contree.newick", "w") as outfile:
 
 -----
 
-# Read tree from file, find close neighbours of specified leaf
+### Read tree from file, find close neighbours of specified leaf
 The code below opens a Newick file, reads one Tree object from the file, and then finds the 5 leaves that are closest (measured along the branches) to the leaf labeled "nitrificans".
 
 ```python
@@ -132,7 +132,7 @@ Output:
 
 -----
 
-# Read DNA alignment, construct Neighbor Joining tree
+### Read DNA alignment, construct Neighbor Joining tree
 The code below opens a fasta file containing a set of aligned DNA sequences and reads the aligned sequences (using classes and methods from the [sequencelib](https://github.com/agormp/sequencelib) library), constructs a nested dictionary containing all pairwise sequence distances, constructs a Distmatrix object from this dictionary, and computes a neighbor joining tree from the distance matrix.
 
 ```python
