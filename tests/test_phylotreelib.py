@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Unit tests for phylotreelib.py
 # UNDER CONSTRUCTION (I know - should have been written prior to the code...)
-# Simple usage: python3 test_treelib.py
-# verbose output: python3 test_treelib.py -v
+# Simple usage: python3 test_phylotreelib.py
+# verbose output: python3 test_phylotreelib.py -v
 
 import phylotreelib as pt
 import unittest
@@ -318,7 +318,7 @@ class TreeRead(TreeTestBase):
         os.remove(filename)
 
     def test_readtree_nexus(self):
-        """Test that readtree returns correct trees and None when Newickfile exhausted"""
+        """Test that readtree returns correct trees and None when Nexusfile exhausted"""
 
         # First: construct treefile
         fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
