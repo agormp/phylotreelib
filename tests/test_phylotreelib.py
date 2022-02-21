@@ -658,6 +658,39 @@ class TreeOutput(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
+class Treesummarytests(TreeTestBase):
+    """Tests for consensus tree related methods"""
+
+    def setUp(self):
+        # Set basepath, get names of files containing ground truth
+        testdir_path = os.path.dirname(__file__)
+        self.t_fname = os.path.join(testdir_path, 'testsumt.nexus.250.t')
+        trprobs_fname = os.path.join(testdir_path, 'testsumt.nexus.trprobs')
+        parts_fname = os.path.join(testdir_path, 'testsumt.nexus.parts')
+        vstat_fname = os.path.join(testdir_path, 'testsumt.nexus.vstat')
+        con_fname = os.path.join(testdir_path, 'testsumt.nexus.con.tre')
+
+        cfile = pt.Nexustreefile(con_fname)
+        self.mb_contree_freqlabel = cfile.readtree()
+
+    def test_contree(self):
+        ts = pt.TreeSummary()
+        tfile = pt.Nexustreefile(self.t_fname)
+        for tree in tfile:
+            ts.add_tree(tree)
+        own_contree_freqlabel = ts.contree(cutoff=0.5, allcompat=False, lab = "freq")
+        #own_contree_semlabel = ts.contree(cutoff=0.5, allcompat=False, lab = "sem")
+
+        self.assertEqual(self.mb_contree_freqlabel.topology(), own_contree_freqlabel.topology())
+        mb_bipdict = self.mb_contree_freqlabel.bipdict()
+        own_bipdict = own_contree_freqlabel.bipdict()
+        for bip, own_branchstruct in own_bipdict.items():
+            mb_branchstruct = mb_bipdict[bip]
+            self.assertEqual(mb_branchstruct.label, own_branchstruct.label)
+
+########################################################################################
+########################################################################################
+
 class Topologytests(TreeTestBase):
     """Tests topology related methods"""
 
@@ -1118,7 +1151,7 @@ class dist_tree_construction(TreeTestBase):
                                 }
                             ]
 
-        # Apparently necessary to set basepath like this when readin data files for test
+        # Apparently necessary to set basepath like this when reading data files for test
         testdir_path = os.path.dirname(__file__)
         dmat_fname = os.path.join(testdir_path, 'large_distmat.tsv')
         njtree_fname = os.path.join(testdir_path, 'large_njtree.txt')
