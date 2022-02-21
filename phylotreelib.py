@@ -351,7 +351,7 @@ class Tree():
         obj = cls()
 
         # Extract set of leaves
-        part1, part2 = next(iter(biplist.keys()))   # First key=set of two leaf name sets
+        part1, part2 = next(iter(biplist))  # First key=set of two leaf name sets
         obj.leaves = part1 | part2          # Concatenate them to get all leafnames
         obj.intnodes = {0}                  # Will be built as we go along
         obj.root = 0                        # Root is node zero at start
@@ -2864,8 +2864,8 @@ class TreeSet():
         stringlist = ["#NEXUS\n\nbegin trees;\n"]
 
         # Add newick tree strings
-        for tree in self.treelist:
-            stringlist.append("    tree nexus_tree = ")
+        for i, tree in enumerate(self.treelist):
+            stringlist.append("    tree t.{} = ".format(i+1))
             stringlist.append(tree.newick(printdist, printlabels))
             stringlist.append("\n")
 
@@ -2961,8 +2961,6 @@ class TreeSummary():
                 self.bipartsummary[bipart].SUMW = weight
                 self.bipartsummary[bipart].mean = brlen
                 self.bipartsummary[bipart].T = 0.0
-
-
 
     ###############################################################################################
 
