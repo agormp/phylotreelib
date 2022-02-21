@@ -342,8 +342,6 @@ class Tree():
     def from_biplist(cls, biplist):
         """Constructor 2: Tree object from bipartition list"""
 
-        # Implementation note: @classmethod useful way of implementing alternative constructors
-
         # Input is a bipartitionlist (actually a dictionary of bipartition:Branchstruct pairs):
         # Names of leaves on one side of a branch are represented as an immutable set of leaves
         # A bipartition is represented as an immutable set of two such (complementary) sets
@@ -3182,31 +3180,31 @@ class TreeSummary():
         # PYTHON NOTE: I am changing bipdict during this iteration, therefore I have to use
         # "for bipart in list(bipdict.keys())" (which uses a full copy of the keys as a list) and
         # not the slightly faster "for bipart in bipdict:" (which uses the builtin iterkeys method)
-        for bipart in list(bipdict.keys()):
+        for bipart, branchstruct in bipdict.items():
+            if branchstruct.freq > cutoff:
+                conbipdict[bipart] = Branchstruct(length=branchstruct.mean)
+                bip1,bip2 = bipart
+                if len(bip1)>1 and len(bip2)>1:
+                    # Option "lab" indicates what to use as branch labels.
+                    # The possible accepted values are:
+                    #   "freq": bipartition frequency  [DEFAULT]
+                    #   "sem": standard error of the mean for the branchlength
+                    #   "rse": relative standard error = sem/mean
+                    if lab == "freq":
+                        conbipdict[bipart].label= "%.3f" % branchstruct.freq
+                    elif lab == "sem":
+                        conbipdict[bipart].label= "%.6f" % branchstruct.sem
+                    elif lab == "rse":
+                        # If branch length is zero: set rse to be "NaN"
+                        if branchstruct.mean == 0.0:
+                            conbipdict[bipart].label= "NaN"
+                            # If branch length > 0: set rse = sem/len
+                        else:
+                            rse = branchstruct.sem / branchstruct.mean
+                            conbipdict[bipart].label= "{:.3f}".format(rse)
 
-            if bipdict[bipart].freq > cutoff:
-                # Option "lab" indicates what to use as branch labels.
-                # The possible accepted values are:
-                #   "freq": bipartition frequency  [DEFAULT]
-                #   "sem": standard error of the mean for the branchlength
-                #   "rse": relative standard error = sem/mean
-                if lab == "freq":
-                    conbipdict[bipart] = Branchstruct(length=bipdict[bipart].mean,
-                                            label= "%.2f" % bipdict[bipart].freq)
-                elif lab == "sem":
-                    conbipdict[bipart] = Branchstruct(length=bipdict[bipart].mean,
-                                            label= "%.6f" % bipdict[bipart].sem)
-                elif lab == "rse":
-                    # If branch length is zero: set rse to be "NaN"
-                    if bipdict[bipart].mean == 0.0:
-                        conbipdict[bipart] = Branchstruct(length=bipdict[bipart].mean,
-                                            label= "NaN")
-                    # If branch length > 0: set rse = sem/len
-                    else:
-                        rse = bipdict[bipart].sem / bipdict[bipart].mean
-                        conbipdict[bipart] = Branchstruct(length=bipdict[bipart].mean,
-                                                          label= "{:.2f}".format(rse))
-                del bipdict[bipart]
+        # Python note: I originally deleted the original bipart to save memory
+        # rethink strategy here after testing memory usage
 
         # Build tree from bipartitions  in new bipdict
         contree = Tree.from_biplist(conbipdict)
@@ -3547,7 +3545,7 @@ class Nexustreefile(Treefile):
             # This was found to break on some trees.
             # Why did I use that? Are there some cases that I am no longer covering?
             # re.compile(";\s+u?tree\s+(\*\s)?\s*[\w\-\/\.]+\s*=.*", re.IGNORECASE | re.DOTALL)
-            pattern = re.compile(";\s+tree.*", re.IGNORECASE | re.DOTALL)
+            pattern = re.compile(";\s+.*tree.*", re.IGNORECASE | re.DOTALL)
             transblock = pattern.sub("", self.buffer)
 
             # Split on commas, generating list of "code-whitespace-origname" pairs
