@@ -3388,6 +3388,7 @@ class Treefile():
             tree = next(self)
             return tree
         except StopIteration:
+            self.treefile.close()
             return None
 
     ###############################################################################################
@@ -3406,6 +3407,12 @@ class Treefile():
             treeset = treeset[ndiscard:]
 
         return treeset
+
+    ###############################################################################################
+
+    def close(self):
+        """For explicit closing of Treefile before content exhausted"""
+        self.treefile.close()
 
 ###################################################################################################
 ###################################################################################################

@@ -672,6 +672,7 @@ class Treesummarytests(TreeTestBase):
 
         cfile = pt.Nexustreefile(con_fname)
         self.mb_contree_freqlabel = cfile.readtree()
+        cfile.close()
 
     def test_contree(self):
         ts = pt.TreeSummary()
