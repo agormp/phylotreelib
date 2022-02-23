@@ -2893,29 +2893,14 @@ class TreeSummary():
 
     def __init__(self, include_zeroterms=False):
         """TreeSummary constructor. Initializes relevant data structures"""
-
         self.tree_count = 0
         self.tree_weight_sum = 0.0
         self.bipartsummary = {}        # Main repository for bipartition info
-        self.bipart_cache = {}         # Cache storing most frequent bipartitions
-        self.cache_minimum = 0.04      # Minimum frequency for bipart to be included in above cache
-                                       # it is assumed that allcompat tree can be built solely with
-                                       # bipartitions that are more frequent than this!!!!
-
-        self.bipart_processed = False  # Flag indicating whether bipartsummary has been
-                                       # processed (i.e., freq+var has been computed. and
-                                       # bipart_cache has been constructed)
-
-        self.include_zeroterms = include_zeroterms  # Flag: count absent branches?
 
     ###############################################################################################
 
     def add_tree(self, curtree, weight=1.0):
-        """Add tree object to treesummary, update all relevant summaries"""
-
-        # Unset flag if it has previously been set (happens when adding more trees after
-        # calling bipart_result() already)
-        self.bipart_processed = False
+        """Add tree object to treesummary, update all relevant bipartition summaries"""
 
         # Main interface to TreeSummary.
         # Takes tree object, updates relevant measures
@@ -2944,21 +2929,30 @@ class TreeSummary():
 
             # If bipartition has been seen before: update existing info
             if bipart in self.bipartsummary:
-                Q = brlen - self.bipartsummary[bipart].mean
-                TEMP = self.bipartsummary[bipart].SUMW + weight
+                brstruct = self.bipartsummary[bipart]
+                Q = brlen - brstruct.mean
+                TEMP = brstruct.SUMW + weight
                 R = Q*weight/TEMP
-                self.bipartsummary[bipart].mean += R
-                self.bipartsummary[bipart].T += R*self.bipartsummary[bipart].SUMW*Q
-                self.bipartsummary[bipart].SUMW = TEMP
-                self.bipartsummary[bipart].bip_count += 1
+                brstruct.mean += R
+                brstruct.T += R*self.bipartsummary[bipart].SUMW*Q
+                brstruct.SUMW = TEMP
+                brstruct.bip_count += 1
+                brstruct.freq = brstruct.SUMW/self.tree_weight_sum
+                n = brstruct.bip_count
+                brstruct.var = brstruct.T*n/((n-1)*brstruct.SUMW)      # Weighted variance (ordinary variance if all w=1)
+                brstruct.sem = math.sqrt(brstruct.var)/math.sqrt(n)    # Standard error of the mean
 
             # If bipartition has never been seen before: add it to dict and enter info
             else:
                 self.bipartsummary[bipart]=Branchstruct()
-                self.bipartsummary[bipart].bip_count = 1
-                self.bipartsummary[bipart].SUMW = weight
-                self.bipartsummary[bipart].mean = brlen
-                self.bipartsummary[bipart].T = 0.0
+                brstruct = self.bipartsummary[bipart]
+                brstruct.bip_count = 1
+                brstruct.SUMW = weight
+                brstruct.mean = brlen
+                brstruct.T = 0.0
+                brstruct.freq = weight/self.tree_weight_sum
+                brstruct.var = 999999    # Undefined when n=1, so use arbitrary value
+                brstruct.sem = 999999
 
     ###############################################################################################
 
@@ -2996,10 +2990,17 @@ class TreeSummary():
                 self_bipsum[bipart].bip_count += other_bipsum[bipart].bip_count
                 self_bipsum[bipart].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
                 self_bipsum[bipart].SUMW += other_bipsum[bipart].SUMW
+                self_bipsum[bipart].freq = self_bipsum[bipart].SUMW/self.tree_weight_sum
 
                 # Note: the following expression was arrived at empirically!
                 # I have not proven this is correct, but it does seem to work...
                 self_bipsum[bipart].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
+
+                # Now compute remaining measures from above
+                n = self_bipsum[bipart].bip_count
+                self_bipsum[bipart].var = self_bipsum[bipart].T*n/((n-1)*self_bipsum[bipart].SUMW)
+                self_bipsum[bipart].sem = math.sqrt(self_bipsum[bipart].var)/math.sqrt(n)
+
 
             # If bipartition has never been seen before: transfer data from other_bipsum:
             else:
@@ -3008,65 +3009,9 @@ class TreeSummary():
                 self_bipsum[bipart].mean = other_bipsum[bipart].mean
                 self_bipsum[bipart].T = other_bipsum[bipart].T
                 self_bipsum[bipart].bip_count = other_bipsum[bipart].bip_count
-
-    ###############################################################################################
-
-    def bipart_result(self):
-        """Return raw summary of all observed bipartitions"""
-
-        # Results are stored in the dictionary built in add_tree. Keys are bipartitions,
-        # values are Branchstructs (classes) that contain a number of intermediate values.
-        # Here I use these values to compute and add the fields "freq" (bipartition frequency),
-        # and "sem" (standard error of the mean). "mean" (mean branch length) is already present
-        # NOTE: I don't actually check if branch lengths are present. If not then mean=0 and sem=0
-        if self.tree_count == 0:
-            msg = "No trees added to summary object. Impossible to compute result."
-            raise TreeError(msg)
-
-        # Compute (1) branch freq, (2) standard error of the mean of branch length.
-        for bipart, branchstruct in self.bipartsummary.items():
-            branchstruct.freq = branchstruct.SUMW/self.tree_weight_sum
-
-            # If "include_zeroterms" is set, then branch length is considered to be zero in trees
-            # where the bipartition is absent, and these terms are included in the computation
-            # (by using the count and weight-sum from all trees instead of from given bipartition)
-            if self.include_zeroterms:
-                n = self.tree_count
-                sumw = self.tree_weight_sum
-                # Correct the already computed mean, to account for missing zero terms
-                branchstruct.mean = branchstruct.mean*branchstruct.SUMW/sumw
-            else:
-                n = branchstruct.bip_count
-                sumw = branchstruct.SUMW
-            T = branchstruct.T
-
-            # The variance (and standard error of the mean) is only defined if n>1.
-            # If n==1 var and sem are arbitrarily set to 999999
-            if n>1:
-                variance = T*n/((n-1)*sumw)      # Weighted variance (ordinary variance if all w=1)
-                branchstruct.var = variance
-                branchstruct.sem = math.sqrt(variance)/math.sqrt(n)    # Standard error of the mean
-            else:
-                branchstruct.var = 999999
-                branchstruct.sem = 999999
-
-            # Save bipartition to cache if its frequency is>cache_minimum
-            # This cache is the basis for constructing consensus trees, and it is therefore assumed
-            # that an allcompat tree can be fully resolved using only bipartitions in this cache.
-            # If cache_minimum is 0.01 then this is probably almost always true, but I don't know!!
-            # Only relevant fields are saved
-            if branchstruct.freq > self.cache_minimum:
-                self.bipart_cache[bipart]=Branchstruct()
-                self.bipart_cache[bipart].mean = branchstruct.mean
-                self.bipart_cache[bipart].var = branchstruct.var
-                self.bipart_cache[bipart].sem = branchstruct.sem
-                self.bipart_cache[bipart].freq = branchstruct.freq
-
-        # Set flag indicating that bipartsummary has been processed
-        # (meaning that freq+var has been computed, and that bipart_cache has been constructed)
-        self.bipart_processed = True
-
-        return self.bipartsummary
+                self_bipsum[bipart].freq = other_bipsum[bipart].freq
+                self_bipsum[bipart].var = other_bipsum[bipart].var
+                self_bipsum[bipart].sem = other_bipsum[bipart].sem
 
     ###############################################################################################
 
@@ -3104,15 +3049,7 @@ class TreeSummary():
         #           entire list is sorted on bipartition frequency
         # The boolean argument "includeleaves" controls whether or not to report external branches
 
-        # Compute raw results if they are not already stored
-        if not self.bipart_processed:
-            self.bipart_result()
-
-        # If minfreq >= cache_mimimum, then all required info is in the much smaller cache!
-        if minfreq >= self.cache_minimum:
-            raw_result = self.bipart_cache
-        else:
-            raw_result = self.bipartsummary
+        raw_result = self.bipartsummary
 
         # Must first figure out which leaves correspond to which positions in bipartstring
         # Note: leaves are ordered alphabetically, meaning first char in bipstring corresponds
@@ -3167,11 +3104,7 @@ class TreeSummary():
             msg = "Consensus tree cutoff has to be at least 0.5"
             raise TreeError(msg)
 
-        # Construct dictionary of most frequent bipartitions.
-        # Use bipart_cache if it already exists, if not then construct it first
-        if not self.bipart_processed:
-            self.bipart_result()
-        bipdict = self.bipart_cache
+        bipdict = self.bipartsummary
 
         # Initialize new bipdict for keeping relevant bipartitions
         conbipdict = {}
