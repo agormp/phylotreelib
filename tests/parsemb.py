@@ -1,15 +1,14 @@
 import sys
-
-# Usage:
-# python parsemb.py trprobs parts vstat
+import phylotreelib as pt
 
 #################################################################################################
 
 def main():
-    if len(sys.argv) != 4:
-        print("usage: python parsemb.py trprobs parts vstat")
+    if len(sys.argv) != 7:
+        print("usage: python parsemb.py trprobs parts vstat run1t run2t burninfrac")
         exit()
-    trprobs_fname, parts_fname, vstat_fname = sys.argv[1:]
+    trprobs_fname, parts_fname, vstat_fname, run1_fname, run2_fname, burninfrac = sys.argv[1:]
+    burninfrac = float(burninfrac)
     id_leafdict = id_leafdict_from_trprobs(trprobs_fname)  # {id:leafname}
     id_branchdict = id_branchdict_from_vstat(vstat_fname)  # {id:[mean,var]}
 
@@ -30,6 +29,19 @@ def main():
                 leafname = id_leafdict[bip2_id]
                 print(leafname, end=" ")
             print("| {} {}".format(mean,var))
+
+    tf1 = pt.Nexustreefile(run1_fname)
+    tf2 = pt.Nexustreefile(run2_fname)
+    trees1 = tf1.readtrees()
+    trees2 = tf2.readtrees()
+    discard1 = round(len(trees1)*burninfrac)
+    discard2 = round(len(trees2)*burninfrac)
+    trees1 = trees1[discard1:]
+    trees2 = trees2[discard2:]
+    with open("contest.postburnin.1.t", "w") as outfile:
+        outfile.write(trees1.nexus())
+    with open("contest.postburnin.2.t", "w") as outfile:
+        outfile.write(trees2.nexus())
 
 #################################################################################################
 
