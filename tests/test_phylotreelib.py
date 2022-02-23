@@ -663,11 +663,12 @@ class Treesummarytests(TreeTestBase):
 
     def setUp(self):
         testdir_path = os.path.dirname(__file__)
-        self.t_fname = os.path.join(testdir_path, 'testsumt.nexus.250.t')
-        con_fname = os.path.join(testdir_path, 'testsumt.nexus.con.tre')
+        self.t1_fname = os.path.join(testdir_path, 'contest.postburnin.1.t')
+        self.t2_fname = os.path.join(testdir_path, 'contest.postburnin.2.t')
+        con_fname = os.path.join(testdir_path, 'contest.nexus.con.tre')
         mbres_fname = os.path.join(testdir_path, 'bip_mean_var.txt')
         cfile = pt.Nexustreefile(con_fname)
-        self.mb_contree_freqlabel = cfile.readtree()
+        self.mb_contree = cfile.readtree()
         cfile.close()
         with open(mbres_fname) as mbfile:
             mbresults = mbfile.readlines()
@@ -684,15 +685,48 @@ class Treesummarytests(TreeTestBase):
 
     def test_contree(self):
         ts = pt.TreeSummary()
-        tfile = pt.Nexustreefile(self.t_fname)
-        for tree in tfile:
-            ts.add_tree(tree)
-        own_contree_freqlabel = ts.contree()
-        own_bipdict = own_contree_freqlabel.bipdict()
-        mb_bipdict = self.mb_contree_freqlabel.bipdict()
+        tf1 = pt.Nexustreefile(self.t1_fname)
+        for t in tf1:
+            ts.add_tree(t)
+        tf2 = pt.Nexustreefile(self.t2_fname)
+        for t in tf2:
+            ts.add_tree(t)
+        own_contree = ts.contree()
+        own_bipdict = own_contree.bipdict()
+        mb_bipdict = self.mb_contree.bipdict()
 
         # test topology of own contree is same as topology found by mrbayes
-        self.assertEqual(self.mb_contree_freqlabel.topology(), own_contree_freqlabel.topology())
+        self.assertEqual(self.mb_contree.topology(), own_contree.topology())
+
+        # test freq and branch length (mean and var) for each branch
+        for bip, own_branch in own_bipdict.items():
+            mb_mean,mb_var = self.mbresdict[bip]
+            self.assertAlmostEqual(mb_mean, own_branch.length)
+            # self.assertAlmostEqual(mb_var, own_branch.var) #implement when changed contree to one-pass version
+
+            bip1, bip2 = bip
+            if len(bip1)!=1 and len(bip2)!=1:
+                mb_branch = mb_bipdict[bip]
+                own_freq = float(own_branch.label)
+                mb_freq = float(mb_branch.label)
+                self.assertAlmostEqual(mb_freq, own_freq)
+
+    def test_treesummary_update(self):
+        ts1 = pt.TreeSummary()
+        tf1 = pt.Nexustreefile(self.t1_fname)
+        for t in tf1:
+            ts1.add_tree(t)
+        ts2 = pt.TreeSummary()
+        tf2 = pt.Nexustreefile(self.t2_fname)
+        for t in tf2:
+            ts2.add_tree(t)
+        ts1.update(ts2)
+        own_contree = ts1.contree()
+        own_bipdict = own_contree.bipdict()
+        mb_bipdict = self.mb_contree.bipdict()
+
+        # test topology of own contree is same as topology found by mrbayes
+        self.assertEqual(self.mb_contree.topology(), own_contree.topology())
 
         # test freq and branch length (mean and var) for each branch
         for bip, own_branch in own_bipdict.items():

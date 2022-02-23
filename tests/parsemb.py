@@ -1,33 +1,47 @@
 import sys
-
-# Usage:
-# python parsemb.py trprobs parts vstat
+import phylotreelib as pt
 
 #################################################################################################
 
 def main():
-    if len(sys.argv) != 4:
-        print("usage: python parsemb.py trprobs parts vstat")
+    if len(sys.argv) != 7:
+        print("usage: python parsemb.py trprobs parts vstat run1t run2t burninfrac")
         exit()
-    trprobs_fname, parts_fname, vstat_fname = sys.argv[1:]
+    trprobs_fname, parts_fname, vstat_fname, run1_fname, run2_fname, burninfrac = sys.argv[1:]
+    burninfrac = float(burninfrac)
     id_leafdict = id_leafdict_from_trprobs(trprobs_fname)  # {id:leafname}
     id_branchdict = id_branchdict_from_vstat(vstat_fname)  # {id:[mean,var]}
 
     with open(parts_fname) as infile:
         partsdata = infile.readlines()
-    for i in range(1,len(partsdata)):
-        mean, var = id_branchdict[i]
-        words = partsdata[i].rstrip().split()
-        astpos = asterisk_poslist(words[1])
-        dotpos = dot_poslist(words[1])
-        for bip1_id in astpos:
-            leafname = id_leafdict[bip1_id]
-            print(leafname, end=" ")
-        print("|", end=" ")
-        for bip2_id in dotpos:
-            leafname = id_leafdict[bip2_id]
-            print(leafname, end=" ")
-        print("| {} {}".format(mean,var))
+    for line in partsdata:
+        if "*" in line:
+            words = line.rstrip().split()
+            parts_id = int(words[0])
+            mean, var = id_branchdict[parts_id]
+            astpos = asterisk_poslist(words[1])
+            dotpos = dot_poslist(words[1])
+            for bip1_id in astpos:
+                leafname = id_leafdict[bip1_id]
+                print(leafname, end=" ")
+            print("|", end=" ")
+            for bip2_id in dotpos:
+                leafname = id_leafdict[bip2_id]
+                print(leafname, end=" ")
+            print("| {} {}".format(mean,var))
+
+    tf1 = pt.Nexustreefile(run1_fname)
+    tf2 = pt.Nexustreefile(run2_fname)
+    trees1 = tf1.readtrees()
+    trees2 = tf2.readtrees()
+    discard1 = round(len(trees1)*burninfrac)
+    discard2 = round(len(trees2)*burninfrac)
+    trees1 = trees1[discard1:]
+    trees2 = trees2[discard2:]
+    with open("contest.postburnin.1.t", "w") as outfile:
+        outfile.write(trees1.nexus())
+    with open("contest.postburnin.2.t", "w") as outfile:
+        outfile.write(trees2.nexus())
 
 #################################################################################################
 
@@ -44,9 +58,9 @@ def id_leafdict_from_trprobs(trprobs_fname):
         if words[0] == "tree":
             break
         else:
-            id = int(words[0])
+            leafid = int(words[0])
             leafname = words[1][:-1]
-            leafdict[id] = leafname
+            leafdict[leafid] = leafname
     return leafdict
 
 #################################################################################################
@@ -55,9 +69,13 @@ def id_branchdict_from_vstat(vstat_fname):
     with open(vstat_fname) as infile:
         data = infile.readlines()
     id_branchdict = {}
-    for i in range(1, len(data)):
-        words = data[i].rstrip().split()
-        id_branchdict[i] = [float(words[1]), float(words[2])]  # [mean, var]
+    for line in data:
+        if line.startswith("length"):
+            line = line.replace("[", " ")
+            line = line.replace("]", " ")
+            words = line.rstrip().split()
+            br_id = int(words[1])
+            id_branchdict[br_id] = [float(words[2]), float(words[3])]  # [mean, var]
     return id_branchdict
 
 #################################################################################################
