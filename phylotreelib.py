@@ -2921,7 +2921,7 @@ class TreeSummary():
         # approach described in D.H.D. West, "Updating Mean and Variance Estimates: An Improved
         # Method", Communications of the ACM, 22(9), 1979.
         # A number of variables are used, some of which are stored in the summary dictionary.
-        # These variables have mostly been named according to that paper.
+        # These variables have mostly been named according to the original paper.
         # Exceptions are "bip_count" which was "N", "weight" which was "W", "mean" which was "M",
         # and "brlen" which was "X".
         for bipart in bipdict:
@@ -2929,30 +2929,21 @@ class TreeSummary():
 
             # If bipartition has been seen before: update existing info
             if bipart in self.bipartsummary:
-                brstruct = self.bipartsummary[bipart]
-                Q = brlen - brstruct.mean
-                TEMP = brstruct.SUMW + weight
+                Q = brlen - self.bipartsummary[bipart].mean
+                TEMP = self.bipartsummary[bipart].SUMW + weight
                 R = Q*weight/TEMP
-                brstruct.mean += R
-                brstruct.T += R*self.bipartsummary[bipart].SUMW*Q
-                brstruct.SUMW = TEMP
-                brstruct.bip_count += 1
-                brstruct.freq = brstruct.SUMW/self.tree_weight_sum
-                n = brstruct.bip_count
-                brstruct.var = brstruct.T*n/((n-1)*brstruct.SUMW)      # Weighted variance (ordinary variance if all w=1)
-                brstruct.sem = math.sqrt(brstruct.var)/math.sqrt(n)    # Standard error of the mean
+                self.bipartsummary[bipart].mean += R
+                self.bipartsummary[bipart].T += R * self.bipartsummary[bipart].SUMW * Q
+                self.bipartsummary[bipart].SUMW = TEMP
+                self.bipartsummary[bipart].bip_count += 1
 
             # If bipartition has never been seen before: add it to dict and enter info
             else:
                 self.bipartsummary[bipart]=Branchstruct()
-                brstruct = self.bipartsummary[bipart]
-                brstruct.bip_count = 1
-                brstruct.SUMW = weight
-                brstruct.mean = brlen
-                brstruct.T = 0.0
-                brstruct.freq = weight/self.tree_weight_sum
-                brstruct.var = 999999    # Undefined when n=1, so use arbitrary value
-                brstruct.sem = 999999
+                self.bipartsummary[bipart].bip_count = 1
+                self.bipartsummary[bipart].SUMW = weight
+                self.bipartsummary[bipart].mean = brlen
+                self.bipartsummary[bipart].T = 0.0
 
     ###############################################################################################
 
@@ -2990,17 +2981,10 @@ class TreeSummary():
                 self_bipsum[bipart].bip_count += other_bipsum[bipart].bip_count
                 self_bipsum[bipart].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
                 self_bipsum[bipart].SUMW += other_bipsum[bipart].SUMW
-                self_bipsum[bipart].freq = self_bipsum[bipart].SUMW/self.tree_weight_sum
 
                 # Note: the following expression was arrived at empirically!
                 # I have not proven this is correct, but it does seem to work...
                 self_bipsum[bipart].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
-
-                # Now compute remaining measures from above
-                n = self_bipsum[bipart].bip_count
-                self_bipsum[bipart].var = self_bipsum[bipart].T*n/((n-1)*self_bipsum[bipart].SUMW)
-                self_bipsum[bipart].sem = math.sqrt(self_bipsum[bipart].var)/math.sqrt(n)
-
 
             # If bipartition has never been seen before: transfer data from other_bipsum:
             else:
@@ -3009,135 +2993,25 @@ class TreeSummary():
                 self_bipsum[bipart].mean = other_bipsum[bipart].mean
                 self_bipsum[bipart].T = other_bipsum[bipart].T
                 self_bipsum[bipart].bip_count = other_bipsum[bipart].bip_count
-                self_bipsum[bipart].freq = other_bipsum[bipart].freq
-                self_bipsum[bipart].var = other_bipsum[bipart].var
-                self_bipsum[bipart].sem = other_bipsum[bipart].sem
 
     ###############################################################################################
 
-    def bipart_to_string(self, bipartition, position_dict):
-        """Takes bipartition (set of two leaf sets) and returns string representation"""
-
-        # Meant to be used only by bipartReport. Make pseudo-private?
-
-        bipart1, bipart2 = bipartition
-
-        # Bipartstring will be built as a list of chars first. Initialize with all "."
-        stringwidth = len(self.leaves)
-        bipart_list = stringwidth * ["."]
-
-        # Smaller set is represented by "*" characters. Larger set by "." characters (already set)
-        if len(bipart1) < len(bipart2):
-            smallset = bipart1
-        else:
-            smallset = bipart2
-
-        for leaf in smallset:
-            pos = position_dict[leaf]
-            bipart_list[pos] = "*"
-
-        return "".join(bipart_list)        # Concatenate into one string
-
-    ###############################################################################################
-
-    def bipart_report(self, includeleaves=True, minfreq=0.05):
-        """Return processed, almost directly printable, summary of all observed bipartitions"""
-
-        # Bipart report consists of a tuple containing:
-        #       (0) a sorted list of leaves (for interpreting bipartstring)
-        #       (1) a sorted list of lists. Each item list is: [bipartstring, freq, mean, var, sem]
-        #           entire list is sorted on bipartition frequency
-        # The boolean argument "includeleaves" controls whether or not to report external branches
-
-        raw_result = self.bipartsummary
-
-        # Must first figure out which leaves correspond to which positions in bipartstring
-        # Note: leaves are ordered alphabetically, meaning first char in bipstring corresponds
-        # to first leaf in alphabetic sort
-        leaflist = sorted(self.leaves)
-
-        position_dict = {}
-        for position, leaf in enumerate(leaflist):
-            position_dict[leaf] = position
-
-        # Loop over all bipartitions in raw_result, build formatted result list in process
-        bipreport = []
-        for bipart in raw_result:
-            bipstring = self.bipart_to_string(bipart, position_dict)
-            bipsize = bipstring.count("*")              # Size of smaller set
-
-            # Only report bipartitions that occur more often than "minfreq":
-            if raw_result[bipart].freq>minfreq:
-
-                # Only include external branches if "includeleaves" is set
-                if bipsize>1 or includeleaves:
-                    freq = raw_result[bipart].freq
-                    mean = raw_result[bipart].mean
-                    var = raw_result[bipart].var
-                    sem = raw_result[bipart].sem
-                    bipreport.append([freq, bipstring, mean, var, sem])
-
-        # Sort bipreport according to (1) frequency (higher values first), (2) size of
-        # smaller bipartition (external branches before internal branches), and
-        # (3) bipartstring (*.. before .*. before ..*)
-        # First construct temporary list of (1-freq, bipsize, bipstring, originial list-item)
-        # tuples. Sort this list of tuples and then re-extract the original list-item again
-        # (Example of Decorate, Sort, Undecorate idiom)
-        tmplist = sorted([(1-bip[0], bip[1].count("*"), bip[1], bip) for bip in bipreport])
-        bipreport = [tup[-1] for tup in tmplist]        # Last element of tuple is orig list
-
-        # Return tuple of (leaflist, bipreport)
-        return (leaflist, bipreport)
-
-    ###############################################################################################
-
-    def contree(self, cutoff=0.5, allcompat=False, lab = "freq"):
+    def contree(self, cutoff=0.5, allcompat=False):
         """Returns a consensus tree built from selected bipartitions"""
-
-        # Check validity of "lab" argument
-        if lab not in ["freq", "sem", "rse"]:
-            msg = "contree method called with invalid lab argument: {}\n".format(lab)
-            msg += "Must be 'freq', 'sem', or 'rse'"
-            raise TreeError(msg)
 
         if cutoff < 0.5:
             msg = "Consensus tree cutoff has to be at least 0.5"
             raise TreeError(msg)
 
-        bipdict = self.bipartsummary
-
-        # Initialize new bipdict for keeping relevant bipartitions
+        # Create new bipdict, compute freqs for branches, transfer branches with freq>cutoff
         conbipdict = {}
-
-        # Iterate over all bipartitions. Copy info for biparts where freq>cutoff
-        # PYTHON NOTE: I am changing bipdict during this iteration, therefore I have to use
-        # "for bipart in list(bipdict.keys())" (which uses a full copy of the keys as a list) and
-        # not the slightly faster "for bipart in bipdict:" (which uses the builtin iterkeys method)
-        for bipart, branchstruct in bipdict.items():
-            if branchstruct.freq > cutoff:
-                conbipdict[bipart] = Branchstruct(length=branchstruct.mean)
-                bip1,bip2 = bipart
+        self.compute_freq()
+        for bip, branch in self.bipartsummary.items():
+            if branch.freq > cutoff:
+                conbipdict[bip] = Branchstruct(length=branch.mean)
+                bip1,bip2 = bip
                 if len(bip1)>1 and len(bip2)>1:
-                    # Option "lab" indicates what to use as branch labels.
-                    # The possible accepted values are:
-                    #   "freq": bipartition frequency  [DEFAULT]
-                    #   "sem": standard error of the mean for the branchlength
-                    #   "rse": relative standard error = sem/mean
-                    if lab == "freq":
-                        conbipdict[bipart].label= "%.3f" % branchstruct.freq
-                    elif lab == "sem":
-                        conbipdict[bipart].label= "%.6f" % branchstruct.sem
-                    elif lab == "rse":
-                        # If branch length is zero: set rse to be "NaN"
-                        if branchstruct.mean == 0.0:
-                            conbipdict[bipart].label= "NaN"
-                            # If branch length > 0: set rse = sem/len
-                        else:
-                            rse = branchstruct.sem / branchstruct.mean
-                            conbipdict[bipart].label= "{:.3f}".format(rse)
-
-        # Python note: I originally deleted the original bipart to save memory
-        # rethink strategy here after testing memory usage
+                    conbipdict[bip].label = "{:.3g}".format(branch.freq)
 
         # Build tree from bipartitions  in new bipdict
         contree = Tree.from_biplist(conbipdict)
@@ -3146,23 +3020,44 @@ class TreeSummary():
         if allcompat:
 
             # Construct sorted list of tuples: (frequency, bipart)
-            freqbiplist = sorted([(bipdict[b].freq, b) for b in bipdict])
-            freqbiplist.reverse()
+            freqbiplist = [(self.bipartsummary[b].freq, b) for b in self.bipartsummary]
+            freqbiplist.sort(reverse=True)
 
             # Iterate over sorted list, adding most frequent, compatible bipartitions first
             for _, bipart in freqbiplist:
                 if contree.is_compatible_with(bipart):
-                    blen = bipdict[bipart].mean
-                    if lab == "freq":
-                        label= "%.2f" % bipdict[bipart].freq
-                    elif lab == "sem":
-                        label= "%.6f" % bipdict[bipart].sem
-                    elif lab == "rse":
-                        label = "%.2f" % bipdict[bipart].freq
+                    blen = self.bipartsummary[bipart].mean
+                    label= "{:.3g}".format(self.bipartsummary[bipart].freq)
                     contree.add_branch(bipart, blen, label)
 
         return contree
 
+    ###############################################################################################
+
+    def get_bipsummary(self):
+        """Return summary of bipartitions as dict: {bipartition:Branchstruct}"""
+
+        self.compute_freq()
+        self.compute_var_and_sem()
+        return self.bipartsummary
+
+    ###############################################################################################
+
+    def compute_freq(self):
+        """Compute freq for bipartitions, add attribute to Branchstructs"""
+
+        for branch in self.bipartsummary.values():
+            branch.freq = branch.SUMW / self.tree_weight_sum
+
+    ###############################################################################################
+
+    def compute_var_and_sem(self):
+        """Compute var and standard error of branch lengths, add attributes to Branchstructs"""
+
+        for branch in self.bipartsummary.values():
+            n = branch.bip_count
+            branch.var = branch.T * n / ((n - 1) * branch.SUMW)
+            branch.sem = math.sqrt(branch.var)/math.sqrt(n)
 
 ###################################################################################################
 ###################################################################################################
