@@ -659,7 +659,6 @@ class TreeOutput(TreeTestBase):
 ########################################################################################
 
 class Treesummarytests(TreeTestBase):
-    """Tests for consensus tree related methods"""
 
     def setUp(self):
         testdir_path = os.path.dirname(__file__)
@@ -667,6 +666,7 @@ class Treesummarytests(TreeTestBase):
         self.t2_fname = os.path.join(testdir_path, 'contest.postburnin.2.t')
         con_fname = os.path.join(testdir_path, 'contest.nexus.con.tre')
         mbres_fname = os.path.join(testdir_path, 'bip_mean_var.txt')
+        mb_trprobs_fname = os.path.join(testdir_path, 'contest.nexus.trprobs')
         cfile = pt.Nexustreefile(con_fname)
         self.mb_contree = cfile.readtree()
         cfile.close()
@@ -682,15 +682,20 @@ class Treesummarytests(TreeTestBase):
             mean = float(vals[0])
             var = float(vals[1])
             self.mbresdict[bipart] = [mean,var]
+        trprobfile = pt.Nexustreefile(mb_trprobs_fname)
+        self.trprob_trees = trprobfile.readtrees()
+        trprobfile.close()
 
     def test_contree(self):
         ts = pt.TreeSummary()
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts.add_tree(t)
+        tf1.close()
         tf2 = pt.Nexustreefile(self.t2_fname)
         for t in tf2:
             ts.add_tree(t)
+        tf2.close()
         own_contree = ts.contree()
         own_bipdict = own_contree.bipdict()
         mb_bipdict = self.mb_contree.bipdict()
@@ -707,19 +712,21 @@ class Treesummarytests(TreeTestBase):
             bip1, bip2 = bip
             if len(bip1)!=1 and len(bip2)!=1:
                 mb_branch = mb_bipdict[bip]
-                own_freq = float(own_branch.label)
+                own_freq = float(own_branch.freq)
                 mb_freq = float(mb_branch.label)
-                self.assertAlmostEqual(mb_freq, own_freq)
+                self.assertAlmostEqual(mb_freq, own_freq, places=2)
 
     def test_treesummary_update(self):
         ts1 = pt.TreeSummary()
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts1.add_tree(t)
+        tf1.close()
         ts2 = pt.TreeSummary()
         tf2 = pt.Nexustreefile(self.t2_fname)
         for t in tf2:
             ts2.add_tree(t)
+        tf2.close()
         ts1.update(ts2)
         own_contree = ts1.contree()
         own_bipdict = own_contree.bipdict()
@@ -737,9 +744,23 @@ class Treesummarytests(TreeTestBase):
             bip1, bip2 = bip
             if len(bip1)!=1 and len(bip2)!=1:
                 mb_branch = mb_bipdict[bip]
-                own_freq = float(own_branch.label)
+                own_freq = float(own_branch.freq)
                 mb_freq = float(mb_branch.label)
-                self.assertAlmostEqual(mb_freq, own_freq)
+                self.assertAlmostEqual(mb_freq, own_freq, places=3)
+
+    def test_bigtreesummary(self):
+        # Note: I am checking that mrbayes topologies are the same I found.
+        # should also check topology frequencies
+        ts = pt.BigTreeSummary()
+        tf1 = pt.Nexustreefile(self.t1_fname)
+        for t in tf1:
+            ts.add_tree(t)
+        tf2 = pt.Nexustreefile(self.t2_fname)
+        for t in tf2:
+            ts.add_tree(t)
+        for tree in self.trprob_trees:
+            mb_topology = tree.topology()
+            self.assertIn(mb_topology, ts.toposummary)
 
 ########################################################################################
 ########################################################################################
@@ -832,7 +853,7 @@ class Topologytests(TreeTestBase):
             self.assertFalse(mytree.is_compatible_with(bip))
 
 
-    def test_resolved(self):
+    def test_is_resolved(self):
         """Does is_resolved() return expected result?"""
         for treestring in self.treedata.values():
             mytree = pt.Tree.from_string(treestring)
@@ -846,6 +867,15 @@ class Topologytests(TreeTestBase):
 
         mytree = pt.Tree.from_string("(A, (B, (C, D), E));")
         self.assertFalse(mytree.is_resolved(), )
+
+
+    def test_resolve(self):
+        # UNDER CONSTRUCTION: use assert method that checks for exception being raised
+        namelist = ["seq{}".format(i) for i in range(50)]
+        t1 = pt.Tree.from_leaves(namelist)
+        t1.resolve()
+        t1_string = t1.newick()
+        t2 = pt.Tree.from_string(t1_string)
 
 
 ########################################################################################
