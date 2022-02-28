@@ -149,7 +149,6 @@ class Branchstruct():
         self.length = length
         self.label = label
 
-
 ###################################################################################################
 ###################################################################################################
 
@@ -157,11 +156,8 @@ class Topostruct():
     """Class that emulates a struct. Keeps topology-related info"""
 
     # Python note: perhaps replace with dataclass, available since python 3.7
-    # Contains the fields "count" and "treestring".
-    def __init__(self, count=1, treestring=""):
-        self.count = count
-        self.treestring = treestring
-
+    # Attributes may be added during computation (e.g., freq)
+    pass
 
 ###################################################################################################
 ###################################################################################################
@@ -368,7 +364,7 @@ class Tree():
 
         # Start by building star-tree, this is resolved branch-by-branch later on
         for leaf in obj.leaves:
-            obj.tree[0][leaf]= Branchstruct()
+            obj.tree[0][leaf]= None
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for (bip1, bip2), branchstruct in biplist.items():
@@ -1290,34 +1286,40 @@ class Tree():
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6):
+    def newick(self, printdist=True, printlabels=True, print_leaflabels=False,
+                precision=6, labelfield="label"):
         """Returns Newick format tree string representation of tree object"""
 
         # Distances and labels are printed unless user explicitly request no printing
         # NOTE: This could probably be done slightly faster by iteration (instead of recursion)
         # for instance by using a stack, but unlikely that this function will be heavily used...
-        def append_children(parentnode):
+        # NOTE 2: I am using getattr() on "labelfield" to allow run-time specification of what
+        # field in Branchstruct to use as label. Perhaps this is an indication that Branchstruct
+        # should be a dict in the first place (instead of a class, that only contains data)
+
+        def append_children(parentnode, labelfield):
             """Recursive function that has main responsibility for building Newick tree string"""
 
             for child in self.children(parentnode):
 
-                dist = self.tree[parentnode][child].length
-                label = self.tree[parentnode][child].label
+                branchstruct = self.tree[parentnode][child]
+                dist = branchstruct.length
+                label = getattr(branchstruct, labelfield)
 
                 if child in self.leaves:
                     treelist.append(child)
                     if label and print_leaflabels:
                         treelist.append(" ")
-                        treelist.append(label)
+                        treelist.append("{}".format(label))    # Note: could be str or float. Think about how to format floats...
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
                 else:
                     treelist.append("(")
-                    append_children(child)
+                    append_children(child, labelfield)
                     treelist.append(")")
 
                     if label and printlabels:
-                        treelist.append(label)
+                        treelist.append("{}".format(label))
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
 
@@ -1330,7 +1332,7 @@ class Tree():
         # Root requires special treatment, rest of tree managed by recursion
         root = self.root
         treelist = ["("]
-        append_children(root)
+        append_children(root, labelfield)
         treelist.append(");")
         treestring = "".join(treelist)
         return treestring
@@ -1420,8 +1422,12 @@ class Tree():
                     Globals.biparts[bipartition] = bipartition
                 global_bipart = Globals.biparts[bipartition]
 
-                bipartition_dict[global_bipart] = Branchstruct(self.tree[node1][node2].length,
-                                                               self.tree[node1][node2].label)
+                # DEBUG: try to directly use Branchstruct from original tree instead of creating new
+                # copy with only .length and .label. Should be better, but not sure whether it
+                # will cause problems that this is pointer (so changes in one reflected in other)
+                # bipartition_dict[global_bipart] = Branchstruct(self.tree[node1][node2].length,
+                #                                                self.tree[node1][node2].label)
+                bipartition_dict[global_bipart] = self.tree[node1][node2]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, compare labels)
@@ -1436,7 +1442,7 @@ class Tree():
             bipart2 = leaves - bipart1
             bipartition = Globals.biparts[frozenset([bipart1, bipart2])]
 
-            # Overwrite previous info
+            # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.tree[root][kid1].length,
                                                          self.tree[root][kid1].label)
 
@@ -1908,6 +1914,7 @@ class Tree():
         """Adds branch represented by bipartition to unresolved tree."""
 
         # NOTE: huge overlap with TreeFromBiplist - should use this function there as well!
+        # NOTE: this function should really take Branchstruct as argument instead of len,lab
 
         # Sanity check: is bipartition compatible with tree?
         if not self.is_compatible_with(bipart):
@@ -2891,7 +2898,7 @@ class TreeSet():
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
-    def __init__(self, include_zeroterms=False):
+    def __init__(self):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.tree_count = 0
         self.tree_weight_sum = 0.0
@@ -2924,6 +2931,8 @@ class TreeSummary():
         # These variables have mostly been named according to the original paper.
         # Exceptions are "bip_count" which was "N", "weight" which was "W", "mean" which was "M",
         # and "brlen" which was "X".
+        # Note: mean branch length is stored in two attributes: mean and length
+        # This is due to other functions that expect the attribute .length to be present
         for bipart in bipdict:
             brlen = bipdict[bipart].length
 
@@ -2944,14 +2953,15 @@ class TreeSummary():
                 self.bipartsummary[bipart].SUMW = weight
                 self.bipartsummary[bipart].mean = brlen
                 self.bipartsummary[bipart].T = 0.0
+            self.bipartsummary[bipart].length = self.bipartsummary[bipart].mean
 
     ###############################################################################################
 
-    def update(self, treesummary):
+    def update(self, other):
         """Merge this class with external treesummary"""
 
         # Sanity check: do two treesummaries refer to same set of leaves?
-        if self.leaves != treesummary.leaves:
+        if self.leaves != other.leaves:
             msg = "Not all trees have same set of leaves."
             raise TreeError(msg)
 
@@ -2960,11 +2970,11 @@ class TreeSummary():
         self.bipart_processed = False
 
         # Update treecount and weight
-        self.tree_count += treesummary.tree_count
-        self.tree_weight_sum += treesummary.tree_weight_sum
+        self.tree_count += other.tree_count
+        self.tree_weight_sum += other.tree_weight_sum
 
         # Merge "treesummary.bipartsummary" with "self.bipartsummary"
-        other_bipsum = treesummary.bipartsummary
+        other_bipsum = other.bipartsummary
         self_bipsum = self.bipartsummary
 
         for bipart in other_bipsum:
@@ -2993,6 +3003,7 @@ class TreeSummary():
                 self_bipsum[bipart].mean = other_bipsum[bipart].mean
                 self_bipsum[bipart].T = other_bipsum[bipart].T
                 self_bipsum[bipart].bip_count = other_bipsum[bipart].bip_count
+            self_bipsum[bipart].length = self_bipsum[bipart].mean
 
     ###############################################################################################
 
@@ -3005,13 +3016,10 @@ class TreeSummary():
 
         # Create new bipdict, compute freqs for branches, transfer branches with freq>cutoff
         conbipdict = {}
-        self.compute_freq()
+        self.compute_bipfreq()
         for bip, branch in self.bipartsummary.items():
             if branch.freq > cutoff:
-                conbipdict[bip] = Branchstruct(length=branch.mean)
-                bip1,bip2 = bip
-                if len(bip1)>1 and len(bip2)>1:
-                    conbipdict[bip].label = "{:.3g}".format(branch.freq)
+                conbipdict[bip] = branch
 
         # Build tree from bipartitions  in new bipdict
         contree = Tree.from_biplist(conbipdict)
@@ -3037,27 +3045,36 @@ class TreeSummary():
     def get_bipsummary(self):
         """Return summary of bipartitions as dict: {bipartition:Branchstruct}"""
 
-        self.compute_freq()
-        self.compute_var_and_sem()
+        self.compute_bipfreq()
+        self.compute_blen_var_and_sem()
         return self.bipartsummary
 
     ###############################################################################################
 
-    def compute_freq(self):
-        """Compute freq for bipartitions, add attribute to Branchstructs"""
+    def compute_bipfreq(self, digits=3):
+        """Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs"""
 
-        for branch in self.bipartsummary.values():
+        self.bipfreqlist = []
+        for bipartition, branch in self.bipartsummary.items():
             branch.freq = branch.SUMW / self.tree_weight_sum
+            branch.freq = round(branch.freq, digits)
+            branch.label = "{}".format(branch.freq)      # Consider for refactoring: are there functions that rely on .label field?
+            self.bipfreqlist.append((branch.freq, bipartition))
+        self.bipfreqlist.sort(reverse=True)
 
     ###############################################################################################
 
-    def compute_var_and_sem(self):
+    def compute_blen_var_and_sem(self):
         """Compute var and standard error of branch lengths, add attributes to Branchstructs"""
 
         for branch in self.bipartsummary.values():
             n = branch.bip_count
-            branch.var = branch.T * n / ((n - 1) * branch.SUMW)
-            branch.sem = math.sqrt(branch.var)/math.sqrt(n)
+            if n > 1:
+                branch.var = branch.T * n / ((n - 1) * branch.SUMW)
+                branch.sem = math.sqrt(branch.var)/math.sqrt(n)
+            else:
+                branch.var = 9999999
+                branch.sem = 9999999
 
 ###################################################################################################
 ###################################################################################################
@@ -3069,21 +3086,13 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in STS)
 
-    def __init__(self, include_zeroterms=False, outgroup=None, rootmid=False):
-        """TreeSummary constructor. Initializes relevant data structures"""
+    def __init__(self):
 
         # Most stuff done by superclass constructor
-        TreeSummary.__init__(self, include_zeroterms)
+        TreeSummary.__init__(self)
 
         # This is where topology information is kept
         self.toposummary = {}
-
-        # Save outgroup for rooting (or None if outgroup rooting not requested)
-        self.outgroup = outgroup
-
-        # Save flag for whether to do midpoint rooting
-        # IMPLEMENTATION NOTE: should check for clash with outgroup rooting
-        self.rootmid = rootmid
 
     ###############################################################################################
 
@@ -3097,64 +3106,45 @@ class BigTreeSummary(TreeSummary):
         # If topology HAS been seen before then update count
         topology = curtree.topology()
         if topology in self.toposummary:
-            self.toposummary[topology].count += weight
+            self.toposummary[topology].weight += weight
         else:
-            # Attempt to root on specified outgroup, but use midpoint rooting if this fails
-            # NOTE: should I warn user?
-            if self.outgroup:
-                try:
-                    curtree.rootout(self.outgroup)
-                except TreeError:
-                    curtree.rootmid()
-
-            elif self.rootmid:
-                curtree.rootmid()
-            treestring = curtree.newick(printdist=False, printlabels=False)
-            self.toposummary[topology]=Topostruct(weight, treestring)
-
+            self.toposummary[topology]=Topostruct()
+            self.toposummary[topology].weight = weight
+            self.toposummary[topology].treestring = curtree.newick(printdist=False)
 
     ###############################################################################################
 
-    def update(self, treesummary):
+    def update(self, other):
         """Merge this class with other treesummary"""
 
-        # Superclass method takes care of updating tree_count, tree_weight_sum, and
-        # bipartsummary, and also unsets self.bipart_processed flag
-        TreeSummary.update(self, treesummary)
+        # Superclass method takes care of updating:
+        # tree_count, tree_weight_sum, and bipartsummary
+        TreeSummary.update(self, other)
 
-        # Merge "treesummary.toposummary" with "self.toposummary"
-        topsum = treesummary.toposummary
-        for topology in topsum:
+        # Merge other.toposummary with self.toposummary
+        for topology in other.toposummary:
             # If topology already in self.toposummary, update count
             if topology in self.toposummary:
-                self.toposummary[topology].count += topsum[topology].count
+                self.toposummary[topology].weight += other.toposummary[topology].weight
             # If topology has never been seen before, simply transfer entry
             else:
-                self.toposummary[topology]=topsum[topology]
+                self.toposummary[topology]=other.toposummary[topology]
 
     ###############################################################################################
 
-    def topo_report(self):
-        """Returns list of [freq, treestring] lists"""
+    def get_toposummary(self):
+        """Return summary of topologies as dict: {topology:Topostruct}"""
 
-        if self.tree_count == 0:
-            msg = "No trees added to summary object. Impossible to compute result."
-            raise TreeError(msg)
+        self.compute_topofreq()
+        return self.toposummary
 
-        toporeport = []
-        for topostruct in self.toposummary.values():
-            freq = topostruct.count / self.tree_weight_sum
-            treestring = topostruct.treestring
+    ###############################################################################################
 
-            # Add freq and treestring to current list
-            toporeport.append([freq, treestring])
+    def compute_topofreq(self):
+        """Compute freq for topologies, add attribute to Topostructs"""
 
-        # Sort report according to frequency (higher values first) and return
-        # (In Python, sequence comparison always looks at first element (freq) first)
-        toporeport.sort()
-        toporeport.reverse()
-
-        return toporeport
+        for topo in self.toposummary.values():
+            topo.freq = topo.weight / self.tree_weight_sum
 
 ###################################################################################################
 ###################################################################################################
