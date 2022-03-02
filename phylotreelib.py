@@ -209,7 +209,6 @@ class Tree():
             msg += "Left: ({0}  Right: {1})".format(treestring.count("("), treestring.count(")"))
             raise TreeError(msg)
 
-
         # Break treestring up into a list of parentheses, commas, names, and branch lengths
         # ("tokenize")
         # Python note: characters that are not one of the below, will be quietly discarded
@@ -300,11 +299,10 @@ class Tree():
             else:
                 # If translation dictionary was supplied: change name accordingly
                 if transdict:
-                    child = transdict[part]
+                    child = sys.intern(transdict[part])  # Already interned. Not sure this is needed...
                 else:
                     child = sys.intern(part)    # "Intern" strings so only one copy in memory
                                                 # (may happen automatically anyway?...)
-                    #child = part
 
                 # Check for duplicated leaf names
                 if child in obj.leaves:
@@ -1392,8 +1390,7 @@ class Tree():
         # Names of leaves on one side of a branch are represented as an immutable set
         # A bipartition is represented as an immutable set of two such (complementary) sets
         # The entire tree is represented as a dictionary where the keys are bipartitions
-        # The values are structs containing the fields "length" (branch length) and
-        # "label" (branch label)
+        # The values are Branchstructs
 
         # In the unlikely event this has already been computed: return stored result
         if self.bipdictcache:
@@ -1408,6 +1405,10 @@ class Tree():
         # Python note: Sorting pays off because remote_children cache is built in rational order
         sortedintnodes = self.sorted_intnodes(deepfirst=False)
 
+        # DEBUG: I think root should be removed from sortedintnodes (dealt with separately below)
+        # DEBUG 2: interning in global dict does help with toposummary, but may cause problems
+        # because there is a reference to all bipartitions regardless of what happens to them
+        # which means they cant be garbage collected.
         for node1 in sortedintnodes:
             for node2 in self.children(node1):
                 bipart1 = frozenset(self.remote_children(node2))
@@ -2996,13 +2997,9 @@ class TreeSummary():
                 # I have not proven this is correct, but it does seem to work...
                 self_bipsum[bipart].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
 
-            # If bipartition has never been seen before: transfer data from other_bipsum:
+            # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
             else:
-                self_bipsum[bipart]=Branchstruct()
-                self_bipsum[bipart].SUMW = other_bipsum[bipart].SUMW
-                self_bipsum[bipart].mean = other_bipsum[bipart].mean
-                self_bipsum[bipart].T = other_bipsum[bipart].T
-                self_bipsum[bipart].bip_count = other_bipsum[bipart].bip_count
+                self_bipsum[bipart] = other_bipsum[bipart]
             self_bipsum[bipart].length = self_bipsum[bipart].mean
 
     ###############################################################################################
@@ -3377,7 +3374,9 @@ class Nexustreefile(Treefile):
             # then split each of these on whitespace, and build translation dictionary
             translist = transblock.split(",")
             for transpair in translist:
-                (code, realname) = transpair.split()
+                words = transpair.split()
+                code = words[0]
+                realname = sys.intern(words[1])
                 self.transdict[code] = realname
 
         # Keep everything after "tree <NAME> =" in self.buffer: may contain tree!
