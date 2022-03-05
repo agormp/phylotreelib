@@ -145,6 +145,7 @@ class Interner():
 
     leafsets = {}
     biparts = {}
+    topo = {}
 
     def intern_leafset(leafset):
         if leafset not in Interner.leafsets:
@@ -155,6 +156,12 @@ class Interner():
         if bipart not in Interner.biparts:
             Interner.biparts[bipart]=bipart
         return Interner.biparts[bipart]
+
+    def intern_topology(topology):
+        if topology not in Interner.topo:
+            Interner.topo[topology]=topology
+        return Interner.topo[topology]
+
 
 ###################################################################################################
 ###################################################################################################
@@ -205,8 +212,6 @@ class Tree():
         self.dist_dict = None
         self.path_dict = None
         self.sorted_intnode_cache = None
-        self.bipdictcache = None        # Bipdict cache to avoid multiple calls to bipdict()
-        self.topologycache = None       # Topology cache to avoid multiple calls to topology()
 
     ###############################################################################################
     @classmethod
@@ -764,7 +769,7 @@ class Tree():
             raise TreeError(msg) from err
 
     ###############################################################################################
-    @functools.lru_cache(maxsize=None)
+    #@functools.lru_cache(maxsize=None)
     def remote_children(self, parent):
         """Returns set containing all leaves that are descendants of parent"""
 
@@ -1416,10 +1421,6 @@ class Tree():
         # Interning: store bipartitions in global dict to avoid duplicating object
         # This is probably mostly useful when creating toposummaries in BigTreeSummary
 
-        # In the unlikely event this has already been computed: return stored result
-        if self.bipdictcache:
-            return self.bipdictcache
-
         bipartition_dict = {}
         leaves = Interner.intern_leafset(frozenset(self.leaves))
 
@@ -1470,8 +1471,12 @@ class Tree():
 
             # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
-            bipart1 = frozenset(self.remote_children(kid1))
-            bipart2 = leaves - bipart1
+            if intern:
+                bipart1 = Interner.intern_leafset(frozenset(self.remote_children(kid1)))
+                bipart2 = Interner.intern_leafset(leaves - bipart1)
+            else:
+                bipart1 = frozenset(self.remote_children(kid1))
+                bipart2 = leaves - bipart1
             # if intern:
             #     bipartition = Globals.biparts[frozenset([bipart1, bipart2])]
             # else:
@@ -1503,8 +1508,7 @@ class Tree():
 
             bipartition_dict[bipartition].label = lab
 
-        self.bipdictcache = bipartition_dict           # Avoid computing several times
-        return self.bipdictcache
+        return bipartition_dict
 
     ###############################################################################################
 
@@ -1516,16 +1520,8 @@ class Tree():
         # The entire tree topology is represented as a set of bipartitions
         # This is essentially a naked version of a bipdict
 
-        # Is precomputed topology or bipdict present? (Avoid unnecessary computation)
-        if self.topologycache:
-            return self.topologycache
-        elif self.bipdictcache:
-            bipdict = self.bipdictcache
-        else:
-            bipdict = self.bipdict()
-
+        bipdict = self.bipdict()
         topology = frozenset(bipdict.keys())
-        self.topologycache = topology
 
         return topology
 
@@ -1775,12 +1771,10 @@ class Tree():
         self.build_parent_dict()
 
         # Erase caches
-        self.bipdictcache = None
-        self.topologycache = None
         self.sorted_intnode_cache = None
 
         # Clear lru_caches (which cannot be edited manually)
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
 
@@ -1937,12 +1931,10 @@ class Tree():
             parent_dict[newnode] = parent
 
         # Erase caches
-        self.bipdictcache = None
-        self.topologycache = None
         self.sorted_intnode_cache = None
 
         # Clear lru_caches (which cannot be edited manually)
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
         return newnode
@@ -1994,12 +1986,8 @@ class Tree():
             # Add branch at determined position: Note - this takes care of updating parent_dict
             self.insert_node(insertpoint, movelist, branchlength=blen, lab=label)
 
-        # Erase caches
-        self.bipdictcache = None
-        self.topologycache = None
-
         # Clear lru_caches (which cannot be edited manually)
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2049,12 +2037,8 @@ class Tree():
         if self.sorted_intnode_cache is not None:
             self.sorted_intnode_cache.remove(child)
 
-        # Erase caches
-        self.bipdictcache = None
-        self.topologycache = None
-
         # Clear lru_caches (which cannot be edited manually)
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2115,15 +2099,11 @@ class Tree():
         self.leaves.remove(leaf)
         self.nodes.remove(leaf)
 
-        # Erase caches (possibly something could be salvaged).
-        self.bipdictcache = None
-        self.topologycache = None
-
         # Erase self.sorted_intnode_cache if it exists (could I salvage something?)
         self.sorted_intnode_cache = None
 
         # Clear lru_caches (which cannot be edited manually)
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2375,12 +2355,8 @@ class Tree():
             self.parent_dict[newname] = self.parent_dict[oldname]
             del self.parent_dict[oldname]
 
-        # All bets are off regarding how the renamed node has altered the other caches
-        self.bipdictcache = None
-        self.topologycache = None
-
         # Clear lru_caches (which cannot be edited manually)
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2426,12 +2402,8 @@ class Tree():
             self.parent_dict[child] = newnum
 
         # Clear lru_caches (which cannot be edited manually)
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
-
-        # All bets are off regarding how the renamed node has altered the other caches
-        self.bipdictcache = None
-        self.topologycache = None
 
     ###############################################################################################
 
@@ -2525,9 +2497,7 @@ class Tree():
 
             # update intnodelist and delete caches, which are now unreliable
             self.intnodes = set(self.tree.keys())
-            self.bipdictcache = None
-            self.topologycache = None
-            self.remote_children.cache_clear()
+            #self.remote_children.cache_clear()
             self.nodedist.cache_clear()
             self.sorted_intnode_cache = None
             self.dist_dict = None
@@ -2584,9 +2554,7 @@ class Tree():
             self.parent_dict[oldparent] = newparent
 
         # Clean up: clear caches, which are now unreliable
-        self.bipdictcache = None
-        self.topologycache = None
-        self.remote_children.cache_clear()
+        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
         self.sorted_intnode_cache = None
 
@@ -2972,8 +2940,8 @@ class TreeSummary():
         # and "brlen" which was "X".
         # Note: mean branch length is stored in two attributes: mean and length
         # This is due to other functions that expect the attribute .length to be present
-        for bipart in bipdict:
-            brlen = bipdict[bipart].length
+        for bipart,branchstruct in bipdict.items():
+            brlen = branchstruct.length
 
             # If bipartition has been seen before: update existing info
             if bipart in self.bipartsummary:
@@ -2985,14 +2953,16 @@ class TreeSummary():
                 self.bipartsummary[bipart].SUMW = TEMP
                 self.bipartsummary[bipart].bip_count += 1
 
-            # If bipartition has never been seen before: add it to dict and enter info
+            # If bipartition has never been seen before: add to dict and add online attributes
             else:
-                self.bipartsummary[bipart]=Branchstruct()
+                self.bipartsummary[bipart]=branchstruct
                 self.bipartsummary[bipart].bip_count = 1
                 self.bipartsummary[bipart].SUMW = weight
                 self.bipartsummary[bipart].mean = brlen
                 self.bipartsummary[bipart].T = 0.0
             self.bipartsummary[bipart].length = self.bipartsummary[bipart].mean
+
+        return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
 
     ###############################################################################################
 
@@ -3135,11 +3105,12 @@ class BigTreeSummary(TreeSummary):
         """Add tree to treesummary, update all summaries"""
 
         # Superclass method takes care of updating n_trees and all bipart-related info
-        TreeSummary.add_tree(self, curtree, weight)
+        # Also returns bipdict so we wont have to recompute here
+        bipdict = TreeSummary.add_tree(self, curtree, weight)
 
         # If topology has never been seen before, then add it and initialize count
         # If topology HAS been seen before then update count
-        topology = curtree.topology()
+        topology = Interner.intern_topology(frozenset(bipdict.keys()))
         if topology in self.toposummary:
             self.toposummary[topology].weight += weight
         else:
