@@ -1411,7 +1411,7 @@ class Tree():
 
     ###############################################################################################
 
-    def bipdict(self, intern=False):
+    def bipdict(self):
         """Returns tree in the form of a "bipartition dictionary" """
 
         # Names of leaves on one side of a branch are represented as an immutable set
@@ -1436,14 +1436,9 @@ class Tree():
         # which means they cant be garbage collected.
         for node1 in sortedintnodes:
             for node2 in self.children(node1):
-                if intern:
-                    bipart1 = Interner.intern_leafset(frozenset(self.remote_children(node2)))
-                    bipart2 = Interner.intern_leafset(leaves - bipart1)
-                    bipartition = Interner.intern_bipart(frozenset([bipart1, bipart2]))
-                else:
-                    bipart1 = frozenset(self.remote_children(node2))
-                    bipart2 = leaves - bipart1
-                    bipartition = frozenset([bipart1, bipart2])
+                bipart1 = Interner.intern_leafset(frozenset(self.remote_children(node2)))
+                bipart2 = Interner.intern_leafset(leaves - bipart1)
+                bipartition = Interner.intern_bipart(frozenset([bipart1, bipart2]))
 
                 # Interning:
                 # Bipartitions can be kept in global dict to avoid redundant saving (they can be huge)
@@ -1471,20 +1466,9 @@ class Tree():
 
             # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
-            if intern:
-                bipart1 = Interner.intern_leafset(frozenset(self.remote_children(kid1)))
-                bipart2 = Interner.intern_leafset(leaves - bipart1)
-            else:
-                bipart1 = frozenset(self.remote_children(kid1))
-                bipart2 = leaves - bipart1
-            # if intern:
-            #     bipartition = Globals.biparts[frozenset([bipart1, bipart2])]
-            # else:
-            #     bipartition = frozenset([bipart1, bipart2])
-            if intern:
-                bipartition = Interner.intern_bipart(frozenset([bipart1, bipart2]))
-            else:
-                bipartition = frozenset([bipart1, bipart2])
+            bipart1 = Interner.intern_leafset(frozenset(self.remote_children(kid1)))
+            bipart2 = Interner.intern_leafset(leaves - bipart1)
+            bipartition = Interner.intern_bipart(frozenset([bipart1, bipart2]))
 
             # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.tree[root][kid1].length,
@@ -2927,7 +2911,7 @@ class TreeSummary():
 
         self.tree_count += 1
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
-        bipdict = curtree.bipdict(intern=True)
+        bipdict = curtree.bipdict()
 
         # I am interested in being able to compute weighted frequency of a bipartition as well as
         # the weighted mean and weighted variance of the branch length for that bipartition.
