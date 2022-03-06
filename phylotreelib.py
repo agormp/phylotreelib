@@ -171,20 +171,29 @@ class Interner():
 class Branchstruct():
     """Class that emulates a struct. Keeps branch-related info"""
 
-    # Python note: perhaps replace with dataclass, available since python 3.7
-    # Always contains the fields "length" and "label".
-    # If undefined, length is 0 (zero) and label is an empty string.
-    # Different sets of fields may be added during computation.
+    # Python note: uses __slots__ to save memory
+    # Some fields mostly used in Treesummaries. Perhaps these should be in separate dict?
+
+    __slots__ = ["length", "label", "freq", "bip_count", "SUMW", "T", "var", "sem", "branchID"]
 
     def __init__(self, length=0.0, label=""):
         self.length = length
         self.label = label
+        self.freq = None
+        self.bip_count = None
+        self.SUMW = None
+        self.T = None
+        self.var = None
+        self.sem = None
+        self.branchID = None
 
 ###################################################################################################
 ###################################################################################################
 
 class Topostruct():
     """Class that emulates a struct. Keeps topology-related info"""
+
+    __slots__ = ["weight", "treestring", "freq"]
 
     # Python note: perhaps replace with dataclass, available since python 3.7
     # Attributes may be added during computation (e.g., freq)
@@ -2939,10 +2948,10 @@ class TreeSummary():
 
             # If bipartition has been seen before: update existing info
             if bipart in self.bipartsummary:
-                Q = brlen - self.bipartsummary[bipart].mean
+                Q = brlen - self.bipartsummary[bipart].length
                 TEMP = self.bipartsummary[bipart].SUMW + weight
                 R = Q*weight/TEMP
-                self.bipartsummary[bipart].mean += R
+                self.bipartsummary[bipart].length += R
                 self.bipartsummary[bipart].T += R * self.bipartsummary[bipart].SUMW * Q
                 self.bipartsummary[bipart].SUMW = TEMP
                 self.bipartsummary[bipart].bip_count += 1
@@ -2952,9 +2961,8 @@ class TreeSummary():
                 self.bipartsummary[bipart]=branchstruct
                 self.bipartsummary[bipart].bip_count = 1
                 self.bipartsummary[bipart].SUMW = weight
-                self.bipartsummary[bipart].mean = brlen
+                self.bipartsummary[bipart].length = brlen
                 self.bipartsummary[bipart].T = 0.0
-            self.bipartsummary[bipart].length = self.bipartsummary[bipart].mean
 
         return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
 
@@ -2986,13 +2994,13 @@ class TreeSummary():
 
                 sumw1 = self_bipsum[bipart].SUMW
                 sumw2 = other_bipsum[bipart].SUMW
-                mean1 = self_bipsum[bipart].mean
-                mean2 = other_bipsum[bipart].mean
+                mean1 = self_bipsum[bipart].length
+                mean2 = other_bipsum[bipart].length
                 t1 = self_bipsum[bipart].T
                 t2 = other_bipsum[bipart].T
 
                 self_bipsum[bipart].bip_count += other_bipsum[bipart].bip_count
-                self_bipsum[bipart].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
+                self_bipsum[bipart].length = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
                 self_bipsum[bipart].SUMW += other_bipsum[bipart].SUMW
 
                 # Note: the following expression was arrived at empirically!
@@ -3002,7 +3010,6 @@ class TreeSummary():
             # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
             else:
                 self_bipsum[bipart] = other_bipsum[bipart]
-            self_bipsum[bipart].length = self_bipsum[bipart].mean
 
     ###############################################################################################
 
@@ -3033,7 +3040,7 @@ class TreeSummary():
             # Iterate over sorted list, adding most frequent, compatible bipartitions first
             for _, bipart in freqbiplist:
                 if contree.is_compatible_with(bipart):
-                    blen = self.bipartsummary[bipart].mean
+                    blen = self.bipartsummary[bipart].length
                     label= "{:.3g}".format(self.bipartsummary[bipart].freq)
                     contree.add_branch(bipart, blen, label)
 
@@ -3085,10 +3092,10 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in STS)
 
-    def __init__(self):
+    def __init__(self, interner=None):
 
         # Most stuff done by superclass constructor
-        TreeSummary.__init__(self)
+        TreeSummary.__init__(self, interner=None)
 
         # This is where topology information is kept
         self.toposummary = {}
