@@ -196,7 +196,6 @@ class Topostruct():
     __slots__ = ["weight", "treestring", "freq"]
 
     # Python note: perhaps replace with dataclass, available since python 3.7
-    # Attributes may be added during computation (e.g., freq)
     pass
 
 ###################################################################################################
