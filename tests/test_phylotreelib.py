@@ -236,14 +236,12 @@ class TreeIteration(TreeTestBase):
         """Does iteration over tree objects from nexus treefile work? """
 
         # First: construct treefile
-        fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
+        fileobject = tempfile.NamedTemporaryFile(mode="a", encoding="UTF-8", delete=False)
         filename = fileobject.name
         filehandle = fileobject.file
-        trees = pt.TreeSet()
         for treestring in self.treedata.values():
             mytree = pt.Tree.from_string(treestring)
-            trees.addtree(mytree)
-        filehandle.write(trees.nexus())
+            filehandle.write(mytree.nexus())
         filehandle.close()
 
         # Secondly: iterate over treefile
@@ -258,16 +256,14 @@ class TreeIteration(TreeTestBase):
         """Do I also get the correctly read trees from nexus treefile"""
 
         # First: construct treefile
-        fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
+        fileobject = tempfile.NamedTemporaryFile(mode="a", encoding="UTF-8", delete=False)
         filename = fileobject.name
         filehandle = fileobject.file
         treelist = []
-        trees = pt.TreeSet()
         for treestring in self.treedata.values():
             mytree = pt.Tree.from_string(treestring)
             treelist.append(mytree)
-            trees.addtree(mytree)
-        filehandle.write(trees.nexus())
+            filehandle.write(mytree.nexus())
         filehandle.close()
 
         # Secondly: iterate over treefile, check that read trees correspond to written trees
@@ -321,29 +317,22 @@ class TreeRead(TreeTestBase):
         """Test that readtree returns correct trees and None when Nexusfile exhausted"""
 
         # First: construct treefile
-        fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
+        fileobject = tempfile.NamedTemporaryFile(mode="a", encoding="UTF-8", delete=False)
         filename = fileobject.name
         filehandle = fileobject.file
         treelist = []
-        trees = pt.TreeSet()
         for treestring in self.treedata.values():
             mytree = pt.Tree.from_string(treestring)
             treelist.append(mytree)
-            trees.addtree(mytree)
-        filehandle.write(trees.nexus())
+            filehandle.write(mytree.nexus())
         filehandle.close()
 
         # Secondly: read all trees from treefile
         # check that read trees correspond to written trees
         ntrees = len(treelist)
         treefile = pt.Nexustreefile(filename)
-        for i in range(ntrees):
-            tree = treefile.readtree()
+        for i,tree in enumerate(treefile):
             self.assertEqual(tree, treelist[i])
-
-        # Check that None is returned when file is exhausted
-        value = treefile.readtree()
-        self.assertIsNone(value)
 
         # Clean up
         os.remove(filename)
@@ -378,23 +367,23 @@ class TreeRead(TreeTestBase):
         """Test that readtrees (plural) returns correct trees from Nexusfile"""
 
         # First: construct treefile
-        fileobject = tempfile.NamedTemporaryFile(mode="wt", encoding="UTF-8", delete=False)
+        fileobject = tempfile.NamedTemporaryFile(mode="a", encoding="UTF-8", delete=False)
         filename = fileobject.name
         filehandle = fileobject.file
         treelist = []
-        trees = pt.TreeSet()
         for treestring in self.treedata.values():
             mytree = pt.Tree.from_string(treestring)
             treelist.append(mytree)
-            trees.addtree(mytree)
-        filehandle.write(trees.nexus())
+            filehandle.write(mytree.nexus())
         filehandle.close()
 
         # Secondly: read all trees from treefile in one go using readtrees()
         # check that read trees correspond to written trees
         treefile = pt.Nexustreefile(filename)
-        treeset_from_file = treefile.readtrees()
-        for origtree, readtree in zip(treelist, treeset_from_file):
+        newlyreadtrees = []
+        for tree in treefile:
+            newlyreadtrees.append(tree)
+        for origtree, readtree in zip(treelist, newlyreadtrees):
             self.assertEqual(origtree, readtree)
 
         # Clean up
