@@ -756,7 +756,7 @@ class Tree():
 
         return sorted_nodes
 
-     ###############################################################################################
+    ###############################################################################################
 
     def leaflist(self):
         """Returns list of leaf names sorted alphabetically"""
@@ -765,7 +765,29 @@ class Tree():
         leafnamelist.sort()
         return leafnamelist
 
-     ###############################################################################################
+    ###############################################################################################
+
+    def transdict(self):
+        """Returns dictionary of {name:number_as_string} for use in translateblocks"""
+
+        leafnamelist = self.leaflist()
+        transdict = {}
+        for i,leafname in enumerate(leafnamelist):
+            transdict[leafname] = "{}".format(i+1)
+        return transdict
+
+    ###############################################################################################
+
+    def translateblock(self, transdict):
+        translist = ["    translate\n"]
+        for number,name in transdict.items():
+            translist.append("        {nam:<4s}  {num}".format(nam=name, num=number,))
+            translist.append(",\n")
+        translist[-1] = "\n		;\n"
+        translateblock = "".join(translist)
+        return translateblock
+
+    ###############################################################################################
 
     def children(self, parent):
         """Returns set containing parent's immediate descendants"""
@@ -1322,10 +1344,13 @@ class Tree():
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, print_leaflabels=False,
-                precision=6, labelfield="label"):
+                precision=6, labelfield="label", transdict=None):
         """Returns Newick format tree string representation of tree object"""
 
         # Distances and labels are printed unless user explicitly request no printing
+        # Transdict is meant for printing Nexus files with translate blocks: In these cases
+        # the leaf names should be replaced by the leaf number instead, so transdict is reverse
+        # of info in translate block: {name:number} instead of {number:name}
         # NOTE: This could probably be done slightly faster by iteration (instead of recursion)
         # for instance by using a stack, but unlikely that this function will be heavily used...
         # NOTE 2: I am using getattr() on "labelfield" to allow run-time specification of what
@@ -1342,10 +1367,13 @@ class Tree():
                 label = getattr(branchstruct, labelfield)
 
                 if child in self.leaves:
-                    treelist.append(child)
+                    if transdict:
+                        treelist.append(transdict[child])     # Should transdict errors be caught here?
+                    else:
+                        treelist.append(child)
                     if label and print_leaflabels:
                         treelist.append(" ")
-                        treelist.append("{}".format(label))    # Note: could be str or float. Think about how to format floats...
+                        treelist.append("{}".format(label))
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
                 else:
@@ -1374,14 +1402,24 @@ class Tree():
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6):
+    def nexus(self, printdist=True, printlabels=True, print_leaflabels=False,
+                precision=6, labelfield="label", translateblock=False):
         """Returns nexus format tree as a string"""
 
         # Construct header
-        stringlist = ["#NEXUS\n\nbegin trees;\n   tree nexus_tree = "]
+        stringlist = ["#NEXUS\n\nbegin trees;\n"]
+
+        # If translateblock is requested: add translateblock to stringlist
+        if translateblock:
+            transdict = self.transdict()
+            stringlist.append(self.translateblock(transdict))
 
         # Add newick tree string
-        stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision))
+        stringlist.append("   tree nexus_tree = ")
+        if translateblock:
+            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision, labelfield, transdict))
+        else:
+            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision, labelfield))
 
         # Add footer
         stringlist.append("\nend;\n")
@@ -2866,16 +2904,24 @@ class TreeSet():
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True):
+    def nexus(self, printdist=True, printlabels=True, translateblock=True):
         """Returns nexus format tree as a string"""
 
         # Construct header
         stringlist = ["#NEXUS\n\nbegin trees;\n"]
 
+        # If translateblock is requested: add translateblock to stringlist
+        if translateblock:
+            transdict = self[0].transdict()
+            stringlist.append(self[0].translateblock(transdict))
+
         # Add newick tree strings
         for i, tree in enumerate(self.treelist):
             stringlist.append("    tree t.{} = ".format(i+1))
-            stringlist.append(tree.newick(printdist, printlabels))
+            if translateblock:
+                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, transdict=transdict))
+            else:
+                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels))
             stringlist.append("\n")
 
         # Add footer
