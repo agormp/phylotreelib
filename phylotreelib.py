@@ -2832,7 +2832,7 @@ class Tree():
 ###################################################################################################
 
 class TreeSet():
-    """Class for storing and manipulating a number of trees"""
+    """Class for storing and manipulating a number of trees, which all have the same leafs"""
 
     def __init__(self):
         self.treelist = []
