@@ -2966,11 +2966,14 @@ class TreeSummary():
 
         # Main interface to TreeSummary.
         # Takes tree object, updates relevant measures
-        # First time entered: build set of leaves for consistency checking:
+        # First time entered: build set of leaves for consistency checking.
+        # Also compute transdict and translateblock for tree reporting (and storage?)
         if self.tree_count == 0:
             self.leaves = curtree.leaves
+            self.transdict = curtree.transdict()
+            self.translateblock = curtree.translateblock(self.transdict)
         elif curtree.leaves != self.leaves:
-            msg = "Leaves on tree number %d are different than previous trees" % self.tree_count
+            msg = "Leaves on tree number {} are different than previous trees".format(self.tree_count)
             raise TreeError(msg)
 
         self.tree_count += 1
@@ -3135,7 +3138,7 @@ class BigTreeSummary(TreeSummary):
     """Class summarizing bipartitions, branch lengths, and topologies from many trees"""
 
     # Does everything TreeSummary does and also keeps track of topologies
-    # (topology list is potentially quite big, which is the reason for not including it in STS)
+    # (topology list is potentially quite big, which is the reason for not including it in TS)
 
     def __init__(self, interner=None):
 
@@ -3164,7 +3167,8 @@ class BigTreeSummary(TreeSummary):
         else:
             self.toposummary[topology]=Topostruct()
             self.toposummary[topology].weight = weight
-            self.toposummary[topology].treestring = curtree.newick(printdist=False)
+            self.toposummary[topology].treestring = curtree.newick(printdist=False, printlabels=False,
+                                                                    transdict=self.transdict)
 
     ###############################################################################################
 
