@@ -226,7 +226,7 @@ class Tree():
     ###############################################################################################
     @classmethod
     def from_string(cls, orig_treestring, transdict=None):
-        """Constructor 1: Tree object from tree-string in Newick format"""
+        """Constructor: Tree object from tree-string in Newick format"""
 
         obj = cls()
 
@@ -371,7 +371,7 @@ class Tree():
     ###############################################################################################
     @classmethod
     def from_biplist(cls, biplist):
-        """Constructor 2: Tree object from bipartition list"""
+        """Constructor: Tree object from bipartition list"""
 
         # Input is a bipartitionlist (actually a dictionary of bipartition:Branchstruct pairs):
         # Names of leaves on one side of a branch are represented as an immutable set of leaves
@@ -447,6 +447,83 @@ class Tree():
                 maxnode += 1
                 obj.tree[maxnode] = {}
                 obj.tree[insertpoint][maxnode] = branchstruct
+                obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
+
+                # Move relevant children to new node, transfer Branchstructs
+                for child in moveset:
+                    obj.tree[maxnode][child] = obj.tree[insertpoint][child]
+                    del obj.tree[insertpoint][child]
+
+        obj.nodes = set(obj.leaves | obj.intnodes)
+        return obj
+
+    ###############################################################################################
+    @classmethod
+    def from_topology(cls, topology):
+        """Constructor: Tree object from topology"""
+
+        # Input is a topology, i.e., a set of bipartitions
+        # Names of leaves on one side of a branch are represented as an immutable set of leaves
+        # A bipartition is represented as an immutable set of two such (complementary) sets
+        # Huge overlap with from_biplist: difference is this doesnt have Branchstructs to begin with
+        # Think about mergin code, with flag for branchstruct presence
+        obj = cls()
+
+        # Extract set of leaves
+        part1, part2 = next(iter(topology)) # First item=set of two leaf name sets
+        obj.leaves = part1 | part2          # Concatenate them to get all leafnames
+        obj.intnodes = {0}                  # Will be built as we go along
+        obj.root = 0                        # Root is node zero at start
+                                            # This may change after re-rooting etc
+
+        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
+        # are the internal nodes, which are numbered consecutively. Each key has an associated
+        # value that is itself a dictionary listing the children: keys are child nodes, values are
+        # Branchstructs containing "length" (float) and "label" (str) fields.
+        # Leafs are identified by a string instead of a number
+
+        # Construct tree dictionary (main data structure, essentially a child list)
+        obj.tree = {}
+        obj.tree[0]={}
+        maxnode = 0
+
+        # Start by building star-tree, this is resolved branch-by-branch later on
+        for leaf in obj.leaves:
+            obj.tree[0][leaf]= Branchstruct()
+
+        # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
+        for bip1, bip2 in topology:
+
+            # If bipartition represents internal branch: add branch to tree
+            if len(bip1) > 1 and len(bip2) > 1:
+                mrca1 = obj.find_mrca(bip1)
+                mrca2 = obj.find_mrca(bip2)
+
+                # Determine which group of leaves to move
+                # Note: one part of bipartition will necessarily have root as its MRCA
+                # since the members are present on both sides of root. It is the other part of
+                # the bipartition (where all members are on same side of root) that should be moved
+                # For a star-tree the resolution will be random (both have root as their MRCA)
+                if mrca1 == 0:                  # If mrca is root, move other group
+                    insertpoint = mrca2
+                    active_bip = bip2
+                else:
+                    insertpoint = mrca1
+                    active_bip = bip1
+
+                # Determine which of insertpoints children to move, namely all children
+                # that are either in the active bipartition OR children whose descendants are
+                moveset = []
+                for child in obj.children(insertpoint):
+                    if child in active_bip:
+                        moveset.append(child)
+                    elif (child not in obj.leaves) and (obj.remote_children(child) <= active_bip):
+                        moveset.append(child)
+
+                # Construct new internal node (and therefore branch)
+                maxnode += 1
+                obj.tree[maxnode] = {}
+                obj.tree[insertpoint][maxnode] = Branchstruct()
                 obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
 
                 # Move relevant children to new node, transfer Branchstructs
@@ -3159,7 +3236,7 @@ class BigTreeSummary(TreeSummary):
 
         # If topology has never been seen before, then add it and initialize count
         # If topology HAS been seen before then update count
-        # Python: A bit messy that interning is here done in add_tree and not in topology
+        # Python: A bit messy that interning is here done in add_tree() and not in topology()
         # This is to avoid recomputing bipdict in topology function (or storing bipdictcache)
         topology = self.interner.intern_topology(frozenset(bipdict.keys()))
         if topology in self.toposummary:
@@ -3168,7 +3245,7 @@ class BigTreeSummary(TreeSummary):
             self.toposummary[topology]=Topostruct()
             self.toposummary[topology].weight = weight
             self.toposummary[topology].treestring = curtree.newick(printdist=False, printlabels=False,
-                                                                    transdict=self.transdict)
+                                                transdict=self.transdict)
 
     ###############################################################################################
 
@@ -3201,8 +3278,8 @@ class BigTreeSummary(TreeSummary):
     def compute_topofreq(self):
         """Compute freq for topologies, add attribute to Topostructs"""
 
-        for topo in self.toposummary.values():
-            topo.freq = topo.weight / self.tree_weight_sum
+        for topostruct in self.toposummary.values():
+            topostruct.freq = topostruct.weight / self.tree_weight_sum
 
 ###################################################################################################
 ###################################################################################################
