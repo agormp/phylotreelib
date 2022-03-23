@@ -1169,8 +1169,10 @@ class RootTester(TreeTestBase):
 class PruneTester(TreeTestBase):
     """Tests for pruning related methods in Tree object"""
 
-    def test_pdprune(self):
-        """Use brute force to test that pd_prune finds the longest tree with given number of leaves"""
+
+
+    def test_prune_maxlen(self):
+        """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves"""
         ntips = 14    # Note: combinatorial explosion means execution time rapidly increases
         nkeep = 7
         t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
