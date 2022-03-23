@@ -1,7 +1,7 @@
 # phylotreelib: python library for analyzing and manipulating phylogenetic trees
 
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/phylotreelib)
-![](https://img.shields.io/badge/version-1.6.0-blue)
+![](https://img.shields.io/badge/version-1.6.2-blue)
 
 
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
@@ -382,6 +382,7 @@ CLASSES
         Branchstruct
         Distmatrix
         Globals
+        Interner
         Topostruct
         Tree
         TreeSet
@@ -392,7 +393,7 @@ CLASSES
             Nexustreefile
 
     class BigTreeSummary(TreeSummary)
-     |  BigTreeSummary(include_zeroterms=False, outgroup=None, rootmid=False)
+     |  BigTreeSummary(interner=None)
      |
      |  Class summarizing bipartitions, branch lengths, and topologies from many trees
      |
@@ -403,32 +404,35 @@ CLASSES
      |
      |  Methods defined here:
      |
-     |  __init__(self, include_zeroterms=False, outgroup=None, rootmid=False)
+     |  __init__(self, interner=None)
      |      TreeSummary constructor. Initializes relevant data structures
      |
      |  add_tree(self, curtree, weight=1.0)
      |      Add tree to treesummary, update all summaries
      |
-     |  topo_report(self)
-     |      Returns list of [freq, treestring] lists
+     |  compute_topofreq(self)
+     |      Compute freq for topologies, add attribute to Topostructs
      |
-     |  update(self, treesummary)
+     |  get_toposummary(self)
+     |      Return summary of topologies as dict: {topology:Topostruct}
+     |
+     |  update(self, other)
      |      Merge this class with other treesummary
      |
      |  ----------------------------------------------------------------------
      |  Methods inherited from TreeSummary:
      |
-     |  bipart_report(self, includeleaves=True, minfreq=0.05)
-     |      Return processed, almost directly printable, summary of all observed bipartitions
+     |  compute_bipfreq(self, digits=3)
+     |      Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs
      |
-     |  bipart_result(self)
-     |      Return raw summary of all observed bipartitions
+     |  compute_blen_var_and_sem(self)
+     |      Compute var and standard error of branch lengths, add attributes to Branchstructs
      |
-     |  bipart_to_string(self, bipartition, position_dict)
-     |      Takes bipartition (set of two leaf sets) and returns string representation
-     |
-     |  contree(self, cutoff=0.5, allcompat=False, lab='freq')
+     |  contree(self, cutoff=0.5, allcompat=False)
      |      Returns a consensus tree built from selected bipartitions
+     |
+     |  get_bipsummary(self)
+     |      Return summary of bipartitions as dict: {bipartition:Branchstruct}
      |
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from TreeSummary:
@@ -452,11 +456,27 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
      |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
+     |  SUMW
      |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
+     |  T
+     |
+     |  bip_count
+     |
+     |  branchID
+     |
+     |  freq
+     |
+     |  kid_height
+     |
+     |  label
+     |
+     |  length
+     |
+     |  parent_height
+     |
+     |  sem
+     |
+     |  var
 
     class Distmatrix(builtins.object)
      |  Class representing distance matrix for set of taxa. Knows hot to compute trees
@@ -484,17 +504,12 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Class methods defined here:
      |
-     |  from_alignment(alignment, dist='pdist') from builtins.type
-     |      Construct Distmatrix object from alignment object
-     |
      |  from_distdict(distdict) from builtins.type
-     |      Construct Distmatrix object from dictionary of {(name1, name2):dist}
+     |      Construct Distmatrix object from nested dictionary of dists: distdict[name1][name2] = dist
      |
-     |  from_numpy_array(nparray, namelist, n) from builtins.type
+     |  from_numpy_array(nparray, namelist) from builtins.type
      |      Construct Distmatrix object from numpy array and corresponding list of names
-     |
-     |  from_phylip_string(dmat_string, n=None) from builtins.type
-     |      Constructs Distmatrix object from string corresponding to PHYLIP square distance matrix
+     |      Names in namelist must be in same order as indices in numpy 2D array
      |
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
@@ -521,6 +536,29 @@ CLASSES
      |
      |  biparts = {}
 
+    class Interner(builtins.object)
+     |  Class used for interning various objects.
+     |
+     |  Methods defined here:
+     |
+     |  __init__(self)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |
+     |  intern_bipart(self, bipart)
+     |
+     |  intern_leafset(self, leafset)
+     |
+     |  intern_topology(self, topology)
+     |
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
     class Newicktreefile(Treefile)
      |  Newicktreefile(filename=None, filecontent=None)
      |
@@ -543,13 +581,16 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Methods inherited from Treefile:
      |
+     |  close(self)
+     |      For explicit closing of Treefile before content exhausted
+     |
      |  get_treestring(self)
      |      Return next tree-string
      |
-     |  read_tree(self)
+     |  readtree(self)
      |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
      |
-     |  read_trees(self, discardprop=0.0)
+     |  readtrees(self, discardprop=0.0)
      |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
      |
      |  ----------------------------------------------------------------------
@@ -583,13 +624,16 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Methods inherited from Treefile:
      |
+     |  close(self)
+     |      For explicit closing of Treefile before content exhausted
+     |
      |  get_treestring(self)
      |      Return next tree-string
      |
-     |  read_tree(self)
+     |  readtree(self)
      |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
      |
-     |  read_trees(self, discardprop=0.0)
+     |  readtrees(self, discardprop=0.0)
      |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
      |
      |  ----------------------------------------------------------------------
@@ -602,23 +646,15 @@ CLASSES
      |      list of weak references to the object (if defined)
 
     class Topostruct(builtins.object)
-     |  Topostruct(count=1, treestring='')
-     |
      |  Class that emulates a struct. Keeps topology-related info
      |
-     |  Methods defined here:
-     |
-     |  __init__(self, count=1, treestring='')
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
      |
-     |  __dict__
-     |      dictionary for instance variables (if defined)
+     |  freq
      |
-     |  __weakref__
-     |      list of weak references to the object (if defined)
+     |  treestring
+     |
+     |  weight
 
     class Tree(builtins.object)
      |  Class representing basic phylogenetic tree object.
@@ -649,7 +685,7 @@ CLASSES
      |  average_pairdist(self, leaflist, return_median=False)
      |      Return average or median pairwise, patristic distance between leaves in leaflist
      |
-     |  bipdict(self)
+     |  bipdict(self, interner=None)
      |      Returns tree in the form of a "bipartition dictionary"
      |
      |  build_dist_dict(self)
@@ -676,7 +712,6 @@ CLASSES
      |
      |      Returns tuple containing: list with sets of leafnames (one set per cluster)
      |                                list of basenodes of clusters
-     |                                set containing all leaves that are put in clusters
      |
      |  collapse_clade(self, leaflist, newname='clade')
      |      Replaces clade (leaves in leaflist) with single leaf.
@@ -753,10 +788,10 @@ CLASSES
      |  nearleafs(self, leaf1, maxdist)
      |      Returns set of leaves that are less than maxdist from leaf, measured along branches
      |
-     |  newick(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6)
+     |  newick(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6, labelfield='label', transdict=None)
      |      Returns Newick format tree string representation of tree object
      |
-     |  nexus(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6)
+     |  nexus(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6, labelfield='label', translateblock=False)
      |      Returns nexus format tree as a string
      |
      |  nodedepth(self, node)
@@ -849,6 +884,11 @@ CLASSES
      |  topology(self)
      |      Returns set of sets of sets representation of topology ("naked bipdict")
      |
+     |  transdict(self)
+     |      Returns dictionary of {name:number_as_string} for use in translateblocks
+     |
+     |  translateblock(self, transdict)
+     |
      |  transname(self, namefile)
      |      Translate all leaf names using oldname/newname pairs in namefile
      |
@@ -863,13 +903,16 @@ CLASSES
      |  Class methods defined here:
      |
      |  from_biplist(biplist) from builtins.type
-     |      Constructor 2: Tree object from bipartition list
+     |      Constructor: Tree object from bipartition list
      |
      |  from_leaves(leaflist) from builtins.type
      |      Constructor 3: star-tree object from list of leaves
      |
      |  from_string(orig_treestring, transdict=None) from builtins.type
-     |      Constructor 1: Tree object from tree-string in Newick format
+     |      Constructor: Tree object from tree-string in Newick format
+     |
+     |  from_topology(topology) from builtins.type
+     |      Constructor: Tree object from topology
      |
      |  randtree(leaflist=None, ntips=None, randomlen=False, name_prefix='s') from builtins.type
      |      Constructor 4: tree with random topology from list of leaf names OR number of tips
@@ -952,7 +995,7 @@ CLASSES
      |  args
 
     class TreeSet(builtins.object)
-     |  Class for storing and manipulating a number of trees
+     |  Class for storing and manipulating a number of trees, which all have the same leafs
      |
      |  Methods defined here:
      |
@@ -979,7 +1022,7 @@ CLASSES
      |  newick(self, printdist=True, printlabels=True)
      |      Returns newick format tree as a string
      |
-     |  nexus(self, printdist=True, printlabels=True)
+     |  nexus(self, printdist=True, printlabels=True, translateblock=True)
      |      Returns nexus format tree as a string
      |
      |  rootmid(self)
@@ -1000,31 +1043,31 @@ CLASSES
      |  TreeSetIterator = <class 'phylotreelib.TreeSet.TreeSetIterator'>
 
     class TreeSummary(builtins.object)
-     |  TreeSummary(include_zeroterms=False)
+     |  TreeSummary(interner=None)
      |
      |  Class summarizing bipartitions and branch lengths (but not topologies) from many trees
      |
      |  Methods defined here:
      |
-     |  __init__(self, include_zeroterms=False)
+     |  __init__(self, interner=None)
      |      TreeSummary constructor. Initializes relevant data structures
      |
      |  add_tree(self, curtree, weight=1.0)
-     |      Add tree object to treesummary, update all relevant summaries
+     |      Add tree object to treesummary, update all relevant bipartition summaries
      |
-     |  bipart_report(self, includeleaves=True, minfreq=0.05)
-     |      Return processed, almost directly printable, summary of all observed bipartitions
+     |  compute_bipfreq(self, digits=3)
+     |      Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs
      |
-     |  bipart_result(self)
-     |      Return raw summary of all observed bipartitions
+     |  compute_blen_var_and_sem(self)
+     |      Compute var and standard error of branch lengths, add attributes to Branchstructs
      |
-     |  bipart_to_string(self, bipartition, position_dict)
-     |      Takes bipartition (set of two leaf sets) and returns string representation
-     |
-     |  contree(self, cutoff=0.5, allcompat=False, lab='freq')
+     |  contree(self, cutoff=0.5, allcompat=False)
      |      Returns a consensus tree built from selected bipartitions
      |
-     |  update(self, treesummary)
+     |  get_bipsummary(self)
+     |      Return summary of bipartitions as dict: {bipartition:Branchstruct}
+     |
+     |  update(self, other)
      |      Merge this class with external treesummary
      |
      |  ----------------------------------------------------------------------
@@ -1046,13 +1089,16 @@ CLASSES
      |  __init__(self, filename=None, filecontent=None)
      |      Initialize self.  See help(type(self)) for accurate signature.
      |
+     |  close(self)
+     |      For explicit closing of Treefile before content exhausted
+     |
      |  get_treestring(self)
      |      Return next tree-string
      |
-     |  read_tree(self)
+     |  readtree(self)
      |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
      |
-     |  read_trees(self, discardprop=0.0)
+     |  readtrees(self, discardprop=0.0)
      |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
      |
      |  ----------------------------------------------------------------------
