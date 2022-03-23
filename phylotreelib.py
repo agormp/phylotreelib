@@ -174,7 +174,8 @@ class Branchstruct():
     # Python note: uses __slots__ to save memory
     # Some fields mostly used in Treesummaries. Perhaps these should be in separate dict?
 
-    __slots__ = ["length", "label", "freq", "bip_count", "SUMW", "T", "var", "sem", "branchID"]
+    __slots__ = ["length", "label", "freq", "bip_count", "SUMW", "T", "var", "sem", "branchID",
+                 "parent_height", "kid_height"]
 
     def __init__(self, length=0.0, label=""):
         self.length = length
@@ -186,6 +187,8 @@ class Branchstruct():
         self.var = None
         self.sem = None
         self.branchID = None
+        self.parent_height = None
+        self.kid_height = None
 
 ###################################################################################################
 ###################################################################################################
@@ -1896,8 +1899,7 @@ class Tree():
         """Divides tree into 'nclust' clusters based on distance from root.
 
            Returns tuple containing: list with sets of leafnames (one set per cluster)
-                                     list of basenodes of clusters
-                                     set containing all leaves that are put in clusters"""
+                                     list of basenodes of clusters"""
 
         # Finds clusters by conceptually cutting across branches at height where there are nclust
         # groups downstream of cutpoint. This essentially finds equally spaced clusters.
@@ -1955,27 +1957,24 @@ class Tree():
 
         # We now know cutoff:
         # height above which we can cut all branches in order to obtain >= nclust groups
-        # PYTHON NOTE:
-        # not quite: low leaves (height below cutpoint) wont belong to any cluster
-        # so number may be too low.
 
         # For each branch in tree:
         # Check if cut at cutoff will cross this branch.
         # If so: add node above it to list of base nodes
         clusterlist = []                # list of sets of leaves (each set is one cluster)
         cluster_basenodes = []          # List of basenodes of clusters
-        cluster_leaves = set()          # set containing all leaves that are put in clusters
         for parent, kid_dict in self.tree.items():
             for kid in kid_dict:
                 if kid_dict[kid].parent_height <= cutoff < kid_dict[kid].kid_height:
                     cluster = self.remote_children(kid)
                     clusterlist.append(cluster)
                     cluster_basenodes.append(kid)       # NOTE: some basenodes may be leaves
-                    cluster_leaves.update(cluster)
-        unclassified = self.leaves - cluster_leaves     # Set containing unclassified leaves
-                                                        # (leaves that are below cutpoint)
+                elif (kid in self.leaves) and kid_dict[kid].kid_height < cutoff:
+                    cluster = set([kid])
+                    clusterlist.append(cluster)
+                    cluster_basenodes.append(kid)       # NOTE: some basenodes may be leaves
 
-        return (clusterlist, cluster_basenodes, unclassified)
+        return (clusterlist, cluster_basenodes)
 
     ###############################################################################################
 
