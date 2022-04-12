@@ -1427,7 +1427,7 @@ class Tree():
                 precision=6, labelfield="label", transdict=None):
         """Returns Newick format tree string representation of tree object"""
 
-        # Distances and labels are printed unless user explicitly request no printing
+        # Distances and (internal branch) labels are printed unless user explicitly request no printing
         # Transdict is meant for printing Nexus files with translate blocks: In these cases
         # the leaf names should be replaced by the leaf number instead, so transdict is reverse
         # of info in translate block: {name:number} instead of {number:name}
@@ -1451,7 +1451,7 @@ class Tree():
                         treelist.append(transdict[child])     # Should transdict errors be caught here?
                     else:
                         treelist.append(child)
-                    if label and print_leaflabels:
+                    if label != "" and print_leaflabels:
                         treelist.append(" ")
                         treelist.append("{}".format(label))
                     if printdist:
@@ -1461,7 +1461,7 @@ class Tree():
                     append_children(child, labelfield)
                     treelist.append(")")
 
-                    if label and printlabels:
+                    if label != "" and printlabels:
                         treelist.append("{}".format(label))
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
