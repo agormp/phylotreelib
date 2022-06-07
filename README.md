@@ -122,13 +122,15 @@ with open("contree.newick", "w") as outfile:
 -----
 
 ### Prune tree to representative subset of n leaves
-The code below opens a Nexus file, reads one Tree object from the file, and then prunes the tree such that 50 leaves remain. The leaves are chosen such that they are maximally representative, in the sense that they spread out the maximal possible percentage of the original tree length (i.e., there is no other subset of 50 leaves that would result in a tree with a larger sum of branch lenths). This can be used e.g. for reducing the size of a tree prior to computationally costly downstream analyses, or to simplify visualization (especially useful if there are many closely related leaves).
+The code below opens a Nexus format file, reads one Tree object from the file, prunes the tree such that 50 leaves remain, and writes the resulting tree, in nexus format, to a new file. The leaves are chosen such that they are maximally representative in the sense that they spread out the maximum possible percentage of the original tree length (i.e., there is no other subset of 50 leaves that would result in a tree with a larger sum of branch lenths). This can be used e.g. for reducing the size of a tree prior to computationally costly downstream analyses, or to simplify visualization (especially useful if there are many closely related leaves).
 
 ```python
 import phylotreelib as pt
-treefile = pt.Nexustreefile("all_SARSCoV2.tree")
+treefile = pt.Nexustreefile("SARSCoV2_all.tree")
 bigtree = treefile.readtree()
 smalltree = bigtree.prune_maxlen(nkeep=50)
+with open("SARSCoV2_50.tree", "w") as outfile:
+    outfile.write(smalltree.nexus())
 ```
 
 -----
