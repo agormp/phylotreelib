@@ -18,6 +18,12 @@ The phylotreelib.py module is available on GitHub: https://github.com/agormp/phy
 python3 -m pip install phylotreelib
 ```
 
+Upgrading to latest version:
+
+```
+python3 -m pip install --upgrade phylotreelib
+```
+
 ## Highlights
 
 * Methods for reading and writing Nexus and Newick format tree files
@@ -111,6 +117,18 @@ consensus_tree = treesummary.contree()
 consensus_tree.rootmid()
 with open("contree.newick", "w") as outfile:
     outfile.write(consensus_tree.newick())
+```
+
+-----
+
+### Prune tree to representative subset of n leaves
+The code below opens a Nexus file, reads one Tree object from the file, and then prunes the tree such that 50 leaves remain. The leaves are chosen such that they are maximally representative, in the sense that they spread out the maximal possible percentage of the original tree length (i.e., there is no other subset of 50 leaves that would result in a tree with a larger sum of branch lenths). This can be used e.g. for reducing the size of a tree prior to computationally costly downstream analyses, or to simplify visualization (especially useful if there are many closely related leaves).
+
+```python
+import phylotreelib as pt
+treefile = pt.Nexustreefile("all_SARSCoV2.tree")
+bigtree = treefile.readtree()
+smalltree = bigtree.prune_maxlen(nkeep=50)
 ```
 
 -----
