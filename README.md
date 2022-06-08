@@ -1,7 +1,7 @@
 # phylotreelib: python library for analyzing and manipulating phylogenetic trees
 
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/phylotreelib)
-![](https://img.shields.io/badge/version-1.6.3-blue)
+![](https://img.shields.io/badge/version-1.7.0-blue)
 
 
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
@@ -798,6 +798,9 @@ CLASSES
      |
      |  length(self)
      |      Returns tree length (sum of all branch lengths)
+     |
+     |  n_bipartitions(self)
+     |      Returns the number of bipartitions (= number of internal branches) in tree
      |
      |  nameprune(self, sep='_', keep_pattern=None)
      |      Prune leaves based on name redundancy:
