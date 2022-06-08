@@ -830,6 +830,18 @@ class Tree():
 
     ###############################################################################################
 
+    def n_bipartitions(self):
+        """Returns the number of bipartitions (= number of internal branches) in tree"""
+
+        nbip = 0
+        for n1 in self.intnodes:
+            for n2 in self.children(n1):
+                if n2 in self.intnodes:
+                    nbip +=1
+        return nbip
+
+    ###############################################################################################
+
     def leaflist(self):
         """Returns list of leaf names sorted alphabetically"""
 
