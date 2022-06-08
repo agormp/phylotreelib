@@ -1072,8 +1072,8 @@ class DistPathTester(TreeTestBase):
         for treestring in self.treedata.values():
             mytree = pt.Tree.from_string(treestring)
             mytree.build_dist_dict()
-            for n1 in mytree.intnodes:
-                for n2 in mytree.leaves:
+            for n1 in mytree.nodes:
+                for n2 in mytree.nodes:
                     self.assertAlmostEqual(mytree.nodedist(n1, n2), mytree.dist_dict[n1][n2])
 
         treestring = self.treedata["simplestring"]
