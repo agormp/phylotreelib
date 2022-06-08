@@ -734,7 +734,6 @@ class Tree():
         # Python note 2: dict.fromkeys does something clever about presizing dict so there is less
         # of a performance hit when it is later added to, hence the slightly odd initialisation
         # (25% faster than dict comprehension)
-
         dist = self.dist_dict = dict.fromkeys(self.nodes)
         for key in dist:
             dist[key] = {}
@@ -808,28 +807,21 @@ class Tree():
         # This function returns a list sorted such that deep nodes generally go before
         # shallow nodes (deepfirst=False reverses this)
 
-        # If info is in cache, use that. If not: build sorted list and save in cache
-        # Python note: maybe use LRU cache instead of keeping track yourself?
-        #        Then remember to delete when rerooting etc.
-        if self.sorted_intnode_cache is not None:
-            sorted_nodes = self.sorted_intnode_cache
-        else:
+        # Add nodes one tree-level at a time.
+        # First root, then children of root, then children of those, etc
+        sorted_nodes = []
+        curlevel = {self.root}
+        while curlevel:
+            sorted_nodes.extend(curlevel)
+            nextlevel = []
 
-            # Add nodes one tree-level at a time.
-            # First root, then children of root, then children of those, etc
-            sorted_nodes = []
-            curlevel = {self.root}
-            while curlevel:
-                sorted_nodes.extend(curlevel)
-                nextlevel = []
+            # For each node in current level: add those children that are also internal nodes
+            for node in curlevel:
+                nextlevel.extend(self.children(node) & self.intnodes)
 
-                # For each node in current level: add those children that are also internal nodes
-                for node in curlevel:
-                    nextlevel.extend(self.children(node) & self.intnodes)
+            curlevel = nextlevel
 
-                curlevel = nextlevel
-
-            self.sorted_intnode_cache = sorted_nodes
+        self.sorted_intnode_cache = sorted_nodes
 
         if not deepfirst:
             sorted_nodes.reverse()
