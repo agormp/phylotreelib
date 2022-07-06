@@ -234,7 +234,7 @@ tree = phylotreelib.Tree.from_leaves(leaflist)
 It is possible to construct Tree objects with random tree topology using the randtree constructor:
 
 ```
-tree = phylotreelib.Tree.randtree(leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
+tree = phylotreelib.Tree.randtree(ntips=35, randomlen=True, name_prefix="s"):
 ```
 
 Either a list of names (`leaflist`) or the number of tips (`ntips`) can be specified as a way of setting the size of the tree. If the function argument `randomlen` is True then branches will get random lengths drawn from a lognormal distribution.
