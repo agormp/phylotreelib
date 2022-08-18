@@ -433,6 +433,31 @@ class BiplistConstructor(unittest.TestCase):
 ########################################################################################
 ########################################################################################
 
+class BranchinfoConstruction(TreeTestBase):
+    """Tests from_branchinfo() constructor"""
+
+    def test_frombranchinfo(self):
+        """Does Tree.from_branchinfo() work correctly?"""
+        # Testing is done by reading trees from treedata, converting them to lists,
+        # recreating tree from lists, and comparing to original tree
+        for treestring in self.treedata.values():
+            origtree = pt.Tree.from_string(treestring)
+            parentlist = []
+            childlist = []
+            lenlist = []
+            lablist = []
+            for parent in origtree.intnodes:
+                for child in origtree.children(parent):
+                    parentlist.append(parent)
+                    childlist.append(child)
+                    lenlist.append(origtree.nodedist(parent,child))
+                    lablist.append(origtree.getlabel(parent,child))
+            newtree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist, lablist)
+            self.assertTrue(origtree == newtree)
+
+########################################################################################
+########################################################################################
+
 class EqualityTest(TreeTestBase):
     """Tests special method __eq__() for Tree objects"""
 

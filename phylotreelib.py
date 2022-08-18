@@ -39,7 +39,7 @@ import numpy as np
 ##            check that this behaves as expected wrt performance (and remove Globals perhaps)
 ##
 ##        (2) Although there is some extra overhead in using classes to emulate structs,
-##            using dicts instead does not make a big difference performancewide (I tried).
+##            using dicts instead does not make a big difference performancewise (I tried).
 ##
 ##        (3) Treestrings could be parsed recursively in fewer lines, but this works a lot
 ##            less efficiently than the iterated version currently in Tree.from_string()
@@ -213,11 +213,9 @@ class TreeError(Exception):
 class Tree():
     """Class representing basic phylogenetic tree object."""
 
-    # Implementation note: Tree objects can be constructed from three different kinds of things:
-    # (1) Newick tree strings, (2) Bipartition lists, and (3) A list of leaves.
-    # It is also possible to create random trees with a given number of leaves.
-    # The Tree class therefore has four alternate constructors named:
-    # "from_string", "from_biplist", "from_leaves", and "randtree" implemented as classmethods
+    # Implementation note: Tree objects can be constructed from several different kinds of things:
+    # including Newick tree strings, Bipartition lists, and a list of leaves.
+    # The Tree class therefore has several alternate constructors implemented as classmethods
     # The main constructor "__init__" is therefore mostly empty
 
     def __init__(self):
@@ -540,7 +538,7 @@ class Tree():
     ###############################################################################################
     @classmethod
     def from_leaves(cls, leaflist):
-        """Constructor 3: star-tree object from list of leaves"""
+        """Constructor: star-tree object from list of leaves"""
 
         treelist = ["("]
         for name in leaflist:
@@ -552,8 +550,69 @@ class Tree():
 
     ###############################################################################################
     @classmethod
+    def from_branchinfo(cls, parentlist, childlist, lenlist=None, lablist=None):
+        """Constructor: Tree object from information about all branches in tree
+
+        Information about one branch is conceptually given as:
+            parentnodeID, childnodeID, [length], [label]
+
+        The function takes as input 2 to 4 separate lists containing:
+            IDs of parents (internal nodes, so integer values)
+            ID of children (internal or leaf nodes, so integer or string)
+            Length of branch (optional)
+            Label of branch (optional)
+
+        The four lists are assumed to be in the same order (so index n in each list
+        corresponds to same branch). Note: most IDs appear multiple times in lists"""
+
+        nbranches = len(parentlist)
+        if lenlist is None:
+            lenlist = [0.0]*nbranches
+        if lablist is None:
+            lablist = [""]*nbranches
+        for lst in [childlist, lenlist, lablist]:
+            if len(lst) != nbranches:
+                msg = "All lists provided to from_branchinfo() must have same length:\n"
+                msg += str(lst)
+                raise TreeError(msg)
+
+        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
+        # are the internal nodes which are numbered consecutively. Each key has an
+        # associated value that is itself a dictionary listing the children: keys are
+        # child nodes, values are Branchstructs containing "length" and "label" fields.
+        # Leafs are identified by a string instead of a number
+        # NOTE: self.tree should ONLY be used by this object. Make pseudo-private?
+        obj = cls()                    # Ensures class will be correct also for subclasses of Tree
+        obj.tree = {}
+        obj.leaves = set()
+        obj.intnodes = set()
+        obj.parent_dict = {}
+
+        for i in range(nbranches):
+            parent = parentlist[i]     # Perhaps check types are OK?
+            child = childlist[i]
+            blen = lenlist[i]
+            lab = lablist[i]
+            if parent in obj.tree:
+                obj.tree[parent][child] = Branchstruct(blen, lab)
+            else:
+                obj.tree[parent] = { child:Branchstruct(blen, lab) }
+            obj.parent_dict[child] = parent
+            obj.intnodes.add(parent)
+            if isinstance(child, str):
+                obj.leaves.add(child)
+
+        # Root node is the parent node that is not also in childlist
+        diffset = set(parentlist) - set(childlist)
+        obj.root = diffset.pop()
+
+        obj.nodes = obj.leaves | obj.intnodes
+        return obj
+
+    ###############################################################################################
+    @classmethod
     def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
-        """Constructor 4: tree with random topology from list of leaf names OR number of tips"""
+        """Constructor: tree with random topology from list of leaf names OR number of tips"""
 
         # Implementation note: random trees are constructed by randomly resolving star-tree
         # Should perhaps use actual bifurcating process to generate random trees instead?
