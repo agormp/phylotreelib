@@ -559,11 +559,14 @@ class Tree():
         The function takes as input 2 to 4 separate lists containing:
             IDs of parents (internal nodes, so integer values)
             ID of children (internal or leaf nodes, so integer or string)
-            Length of branch (optional)
-            Label of branch (optional)
+            Length of branches (optional)
+            Label of branches (optional)
 
-        The four lists are assumed to be in the same order (so index n in each list
-        corresponds to same branch). Note: most IDs appear multiple times in lists"""
+        The four lists are assumed to have same length and be in same order (so index n in
+        each list corresponds to same branch).
+
+        Note: most IDs appear multiple times in lists
+        Note 2: can be used as workaround so user can specify IDs for internal nodes"""
 
         nbranches = len(parentlist)
         if lenlist is None:
@@ -576,12 +579,6 @@ class Tree():
                 msg += str(lst)
                 raise TreeError(msg)
 
-        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
-        # are the internal nodes which are numbered consecutively. Each key has an
-        # associated value that is itself a dictionary listing the children: keys are
-        # child nodes, values are Branchstructs containing "length" and "label" fields.
-        # Leafs are identified by a string instead of a number
-        # NOTE: self.tree should ONLY be used by this object. Make pseudo-private?
         obj = cls()                    # Ensures class will be correct also for subclasses of Tree
         obj.tree = {}
         obj.leaves = set()
@@ -3625,7 +3622,7 @@ class Nexustreefile(Treefile):
 ###################################################################################################
 
 class Distmatrix(object):
-    """Class representing distance matrix for set of taxa. Knows hot to compute trees"""
+    """Class representing distance matrix for set of taxa. Knows how to compute trees"""
 
     def __init__(self):
         self.dmat = None
@@ -3668,6 +3665,35 @@ class Distmatrix(object):
         self.dmat = nparray
         self.name2index = dict(zip(self.namelist, range(self.n)))
         self.index2name = dict(zip(range(self.n), self.namelist))
+
+        return self
+
+    #######################################################################################
+
+    @classmethod
+    def from_distfile(cls, distfilename):
+        """
+        Construct Distmatrix object from file containing rows of: name1 name2 distance
+        """
+        self = cls()
+        name1list = []
+        name2list = []
+        distlist = []
+        with open(distfilename, "r") as distfile:
+            for line in distfile:
+                words = line.split()
+                name1list.append(words[0])
+                name2list.append(words[1])
+                distlist.append(float(words[2]))
+        uniqnames = set(name1list) | set(name2list)
+        self.namelist = sorted(uniqnames)
+        self.n = len(self.namelist)
+        self.name2index = dict(zip(self.namelist, range(self.n)))
+        self.index2name = dict(zip(range(self.n), self.namelist))
+
+        self.dmat = np.zeros((self.n, self.n))
+        for name1,name2,dist in zip(name1list, name2list, distlist):
+            self.setdist(name1, name2, dist)
 
         return self
 
