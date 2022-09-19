@@ -9,3 +9,5 @@ phylotreelib.egg-info/
 notes/
 .ztr-directory
 phylotreelibnotes.md
+tests/phyldiv.py
+tmp
