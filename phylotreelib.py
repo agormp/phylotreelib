@@ -1189,7 +1189,7 @@ class Tree():
 
         # Local copies to speed up access
         root = self.root
-        self.build_parent_dict()  # Rethink! (in treelib2 always construct?)
+        #self.build_parent_dict()  # Rethink! (in treelib2 always construct?)
         pdict = self.parent_dict
         tree = self.tree
 
@@ -1878,6 +1878,8 @@ class Tree():
                     other.leaves.update(leaf_kids)
                 curlevel = nextlevel
             other.nodes = other.leaves | other.intnodes
+
+        other.build_parent_dict()
 
         # Python note: possibly bad idea to have different possible returnvalues.
         # Simplify and deal with it at consumer end
@@ -3720,7 +3722,7 @@ class Distmatrix(object):
         tmplist.pop()
         tmplist.append("\n")
 
-        # Body of matrix. Same order as nameline
+        # Body of matrix. Same order as namelist
         for name1 in namelist:
             tmplist.append(name1)
             tmplist.append("\t")
