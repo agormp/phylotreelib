@@ -6,7 +6,7 @@
 
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
 
-![](https://github.com/agormp/phylotreelib/raw/main/phylogenetictree.png?raw=true)
+![](https://github.com/agormp/phylotreelib/raw/main/treefig.png?raw=true)
 
 ## Availability
 
