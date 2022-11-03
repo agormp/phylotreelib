@@ -11,3 +11,5 @@ notes/
 phylotreelibnotes.md
 tests/phyldiv.py
 tmp
+.DS_Store
+/tests/.DS_Store
