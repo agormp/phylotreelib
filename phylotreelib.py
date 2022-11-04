@@ -737,7 +737,7 @@ class Tree():
         """Implements equality testing for Tree objects"""
 
         # Two trees are identical if they have the same leaves, the same topology
-        # and the same branchlengths. Branch labels are ignored
+        # and the same branchlengths. Branch labels are ignored. Rooting is ignored 
         # NB: floating point comparison of relative difference.
         # Precision chosen based on empirical comparison between own and PHYLIP tree (...)
         if self.leaves != other.leaves:
@@ -2635,6 +2635,24 @@ class Tree():
 
     ###############################################################################################
 
+    def same_root(self, other):
+        """Compares two trees. Returns True if topologies are same and rooted in same place"""
+        if self.topology() != other.topology():
+            raise TreeError("Tree topologies are different: Rootings can not be compared")
+        else:
+            t1partition = set()   # Set of sets of kid's remotechildren
+            for kid in self.children(self.root):
+                t1partition.add(frozenset(self.remote_children(kid)))
+            t2partition = set()
+            for kid in other.children(other.root):
+                t2partition.add(frozenset(other.remote_children(kid)))
+            if t1partition == t2partition:
+                return True
+            else:
+                return False
+
+    ###############################################################################################
+
     def deroot(self):
         """If root is at bifurcation: remove root node, connect adjacent nodes"""
         root = self.root
@@ -2676,7 +2694,7 @@ class Tree():
             self.dist_dict = None
 
             # Rebuild parent_dict
-            self.build_parent_dict()
+            self.build_parent_dict() # Should fix by explicitly using info about root and kids
 
     ###############################################################################################
 
