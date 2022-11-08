@@ -768,7 +768,7 @@ class Tree():
 
     ###############################################################################################
 
-    def copy_treeobject(self, copylengths=True):
+    def copy_treeobject(self, copylengths=True, copylabels=True):
         """Returns copy of Tree object. Copies structure and branch lengths.
         Caches and any user-added attributes are not copied.
         Similar to effect of copy.deepcopy but customized and much faster"""
@@ -787,9 +787,14 @@ class Tree():
             newtree[parent] = {}
             for child in origtree[parent]:
                 if copylengths:
-                    newtree[parent][child] = Branchstruct(origtree[parent][child].length)
-                else:
-                    newtree[parent][child] = Branchstruct(0.0)
+                    blen = origtree[parent][child].length
+                else: 
+                    blen = 0.0
+                if copylabels:
+                    lab = origtree[parent][child].label
+                else: 
+                    lab = ""
+                newtree[parent][child] = Branchstruct(blen,lab)
         return obj
 
     ###############################################################################################
