@@ -752,6 +752,8 @@ class Tree():
             if len1 != 0 and len2 != 0:
                 if (abs(len1 - len2) / len1) > blenprecision:   # Floating point comparison of relative diff
                     return False
+            if (len1 == 0 and len2 > 0) or (len1 > 0 and len2 == 0):
+                return False
 
         # If we made it this far without returning, then Tree objects must be identical
         return True
