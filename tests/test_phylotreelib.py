@@ -497,9 +497,11 @@ class Match_intnodes(TreeTestBase):
             delta_id = 35 + max(t1.intnodes)
             for i,id in enumerate(t1.intnodes):
                 t2.rename_intnode(id, id+delta_id)
-            intnode1to2 = t1.match_intnodes(t2)
+            intnode1to2,unmatched_root1,unmatched_root2 = t1.match_intnodes(t2)
             for id1 in intnode1to2:
                 self.assertEqual(id1+delta_id, intnode1to2[id1])
+            self.assertEqual(unmatched_root1, None)
+            self.assertEqual(unmatched_root2, None)
 
     def test_sametop_difroot(self):
         """Test correct output from well formed examples with different root"""
@@ -513,10 +515,32 @@ class Match_intnodes(TreeTestBase):
                 delta_id = 35 + max(t1.intnodes)
                 for i,id in enumerate(t1.intnodes):
                     t2.rename_intnode(id, id+delta_id)
-                intnode1to2 = t1.match_intnodes(t2)
+                intnode1to2,unmatched_root1,unmatched_root2 = t1.match_intnodes(t2)
                 for id1 in intnode1to2:
                     self.assertEqual(id1+delta_id, intnode1to2[id1])
+                self.assertEqual(unmatched_root1, None) # Both rooted at polytomies
+                self.assertEqual(unmatched_root2, None)
 
+    def test_unmatchedroots(self):
+        """Test that unmatched roots are reported correctly"""
+        t1 = pt.Tree.randtree(ntips=50)
+        t2 = t1.copy_treeobject(False,False)
+        delta_id = 35 + max(t1.intnodes)
+        for i,id in enumerate(t1.intnodes):
+            t2.rename_intnode(id, id+delta_id)
+        t2.deroot()
+        parent = random.choice(tuple(t2.intnodes))
+        kid = t2.children(parent).pop()
+        blen = t2.nodedist(parent,kid)
+        t2.reroot(parent,kid,node1dist=blen/2)
+        t1origroot = t1.root
+        t2origroot = t2.root
+        intnode1to2,unmatched_root1,unmatched_root2 = t1.match_intnodes(t2)
+        for id1 in intnode1to2:
+            self.assertEqual(id1+delta_id, intnode1to2[id1])
+        self.assertEqual(unmatched_root1, t1origroot)
+        self.assertEqual(unmatched_root2, t2origroot)
+        
     def test_difleaves(self):
         """Test error raised when leaves differ"""
         for treestring in self.treedata.values():
