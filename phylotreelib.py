@@ -768,6 +768,32 @@ class Tree():
 
     ###############################################################################################
 
+    def copy_treeobject(self, copylengths=True):
+        """Returns copy of Tree object. Copies structure and branch lengths.
+        Caches and any user-added attributes are not copied.
+        Similar to effect of copy.deepcopy but customized and much faster"""
+
+        # Python note: should add branch label in if else like length
+        obj = Tree()
+        obj.root = self.root
+        obj.leaves = self.leaves.copy()
+        obj.intnodes = self.intnodes.copy()
+        obj.leaves = self.leaves.copy()
+        obj.parent_dict = self.parent_dict.copy()
+        obj.tree = {}
+        origtree = self.tree
+        newtree = obj.tree
+        for parent in origtree:
+            newtree[parent] = {}
+            for child in origtree[parent]:
+                if copylengths:
+                    newtree[parent][child] = Branchstruct(origtree[parent][child].length)
+                else:
+                    newtree[parent][child] = Branchstruct(0.0)
+        return obj
+
+    ###############################################################################################
+
     def build_parent_dict(self):
         """Forces construction of parent_dict enabling faster lookups"""
         self.parent_dict = {}
@@ -886,6 +912,15 @@ class Tree():
 
     ###############################################################################################
 
+    def is_bifurcation(self, node):
+        """Checks if internal node is at bifurcation (has two children)"""
+        if node in self.leaves:
+            raise TreeError("Node is leaf. Can't check for bifurcation when no children")
+        kids = self.children(node)
+        return (len(kids) == 2)
+
+    ###############################################################################################
+
     def n_bipartitions(self):
         """Returns the number of bipartitions (= number of internal branches) in tree"""
 
@@ -983,6 +1018,50 @@ class Tree():
             return self.parent_dict[node]
         except KeyError as err:
             raise TreeError("Node {} does not exist (as a key in parent_dict)".format(node)) from err
+
+    ###############################################################################################
+
+    def match_intnodes(self, other):
+        """Compares two identical trees with different internal node IDs. 
+        Returns dictionary giving mapping from intnode id in self to intnode id in other"""
+        
+        # Python note: trees are potentially re-rooted and old roots removed. 
+        # Should the originals be left untouched and work done on copies?
+        
+        if self.leaves != other.leaves:
+            raise TreeError("Trees have different leaves. Can't match intnodes")
+        elif self.topology() != other.topology():  # Also checked in sameroot. Could use try except and catch exception
+            raise TreeError("Trees have different topologies. Can't match intnodes")
+        elif not self.has_same_root(other):
+            
+            # Keep track of original roots if bifurcations
+            unmatched_root1 = None
+            unmatched_root2 = None            
+            if self.is_bifurcation(self.root):
+                unmatched_root1 = self.root
+                self.deroot()
+            if other.is_bifurcation(other.root):
+                unmatched_root2 = other.root
+                other.deroot()
+
+            # Pick arbitrary internal node to root two trees on. 
+            arbitrarykid = random.choice(tuple(self.leaves))
+            newroot1 = self.parent(arbitrarykid)
+            newroot2 = other.parent(arbitrarykid)
+            self.reroot(newroot1, polytomy=True)
+            other.reroot(newroot2, polytomy=True)
+        
+        # Now possible to match internal nodes based on their offspring
+        intnode1to2 = dict()
+        childpairset = {(leaf,leaf) for leaf in self.leaves}
+        while childpairset:
+            kid1,kid2 = childpairset.pop()
+            parent1 = self.parent(kid1)
+            parent2 = other.parent(kid2)
+            intnode1to2[parent1] = parent2
+            if parent1 != self.root:
+                childpairset.add((parent1,parent2))
+        return intnode1to2
 
     ###############################################################################################
 
@@ -2635,7 +2714,7 @@ class Tree():
 
     ###############################################################################################
 
-    def same_root(self, other):
+    def has_same_root(self, other):
         """Compares two trees. Returns True if topologies are same and rooted in same place"""
         if self.topology() != other.topology():
             raise TreeError("Tree topologies are different: Rootings can not be compared")
