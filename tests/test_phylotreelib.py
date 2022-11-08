@@ -477,11 +477,69 @@ class EqualityTest(TreeTestBase):
                 mytree1 = pt.Tree.from_string(stringlist[i])
                 mytree2 = pt.Tree.from_string(stringlist[j])
                 self.assertNotEqual(mytree1, mytree2)
+                
+    def test_diffblens(self):
+        """Check that different branch lengths results in non-equality"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            for parent in t2.intnodes:
+                for kid in t2.children(parent):
+                    origblen = t2.nodedist(parent,kid)
+                    t2.setlength(parent,kid,origblen*1.5)
+            self.assertNotEqual(t1, t2)
 
 ########################################################################################
 ########################################################################################
 
 # To be implemented: test of sorted_intnodes
+
+########################################################################################
+########################################################################################
+
+class Copy_treeobject(TreeTestBase):
+    """Tests for copy_treeobject function"""
+    
+    def test_blen_lab(self):
+        """Test copy_treeobject with copylengths=True, copylabels=True"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = t1.copy_treeobject(copylengths=True, copylabels=True)
+            self.assertEqual(t1,t2)
+            self.assertEqual(t1.root, t2.root)
+            self.assertTrue(t1.has_same_root(t2))
+            for parent in t1.intnodes:
+                for kid in t1.children(parent):
+                    t1lab = t1.getlabel(parent, kid)
+                    t2lab = t2.getlabel(parent, kid)
+                    self.assertEqual(t1lab,t2lab)
+                           
+    def test_blen_nolab(self):
+        """Test copy_treeobject with copylengths=True, copylabels=False"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = t1.copy_treeobject(copylengths=True, copylabels=False)
+            self.assertEqual(t1,t2)
+            self.assertEqual(t1.root, t2.root)
+            self.assertTrue(t1.has_same_root(t2))
+            for parent in t2.intnodes:
+                for kid in t2.children(parent):
+                    t2lab = t2.getlabel(parent, kid)
+                    self.assertEqual("",t2lab)
+
+    def test_noblen_nolab(self):
+        """Test copy_treeobject with copylengths=True, copylabels=False"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = t1.copy_treeobject(copylengths=False, copylabels=False)
+            self.assertEqual(t1.topology(),t2.topology())
+            self.assertEqual(t1.root, t2.root)
+            self.assertTrue(t1.has_same_root(t2))
+            for parent in t2.intnodes:
+                for kid in t2.children(parent):
+                    t2lab = t2.getlabel(parent, kid)
+                    self.assertEqual("",t2lab)
+                 
 
 ########################################################################################
 ########################################################################################
