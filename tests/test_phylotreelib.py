@@ -497,6 +497,53 @@ class EqualityTest(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
+class Has_same_root(TreeTestBase):
+    """Tests for has_same_root function"""
+    def test_sameroot_sameintnodenumbers(self):
+        """Check returns True: two identical trees"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            self.assertTrue(t1.has_same_root(t2))
+
+    def test_sameroot_diffintnodenumbers(self):
+        """Check returns True: two trees with same rooted topology, different nodeids"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            delta_id = 35 + max(t1.intnodes)
+            for i,id in enumerate(t1.intnodes):
+                t2.rename_intnode(id, id+delta_id)
+            self.assertTrue(t1.has_same_root(t2))
+
+    def test_diffroot_sameintnodenumbers(self):
+        """Check returns False: two trees with same unrooted topology, different roots"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            newroot = random.choice(tuple(t1.intnodes - {t1.root}))
+            t2.deroot()
+            t2.reroot(newroot, polytomy=True)
+            self.assertFalse(t1.has_same_root(t2))
+
+
+########################################################################################
+########################################################################################
+
+class Is_bifurcation(TreeTestBase):
+    """Tests for ss_bifurcation function"""
+    pass
+
+########################################################################################
+########################################################################################
+
+class Baseml_rstfile(TreeTestBase):
+    """Tests for class Baseml_rstfile"""
+    pass
+
+########################################################################################
+########################################################################################
+
 class Copy_treeobject(TreeTestBase):
     """Tests for copy_treeobject function"""
     
