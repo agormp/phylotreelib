@@ -931,36 +931,6 @@ class Treesummarytests(TreeTestBase):
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts1.add_tree(t)
-        ts2 = pt.TreeSummary()
-        tf2 = pt.Nexustreefile(self.t2_fname)
-        for t in tf2:
-            ts2.add_tree(t)
-        ts1.update(ts2)
-        own_contree = ts1.contree()
-        own_bipdict = own_contree.bipdict()
-        mb_bipdict = self.mb_contree.bipdict()
-
-        # test topology of own contree is same as topology found by mrbayes
-        self.assertEqual(self.mb_contree.topology(), own_contree.topology())
-
-        # test freq and branch length (mean and var) for each branch
-        for bip, own_branch in own_bipdict.items():
-            mb_mean,mb_var = self.mbresdict[bip]
-            self.assertAlmostEqual(mb_mean, own_branch.length)
-            # self.assertAlmostEqual(mb_var, own_branch.var) #implement when changed contree to one-pass version
-
-            bip1, bip2 = bip
-            if len(bip1)!=1 and len(bip2)!=1:
-                mb_branch = mb_bipdict[bip]
-                own_freq = float(own_branch.freq)
-                mb_freq = float(mb_branch.label)
-                self.assertAlmostEqual(mb_freq, own_freq, places=2)
-
-    def test_treesummary_update(self):
-        ts1 = pt.TreeSummary()
-        tf1 = pt.Nexustreefile(self.t1_fname)
-        for t in tf1:
-            ts1.add_tree(t)
         tf1.close()
         ts2 = pt.TreeSummary()
         tf2 = pt.Nexustreefile(self.t2_fname)
