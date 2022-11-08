@@ -171,24 +171,9 @@ class Interner():
 class Branchstruct():
     """Class that emulates a struct. Keeps branch-related info"""
 
-    # Python note: uses __slots__ to save memory
-    # Some fields mostly used in Treesummaries. Perhaps these should be in separate dict?
-
-    __slots__ = ["length", "label", "freq", "bip_count", "SUMW", "T", "var", "sem", "branchID",
-                 "parent_height", "kid_height"]
-
     def __init__(self, length=0.0, label=""):
         self.length = length
         self.label = label
-        self.freq = None
-        self.bip_count = None
-        self.SUMW = None
-        self.T = None
-        self.var = None
-        self.sem = None
-        self.branchID = None
-        self.parent_height = None
-        self.kid_height = None
 
 ###################################################################################################
 ###################################################################################################
