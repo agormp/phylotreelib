@@ -778,7 +778,7 @@ class Tree():
         obj.root = self.root
         obj.leaves = self.leaves.copy()
         obj.intnodes = self.intnodes.copy()
-        obj.leaves = self.leaves.copy()
+        obj.nodes = self.nodes.copy()
         obj.parent_dict = self.parent_dict.copy()
         obj.tree = {}
         origtree = self.tree
@@ -1028,20 +1028,26 @@ class Tree():
 
     def match_intnodes(self, other):
         """Compares two identical trees with different internal node IDs. 
-        Returns dictionary giving mapping from intnode id in self to intnode id in other"""
-        
-        # Python note: trees are potentially re-rooted and old roots removed. 
-        # Should the originals be left untouched and work done on copies?
-        
+        Returns tuple containing follorwing:
+            Dictionary giving mapping from intnode id in self to intnode id in other.
+            unmatched_root1: "None" or id of original root in self if root at bifurcation 
+            unmatched_root2: "None" or id of original root in other if root at bifurcation
+        """
+
+        unmatched_root1 = None
+        unmatched_root2 = None            
+                        
         if self.leaves != other.leaves:
             raise TreeError("Trees have different leaves. Can't match intnodes")
-        elif self.topology() != other.topology():  # Also checked in sameroot. Could use try except and catch exception
+        elif self.topology() != other.topology():  # Also checked in sameroot. Could use try
             raise TreeError("Trees have different topologies. Can't match intnodes")
         elif not self.has_same_root(other):
             
+            # Point "self" and "other" to copies of objects so originals are unchanged
+            self = self.copy_treeobject(copylengths=False, copylabels=False)
+            other = other.copy_treeobject(copylengths=False, copylabels=False)
+            
             # Keep track of original roots if bifurcations
-            unmatched_root1 = None
-            unmatched_root2 = None            
             if self.is_bifurcation(self.root):
                 unmatched_root1 = self.root
                 self.deroot()
@@ -1066,7 +1072,8 @@ class Tree():
             intnode1to2[parent1] = parent2
             if parent1 != self.root:
                 childpairset.add((parent1,parent2))
-        return intnode1to2
+                
+        return (intnode1to2, unmatched_root1, unmatched_root2)
 
     ###############################################################################################
 
@@ -2808,7 +2815,7 @@ class Tree():
                 parent_to_root_dist = self.tree[parent][child].length - node1dist
                 root_to_child_dist = node1dist
             else:
-                msg = "Node %s and %s are not neighbors in tree" % (node1, node2)
+                msg = "Node {} and {} are not neighbors in tree".format(node1, node2)
                 raise TreeError(msg)
 
             newroot = self.insert_node(parent, [child],
