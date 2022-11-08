@@ -486,6 +486,59 @@ class EqualityTest(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
+class Match_intnodes(TreeTestBase):
+    """Tests for match_intnodes function"""
+    
+    def test_sametop_sameroot(self):
+        """Test correct output from well formed examples"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            delta_id = 35 + max(t1.intnodes)
+            for i,id in enumerate(t1.intnodes):
+                t2.rename_intnode(id, id+delta_id)
+            intnode1to2 = t1.match_intnodes(t2)
+            for id1 in intnode1to2:
+                self.assertEqual(id1+delta_id, intnode1to2[id1])
+
+    def test_sametop_difroot(self):
+        """Test correct output from well formed examples with different root"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            if len(t1.intnodes) > 2:
+                root1,root2 = random.sample(tuple(t1.intnodes - {t1.root}), 2)
+                t1.reroot(root1, polytomy=True)
+                t2.reroot(root2, polytomy=True)
+                delta_id = 35 + max(t1.intnodes)
+                for i,id in enumerate(t1.intnodes):
+                    t2.rename_intnode(id, id+delta_id)
+                intnode1to2 = t1.match_intnodes(t2)
+                for id1 in intnode1to2:
+                    self.assertEqual(id1+delta_id, intnode1to2[id1])
+
+    def test_difleaves(self):
+        """Test error raised when leaves differ"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            randleaf = random.choice(tuple(t1.leaves))
+            t1.remove_leaf(randleaf)
+            self.assertRaises(pt.TreeError, t1.match_intnodes, t2)
+            
+    def test_sameleaves_diftop(self):
+        """Test error raised when leaves same but topologies differ"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            while t1.topology() == t2.topology():
+                t2.shuffle_leaf_names()
+            self.assertRaises(pt.TreeError, t1.match_intnodes, t2)
+            
+
+########################################################################################
+########################################################################################
+
 class RelationShipMethods(TreeTestBase):
     """Tests methods for determining children, parents, remote children, MRCAs, and basenode in Tree object"""
 
