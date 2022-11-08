@@ -531,8 +531,24 @@ class Has_same_root(TreeTestBase):
 ########################################################################################
 
 class Is_bifurcation(TreeTestBase):
-    """Tests for ss_bifurcation function"""
-    pass
+    """Tests for is_bifurcation function"""
+    def test_bifurcations(self):
+        """Check returns True: internal nodes with two descendants"""
+        for i in range(10):
+            t = pt.Tree.randtree(ntips=50)
+            for intnode in t.intnodes:
+                self.assertTrue(t.is_bifurcation(intnode))
+
+    def test_trifurcations(self):
+        """Check returns False: internal nodes with three descendants"""
+        for i in range(10):
+            t = pt.Tree.randtree(ntips=50)
+            for intnode in t.intnodes:
+                kid = t.children(intnode).pop()
+                if kid not in t.leaves:
+                    t.remove_branch(intnode, kid)
+                break
+            self.assertFalse(t.is_bifurcation(intnode))
 
 ########################################################################################
 ########################################################################################
