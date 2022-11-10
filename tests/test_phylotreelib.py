@@ -547,8 +547,9 @@ class Is_bifurcation(TreeTestBase):
                 kid = t.children(intnode).pop()
                 if kid not in t.leaves:
                     t.remove_branch(intnode, kid)
-                break
-            self.assertFalse(t.is_bifurcation(intnode))
+                    self.assertFalse(t.is_bifurcation(intnode))
+                    break
+            
 
 ########################################################################################
 ########################################################################################
