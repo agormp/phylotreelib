@@ -2835,12 +2835,12 @@ class Tree():
     def rootmid(self):
         """Performs midpoint rooting of tree"""
 
-        # Remove previous root if present at bifurcation
-        self.deroot()
-
         # Sanity check: if tree has zero length, then midpoint rooting is not possible
         if self.length() == 0.0:
             raise TreeError("All branch lengths are zero - midpoint rooting not possible")
+
+        # Remove previous root if present at bifurcation
+        self.deroot()
 
         # Find the two leaves having the largest pairwise distance.
         (maxdist, leaf1, leaf2) = self.diameter(return_leaves = True)
