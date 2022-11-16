@@ -446,430 +446,435 @@ CLASSES
         Treefile
             Newicktreefile
             Nexustreefile
-
+    
     class BigTreeSummary(TreeSummary)
      |  BigTreeSummary(interner=None)
-     |
+     |  
      |  Class summarizing bipartitions, branch lengths, and topologies from many trees
-     |
+     |  
      |  Method resolution order:
      |      BigTreeSummary
      |      TreeSummary
      |      builtins.object
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self, interner=None)
      |      TreeSummary constructor. Initializes relevant data structures
-     |
+     |  
      |  add_tree(self, curtree, weight=1.0)
      |      Add tree to treesummary, update all summaries
-     |
+     |  
      |  compute_topofreq(self)
      |      Compute freq for topologies, add attribute to Topostructs
-     |
+     |  
      |  get_toposummary(self)
      |      Return summary of topologies as dict: {topology:Topostruct}
-     |
+     |  
      |  update(self, other)
      |      Merge this class with other treesummary
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Methods inherited from TreeSummary:
-     |
+     |  
      |  compute_bipfreq(self, digits=3)
      |      Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs
-     |
+     |  
      |  compute_blen_var_and_sem(self)
      |      Compute var and standard error of branch lengths, add attributes to Branchstructs
-     |
+     |  
      |  contree(self, cutoff=0.5, allcompat=False)
      |      Returns a consensus tree built from selected bipartitions
-     |
+     |  
      |  get_bipsummary(self)
      |      Return summary of bipartitions as dict: {bipartition:Branchstruct}
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from TreeSummary:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-
+    
     class Branchstruct(builtins.object)
      |  Branchstruct(length=0.0, label='')
-     |
+     |  
      |  Class that emulates a struct. Keeps branch-related info
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self, length=0.0, label='')
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
-     |
-     |  SUMW
-     |
-     |  T
-     |
-     |  bip_count
-     |
-     |  branchID
-     |
-     |  freq
-     |
-     |  kid_height
-     |
-     |  label
-     |
-     |  length
-     |
-     |  parent_height
-     |
-     |  sem
-     |
-     |  var
-
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+    
     class Distmatrix(builtins.object)
-     |  Class representing distance matrix for set of taxa. Knows hot to compute trees
-     |
+     |  Class representing distance matrix for set of taxa. Knows how to compute trees
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self)
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  __str__(self)
      |      Returns distance matrix as string
-     |
+     |  
      |  getdist(self, name1, name2)
      |      Returns distance between named entries
-     |
+     |  
      |  nj(self)
      |      Computes neighbor joining tree, returns Tree object
-     |
+     |  
      |  setdist(self, name1, name2, dist)
      |      Sets distance between named entries
-     |
+     |  
      |  upgma(self)
      |      Computes UPGMA tree, returns Tree object
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Class methods defined here:
-     |
+     |  
      |  from_distdict(distdict) from builtins.type
      |      Construct Distmatrix object from nested dictionary of dists: distdict[name1][name2] = dist
-     |
+     |  
+     |  from_distfile(distfilename) from builtins.type
+     |      Construct Distmatrix object from file containing rows of: name1 name2 distance
+     |  
      |  from_numpy_array(nparray, namelist) from builtins.type
      |      Construct Distmatrix object from numpy array and corresponding list of names
      |      Names in namelist must be in same order as indices in numpy 2D array
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-
+    
     class Globals(builtins.object)
      |  Class containing globally used functions and labels.
-     |
+     |  
      |  Data descriptors defined here:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes defined here:
-     |
+     |  
      |  biparts = {}
-
+    
     class Interner(builtins.object)
      |  Class used for interning various objects.
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self)
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  intern_bipart(self, bipart)
-     |
+     |  
      |  intern_leafset(self, leafset)
-     |
+     |  
      |  intern_topology(self, topology)
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-
+    
     class Newicktreefile(Treefile)
      |  Newicktreefile(filename=None, filecontent=None)
-     |
+     |  
      |  Class representing Newick tree file. Iteration returns tree-objects
-     |
+     |  
      |  Method resolution order:
      |      Newicktreefile
      |      Treefile
      |      builtins.object
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self, filename=None, filecontent=None)
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  __iter__(self)
-     |
+     |  
      |  __next__(self)
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Methods inherited from Treefile:
-     |
+     |  
      |  close(self)
      |      For explicit closing of Treefile before content exhausted
-     |
+     |  
      |  get_treestring(self)
      |      Return next tree-string
-     |
+     |  
      |  readtree(self)
      |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
-     |
+     |  
      |  readtrees(self, discardprop=0.0)
      |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from Treefile:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-
+    
     class Nexustreefile(Treefile)
      |  Nexustreefile(filename=None, filecontent=None)
-     |
+     |  
      |  Class representing Nexus tree file. Iteration returns tree object or None
-     |
+     |  
      |  Method resolution order:
      |      Nexustreefile
      |      Treefile
      |      builtins.object
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self, filename=None, filecontent=None)
      |      Read past NEXUS file header, parse translate block if present
-     |
+     |  
      |  __iter__(self)
-     |
+     |  
      |  __next__(self, noreturn=False)
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Methods inherited from Treefile:
-     |
+     |  
      |  close(self)
      |      For explicit closing of Treefile before content exhausted
-     |
+     |  
      |  get_treestring(self)
      |      Return next tree-string
-     |
+     |  
      |  readtree(self)
      |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
-     |
+     |  
      |  readtrees(self, discardprop=0.0)
      |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from Treefile:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-
+    
     class Topostruct(builtins.object)
      |  Class that emulates a struct. Keeps topology-related info
-     |
+     |  
      |  Data descriptors defined here:
-     |
+     |  
      |  freq
-     |
+     |  
      |  treestring
-     |
+     |  
      |  weight
-
+    
     class Tree(builtins.object)
      |  Class representing basic phylogenetic tree object.
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __eq__(self, other, blenprecision=0.005)
      |      Implements equality testing for Tree objects
-     |
+     |  
      |  __hash__(self)
      |      Implements hashing for Tree objects, so they can be used as keys in dicts
-     |
+     |  
      |  __init__(self)
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  __iter__(self)
      |      Returns iterator object for Tree object. Yields subtrees with .basalbranch attribute
-     |
+     |  
      |  __str__(self)
      |      Prints table of parent-child relationships including branch lengths and labels
-     |
+     |  
      |  add_branch(self, bipart, blen=0.0, label='')
      |      Adds branch represented by bipartition to unresolved tree.
-     |
+     |  
      |  average_ancdist(self, leaflist, return_median=False)
      |      Return average or median patristic distance from leaves to their MRCA
-     |
+     |  
      |  average_pairdist(self, leaflist, return_median=False)
      |      Return average or median pairwise, patristic distance between leaves in leaflist
-     |
+     |  
      |  bipdict(self, interner=None)
      |      Returns tree in the form of a "bipartition dictionary"
-     |
+     |  
      |  build_dist_dict(self)
      |      Construct dictionary keeping track of all pairwise distances between nodes
-     |
+     |  
      |  build_parent_dict(self)
      |      Forces construction of parent_dict enabling faster lookups
-     |
+     |  
      |  build_path_dict(self)
      |      Construct dictionary keeping track of all pairwise paths between nodes
-     |
+     |  
      |  children(self, parent)
      |      Returns set containing parent's immediate descendants
-     |
+     |  
      |  cladegrep(self, pattern, minsize=2)
      |      Finds clades (monophyletic groups) where all leaves contain specified pattern
-     |
+     |  
      |  cluster_cut(self, cutoff)
      |      Divides tree into clusters by cutting across tree "cutoff" distance from root.
      |      Returns list containing sets of leafnames
-     |
+     |  
      |  cluster_n(self, nclust)
      |      Divides tree into 'nclust' clusters based on distance from root.
-     |
+     |      
      |      Returns tuple containing: list with sets of leafnames (one set per cluster)
      |                                list of basenodes of clusters
-     |
+     |  
      |  collapse_clade(self, leaflist, newname='clade')
      |      Replaces clade (leaves in leaflist) with single leaf.
      |      Branch length is set to average dist from basenode parent to leaves
-     |
+     |  
+     |  copy_treeobject(self, copylengths=True, copylabels=True)
+     |      Returns copy of Tree object. Copies structure and branch lengths.
+     |      Caches and any user-added attributes are not copied.
+     |      Similar to effect of copy.deepcopy but customized and much faster
+     |  
      |  deroot(self)
      |      If root is at bifurcation: remove root node, connect adjacent nodes
-     |
+     |  
      |  diameter(self, return_leaves=False)
      |      Return diameter: longest leaf-leaf distance along tree.
      |      If return_leaves is True: Return tuple with (maxdist, Leaf1, Leaf2)
-     |
+     |  
      |  figtree(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6, colorlist=None, color='0000FF')
      |      Returns figtree format tree as a string
-     |
+     |  
      |  find_central_leaf(self, leaflist)
      |      Finds central leaf for the provided list of leaves.
      |      Defined as having approximately equal distance to the two farthest leaves in leaflist
-     |
+     |  
      |  find_common_leaf(self, leaflist)
      |      Finds common leaf for the provided list of leaves.
      |      Defined as having the smallest average distance to remaining leaves
-     |
+     |  
      |  find_most_distant(self, node1, nodeset)
      |      Finds node in nodeset that is most distant from node1
-     |
+     |  
      |  find_mrca(self, leafset)
      |      Finds Most Recent Common Ancestor for the provided set of leaves
-     |
+     |  
      |  findbasenode(self, leafset)
      |      Finds node that is at the base of all leaves in leafset.
-     |
+     |  
      |  getlabel(self, node1, node2)
      |      Gets label on branch connecting node1 and node2
-     |
+     |  
      |  graft(self, other, node1, node2=None, blen1=0, blen2=0, graftlabel=None)
      |      Graft other tree to self
-     |
+     |      
      |      tree2 (other) intnodes will be renamed if names clash with those in tree1.
      |      node1: node in tree1 (self) below which tree2 (other) will be grafted. Cannot be root1
      |      node2: node in tree2 (other) below which tree2 will be attached (default is root of tree2)
      |      blen1: length of branch added to tree1 below graftpoint (lower of two newly created branches)
      |      blen2: length of branch above graft point and below tree2 (upper of two newly created branches)
      |      graftlabel: prepend value of "label" to leaf names on t2 (e.g: "graft_s1")
-     |
+     |  
+     |  has_same_root(self, other)
+     |      Compares two trees. Returns True if topologies are same and rooted in same place
+     |  
      |  height(self)
      |      Returns height of tree: Largest root-to-tip distance
-     |
+     |  
      |  insert_node(self, parent, childnodes, branchlength=0, lab='')
      |      Inserts an extra node between parent and children listed in childnodes list.
-     |
+     |      
      |      Length of inserted branch is 'branchlength' and defaults to zero. The node number
      |      of the new node is returned
-     |
+     |  
+     |  is_bifurcation(self, node)
+     |      Checks if internal node is at bifurcation (has two children)
+     |  
      |  is_compatible_with(self, bipart)
      |      Checks whether a given bipartition is compatible with the tree
-     |
+     |  
      |  is_resolved(self)
      |      Checks whether tree is fully resolved (no polytomies)
-     |
+     |  
      |  leaflist(self)
      |      Returns list of leaf names sorted alphabetically
-     |
+     |  
      |  length(self)
      |      Returns tree length (sum of all branch lengths)
-     |
+     |  
+     |  match_intnodes(self, other)
+     |      Compares two identical trees with different internal node IDs. 
+     |      Returns tuple containing follorwing:
+     |          Dictionary giving mapping from intnode id in self to intnode id in other.
+     |          unmatched_root1: "None" or id of original root in self if root at bifurcation 
+     |          unmatched_root2: "None" or id of original root in other if root at bifurcation
+     |  
      |  n_bipartitions(self)
      |      Returns the number of bipartitions (= number of internal branches) in tree
-     |
+     |  
      |  nameprune(self, sep='_', keep_pattern=None)
      |      Prune leaves based on name redundancy:
      |      Find subtrees where all leaves have same start of name (up to first "_")
-     |
+     |  
      |  nearest_n_leaves(self, leaf1, n_neighbors)
      |      Returns set of N leaves closest to leaf along tree (patristic distance)
-     |
+     |  
      |  nearleafs(self, leaf1, maxdist)
      |      Returns set of leaves that are less than maxdist from leaf, measured along branches
-     |
+     |  
      |  newick(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6, labelfield='label', transdict=None)
      |      Returns Newick format tree string representation of tree object
-     |
+     |  
      |  nexus(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6, labelfield='label', translateblock=False)
      |      Returns nexus format tree as a string
-     |
+     |  
      |  nodedepth(self, node)
      |      Returns depth of node: distance from furthest leaf-level to node
-     |
+     |  
      |  nodedist(self, node1, node2=None)
      |      Returns distance between node1 and node2 along tree (patristic distance)
-     |
+     |  
      |  nodedistlist(self, node1, nodelist)
      |      Returns list of distances from node1 to nodes in nodelist (same order as nodelist)
-     |
+     |  
      |  nodepath(self, node1, node2)
      |      Returns path between node1 and node2 along tree.
-     |
+     |  
      |  nodepath_fromdict(self, node1, node2)
      |      Returns path between node1 and node2 along tree, from preconstructed path_dict
-     |
+     |  
      |  numberprune(self, nkeep, keeplist=None, keep_common_leaves=False, keep_most_distant=False, return_leaves=False, enforce_n=False)
      |      Prune tree so 'nkeep' leaves remain, approximately evenly spaced over tree.
-     |
+     |      
      |      "keeplist" can be used to specify leaves that _must_ be retained.
      |      'keep_common_leaves' requests preferential retainment of leaves with many neighbors
      |      (default is to keep leaves that are as equally spaced as possible)
@@ -878,303 +883,321 @@ CLASSES
      |      'return_leaves': return selected leaves, but do not actually prune tree
      |      'enforce_n' enforce exactly N leaves in pruned tree
      |                  (normally leaves in includelist and most distant are additional to N)
-     |
+     |  
      |  parent(self, node)
      |      Returns parent of node
-     |
+     |  
      |  prune_maxlen(self, nkeep, return_leaves=False)
      |      Prune tree so remaining nkeep leaves spread out maximal percentage of branch length
-     |
+     |  
      |  remote_children(self, parent)
      |      Returns set containing all leaves that are descendants of parent
-     |
+     |  
      |  remove_branch(self, node1, node2)
      |      Removes branch connecting node1 and node2 (thereby creating polytomy)
-     |
+     |  
      |  remove_leaf(self, leaf)
      |      Removes named leaf from tree, cleans up so remaining tree structure is sane
-     |
+     |  
      |  remove_leaves(self, leaflist)
      |      Removes leaves in list from tree, cleans up so remaining tree structure is sane
-     |
+     |  
      |  rename_intnode(self, oldnum, newnum)
      |      Changes number of one internal node
-     |
+     |  
      |  rename_leaf(self, oldname, newname, fixdups=False)
      |      Changes name of one leaf. Automatically fixes duplicates if requested
-     |
+     |  
      |  reroot(self, node1, node2=None, polytomy=False, node1dist=0.0)
      |      Places new root on branch between node1 and node2, node1dist from node1
-     |
+     |  
      |  resolve(self)
      |      Randomly resolves multifurcating tree by by adding zero-length internal branches.
-     |
+     |  
      |  rootmid(self)
      |      Performs midpoint rooting of tree
-     |
+     |  
      |  rootminvar(self)
      |      Performs minimum variance rooting of tree
-     |
+     |  
      |  rootout(self, outgroup, polytomy=False)
      |      Roots tree on outgroup
-     |
+     |  
      |  setlabel(self, node1, node2, label)
      |      Sets label on branch connecting node1 and node2
-     |
+     |  
      |  setlength(self, node1, node2, length)
      |      Sets length of branch connecting node1 and node2
-     |
+     |  
      |  shuffle_leaf_names(self)
      |      Shuffles the names of all leaves
-     |
+     |  
      |  sorted_intnodes(self, deepfirst=True)
      |      Returns sorted intnode list for breadth-first traversal of tree
-     |
+     |  
      |  spr(self, subtree_node, regraft_node)
      |      Subtree Pruning and Regrafting.
-     |
+     |      
      |      subtree_node: basenode of subtree that will be pruned.
      |      regraft_node: node in tree below which subtree will be grafted
-     |
+     |  
      |  subtree(self, basenode, return_basalbranch=False)
      |      Returns subtree rooted at basenode as Tree object
-     |
+     |  
      |  topology(self)
      |      Returns set of sets of sets representation of topology ("naked bipdict")
-     |
+     |  
      |  transdict(self)
      |      Returns dictionary of {name:number_as_string} for use in translateblocks
-     |
+     |  
      |  translateblock(self, transdict)
-     |
+     |  
      |  transname(self, namefile)
      |      Translate all leaf names using oldname/newname pairs in namefile
-     |
+     |  
      |  treedist(self, other, normalise=True, verbose=False)
      |      Compute symmetric tree distance (Robinson Foulds) between self and other tree.
      |      Normalised measure returned by default
-     |
+     |  
      |  treesim(self, other, verbose=False)
      |      Compute normalised symmetric similarity between self and other tree
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Class methods defined here:
-     |
+     |  
      |  from_biplist(biplist) from builtins.type
      |      Constructor: Tree object from bipartition list
-     |
+     |  
+     |  from_branchinfo(parentlist, childlist, lenlist=None, lablist=None) from builtins.type
+     |      Constructor: Tree object from information about all branches in tree
+     |      
+     |      Information about one branch is conceptually given as:
+     |          parentnodeID, childnodeID, [length], [label]
+     |      
+     |      The function takes as input 2 to 4 separate lists containing:
+     |          IDs of parents (internal nodes, so integer values)
+     |          ID of children (internal or leaf nodes, so integer or string)
+     |          Length of branches (optional)
+     |          Label of branches (optional)
+     |      
+     |      The four lists are assumed to have same length and be in same order (so index n in
+     |      each list corresponds to same branch).
+     |      
+     |      Note: most IDs appear multiple times in lists
+     |      Note 2: can be used as workaround so user can specify IDs for internal nodes
+     |  
      |  from_leaves(leaflist) from builtins.type
-     |      Constructor 3: star-tree object from list of leaves
-     |
+     |      Constructor: star-tree object from list of leaves
+     |  
      |  from_string(orig_treestring, transdict=None) from builtins.type
      |      Constructor: Tree object from tree-string in Newick format
-     |
+     |  
      |  from_topology(topology) from builtins.type
      |      Constructor: Tree object from topology
-     |
+     |  
      |  randtree(leaflist=None, ntips=None, randomlen=False, name_prefix='s') from builtins.type
-     |      Constructor 4: tree with random topology from list of leaf names OR number of tips
-     |
+     |      Constructor: tree with random topology from list of leaf names OR number of tips
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-
+    
     class TreeError(builtins.Exception)
      |  Method resolution order:
      |      TreeError
      |      builtins.Exception
      |      builtins.BaseException
      |      builtins.object
-     |
+     |  
      |  Data descriptors defined here:
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Methods inherited from builtins.Exception:
-     |
+     |  
      |  __init__(self, /, *args, **kwargs)
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Static methods inherited from builtins.Exception:
-     |
+     |  
      |  __new__(*args, **kwargs) from builtins.type
      |      Create and return a new object.  See help(type) for accurate signature.
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Methods inherited from builtins.BaseException:
-     |
+     |  
      |  __delattr__(self, name, /)
      |      Implement delattr(self, name).
-     |
+     |  
      |  __getattribute__(self, name, /)
      |      Return getattr(self, name).
-     |
+     |  
      |  __reduce__(...)
      |      Helper for pickle.
-     |
+     |  
      |  __repr__(self, /)
      |      Return repr(self).
-     |
+     |  
      |  __setattr__(self, name, value, /)
      |      Implement setattr(self, name, value).
-     |
+     |  
      |  __setstate__(...)
-     |
+     |  
      |  __str__(self, /)
      |      Return str(self).
-     |
+     |  
      |  with_traceback(...)
      |      Exception.with_traceback(tb) --
      |      set self.__traceback__ to tb and return self.
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from builtins.BaseException:
-     |
+     |  
      |  __cause__
      |      exception cause
-     |
+     |  
      |  __context__
      |      exception context
-     |
+     |  
      |  __dict__
-     |
+     |  
      |  __suppress_context__
-     |
+     |  
      |  __traceback__
-     |
+     |  
      |  args
-
+    
     class TreeSet(builtins.object)
      |  Class for storing and manipulating a number of trees, which all have the same leafs
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __getitem__(self, index)
      |      Implements indexing of treeset.
-     |
+     |      
      |      Simple index returns single tree.
      |      Slice returns TreeSet object with selected subset of trees
-     |
+     |  
      |  __init__(self)
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  __iter__(self)
      |      Returns fresh iterator object allowing iteration over Treeset (which is itself an iterable)
-     |
+     |  
      |  __len__(self)
-     |
+     |  
      |  addtree(self, tree)
      |      Adds Tree object to Treeset object
-     |
+     |  
      |  addtreeset(self, treeset)
      |      Adds all trees in TreeSet object to this TreeSet object
-     |
+     |  
      |  newick(self, printdist=True, printlabels=True)
      |      Returns newick format tree as a string
-     |
+     |  
      |  nexus(self, printdist=True, printlabels=True, translateblock=True)
      |      Returns nexus format tree as a string
-     |
+     |  
      |  rootmid(self)
      |      Performs midpoint rooting on all trees in TreeSet
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data and other attributes defined here:
-     |
+     |  
      |  TreeSetIterator = <class 'phylotreelib.TreeSet.TreeSetIterator'>
-
+    
     class TreeSummary(builtins.object)
      |  TreeSummary(interner=None)
-     |
+     |  
      |  Class summarizing bipartitions and branch lengths (but not topologies) from many trees
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self, interner=None)
      |      TreeSummary constructor. Initializes relevant data structures
-     |
+     |  
      |  add_tree(self, curtree, weight=1.0)
      |      Add tree object to treesummary, update all relevant bipartition summaries
-     |
+     |  
      |  compute_bipfreq(self, digits=3)
      |      Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs
-     |
+     |  
      |  compute_blen_var_and_sem(self)
      |      Compute var and standard error of branch lengths, add attributes to Branchstructs
-     |
+     |  
      |  contree(self, cutoff=0.5, allcompat=False)
      |      Returns a consensus tree built from selected bipartitions
-     |
+     |  
      |  get_bipsummary(self)
      |      Return summary of bipartitions as dict: {bipartition:Branchstruct}
-     |
+     |  
      |  update(self, other)
      |      Merge this class with external treesummary
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
-
+    
     class Treefile(builtins.object)
      |  Treefile(filename=None, filecontent=None)
-     |
+     |  
      |  Abstract base-class for representing tree file objects.
-     |
+     |  
      |  Methods defined here:
-     |
+     |  
      |  __init__(self, filename=None, filecontent=None)
      |      Initialize self.  See help(type(self)) for accurate signature.
-     |
+     |  
      |  close(self)
      |      For explicit closing of Treefile before content exhausted
-     |
+     |  
      |  get_treestring(self)
      |      Return next tree-string
-     |
+     |  
      |  readtree(self)
      |      Reads one tree from file and returns as Tree object. Returns None when exhausted file
-     |
+     |  
      |  readtrees(self, discardprop=0.0)
      |      Reads trees from file and returns as TreeSet object. Can discard fraction of trees
-     |
+     |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
-     |
+     |  
      |  __dict__
      |      dictionary for instance variables (if defined)
-     |
+     |  
      |  __weakref__
      |      list of weak references to the object (if defined)
 
 FUNCTIONS
     escape_metachars(text, metachars='.^$*+?{}[]\\|()')
         Add backslashes to escape metachars in input string.
-
+    
     main()
         # # Placeholder: Insert test code here and run module in standalone mode
-
+    
     remove_comments(text, leftdelim, rightdelim=None)
         Takes input string and strips away commented text, delimited by 'leftdelim' and 'rightdelim'.
         Also deals with nested comments.
