@@ -211,7 +211,7 @@ for tree in treefile:
 
 ### Constructing Tree objects directly
 
-Instead of reading a tree from a file, you can also construct Tree objects using one of the 3 alternative constructors in the Tree class.
+Instead of reading a tree from a file, you can also construct Tree objects using one of the several alternative constructors in the Tree class.
 
 #### Constructing Tree object from string
 
@@ -227,6 +227,40 @@ Tree objects (with a star topology) can be constructed from a list of leaf names
 
 ```
 tree = phylotreelib.Tree.from_leaves(leaflist)
+```
+
+#### Constructing Tree object from lists of parent and child nodes corresponding to branches in tree
+
+The constructor Tree.from_branchinfo() constructs a tree from information about all individual branches in the tree. Specifically the input is a list of parent node IDs and a list of child node IDs (of the same length), such that each pairing of parentnode and  childnode corresponds to a branch in the tree. It is possible to add extra lists containing the corresponding branch lengths and comments. Using this constructor allows the specific naming of internal nodes (otherwise set automatically based on e.g. the order in which a newick string is parsed). **NOTE:** internal node IDs have to be integers, while leave IDs have to be strings.
+
+```
+parentlist = [100, 100, 101, 101, 102, 102]
+childlist = [101, 102, "A", "B", "C", "D"]
+blenlist = [1,1,2,3,2,3]
+tree = phylotreelib.Tree.from_branchinfo(parentlist,childlist,blenlist)
+```
+
+would result in this tree:
+
+```
+print(tree)
+|-----------------------------------------|
+|  Node  |  Child  |  Distance  |  Label  |
+|-----------------------------------------|
+|   100  |    101  |         1  |         |
+|   100  |    102  |         1  |         |
+|   101  |      A  |         2  |         |
+|   101  |      B  |         3  |         |
+|   102  |      C  |         2  |         |
+|   102  |      D  |         3  |         |
+|-----------------------------------------|
+
+4 Leafs:
+-----
+A
+B
+C
+D
 ```
 
 #### Constructing Tree object with random topology and branch lengths
