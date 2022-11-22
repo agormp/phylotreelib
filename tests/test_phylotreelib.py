@@ -224,10 +224,8 @@ class TreeIteration(TreeTestBase):
 
         # Secondly: iterate over treefile, check that read trees correspond to written trees
         treefile = pt.Newicktreefile(filename)
-        i = 0
-        for tree in treefile:
+        for i, tree in enumerate(treefile):
             self.assertEqual(tree, treelist[i])
-            i += 1
 
         # Clean up
         os.remove(filename)

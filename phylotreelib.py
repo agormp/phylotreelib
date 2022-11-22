@@ -52,18 +52,6 @@ import numpy as np
 ###################################################################################################
 #
 # Various functions used by methods, that do not fit neatly in any class
-
-def escape_metachars(text, metachars=".^$*+?{}[]\|()"):
-    """Add backslashes to escape metachars in input string."""
-
-    newtxt = ""
-    for char in text:
-        if char in metachars:
-            newtxt += "\\" + char
-        else:
-            newtxt += char
-    return newtxt
-
 ###################################################################################################
 
 def remove_comments(text, leftdelim, rightdelim=None):
@@ -80,8 +68,8 @@ def remove_comments(text, leftdelim, rightdelim=None):
         raise Exception("Right delimiter is substring of left delimiter")
 
     # Preprocess delims for use in re etc
-    leftdelim = escape_metachars(leftdelim)
-    rightdelim = escape_metachars(rightdelim)
+    leftdelim = re.escape(leftdelim)
+    rightdelim = re.escape(rightdelim)
 
     # Construct sorted list of tuples of the form [(0, 'start'), (5, 'stop'), (7, 'start'), ...]
     delimlist = [(delim.start(), "start") for delim in re.finditer(leftdelim, text)]
@@ -1014,11 +1002,14 @@ class Tree():
     ###############################################################################################
 
     def match_intnodes(self, other):
-        """Compares two identical trees with different internal node IDs. 
+        """Compares two identical trees with potentially different internal node IDs. 
         Returns tuple containing follorwing:
-            Dictionary giving mapping from intnode id in self to intnode id in other.
-            unmatched_root1: "None" or id of original root in self if root at bifurcation 
-            unmatched_root2: "None" or id of original root in other if root at bifurcation
+            Dictionary giving mapping from node id in self to node id in other.
+            unmatched_root1: "None" or id of unmatched root in self if root at bifurcation 
+            unmatched_root2: "None" or id of unmatched root in other if root at bifurcation
+        
+        Note: The last two are only different from None if the trees dont have the same
+        exact rooting
         """
 
         unmatched_root1 = None
@@ -3654,7 +3645,7 @@ class Nexustreefile(Treefile):
             self.transdict = {}
 
             # Remove start of buffer
-            pattern = re.compile("^.*translate\s*", re.IGNORECASE | re.DOTALL)
+            pattern = re.compile(r"^.*translate\s*", re.IGNORECASE | re.DOTALL)
             self.buffer = pattern.sub("", self.buffer)
 
             # Remove end of buffer, only "translate" block core remains after this
@@ -3662,7 +3653,7 @@ class Nexustreefile(Treefile):
             # This was found to break on some trees.
             # Why did I use that? Are there some cases that I am no longer covering?
             # re.compile(";\s+u?tree\s+(\*\s)?\s*[\w\-\/\.]+\s*=.*", re.IGNORECASE | re.DOTALL)
-            pattern = re.compile(";\s+.*tree.*", re.IGNORECASE | re.DOTALL)
+            pattern = re.compile(r";\s+.*tree.*", re.IGNORECASE | re.DOTALL)
             transblock = pattern.sub("", self.buffer)
 
             # Split on commas, generating list of "code-whitespace-origname" pairs
