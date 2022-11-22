@@ -83,29 +83,28 @@ def remove_comments(text, leftdelim, rightdelim=None):
     rightdelim = re.escape(rightdelim)
 
     # Construct sorted list of tuples of the form [(0, 'start'), (5, 'stop'), (7, 'start'), ...]
-    delimlist = [(delim.start(), "start") for delim in re.finditer(leftdelim, text)]
+    delimlist = [(match.start(), match.end(), "start") for match in re.finditer(leftdelim, text)]
     # If text contains no starts (=> no comments): return un-altered text
     if not delimlist:
         return text
     else:
-        delimlist.extend([(delim.start(), "stop") for delim in re.finditer(rightdelim, text)])
+        delimlist.extend([(match.start(), match.end(), "stop") for match in re.finditer(rightdelim, text)])
         delimlist.sort()
 
     # Traverse text; along the way copy text not inside comment-delimiter pairs.
     # Use stack ("unmatched_starts") to keep track of nesting
-    offset = len(rightdelim) - 1
     unmatched_starts = 0
     prevpos = 0
     processed_text = []
-    for (start, delim) in delimlist:
-        if delim == "start":
+    for (match_start, match_end, match_type) in delimlist:
+        if match_type == "start":
             unmatched_starts += 1
             if unmatched_starts == 1:                               # Beginning of new comment region
-                processed_text.append(text[prevpos:start])
-        elif delim == "stop":
+                processed_text.append(text[prevpos:match_start])
+        elif match_type == "stop":
             unmatched_starts -= 1
             if unmatched_starts == 0:                               # End of comment region
-                prevpos = start + offset
+                prevpos = match_end
             elif unmatched_starts == -1:                            # Error: more right delims than left delims
                 raise Exception("Unmatched end-comment delimiter. Context: '{}'".format(text[prevpos-10:prevpos+10]))
 
