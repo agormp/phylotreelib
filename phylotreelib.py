@@ -59,13 +59,24 @@ def remove_comments(text, leftdelim, rightdelim=None):
         Also deals with nested comments."""
 
     # NOTE: only deals with block comments at present
-    # Sanity checks: delimiters can not be identical, and one cannot be substring of the other
+    # Python note: maybe this is too general. Will I ever use multichar delims?
+    def wordsoverlap(w1, w2):
+        for i in range(1, len(w2)):
+            if w1.startswith(w2[i:]):
+                return True
+        for i in range(1, len(w1)):
+            if w2.startswith(w1[i:]):
+                return True
+        return False
+
     if leftdelim == rightdelim:
-        raise Exception("Left and right delimiters are identical")
-    if leftdelim in rightdelim:
-        raise Exception("Left delimiter is substring of right delimiter")
-    if rightdelim in leftdelim:
-        raise Exception("Right delimiter is substring of left delimiter")
+        raise SeqError("Left and right delimiters are identical")
+    elif leftdelim in rightdelim:
+        raise SeqError("Left delimiter is substring of right delimiters")
+    elif rightdelim in leftdelim:
+        raise ExcepSeqErrortion("Right delimiter is substring of left delimiters")
+    elif wordsoverlap(leftdelim, rightdelim):
+        raise SeqError("Right and left delimiters overlap")
 
     # Preprocess delims for use in re etc
     leftdelim = re.escape(leftdelim)
@@ -76,41 +87,32 @@ def remove_comments(text, leftdelim, rightdelim=None):
     # If text contains no starts (=> no comments): return un-altered text
     if not delimlist:
         return text
-    delimlist.extend([(delim.start(), "stop") for delim in re.finditer(rightdelim, text)])
-    delimlist.sort()
-
-    # Resolve issues with overlapping delimiters:
-    tmplist = [delimlist[0]]
-    for i in range(1, len(delimlist)):
-        start1 = delimlist[i - 1][0]
-        start2 = delimlist[i][0]
-        if start2 > start1 + len(leftdelim) - 1:    # If  next item does not overlap previous item
-            tmplist.append(delimlist[i])
-    delimlist = tmplist
+    else:
+        delimlist.extend([(delim.start(), "stop") for delim in re.finditer(rightdelim, text)])
+        delimlist.sort()
 
     # Traverse text; along the way copy text not inside comment-delimiter pairs.
     # Use stack ("unmatched_starts") to keep track of nesting
     offset = len(rightdelim) - 1
     unmatched_starts = 0
     prevpos = 0
-    processed_text = ""
+    processed_text = []
     for (start, delim) in delimlist:
         if delim == "start":
             unmatched_starts += 1
-            if unmatched_starts == 1:                   # Beginning of new comment region
-                processed_text += text[prevpos:start]
+            if unmatched_starts == 1:                               # Beginning of new comment region
+                processed_text.append(text[prevpos:start])
         elif delim == "stop":
             unmatched_starts -= 1
-            if unmatched_starts == 0:                   # End of comment region
+            if unmatched_starts == 0:                               # End of comment region
                 prevpos = start + offset
-            elif unmatched_starts == -1:                # Error: more right delims than left delims
-                msg = "Unmatched end-comment delimiter: {}".format(text[prevpos-5:prevpos+5])
-                raise TreeError(msg)
+            elif unmatched_starts == -1:                            # Error: more right delims than left delims
+                raise Exception("Unmatched end-comment delimiter. Context: '{}'".format(text[prevpos-10:prevpos+10]))
 
-    # Add parts of original text to the right of rightdelim (if present)
+    # Add final block of text if relevant (i.e., if text does not stop with rightdelim), return processed text
     if prevpos < len(text):
-        processed_text += text[prevpos:]
-    return processed_text
+        processed_text.append(text[prevpos:])
+    return "".join(processed_text)
 
 ###################################################################################################
 ###################################################################################################
