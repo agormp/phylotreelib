@@ -13,3 +13,4 @@ tests/phyldiv.py
 tmp
 .DS_Store
 /tests/.DS_Store
+.venv*
