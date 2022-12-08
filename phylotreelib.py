@@ -711,7 +711,7 @@ class Tree():
         """Implements equality testing for Tree objects"""
 
         # Two trees are identical if they have the same leaves, the same topology
-        # and the same branchlengths. Branch labels are ignored. Rooting is ignored 
+        # and the same branchlengths. Branch labels are ignored. Rooting is ignored
         # NB: floating point comparison of relative difference.
         # Precision chosen based on empirical comparison between own and PHYLIP tree (...)
         if self.leaves != other.leaves:
@@ -764,11 +764,11 @@ class Tree():
             for child in origtree[parent]:
                 if copylengths:
                     blen = origtree[parent][child].length
-                else: 
+                else:
                     blen = 0.0
                 if copylabels:
                     lab = origtree[parent][child].label
-                else: 
+                else:
                     lab = ""
                 newtree[parent][child] = Branchstruct(blen,lab)
         return obj
@@ -1003,29 +1003,29 @@ class Tree():
     ###############################################################################################
 
     def match_intnodes(self, other):
-        """Compares two identical trees with potentially different internal node IDs. 
+        """Compares two identical trees with potentially different internal node IDs.
         Returns tuple containing follorwing:
             Dictionary giving mapping from node id in self to node id in other.
-            unmatched_root1: "None" or id of unmatched root in self if root at bifurcation 
+            unmatched_root1: "None" or id of unmatched root in self if root at bifurcation
             unmatched_root2: "None" or id of unmatched root in other if root at bifurcation
-        
+
         Note: The last two are only different from None if the trees dont have the same
         exact rooting
         """
 
         unmatched_root1 = None
-        unmatched_root2 = None            
-                        
+        unmatched_root2 = None
+
         if self.leaves != other.leaves:
             raise TreeError("Trees have different leaves. Can't match intnodes")
         elif self.topology() != other.topology():  # Also checked in sameroot. Could use try
             raise TreeError("Trees have different topologies. Can't match intnodes")
         elif not self.has_same_root(other):
-            
+
             # Point "self" and "other" to copies of objects so originals are unchanged
             self = self.copy_treeobject(copylengths=False, copylabels=False)
             other = other.copy_treeobject(copylengths=False, copylabels=False)
-            
+
             # Keep track of original roots if bifurcations
             if self.is_bifurcation(self.root):
                 unmatched_root1 = self.root
@@ -1034,13 +1034,13 @@ class Tree():
                 unmatched_root2 = other.root
                 other.deroot()
 
-            # Pick arbitrary internal node to root two trees on. 
+            # Pick arbitrary internal node to root two trees on.
             arbitrarykid = random.choice(tuple(self.leaves))
             newroot1 = self.parent(arbitrarykid)
             newroot2 = other.parent(arbitrarykid)
             self.reroot(newroot1, polytomy=True)
             other.reroot(newroot2, polytomy=True)
-        
+
         # Now possible to match internal nodes based on their offspring
         intnode1to2 = dict()
         childpairset = {(leaf,leaf) for leaf in self.leaves}
@@ -1051,7 +1051,7 @@ class Tree():
             intnode1to2[parent1] = parent2
             if parent1 != self.root:
                 childpairset.add((parent1,parent2))
-                
+
         return (intnode1to2, unmatched_root1, unmatched_root2)
 
     ###############################################################################################
@@ -3821,6 +3821,33 @@ class Distmatrix(object):
             tmplist.append("\n")
 
         return "".join(tmplist)
+
+    #######################################################################################
+
+    def clean_names(self, rep="_"):
+        """Rename items to avoid characters that are problematic in Newick tree strings:
+        Replaces all occurrences of comma, colon, and semicolon, by 'rep'"""
+
+        if self.namelist is None:
+            raise TreeError("There are no items in Distmatrix object. Can not run clean_names()")
+        old_new_tuples = []
+        for old in self.namelist:
+            new = old.replace(",", rep).replace(":", rep).replace(";", rep)
+            old_new_tuples.append((old, new))
+        for old,new in old_new_tuples:
+            self.rename(old, new)
+
+    #######################################################################################
+
+    def rename(self, oldname, newname):
+        """Changes name of one item from oldname to newname"""
+
+        self.namelist.remove(oldname)
+        self.namelist.append(newname)
+        i = self.name2index[oldname]
+        del self.name2index[oldname]
+        self.name2index[newname] = i
+        self.index2name[i] = newname
 
     #######################################################################################
 
