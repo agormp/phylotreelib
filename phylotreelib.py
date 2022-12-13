@@ -3826,13 +3826,14 @@ class Distmatrix(object):
 
     def clean_names(self, rep="_"):
         """Rename items to avoid characters that are problematic in Newick tree strings:
-        Replaces all occurrences of comma, colon, and semicolon, by 'rep'"""
+        Replaces all occurrences of ,:;()[] by 'rep'"""
 
         if self.namelist is None:
             raise TreeError("There are no items in Distmatrix object. Can not run clean_names()")
+        translation_table = "".maketrans(",:;()[]", rep * 7)
         old_new_tuples = []
         for old in self.namelist:
-            new = old.replace(",", rep).replace(":", rep).replace(";", rep)
+            new = old.translate(translation_table)
             old_new_tuples.append((old, new))
         for old,new in old_new_tuples:
             self.rename(old, new)
