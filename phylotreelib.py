@@ -3830,10 +3830,12 @@ class Distmatrix(object):
 
         if self.namelist is None:
             raise TreeError("There are no items in Distmatrix object. Can not run clean_names()")
-        translation_table = "".maketrans(illegal, rep * 7)
-        old_new_tuples = []
+        illegal_esc_list = [re.escape(char) for char in illegal]
+        illegal_esc_list.append("_") # To avoid two underscores in a row
+        illegal_esc_string = "".join(illegal_esc_list)
+        regex = f"[{illegal_esc_string}]+"
         for old in self.namelist:
-            new = old.translate(translation_table)
+            new = re.sub(regex,"_",old)
             old_new_tuples.append((old, new))
         for old,new in old_new_tuples:
             self.rename(old, new)
