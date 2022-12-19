@@ -3871,6 +3871,14 @@ class Distmatrix(object):
         i2 = self.name2index[name2]
         self.dmat[i1, i2] = self.dmat[i2, i1] = dist
 
+    #######################################################################################
+
+    def avdist(self):
+        """Returns average dist in matrix (not including diagonal)"""
+        ndist = self.n * (self.n - 1)           # diagonal entries are zero
+        avdist = np.sum(self.dmat) / ndist
+        return avdist
+
     ###############################################################################################
 
     def nj(self):
