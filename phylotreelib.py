@@ -1242,7 +1242,7 @@ class Tree():
             leafstring += ", "
         leafstring = leafstring[:-2]    # Remove trailing comma and blank
 
-        msg = "This is not a monophyletic group:\n%s" % leafstring
+        msg = f"The following is not a monophyletic group in this tree:\n{leafstring}"
         raise TreeError(msg)
 
     ###############################################################################################
@@ -3803,7 +3803,7 @@ class Distmatrix(object):
         tmplist = []
 
         # Header line: all names in order, tab separated
-        tmplist.append("\t\t")
+        tmplist.append("\t")
         for name in namelist:
             tmplist.append(str(name))
             tmplist.append("\t")
