@@ -1,7 +1,7 @@
 # phylotreelib: python library for analyzing and manipulating phylogenetic trees
 
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/phylotreelib)
-![](https://img.shields.io/badge/version-1.10.0-blue)
+![](https://img.shields.io/badge/version-1.10.2-blue)
 
 
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
@@ -370,7 +370,7 @@ List of useful Tree object attributes:
 
 *	`.leaves` 	: Set of leaf names
 *	`.intnodes` : Set of internal node IDs
-*	`.nodes`	: Set of all nodes (= leafs + internal nodes)
+*	`.nodes`	: Set of all nodes (= leaves + internal nodes)
 *	`.root`		: ID for root node (usually 0, but may change if re-rooted)
 
 
