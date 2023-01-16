@@ -1,4 +1,4 @@
-# phylotreelib: python library for analyzing and manipulating phylogenetic trees
+# phylotreelib
 
 ![](https://img.shields.io/badge/version-1.10.2-blue)
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=downloads&service=github)](https://pepy.tech/project/phylotreelib)
