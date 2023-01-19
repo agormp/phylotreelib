@@ -53,7 +53,7 @@ mytree.rootminvar()
 rootnode = mytree.root
 for tip in mytree.leaves:
 	dist = mytree.nodedist(rootnode, tip)
-	print("{:<10s}\t{:.2f}".format(tip,dist))
+	print(f"{tip:<10s} \t {dist:.2f}")
 ```
 
 Output:
