@@ -13,6 +13,7 @@ import os
 import itertools
 import random
 from io import StringIO
+import pytest
 
 ###################################################################################################
 ###################################################################################################
@@ -475,7 +476,7 @@ class EqualityTest(TreeTestBase):
                 mytree1 = pt.Tree.from_string(stringlist[i])
                 mytree2 = pt.Tree.from_string(stringlist[j])
                 self.assertNotEqual(mytree1, mytree2)
-                
+
     def test_diffblens(self):
         """Check that different branch lengths results in non-equality"""
         for treestring in self.treedata.values():
@@ -547,7 +548,7 @@ class Is_bifurcation(TreeTestBase):
                     t.remove_branch(intnode, kid)
                     self.assertFalse(t.is_bifurcation(intnode))
                     break
-            
+
 
 ########################################################################################
 ########################################################################################
@@ -561,7 +562,7 @@ class Baseml_rstfile(TreeTestBase):
 
 class Copy_treeobject(TreeTestBase):
     """Tests for copy_treeobject function"""
-    
+
     def test_blen_lab(self):
         """Test copy_treeobject with copylengths=True, copylabels=True"""
         for treestring in self.treedata.values():
@@ -575,7 +576,7 @@ class Copy_treeobject(TreeTestBase):
                     t1lab = t1.getlabel(parent, kid)
                     t2lab = t2.getlabel(parent, kid)
                     self.assertEqual(t1lab,t2lab)
-                           
+
     def test_blen_nolab(self):
         """Test copy_treeobject with copylengths=True, copylabels=False"""
         for treestring in self.treedata.values():
@@ -601,14 +602,14 @@ class Copy_treeobject(TreeTestBase):
                 for kid in t2.children(parent):
                     t2lab = t2.getlabel(parent, kid)
                     self.assertEqual("",t2lab)
-                 
+
 
 ########################################################################################
 ########################################################################################
 
 class Match_intnodes(TreeTestBase):
     """Tests for match_intnodes function"""
-    
+
     def test_sametop_sameroot(self):
         """Test correct output from well formed examples"""
         for treestring in self.treedata.values():
@@ -660,7 +661,7 @@ class Match_intnodes(TreeTestBase):
             self.assertEqual(id1+delta_id, intnode1to2[id1])
         self.assertEqual(unmatched_root1, t1origroot)
         self.assertEqual(unmatched_root2, t2origroot)
-        
+
     def test_difleaves(self):
         """Test error raised when leaves differ"""
         for treestring in self.treedata.values():
@@ -669,7 +670,7 @@ class Match_intnodes(TreeTestBase):
             randleaf = random.choice(tuple(t1.leaves))
             t1.remove_leaf(randleaf)
             self.assertRaises(pt.TreeError, t1.match_intnodes, t2)
-            
+
     def test_sameleaves_diftop(self):
         """Test error raised when leaves same but topologies differ"""
         for treestring in self.treedata.values():
@@ -678,7 +679,7 @@ class Match_intnodes(TreeTestBase):
             while t1.topology() == t2.topology():
                 t2.shuffle_leaf_names()
             self.assertRaises(pt.TreeError, t1.match_intnodes, t2)
-            
+
 
 ########################################################################################
 ########################################################################################
@@ -897,6 +898,7 @@ class Treesummarytests(TreeTestBase):
         self.trprob_trees = trprobfile.readtrees()
         trprobfile.close()
 
+    @pytest.mark.slow
     def test_contree(self):
         ts = pt.TreeSummary()
         tf1 = pt.Nexustreefile(self.t1_fname)
@@ -925,6 +927,7 @@ class Treesummarytests(TreeTestBase):
                 mb_freq = float(mb_branch.label)
                 self.assertAlmostEqual(mb_freq, own_freq)
 
+    @pytest.mark.slow
     def test_treesummary_update(self):
         ts1 = pt.TreeSummary()
         tf1 = pt.Nexustreefile(self.t1_fname)
@@ -957,6 +960,7 @@ class Treesummarytests(TreeTestBase):
                 mb_freq = float(mb_branch.label)
                 self.assertAlmostEqual(mb_freq, own_freq, places=3)
 
+    @pytest.mark.slow
     def test_bigtreesummary(self):
         # Note: I am checking that mrbayes topologies are the same I found.
         # should also check topology frequencies
