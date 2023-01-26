@@ -3456,11 +3456,24 @@ class Treefile():
     ###############################################################################################
 
     def __enter__(self):
+        """Implements context manager behaviour for Treefile types.
+        Usage example:
+            with pt.Newicktreefile(filename) as tf:
+                mytree = tf.readtree()
+            mytree.rootminvar()
+        """
         return self
 
     ###############################################################################################
 
     def __exit__(self, type, value, traceback):
+        """Implements context manager behaviour for Treefile types.
+        Usage example:
+            with pt.Newicktreefile(filename) as tf:
+                mytree = tf.readtree()
+            mytree.rootminvar()
+        """
+        # Python note: consider adding code to handle exceptions (but maybe ok to just pass on?)
         self.close()
 
     ###############################################################################################
