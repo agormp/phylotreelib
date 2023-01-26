@@ -1004,7 +1004,7 @@ class Tree():
 
     def match_intnodes(self, other):
         """Compares two identical trees with potentially different internal node IDs.
-        Returns tuple containing follorwing:
+        Returns tuple containing following:
             Dictionary giving mapping from node id in self to node id in other.
             unmatched_root1: "None" or id of unmatched root in self if root at bifurcation
             unmatched_root2: "None" or id of unmatched root in other if root at bifurcation
@@ -3452,6 +3452,16 @@ class Treefile():
             self.treefile = open(filename, mode="rt", encoding="UTF-8")
 
         self.buffer = ""                # Used for keeping leftovers after reading whole line
+
+    ###############################################################################################
+
+    def __enter__(self):
+        return self
+
+    ###############################################################################################
+
+    def __exit__(self, type, value, traceback):
+        self.close()
 
     ###############################################################################################
 
