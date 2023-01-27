@@ -607,8 +607,8 @@ class Copy_treeobject(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
-class Match_intnodes(TreeTestBase):
-    """Tests for match_intnodes function"""
+class Match_nodes(TreeTestBase):
+    """Tests for match_nodes function"""
 
     def test_sametop_sameroot(self):
         """Test correct output from well formed examples"""
@@ -618,9 +618,12 @@ class Match_intnodes(TreeTestBase):
             delta_id = 35 + max(t1.intnodes)
             for i,id in enumerate(t1.intnodes):
                 t2.rename_intnode(id, id+delta_id)
-            intnode1to2,unmatched_root1,unmatched_root2 = t1.match_intnodes(t2)
+            intnode1to2,unmatched_root1,unmatched_root2 = t1.match_nodes(t2)
             for id1 in intnode1to2:
-                self.assertEqual(id1+delta_id, intnode1to2[id1])
+                if type(id1) == int:
+                    self.assertEqual(id1+delta_id, intnode1to2[id1])
+                else:
+                    self.assertEqual(id1, intnode1to2[id1])
             self.assertEqual(unmatched_root1, None)
             self.assertEqual(unmatched_root2, None)
 
@@ -636,9 +639,12 @@ class Match_intnodes(TreeTestBase):
                 delta_id = 35 + max(t1.intnodes)
                 for i,id in enumerate(t1.intnodes):
                     t2.rename_intnode(id, id+delta_id)
-                intnode1to2,unmatched_root1,unmatched_root2 = t1.match_intnodes(t2)
+                intnode1to2,unmatched_root1,unmatched_root2 = t1.match_nodes(t2)
                 for id1 in intnode1to2:
-                    self.assertEqual(id1+delta_id, intnode1to2[id1])
+                    if type(id1) == int:
+                        self.assertEqual(id1+delta_id, intnode1to2[id1])
+                    else:
+                        self.assertEqual(id1, intnode1to2[id1])
                 self.assertEqual(unmatched_root1, None) # Both rooted at polytomies
                 self.assertEqual(unmatched_root2, None)
 
@@ -656,9 +662,12 @@ class Match_intnodes(TreeTestBase):
         t2.reroot(parent,kid,node1dist=blen/2)
         t1origroot = t1.root
         t2origroot = t2.root
-        intnode1to2,unmatched_root1,unmatched_root2 = t1.match_intnodes(t2)
+        intnode1to2,unmatched_root1,unmatched_root2 = t1.match_nodes(t2)
         for id1 in intnode1to2:
-            self.assertEqual(id1+delta_id, intnode1to2[id1])
+            if type(id1) == int:
+                self.assertEqual(id1+delta_id, intnode1to2[id1])
+            else:
+                self.assertEqual(id1, intnode1to2[id1])
         self.assertEqual(unmatched_root1, t1origroot)
         self.assertEqual(unmatched_root2, t2origroot)
 
@@ -669,7 +678,7 @@ class Match_intnodes(TreeTestBase):
             t2 = pt.Tree.from_string(treestring)
             randleaf = random.choice(tuple(t1.leaves))
             t1.remove_leaf(randleaf)
-            self.assertRaises(pt.TreeError, t1.match_intnodes, t2)
+            self.assertRaises(pt.TreeError, t1.match_nodes, t2)
 
     def test_sameleaves_diftop(self):
         """Test error raised when leaves same but topologies differ"""
@@ -678,7 +687,7 @@ class Match_intnodes(TreeTestBase):
             t2 = pt.Tree.from_string(treestring)
             while t1.topology() == t2.topology():
                 t2.shuffle_leaf_names()
-            self.assertRaises(pt.TreeError, t1.match_intnodes, t2)
+            self.assertRaises(pt.TreeError, t1.match_nodes, t2)
 
 
 ########################################################################################
