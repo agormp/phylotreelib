@@ -240,7 +240,6 @@ class Tree():
                                                     #     placed as branch label
                 """, re.VERBOSE)
         tree_parts_list = tree_parts.findall(treestring)
-
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
         # are the internal nodes which are numbered consecutively. Each key has an
         # associated value that is itself a dictionary listing the children: keys are
@@ -252,13 +251,20 @@ class Tree():
         obj.intnodes = set()           # Set of internal node IDs. For speedy lookups
         obj.root = 0                   # Root is node zero at start. (May change)
         obj.parent_dict = {}
+        obj.belowroot = None
 
-        # Preprocess parts list to remove any labels or lengths below root node
-        # (these are explicitly ignored!)
-        # Done by removing all parts between the semicolon and the last right parenthesis
-        # NOTE: I am assuming that semicolon is at [-1]. Should I find it first instead?
-        while tree_parts_list[-2] != ")":
-            del tree_parts_list[-2]
+        # Preprocess parts list to remove and store any labels or lengths below root node
+        # Any text here (between the semicolon and the last right parenthesis)
+        # will be stores as _one_ string in "self.belowroot"
+        i = -2
+        extraparts = []
+        while tree_parts_list[i] != ")":
+            extraparts.append(tree_parts_list[i])
+            i -= 1
+        if extraparts:
+            extraparts.reverse()
+            obj.belowroot = "".join(extraparts)
+            del tree_parts_list[(i+1):-1]
 
         # Parse tree_parts_list left to right. Use a stack to keep track of current node
         nodeno = -1
@@ -1002,10 +1008,10 @@ class Tree():
 
     ###############################################################################################
 
-    def match_intnodes(self, other):
+    def match_nodes(self, other):
         """Compares two identical trees with potentially different internal node IDs.
         Returns tuple containing following:
-            Dictionary giving mapping from node id in self to node id in other.
+            Dictionary giving mapping from nodeid in self to nodeid in other (also leaves)
             unmatched_root1: "None" or id of unmatched root in self if root at bifurcation
             unmatched_root2: "None" or id of unmatched root in other if root at bifurcation
 
@@ -1042,17 +1048,22 @@ class Tree():
             other.reroot(newroot2, polytomy=True)
 
         # Now possible to match internal nodes based on their offspring
-        intnode1to2 = dict()
+        node1to2 = dict()
         childpairset = {(leaf,leaf) for leaf in self.leaves}
         while childpairset:
             kid1,kid2 = childpairset.pop()
             parent1 = self.parent(kid1)
             parent2 = other.parent(kid2)
-            intnode1to2[parent1] = parent2
+            node1to2[parent1] = parent2
             if parent1 != self.root:
                 childpairset.add((parent1,parent2))
 
-        return (intnode1to2, unmatched_root1, unmatched_root2)
+        # Add leaves
+        # These are identical in two trees, but often useful to have in dict for downstream use
+        for leafnode in self.leaves:
+            node1to2[leafnode] = leafnode      # Leaf names are same. Add to dict
+
+        return (node1to2, unmatched_root1, unmatched_root2)
 
     ###############################################################################################
 
