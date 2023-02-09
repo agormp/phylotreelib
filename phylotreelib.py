@@ -3254,7 +3254,7 @@ class TreeSummary():
     ###############################################################################################
 
     def update(self, other):
-        """Merge this class with external treesummary"""
+        """Merge this object with external treesummary"""
 
         # Sanity check: do two treesummaries refer to same set of leaves?
         if self.leaves != other.leaves:
@@ -3410,7 +3410,7 @@ class BigTreeSummary(TreeSummary):
     ###############################################################################################
 
     def update(self, other):
-        """Merge this class with other treesummary"""
+        """Merge this object with other treesummary"""
 
         # Superclass method takes care of updating:
         # tree_count, tree_weight_sum, and bipartsummary
