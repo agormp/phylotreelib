@@ -170,7 +170,7 @@ class Branchstruct():
 class Topostruct():
     """Class that emulates a struct. Keeps topology-related info"""
 
-    __slots__ = ["weight", "treestring", "freq"]
+    __slots__ = ["weight", "tree", "freq"]
 
     # Python note: perhaps replace with dataclass, available since python 3.7
     pass
@@ -3384,7 +3384,7 @@ class BigTreeSummary(TreeSummary):
 
         # This is where topology information is kept
         self.toposummary = {}
-        self.store_treestrings = store_treestrings
+        self.store_trees = store_trees
 
     ###############################################################################################
 
@@ -3442,17 +3442,7 @@ class BigTreeSummary(TreeSummary):
         for topostruct in self.toposummary.values():
             topostruct.freq = topostruct.weight / self.tree_weight_sum
 
-<<<<<<< Local Changes
-    ###############################################################################################
 
-    def max_clade_cred_tree(self):
-        """Summarise trees as maximum clade credibility tree"""
-
-
-
-
-=======
->>>>>>> External Changes
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
