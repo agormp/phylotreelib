@@ -3377,13 +3377,14 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, interner=None):
+    def __init__(self, interner=None, store_treestrings=False):
 
         # Most stuff done by superclass constructor
         TreeSummary.__init__(self, interner=None)
 
         # This is where topology information is kept
         self.toposummary = {}
+        self.store_treestrings = store_treestrings
 
     ###############################################################################################
 
@@ -3404,8 +3405,10 @@ class BigTreeSummary(TreeSummary):
         else:
             self.toposummary[topology]=Topostruct()
             self.toposummary[topology].weight = weight
-            self.toposummary[topology].treestring = curtree.newick(printdist=False, printlabels=False,
-                                                transdict=self.transdict)
+            if self.store_treestrings:
+                self.toposummary[topology].treestring = curtree.newick(printdist=False,
+                                                                       printlabels=False,
+                                                                       transdict=self.transdict)
 
     ###############################################################################################
 
