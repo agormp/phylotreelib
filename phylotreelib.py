@@ -3377,7 +3377,7 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, interner=None, store_treestrings=False):
+    def __init__(self, interner=None, store_trees=False):
 
         # Most stuff done by superclass constructor
         TreeSummary.__init__(self, interner=None)
@@ -3405,10 +3405,8 @@ class BigTreeSummary(TreeSummary):
         else:
             self.toposummary[topology]=Topostruct()
             self.toposummary[topology].weight = weight
-            if self.store_treestrings:
-                self.toposummary[topology].treestring = curtree.newick(printdist=False,
-                                                                       printlabels=False,
-                                                                       transdict=self.transdict)
+            if self.store_trees:
+                self.toposummary[topology].tree = curtree
 
     ###############################################################################################
 
@@ -3444,6 +3442,17 @@ class BigTreeSummary(TreeSummary):
         for topostruct in self.toposummary.values():
             topostruct.freq = topostruct.weight / self.tree_weight_sum
 
+<<<<<<< Local Changes
+    ###############################################################################################
+
+    def max_clade_cred_tree(self):
+        """Summarise trees as maximum clade credibility tree"""
+
+
+
+
+=======
+>>>>>>> External Changes
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
