@@ -3297,7 +3297,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def contree(self, cutoff=0.5, allcompat=False):
+    def contree(self, cutoff=0.5, allcompat=False, labeldigits=3):
         """Returns a consensus tree built from selected bipartitions"""
 
         if cutoff < 0.5:
@@ -3309,6 +3309,7 @@ class TreeSummary():
         self.compute_bipfreq()
         for bip, branch in self.bipartsummary.items():
             if branch.freq > cutoff:
+                branch.label = f"{round(branch.freq, labeldigits)}"
                 conbipdict[bip] = branch
 
         # Build tree from bipartitions  in new bipdict
@@ -3347,8 +3348,6 @@ class TreeSummary():
         self.bipfreqlist = []
         for bipartition, branch in self.bipartsummary.items():
             branch.freq = branch.SUMW / self.tree_weight_sum
-            branch.freq = round(branch.freq, digits)
-            branch.label = "{}".format(branch.freq)      # Consider for refactoring: are there functions that rely on .label field?
             self.bipfreqlist.append((branch.freq, bipartition))
         self.bipfreqlist.sort(reverse=True)
 
