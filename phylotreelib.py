@@ -3188,7 +3188,8 @@ class TreeSummary():
         """TreeSummary constructor. Initializes relevant data structures"""
         self.tree_count = 0
         self.tree_weight_sum = 0.0
-        self.bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
+        self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
+        self._bipartsummary_processed = False
         if not interner:
             self.interner = Interner()
         else:
@@ -3197,8 +3198,29 @@ class TreeSummary():
 
     ###############################################################################################
 
+    @property
+    def bipartsummary(self):
+        """Property method for lazy evaluation of freq, var, and sem for branches"""
+        if not self._bipartsummary_processed:
+            for bipartition, branch in self._bipartsummary.items():
+                branch.freq = branch.SUMW / self.tree_weight_sum
+                n = branch.bip_count
+                if n > 1:
+                    branch.var = branch.T * n / ((n - 1) * branch.SUMW)
+                    branch.sem = math.sqrt(branch.var)/math.sqrt(n)
+                else:
+                    branch.var = 9999999
+                    branch.sem = 9999999
+            self._bipartsummary_processed = True
+
+        return self._bipartsummary
+
+    ###############################################################################################
+
     def add_tree(self, curtree, weight=1.0):
         """Add tree object to treesummary, update all relevant bipartition summaries"""
+
+        self._bipartsummary_processed = False
 
         # Main interface to TreeSummary.
         # Takes tree object, updates relevant measures
@@ -3231,22 +3253,22 @@ class TreeSummary():
             brlen = branchstruct.length
 
             # If bipartition has been seen before: update existing info
-            if bipart in self.bipartsummary:
-                Q = brlen - self.bipartsummary[bipart].length
-                TEMP = self.bipartsummary[bipart].SUMW + weight
+            if bipart in self._bipartsummary:
+                Q = brlen - self._bipartsummary[bipart].length
+                TEMP = self._bipartsummary[bipart].SUMW + weight
                 R = Q*weight/TEMP
-                self.bipartsummary[bipart].length += R
-                self.bipartsummary[bipart].T += R * self.bipartsummary[bipart].SUMW * Q
-                self.bipartsummary[bipart].SUMW = TEMP
-                self.bipartsummary[bipart].bip_count += 1
+                self._bipartsummary[bipart].length += R
+                self._bipartsummary[bipart].T += R * self._bipartsummary[bipart].SUMW * Q
+                self._bipartsummary[bipart].SUMW = TEMP
+                self._bipartsummary[bipart].bip_count += 1
 
             # If bipartition has never been seen before: add to dict and add online attributes
             else:
-                self.bipartsummary[bipart]=branchstruct
-                self.bipartsummary[bipart].bip_count = 1
-                self.bipartsummary[bipart].SUMW = weight
-                self.bipartsummary[bipart].length = brlen
-                self.bipartsummary[bipart].T = 0.0
+                self._bipartsummary[bipart]=branchstruct
+                self._bipartsummary[bipart].bip_count = 1
+                self._bipartsummary[bipart].SUMW = weight
+                self._bipartsummary[bipart].length = brlen
+                self._bipartsummary[bipart].T = 0.0
 
         return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
 
@@ -3254,6 +3276,8 @@ class TreeSummary():
 
     def update(self, other):
         """Merge this object with external treesummary"""
+
+        self._bipartsummary_processed = False
 
         # Sanity check: do two treesummaries refer to same set of leaves?
         if self.leaves != other.leaves:
@@ -3266,7 +3290,7 @@ class TreeSummary():
 
         # Merge "treesummary.bipartsummary" with "self.bipartsummary"
         other_bipsum = other.bipartsummary
-        self_bipsum = self.bipartsummary
+        self_bipsum = self._bipartsummary
 
         for bipart in other_bipsum:
             # If bipart already in self.bipartsummary, update fields
@@ -3300,9 +3324,8 @@ class TreeSummary():
             msg = "Consensus tree cutoff has to be at least 0.5"
             raise TreeError(msg)
 
-        # Create new bipdict, compute freqs for branches, transfer branches with freq>cutoff
+        # Create new bipdict, transfer branches with freq>cutoff
         conbipdict = {}
-        self.compute_bipfreq()
         for bip, branch in self.bipartsummary.items():
             if branch.freq > cutoff:
                 branch.label = f"{round(branch.freq, labeldigits)}"
@@ -3326,37 +3349,6 @@ class TreeSummary():
                     contree.add_branch(bipart, blen, label)
 
         return contree
-
-    ###############################################################################################
-
-    def get_bipsummary(self):
-        """Return summary of bipartitions as dict: {bipartition:Branchstruct}"""
-
-        self.compute_bipfreq()
-        self.compute_blen_var_and_sem()
-        return self.bipartsummary
-
-    ###############################################################################################
-
-    def compute_bipfreq(self, digits=3):
-        """Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs"""
-
-        for bipartition, branch in self.bipartsummary.items():
-            branch.freq = branch.SUMW / self.tree_weight_sum
-
-    ###############################################################################################
-
-    def compute_blen_var_and_sem(self):
-        """Compute var and standard error of branch lengths, add attributes to Branchstructs"""
-
-        for branch in self.bipartsummary.values():
-            n = branch.bip_count
-            if n > 1:
-                branch.var = branch.T * n / ((n - 1) * branch.SUMW)
-                branch.sem = math.sqrt(branch.var)/math.sqrt(n)
-            else:
-                branch.var = 9999999
-                branch.sem = 9999999
 
 ###################################################################################################
 ###################################################################################################
