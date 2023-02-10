@@ -1270,7 +1270,6 @@ class Tree():
 
         # Local copies to speed up access
         root = self.root
-        #self.build_parent_dict()  # Rethink! (in treelib2 always construct?)
         pdict = self.parent_dict
         tree = self.tree
 
