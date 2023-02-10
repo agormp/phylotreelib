@@ -3260,10 +3260,6 @@ class TreeSummary():
             msg = "Not all trees have same set of leaves."
             raise TreeError(msg)
 
-        # Unset flag if it has previously been set (relevant when adding treesummary after
-        # previously calling bipartResult)
-        self.bipart_processed = False
-
         # Update treecount and weight
         self.tree_count += other.tree_count
         self.tree_weight_sum += other.tree_weight_sum
