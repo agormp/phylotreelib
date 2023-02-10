@@ -3289,7 +3289,7 @@ class TreeSummary():
         self.tree_weight_sum += other.tree_weight_sum
 
         # Merge "treesummary.bipartsummary" with "self.bipartsummary"
-        other_bipsum = other.bipartsummary
+        other_bipsum = other._bipartsummary
         self_bipsum = self._bipartsummary
 
         for bipart in other_bipsum:
@@ -3361,18 +3361,29 @@ class BigTreeSummary(TreeSummary):
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
     def __init__(self, interner=None, store_trees=False):
-
-        # Most stuff done by superclass constructor
         TreeSummary.__init__(self, interner=None)
-
-        # This is where topology information is kept
-        self.toposummary = {}
+        self._toposummary = {}
+        self._toposummary_processed = False
         self.store_trees = store_trees
+
+    ###############################################################################################
+
+    @property
+    def toposummary(self):
+        """Property method for lazy evaluation of topostruct.freq"""
+        if not self._toposummary_processed:
+            for topostruct in self._toposummary.values():
+                topostruct.freq = topostruct.weight / self.tree_weight_sum
+            self._toposummary_processed = True
+
+        return self._toposummary
 
     ###############################################################################################
 
     def add_tree(self,curtree, weight=1.0):
         """Add tree to treesummary, update all summaries"""
+
+        self._toposummary_processed = False
 
         # Superclass method takes care of updating n_trees and all bipart-related info
         # Also returns bipdict so we wont have to recompute here
@@ -3383,31 +3394,33 @@ class BigTreeSummary(TreeSummary):
         # Python: A bit messy that interning is here done in add_tree() and not in topology()
         # This is to avoid recomputing bipdict in topology function (or storing bipdictcache)
         topology = self.interner.intern_topology(frozenset(bipdict.keys()))
-        if topology in self.toposummary:
-            self.toposummary[topology].weight += weight
+        if topology in self._toposummary:
+            self._toposummary[topology].weight += weight
         else:
-            self.toposummary[topology]=Topostruct()
-            self.toposummary[topology].weight = weight
+            self._toposummary[topology]=Topostruct()
+            self._toposummary[topology].weight = weight
             if self.store_trees:
-                self.toposummary[topology].tree = curtree
+                self._toposummary[topology].tree = curtree
 
     ###############################################################################################
 
     def update(self, other):
         """Merge this object with other treesummary"""
 
+        self._toposummary_processed = False
+
         # Superclass method takes care of updating:
         # tree_count, tree_weight_sum, and bipartsummary
         TreeSummary.update(self, other)
 
         # Merge other.toposummary with self.toposummary
-        for topology in other.toposummary:
+        for topology in other._toposummary:
             # If topology already in self.toposummary, update count
-            if topology in self.toposummary:
-                self.toposummary[topology].weight += other.toposummary[topology].weight
+            if topology in self._toposummary:
+                self._toposummary[topology].weight += other._toposummary[topology].weight
             # If topology has never been seen before, simply transfer entry
             else:
-                self.toposummary[topology]=other.toposummary[topology]
+                self._toposummary[topology]=other._toposummary[topology]
 
     ###############################################################################################
 
@@ -3421,10 +3434,6 @@ class BigTreeSummary(TreeSummary):
 
     def compute_topofreq(self):
         """Compute freq for topologies, add attribute to Topostructs"""
-
-        for topostruct in self.toposummary.values():
-            topostruct.freq = topostruct.weight / self.tree_weight_sum
-
 
 ###################################################################################################
 ###################################################################################################
