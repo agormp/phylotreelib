@@ -3188,7 +3188,7 @@ class TreeSummary():
         """TreeSummary constructor. Initializes relevant data structures"""
         self.tree_count = 0
         self.tree_weight_sum = 0.0
-        self.bipartsummary = {}        # Main repository for bipartition info
+        self.bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
         if not interner:
             self.interner = Interner()
         else:
@@ -3345,11 +3345,8 @@ class TreeSummary():
     def compute_bipfreq(self, digits=3):
         """Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs"""
 
-        self.bipfreqlist = []
         for bipartition, branch in self.bipartsummary.items():
             branch.freq = branch.SUMW / self.tree_weight_sum
-            self.bipfreqlist.append((branch.freq, bipartition))
-        self.bipfreqlist.sort(reverse=True)
 
     ###############################################################################################
 
