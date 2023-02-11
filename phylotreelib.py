@@ -1857,12 +1857,14 @@ class Tree():
             #   if more than 2 members: also add intnode2 to list of unresolved nodes
             # After this, intnode1 is resolved (two branches emanating from it)
             if subset1_size > 1:
-                intnode2 = self.insert_node(intnode1, subset1)
+                branchstruct = Branchstruct()
+                intnode2 = self.insert_node(intnode1, subset1, branchstruct)
                 if subset1_size > 2:
                     unresolved_nodes.append(intnode2)
 
             if subset2_size > 1:
-                intnode2 = self.insert_node(intnode1, subset2)
+                branchstruct = Branchstruct()
+                intnode2 = self.insert_node(intnode1, subset2, branchstruct)
                 if subset2_size > 2:
                     unresolved_nodes.append(intnode2)
 
@@ -1988,7 +1990,8 @@ class Tree():
 
         # Add new intnode on branch in tree1 where tree2 is to be grafted
         parent1 = self.parent(node1)
-        graftpoint = self.insert_node(parent1, [node1], branchlength=blen1)
+        branchstruct = Branchstruct(length=blen1)
+        graftpoint = self.insert_node(parent1, [node1], branchstruct)
 
         # If node2 is not given: set to root node of tree2
         if node2 is None:
@@ -2147,11 +2150,12 @@ class Tree():
 
     ###############################################################################################
 
-    def insert_node(self,parent,childnodes,branchlength=0, lab=""):
-        """Inserts an extra node between parent and children listed in childnodes list.
-
-        Length of inserted branch is 'branchlength' and defaults to zero. The node number
-        of the new node is returned"""
+    def insert_node(self, parent, childnodes, branchstruct):
+        """Inserts an extra node between parent and children listed in childnodes list
+        (so childnodes are now attached to newnode instead of parent).
+        The branchstruct is attached to the branch between parent and newnode.
+        Branches to childnodes retain their original branchstructs.
+        The node number of the new node is returned"""
 
         if parent not in self.nodes:
             msg = f"Node {parent} does not exist"
@@ -2165,8 +2169,7 @@ class Tree():
         tree[newnode] = {}
 
         # Add new internal node as child of "parent"
-        # Python note: should handle additional branchstruct attributes if present!
-        tree[parent][newnode] = Branchstruct(length = branchlength, label=lab)
+        tree[parent][newnode] = branchstruct
 
         # Move childnodes from previous parent to new node
         for child in childnodes:
@@ -2212,8 +2215,10 @@ class Tree():
         # In the special case of a star tree: add two new internal nodes, and move each half of
         # bipartition away from root (branch length will be divided equally between two branches)
         if len(self.intnodes) == 1:
-            self.insert_node(self.root, part1, branchstruct.length/2, branchstruct.label)
-            self.insert_node(self.root, part2, branchstruct.length/2, branchstruct.label)
+            branchstruct1 = Branchstruct(length=branchstruct.length/2, label=branchstruct.label)
+            branchstruct2 = Branchstruct(length=branchstruct.length/2, label=branchstruct.label)
+            self.insert_node(self.root, part1, branchstruct1)
+            self.insert_node(self.root, part2, branchstruct2)
 
         # In all other cases: one part of bipartition will necessarily have root as its MRCA
         #       (because its members are present on both sides of root).
@@ -2237,7 +2242,7 @@ class Tree():
                     movelist.append(child)
 
             # Add branch at determined position: Note - this takes care of updating parent_dict
-            self.insert_node(insertpoint, movelist, branchstruct.length, branchstruct.label)
+            self.insert_node(insertpoint, movelist, branchstruct)
 
         # Clear lru_caches (which cannot be edited manually)
         #self.remote_children.cache_clear()
@@ -2809,8 +2814,8 @@ class Tree():
                 msg = "Node {} and {} are not neighbors in tree".format(node1, node2)
                 raise TreeError(msg)
 
-            newroot = self.insert_node(parent, [child],
-                                       parent_to_root_dist, self.tree[parent][child].label)
+            branchstruct = Branchstruct(length=parent_to_root_dist, label=self.tree[parent][child].label)
+            newroot = self.insert_node(parent, [child], branchstruct)
             self.tree[newroot][child].length = root_to_child_dist
 
         # Things that were already downstream of newroot do not need to be moved, but things that
@@ -3974,7 +3979,8 @@ class Distmatrix(object):
             dist_12 = dmat[i1,i2]
             udist_1 = udist[i1]
             udist_2 = udist[i2]
-            newnode = njtree.insert_node(rootnode, [nb1, nb2])
+            branchstruct = Branchstruct()
+            newnode = njtree.insert_node(rootnode, [nb1, nb2], branchstruct)
             dist1 = 0.5 * dist_12 + 0.5 * (udist_1 - udist_2) / (n - 2)
             dist2 = 0.5 * dist_12 + 0.5 * (udist_2 - udist_1) / (n - 2)
             njtree.setlength(newnode, nb1, dist1)
@@ -4036,7 +4042,8 @@ class Distmatrix(object):
             n2 = ix2name[i2]
 
             # Connect two nearest nodes on tree (insert new node below them)
-            newnode = upgmatree.insert_node(rootnode, [n1, n2])
+            branchstruct = Branchstruct()
+            newnode = upgmatree.insert_node(rootnode, [n1, n2], branchstruct)
             depth_12 = dmat[i1,i2]/2
             dist_new1 = depth_12 - depth[i1]
             dist_new2 = depth_12 - depth[i2]
