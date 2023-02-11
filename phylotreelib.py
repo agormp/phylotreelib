@@ -2194,7 +2194,7 @@ class Tree():
 
     ###############################################################################################
 
-    def add_branch(self, bipart, blen=0.0, label=""):
+    def add_branch(self, bipart, branchstruct):
         """Adds branch represented by bipartition to unresolved tree."""
 
         # NOTE: huge overlap with TreeFromBiplist - should use this function there as well!
@@ -2212,8 +2212,8 @@ class Tree():
         # In the special case of a star tree: add two new internal nodes, and move each half of
         # bipartition away from root (branch length will be divided equally between two branches)
         if len(self.intnodes) == 1:
-            self.insert_node(self.root, part1, branchlength=blen/2, lab=label)
-            self.insert_node(self.root, part2, branchlength=blen/2, lab=label)
+            self.insert_node(self.root, part1, branchstruct.length/2, branchstruct.label)
+            self.insert_node(self.root, part2, branchstruct.length/2, branchstruct.label)
 
         # In all other cases: one part of bipartition will necessarily have root as its MRCA
         #       (because its members are present on both sides of root).
@@ -2237,7 +2237,7 @@ class Tree():
                     movelist.append(child)
 
             # Add branch at determined position: Note - this takes care of updating parent_dict
-            self.insert_node(insertpoint, movelist, branchlength=blen, lab=label)
+            self.insert_node(insertpoint, movelist, branchstruct.length, branchstruct.label)
 
         # Clear lru_caches (which cannot be edited manually)
         #self.remote_children.cache_clear()
@@ -3354,7 +3354,8 @@ class TreeSummary():
                 if contree.is_compatible_with(bipart):
                     blen = self.bipartsummary[bipart].length
                     label= f"{self.bipartsummary[bipart].freq:.{labeldigits}f}"
-                    contree.add_branch(bipart, blen, label)
+                    branchstruct = Branchstruct(length=blen, label=label)
+                    contree.add_branch(bipart, branchstruct)
 
         return contree
 
