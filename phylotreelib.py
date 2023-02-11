@@ -379,6 +379,7 @@ class Tree():
         maxnode = 0
 
         # Start by building star-tree, this is resolved branch-by-branch later on
+        # Python note: use startree constructor?
         for leaf in obj.leaves:
             obj.tree[0][leaf]= None
 
@@ -1845,6 +1846,7 @@ class Tree():
 
             # Divide children into two random subsets
             # Note: subsets can contain mix of leaves and intnodes
+            # Python note: is it just as random, and simpler, to do one at a time?
             subset1_size = random.randint(1, len(kids) - 1)
             subset1 = random.sample(kids, subset1_size)
             subset2 = set(kids) - set(subset1)
@@ -2151,21 +2153,19 @@ class Tree():
         Length of inserted branch is 'branchlength' and defaults to zero. The node number
         of the new node is returned"""
 
+        if parent not in self.nodes:
+            msg = f"Node {parent} does not exist"
+            raise TreeError(msg)
+
         # Local copies for faster access
         tree = self.tree
         parent_dict = self.parent_dict
 
-        if parent not in self.nodes:
-            msg = "Node %d does not exist" % parent
-            raise TreeError(msg)
-
-        # Find next un-used node number
         newnode = max(self.intnodes) + 1
-
-        # Add entry for new node in tree
         tree[newnode] = {}
 
         # Add new internal node as child of "parent"
+        # Python note: should handle additional branchstruct attributes if present!
         tree[parent][newnode] = Branchstruct(length = branchlength, label=lab)
 
         # Move childnodes from previous parent to new node
@@ -2754,6 +2754,8 @@ class Tree():
             else:
                 lab = lab1                  # If agree pick 1, if disagree: pick 1 randomly
 
+            # Python note: should handle situation where Branchstruct has additional attributes
+            # Use introspection to find attributes and combine intelligently?
             if kid1 in self.intnodes:
                 self.tree[kid1][kid2] = Branchstruct(length = distsum, label = lab)
                 self.root = kid1
@@ -2825,6 +2827,7 @@ class Tree():
             self.parent_dict[oldparent] = newparent
 
         # Clean up: clear caches, which are now unreliable
+        # Python note: replace with lazy evaluation, using @property?
         #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
         self.sorted_intnode_cache = None
@@ -3198,6 +3201,11 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def __len__(self):
+        return self.tree_count
+
+    ###############################################################################################
+
     @property
     def bipartsummary(self):
         """Property method for lazy evaluation of freq, var, and sem for branches"""
@@ -3452,7 +3460,7 @@ class BigTreeSummary(TreeSummary):
 
         # Build tree from bipartitions  in new bipdict
         maxcredtree = Tree.from_biplist(maxcredbipdict)
-        return maxcredtree
+        return maxcredtree, maxlogcred
 
 ###################################################################################################
 ###################################################################################################
