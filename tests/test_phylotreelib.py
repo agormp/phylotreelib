@@ -1176,7 +1176,8 @@ class TreeChanging(TreeTestBase):
                             frozenset(["D", "E"])])
         pre_nodes = copy.copy(mytree.nodes)           # Copy mutable
 
-        mytree.add_branch(bipart1, 0.222, "First_branch")
+        branchstruct = pt.Branchstruct(length=0.222, label="First_branch")
+        mytree.add_branch(bipart1, branchstruct)
         anc1 = mytree.parent("A")
         anc2 = mytree.parent("C")
         root = mytree.root
@@ -1191,7 +1192,8 @@ class TreeChanging(TreeTestBase):
         self.assertEqual(len(pre_nodes) + 2, len(mytree.nodes))
         self.assertTrue(pre_nodes < mytree.nodes)
 
-        mytree.add_branch(bipart2, 0.333, "Second_branch")
+        branchstruct = pt.Branchstruct(length=0.333, label="Second_branch")
+        mytree.add_branch(bipart2, branchstruct)
         anc3 = mytree.parent("D")
         anc4 = mytree.parent(anc3)
         # print("\n##############################################\nIn test_addbranch\n\n")
