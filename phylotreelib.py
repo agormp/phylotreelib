@@ -3328,7 +3328,7 @@ class TreeSummary():
         conbipdict = {}
         for bip, branch in self.bipartsummary.items():
             if branch.freq > cutoff:
-                branch.label = f"{round(branch.freq, labeldigits)}"
+                branch.label = f"{branch.freq:.{labeldigits}f}"
                 conbipdict[bip] = branch
 
         # Build tree from bipartitions  in new bipdict
@@ -3345,7 +3345,7 @@ class TreeSummary():
             for _, bipart in freqbiplist:
                 if contree.is_compatible_with(bipart):
                     blen = self.bipartsummary[bipart].length
-                    label= "{:.3g}".format(self.bipartsummary[bipart].freq)
+                    label= f"{self.bipartsummary[bipart].freq:.{labeldigits}f}"
                     contree.add_branch(bipart, blen, label)
 
         return contree
