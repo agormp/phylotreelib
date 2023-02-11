@@ -3424,16 +3424,35 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def get_toposummary(self):
-        """Return summary of topologies as dict: {topology:Topostruct}"""
+    def log_clade_credibility(self, topology, bipartsummary):
+        """Compute log clade credibility for topology (sum of log(freq) for all branches)"""
 
-        self.compute_topofreq()
-        return self.toposummary
+        logsum = 0.0
+        for bipartition in topology:
+            logsum += math.log(bipartsummary[bipartition].freq)
+        return logsum
 
     ###############################################################################################
 
-    def compute_topofreq(self):
-        """Compute freq for topologies, add attribute to Topostructs"""
+    def max_clade_cred_tree(self, labeldigits=3):
+        """Find and return maximum clade credibility tree"""
+
+        maxlogcred = -math.inf
+        for topology in self.toposummary:
+            logcred = self.log_clade_credibility(topology, self.bipartsummary)
+            if logcred > maxlogcred:
+                maxlogcred = logcred
+                maxlogcredtopo = topology
+
+        maxcredbipdict = {}
+        for bipartition in maxlogcredtopo:
+            branch = self.bipartsummary[bipartition]
+            branch.label = f"{round(branch.freq, labeldigits)}"
+            maxcredbipdict[bipartition] = branch
+
+        # Build tree from bipartitions  in new bipdict
+        maxcredtree = Tree.from_biplist(maxcredbipdict)
+        return maxcredtree
 
 ###################################################################################################
 ###################################################################################################
