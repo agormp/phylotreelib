@@ -204,12 +204,33 @@ class Tree():
     # The main constructor "__init__" is therefore mostly empty
 
     def __init__(self):
-        self.parent_dict = None         # Dict node:parent relationships (only built if required)
+        self._parent_dict = None         # Dict node:parent relationships (only built if required)
         self.dist_dict = None
         self.path_dict = None
         self.sorted_intnode_cache = None
 
     ###############################################################################################
+
+    @property
+    def parent_dict(self):
+        """Lazy evaluation of _parent_dict when needed"""
+        if self._parent_dict == None:
+            self.build_parent_dict()
+        return self._parent_dict
+
+    ###############################################################################################
+
+    def build_parent_dict(self):
+        """Constructs _parent_dict enabling faster lookups, when needed"""
+
+        self._parent_dict = {}
+        for parent in self.intnodes:
+            for child in self.tree[parent]:
+                self._parent_dict[child] = parent
+        self._parent_dict[self.root] = None     # Add special value "None" as parent of root
+
+    ###############################################################################################
+
     @classmethod
     def from_string(cls, orig_treestring, transdict=None):
         """Constructor: Tree object from tree-string in Newick format"""
