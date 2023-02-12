@@ -2800,6 +2800,10 @@ class Tree():
             if node2 is None:
                 msg = "Need to specify node2 to reroot() method when rooting at bifurcation"
                 raise TreeError(msg)
+            if node1dist > self.nodedist(node1,node2):
+                msg = ("Parameter node1dist too large:\n"
+                       + f"    node1dist = {node1dist} > dist(node1, node2) = {self.nodedist(node1,node2)}")
+                raise TreeError(msg)
             if node1 == self.parent(node2):
                 parent = node1
                 child = node2
