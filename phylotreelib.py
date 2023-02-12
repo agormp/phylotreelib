@@ -1276,6 +1276,10 @@ class Tree():
 
         # Python note: make recursive to gain advantage of keeping intermediate nodedists in cache?
 
+        # Special case when node1 == node2:
+        if node1 == node2:
+            return 0.0
+
         # Node2 defaults to root if not given
         if node2 is None:
             node2 = self.root
@@ -1284,10 +1288,6 @@ class Tree():
         root = self.root
         pdict = self.parent_dict
         tree = self.tree
-
-        # Special case when node1 == node2:
-        if node1 == node2:
-            return 0.0
 
         # Find path from node1 back to root Keep track of cumulated distances along the way
         child1 = node1
