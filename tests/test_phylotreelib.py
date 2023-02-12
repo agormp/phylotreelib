@@ -859,7 +859,7 @@ class TreeOutput(TreeTestBase):
         treesummary = pt.TreeSummary()
         rand_tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
         for i in range(10):
-            tree = copy.deepcopy(rand_tree)
+            tree = rand_tree.copy_treeobject()
             most_distant, maxdist = tree.find_most_distant(tree.root, tree.leaves)
             parent = tree.parent(most_distant)
             grandparent = tree.parent(parent)
