@@ -767,7 +767,7 @@ class Tree():
         Caches and any user-added attributes are not copied.
         Similar to effect of copy.deepcopy but customized and much faster"""
 
-        # Python note: should add branch label in if else like length
+        # Python note: reconsider copying attributes besides blen and lab?
         obj = Tree()
         obj.root = self.root
         obj.leaves = self.leaves.copy()
