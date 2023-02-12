@@ -2808,11 +2808,11 @@ class Tree():
                 parent = node1
                 child = node2
                 parent_to_root_dist = node1dist
-                root_to_child_dist = self.tree[parent][child].length - node1dist
+                root_to_child_dist = self.nodedist(node1,node2) - node1dist
             elif node2 == self.parent(node1):
                 parent = node2
                 child = node1
-                parent_to_root_dist = self.tree[parent][child].length - node1dist
+                parent_to_root_dist = self.nodedist(node1,node2) - node1dist
                 root_to_child_dist = node1dist
             else:
                 msg = "Node {} and {} are not neighbors in tree".format(node1, node2)
