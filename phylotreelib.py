@@ -2799,6 +2799,8 @@ class Tree():
     def reroot(self, node1, node2=None, polytomy=False, node1dist=0.0):
         """Places new root on branch between node1 and node2, node1dist from node1"""
 
+        self.build_parent_dict()  #Temporary hack: implement as @property with lazy evaluation!
+
         # If tree is to be rooted at basal polytomy, then node1 (base of outgroup) is the new root
         if polytomy:
             newroot = node1
@@ -2835,14 +2837,13 @@ class Tree():
             newbranch.length = parent_to_root_dist
             newroot = self.insert_node(parent, [child], newbranch)
             self.tree[newroot][child].length = root_to_child_dist
+            self.build_parent_dict()  #Temporary hack: implement as @property with lazy evaluation!
 
         # Things that were already downstream of newroot do not need to be moved, but things that
         # were previously upstream need to be moved downstream, which is done by reversing the
         # links on the direct path going back from newroot to oldroot
         oldroot = self.root
         path_to_old = self.nodepath(newroot, oldroot)
-        if self.parent_dict is None:
-            self.build_parent_dict()
         for i in range( len(path_to_old) - 1 ):
             newparent, oldparent = path_to_old[i], path_to_old[i+1]
             self.tree[newparent][oldparent] = self.tree[oldparent][newparent]
