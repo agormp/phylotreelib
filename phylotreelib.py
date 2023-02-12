@@ -164,6 +164,17 @@ class Branchstruct():
         self.length = length
         self.label = label
 
+    ###############################################################################################
+
+    def copy(self):
+        """Returns copy of Branchstruct object, with all attributes included"""
+
+        # Python note: reconsider copying attributes besides blen and lab?
+        obj = Branchstruct()
+        for attrname, value in vars(self).items():
+            setattr(obj, attrname, value)
+        return obj
+
 ###################################################################################################
 ###################################################################################################
 
