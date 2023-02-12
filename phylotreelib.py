@@ -282,7 +282,6 @@ class Tree():
         obj.leaves = set()             # Set of leaf names. For speedy lookups
         obj.intnodes = set()           # Set of internal node IDs. For speedy lookups
         obj.root = 0                   # Root is node zero at start. (May change)
-        obj.parent_dict = {}
         obj.belowroot = None
 
         # Preprocess parts list to remove and store any labels or lengths below root node
@@ -312,7 +311,6 @@ class Tree():
                 if nodeno != 0:                 # If we are not at the root then add new node
                     parent = node_stack[-1]     # to previous node's list of children
                     obj.tree[parent][nodeno] = Branchstruct()
-                    obj.parent_dict[nodeno] = parent   # Build parent_dict as nodes are added
 
                 node_stack.append(nodeno)       # Push new node onto stack
                 obj.intnodes.add(nodeno)       # Add node to list of internal nodes
@@ -361,7 +359,6 @@ class Tree():
 
                 parent=node_stack[-1]                      # Add new leaf node to previous node's
                 obj.tree[parent][child] = Branchstruct()   # list of children
-                obj.parent_dict[child] = parent            # Build parent_dict as nodes are added
 
                 node_stack.append(child)                   # Push new leaf node onto stack
                 obj.leaves.add(child)                      # Also update list of leaves
@@ -369,8 +366,6 @@ class Tree():
                 part = "leafname"
 
             prevpart = part
-
-        obj.parent_dict[obj.root] = None
 
         # If nodes remain on stack after parsing, then something was wrong with tree-string
         if node_stack:
@@ -596,7 +591,6 @@ class Tree():
         obj.tree = {}
         obj.leaves = set()
         obj.intnodes = set()
-        obj.parent_dict = {}
 
         for i in range(nbranches):
             parent = parentlist[i]     # Perhaps check types are OK?
@@ -607,7 +601,6 @@ class Tree():
                 obj.tree[parent][child] = Branchstruct(blen, lab)
             else:
                 obj.tree[parent] = { child:Branchstruct(blen, lab) }
-            obj.parent_dict[child] = parent
             obj.intnodes.add(parent)
             if isinstance(child, str):
                 obj.leaves.add(child)
@@ -794,7 +787,6 @@ class Tree():
         obj.leaves = self.leaves.copy()
         obj.intnodes = self.intnodes.copy()
         obj.nodes = self.nodes.copy()
-        obj.parent_dict = self.parent_dict.copy()
         obj.tree = {}
         origtree = self.tree
         newtree = obj.tree
@@ -811,16 +803,6 @@ class Tree():
                     lab = ""
                 newtree[parent][child] = Branchstruct(blen,lab)
         return obj
-
-    ###############################################################################################
-
-    def build_parent_dict(self):
-        """Forces construction of parent_dict enabling faster lookups"""
-        self.parent_dict = {}
-        for parent in self.intnodes:
-            for child in self.tree[parent]:
-                self.parent_dict[child] = parent
-        self.parent_dict[self.root] = None     # Add special value "None" as parent of root
 
     ###############################################################################################
 
@@ -1024,16 +1006,10 @@ class Tree():
     def parent(self, node):
         """Returns parent of node"""
 
-        # First time function is run it will build dictionary of node:parent connections
-        # Assumption is that if this function is required once, then it will be used again
-        # and building the dict will pay off. Building the dict should not be the default
-        # behaviour when new tree is constructed
-
-        # Construct parent_dict if it does not exist already
-        if self.parent_dict is  None:
-            self.build_parent_dict()
-
-        # Return parent
+        # Python note: should this be distinct from .parent_dict?
+        # Perhaps to be used for one-offs when I dont want to trigger construction of full dict
+        # Then in code .parent_dict can be used explicitly for when repeated usage is expected
+        # Would then perhaps have to be iteration through intnodes until match found.
         try:
             return self.parent_dict[node]
         except KeyError as err:
@@ -1974,7 +1950,6 @@ class Tree():
         else:
             # Create empty Tree object. Transfer relevant subset of self's data structure to other
             other = Tree()
-            other.parent_dict = None
             other.tree = {}
             other.intnodes = {basenode}
             other.leaves = set()
@@ -1994,8 +1969,6 @@ class Tree():
                     other.leaves.update(leaf_kids)
                 curlevel = nextlevel
             other.nodes = other.leaves | other.intnodes
-
-        other.build_parent_dict()
 
         # Python note: possibly bad idea to have different possible returnvalues.
         # Simplify and deal with it at consumer end
@@ -2060,15 +2033,10 @@ class Tree():
         self.intnodes.update( other.intnodes )
         self.leaves.update( other.leaves )
 
-        # Reset those caches and lists that are too hard to salvage (or... could I?)
+        # Reset caches and lists
         self.sorted_intnode_cache = None
-        self.build_parent_dict()
-
-        # Erase caches
+        self._parent_dict = None
         self.sorted_intnode_cache = None
-
-        # Clear lru_caches (which cannot be edited manually)
-        #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
 
@@ -2189,13 +2157,14 @@ class Tree():
         Branches to childnodes retain their original branchstructs.
         The node number of the new node is returned"""
 
+        self._parent_dict = None
+
         if parent not in self.nodes:
             msg = f"Node {parent} does not exist"
             raise TreeError(msg)
 
         # Local copies for faster access
         tree = self.tree
-        parent_dict = self.parent_dict
 
         newnode = max(self.intnodes) + 1
         tree[newnode] = {}
@@ -2211,12 +2180,6 @@ class Tree():
         # Update self.intnodes and self.nodes to include new node.
         self.intnodes.add(newnode)
         self.nodes.add(newnode)
-
-        # Update self.parent_dict if it exists
-        if parent_dict is not None:
-            for child in childnodes:
-                parent_dict[child] = newnode
-            parent_dict[newnode] = parent
 
         # Erase caches
         self.sorted_intnode_cache = None
@@ -2273,7 +2236,7 @@ class Tree():
                 elif (child not in self.leaves) and (self.remote_children(child) <= active_bip):
                     movelist.append(child)
 
-            # Add branch at determined position: Note - this takes care of updating parent_dict
+            # Add branch at determined position
             self.insert_node(insertpoint, movelist, branchstruct)
 
         # Clear lru_caches (which cannot be edited manually)
@@ -2309,9 +2272,6 @@ class Tree():
         for grandchild in self.children(child):
             self.tree[parent][grandchild] = Branchstruct(self.tree[child][grandchild].length,
                                                          self.tree[child][grandchild].label)
-            # Update parent_dict if it exists
-            if self.parent_dict is not None:
-                self.parent_dict[grandchild] = parent
 
         # Delete "child" node and link from parent to child. Update intnodes and nodes
         del self.tree[child]
@@ -2319,9 +2279,8 @@ class Tree():
         self.intnodes.remove(child)
         self.nodes = self.leaves | self.intnodes
 
-        # Update parent_dict if it exists
-        if self.parent_dict is not None:
-            del self.parent_dict[child]
+        # Python note: would be simple to just update _parent_dict instead of setting to None
+        self._parent_dict = None
 
         # Update self.sorted_intnode_cache if it exists
         if self.sorted_intnode_cache is not None:
@@ -2356,7 +2315,7 @@ class Tree():
             self.intnodes.remove(root)
             self.nodes.remove(root)
             self.root = child2                              # child2 is new root
-            del self.parent_dict[child2]                    # clean up parent_dict
+            del self._parent_dict[child2]                   # clean up parent_dict: Note: not lazy? change?
 
         # If leaf is part of bifurcation but NOT attached directly to root, then parent
         # must also be removed from tree, and the remaining child needs to be grafted
@@ -2631,6 +2590,7 @@ class Tree():
             newname = fixedname
 
         parent = self.parent(oldname)
+        self._parent_dict = None
         self.tree[parent][newname] = self.tree[parent][oldname]
         del self.tree[parent][oldname]
 
@@ -2640,10 +2600,10 @@ class Tree():
         self.nodes.add(newname)
         self.nodes.remove(oldname)
 
-        # Update self.parent_dict if it exists:
-        if self.parent_dict is not None:
-            self.parent_dict[newname] = self.parent_dict[oldname]
-            del self.parent_dict[oldname]
+        # # Update self.parent_dict if it exists:
+        # if self.parent_dict is not None:
+        #     self.parent_dict[newname] = self.parent_dict[oldname]
+        #     del self.parent_dict[oldname]
 
         # Clear lru_caches (which cannot be edited manually)
         #self.remote_children.cache_clear()
@@ -2685,11 +2645,12 @@ class Tree():
         if self.sorted_intnode_cache is not None:
             i = self.sorted_intnode_cache.index(oldnum)
             self.sorted_intnode_cache[i] = newnum
-        if parent is not None:
-            self.parent_dict[newnum] = self.parent_dict[oldnum]
-            del self.parent_dict[oldnum]
-        for child in kidlist:
-            self.parent_dict[child] = newnum
+        self._parent_dict = None
+        # if parent is not None:
+        #     self.parent_dict[newnum] = self.parent_dict[oldnum]
+        #     del self.parent_dict[oldnum]
+        # for child in kidlist:
+        #     self.parent_dict[child] = newnum
 
         # Clear lru_caches (which cannot be edited manually)
         #self.remote_children.cache_clear()
@@ -2811,16 +2772,12 @@ class Tree():
             self.nodedist.cache_clear()
             self.sorted_intnode_cache = None
             self.dist_dict = None
-
-            # Rebuild parent_dict
-            self.build_parent_dict() # Should fix by explicitly using info about root and kids
+            self._parent_dict = None
 
     ###############################################################################################
 
     def reroot(self, node1, node2=None, polytomy=False, node1dist=0.0):
         """Places new root on branch between node1 and node2, node1dist from node1"""
-
-        self.build_parent_dict()  #Temporary hack: implement as @property with lazy evaluation!
 
         # If tree is to be rooted at basal polytomy, then node1 (base of outgroup) is the new root
         if polytomy:
@@ -2858,7 +2815,6 @@ class Tree():
             newbranch.length = parent_to_root_dist
             newroot = self.insert_node(parent, [child], newbranch)
             self.tree[newroot][child].length = root_to_child_dist
-            self.build_parent_dict()  #Temporary hack: implement as @property with lazy evaluation!
 
         # Things that were already downstream of newroot do not need to be moved, but things that
         # were previously upstream need to be moved downstream, which is done by reversing the
@@ -2869,13 +2825,14 @@ class Tree():
             newparent, oldparent = path_to_old[i], path_to_old[i+1]
             self.tree[newparent][oldparent] = self.tree[oldparent][newparent]
             del self.tree[oldparent][newparent]
-            self.parent_dict[oldparent] = newparent
+            # self.parent_dict[oldparent] = newparent
 
         # Clean up: clear caches, which are now unreliable
         # Python note: replace with lazy evaluation, using @property?
         #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
         self.sorted_intnode_cache = None
+        self._parent_dict = None
 
         # Update root info:
         self.root = newroot
