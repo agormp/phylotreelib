@@ -2829,8 +2829,11 @@ class Tree():
                 msg = "Node {} and {} are not neighbors in tree".format(node1, node2)
                 raise TreeError(msg)
 
-            branchstruct = Branchstruct(length=parent_to_root_dist, label=self.tree[parent][child].label)
-            newroot = self.insert_node(parent, [child], branchstruct)
+            # New branch (from parent to newroot) will inherit all attributes from original branch
+            # (from parent to child), except for length, which is split between the two branches
+            newbranch = self.tree[parent][child].copy()
+            newbranch.length = parent_to_root_dist
+            newroot = self.insert_node(parent, [child], newbranch)
             self.tree[newroot][child].length = root_to_child_dist
 
         # Things that were already downstream of newroot do not need to be moved, but things that
