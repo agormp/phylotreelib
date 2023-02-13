@@ -3219,8 +3219,8 @@ class TreeSummary():
                     branch.var = branch.T * n / ((n - 1) * branch.SUMW)
                     branch.sem = math.sqrt(branch.var)/math.sqrt(n)
                 else:
-                    branch.var = 9999999
-                    branch.sem = 9999999
+                    branch.var = "NA"
+                    branch.sem = "NA"
             self._bipartsummary_processed = True
 
         return self._bipartsummary
