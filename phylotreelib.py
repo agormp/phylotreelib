@@ -2921,7 +2921,10 @@ class Tree():
                 a = 1 - beta**2
                 b = alpha - (2*STu*beta / n)
                 c = distvar[u]
-                x = -b / (2*a)                  # Equation 4. x = distance from parent on branch
+                if a != 0:
+                    x = -b / (2*a)                  # Equation 4. x = distance from parent on branch
+                else:
+                    x = -math.inf                   # Indicator value to show no root in polynomium
                 if 0 < x < ev:
                     xvar = a*x**2 + b*x + c
                 elif distvar[u] < distvar[v]:
