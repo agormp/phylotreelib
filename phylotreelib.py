@@ -12,6 +12,7 @@ import re
 import statistics
 import sys
 from io import StringIO
+from operator import itemgetter
 import numpy as np
 
 ###################################################################################################
@@ -3190,6 +3191,7 @@ class TreeSummary():
         self.tree_weight_sum = 0.0
         self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
+        self._sorted_biplist = None
         if not interner:
             self.interner = Interner()
         else:
@@ -3222,10 +3224,40 @@ class TreeSummary():
 
     ###############################################################################################
 
+    @property
+    def sorted_biplist(self):
+        """Return list of bipartitions.
+        First external (leaf) bipartitions sorted by leafname.
+        Then internal bipartitions sorted by freq"""
+
+        if self._sorted_biplist = None:
+            leafbips = []
+            internalbips = []
+
+            for bip, branch in self.bipartsummary.items():
+                bip1,bip2 = bip
+                if len(bip1) == 1:
+                    leafname = next(iter(bip1))
+                    leafbips.append((leafname, bip))
+                elif len(bip2) == 1:
+                    leafname = next(iter(bip1))
+                    leafbips.append((leafname, bip))
+                else:
+                    internalbips.append((branch.freq,bip))
+
+            leafbips = sorted(leafbips, key=itemgetter(0))
+            internalbips = sorted(internalbips, keys=itemgetter(0), reverse=True)
+            self._sorted_biplist = leafbips + internalbips
+
+        return self._sorted_biplist
+
+    ###############################################################################################
+
     def add_tree(self, curtree, weight=1.0):
         """Add tree object to treesummary, update all relevant bipartition summaries"""
 
         self._bipartsummary_processed = False
+        self._sorted_biplist = None
 
         # Main interface to TreeSummary.
         # Takes tree object, updates relevant measures
@@ -3319,6 +3351,7 @@ class TreeSummary():
                 self_bipsum[bipart] = other_bipsum[bipart]
 
         self._bipartsummary_processed = False
+        self._sorted_biplist = None
 
     ###############################################################################################
 
