@@ -3246,10 +3246,23 @@ class TreeSummary():
                     internalbips.append((branch.freq,bip))
 
             leafbips = sorted(leafbips, key=itemgetter(0))
-            internalbips = sorted(internalbips, keys=itemgetter(0), reverse=True)
+            internalbips = sorted(internalbips, key=itemgetter(0), reverse=True)
             self._sorted_biplist = leafbips + internalbips
 
         return self._sorted_biplist
+
+    ###############################################################################################
+
+    def add_branchid(self):
+        """Adds attribute .branchID to all bipartitions in .bipartsummary
+        External bipartitions are labeled with the leafname.
+        Internal bipartitions are labeled with consecutive numbers by decreasing frequency"""
+
+        for freqrank, (sortkey,bipart) in enumerate(self.sorted_biplist):
+            if type(sortkey) == str:
+                self.bipartsummary[bipart].branchID = sortkey
+            else:
+                self.bipartsummary[bipart].branchID = freqrank
 
     ###############################################################################################
 
