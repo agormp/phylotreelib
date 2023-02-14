@@ -3282,8 +3282,6 @@ class TreeSummary():
     def update(self, other):
         """Merge this object with external treesummary"""
 
-        self._bipartsummary_processed = False
-
         # Sanity check: do two treesummaries refer to same set of leaves?
         if self.leaves != other.leaves:
             msg = "Not all trees have same set of leaves."
@@ -3294,8 +3292,8 @@ class TreeSummary():
         self.tree_weight_sum += other.tree_weight_sum
 
         # Merge "treesummary.bipartsummary" with "self.bipartsummary"
-        other_bipsum = other._bipartsummary
-        self_bipsum = self._bipartsummary
+        other_bipsum = other.bipartsummary
+        self_bipsum = self.bipartsummary
 
         for bipart in other_bipsum:
             # If bipart already in self.bipartsummary, update fields
@@ -3319,6 +3317,8 @@ class TreeSummary():
             # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
             else:
                 self_bipsum[bipart] = other_bipsum[bipart]
+
+        self._bipartsummary_processed = False
 
     ###############################################################################################
 
