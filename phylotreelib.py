@@ -916,10 +916,11 @@ class Tree():
 
     def is_bifurcation(self, node):
         """Checks if internal node is at bifurcation (has two children)"""
-        if node in self.leaves:
+        try:
+            nkids = len(self.children(node))
+            return (nkids == 2)
+        except:
             raise TreeError("Node is leaf. Can't check for bifurcation when no children")
-        kids = self.children(node)
-        return (len(kids) == 2)
 
     ###############################################################################################
 
@@ -1814,24 +1815,15 @@ class Tree():
     def is_resolved(self):
         """Checks whether tree is fully resolved (no polytomies)"""
 
-        n_rootkids = len(self.children(self.root))
         n_leaves = len(self.leaves)
         n_nodes = n_leaves + len(self.intnodes)
 
-        # If root is a bifurcation, and tree resolved, then n_nodes = 2 * n_leaves - 1
-        if (n_rootkids == 2) and (n_nodes < (2 * n_leaves - 1)):
-            return False
+        if self.is_bifurcation(self.root):
+            maxnodes = 2 * n_leaves - 1
+        else:
+            maxnodes = 2 * n_leaves - 2
 
-        # If root is a trifurcation and tree is resolved, then n_nodes = 2 * n_leaves - 2
-        if (n_rootkids == 3) and (n_nodes < (2 * n_leaves - 2)):
-            return False
-
-        # If root has more than 3 kids, then tree is not resolved
-        if n_rootkids > 3:
-            return False
-
-        # If we made it this far, then tree is resolved
-        return True
+        return(n_nodes == maxnodes)
 
     ###############################################################################################
 
