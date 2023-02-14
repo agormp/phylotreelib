@@ -3230,7 +3230,7 @@ class TreeSummary():
         First external (leaf) bipartitions sorted by leafname.
         Then internal bipartitions sorted by freq"""
 
-        if self._sorted_biplist = None:
+        if self._sorted_biplist == None:
             leafbips = []
             internalbips = []
 
