@@ -3453,12 +3453,12 @@ class TreeSummary():
         # If allcompat has been requested: add remaining, compatible bipartitions to contree
         if allcompat:
             for j in range(i, len(self.sorted_biplist)):
-                if self.is_resolved():
+                if contree.is_resolved():
                     break
                 _,bip = self.sorted_biplist[j]
                 branch = self.bipartsummary[bip]
                 branch.label= f"{branch.freq:.{labeldigits}f}"
-                is_present, is_compatible, insert_tuple = self.check_bip_compatibility(bip)
+                is_present, is_compatible, insert_tuple = contree.check_bip_compatibility(bip)
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
