@@ -2189,7 +2189,6 @@ class Tree():
         """Adds branch represented by bipartition to unresolved tree."""
 
         # NOTE: huge overlap with TreeFromBiplist - should use this function there as well!
-        # NOTE: this function should really take Branchstruct as argument instead of len,lab
 
         # Sanity check: is bipartition compatible with tree?
         if not self.is_compatible_with(bipart):
@@ -3387,18 +3386,12 @@ class TreeSummary():
 
         # If allcompat has been requested: add remaining, compatible bipartitions to contree
         if allcompat:
-
-            # Construct sorted list of tuples: (frequency, bipart)
-            freqbiplist = [(self.bipartsummary[b].freq, b) for b in self.bipartsummary]
-            freqbiplist.sort(reverse=True)
-
-            # Iterate over sorted list, adding most frequent, compatible bipartitions first
-            for _, bipart in freqbiplist:
-                if contree.is_compatible_with(bipart):
-                    blen = self.bipartsummary[bipart].length
-                    label= f"{self.bipartsummary[bipart].freq:.{labeldigits}f}"
-                    branchstruct = Branchstruct(length=blen, label=label)
-                    contree.add_branch(bipart, branchstruct)
+            for _, bipart in self.sorted_biplist:
+                if self.is_resolved():
+                    break
+                branch = self.bipartsummary[bipart]
+                branch.label= f"{branch.freq:.{labeldigits}f}"
+                contree.add_branch_if_compatible(bipart, branchstruct)
 
         return contree
 
