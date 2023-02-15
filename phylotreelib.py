@@ -1794,22 +1794,64 @@ class Tree():
     ###############################################################################################
 
     def is_compatible_with(self, bipart):
-        """Checks whether a given bipartition is compatible with the tree"""
+        """Checks whether a given bipartition is compatible with the tree.
+        Possible return values:
+            False:
+                bipartition was not compatible with tree
+            True:
+                bipartition was compatible, and already present in tree
+            Tuple of (parentnode, childnodelist):
+                bipartition was compatible (not present, but could be added)
+                tuple (which is truth-ish) describes where bipartition fits in.
+                tuple can be used as parameters to the insert_node() function.
+        """
 
-        # A bipartition is compatible with a tree if, for all bipartitions in the tree,
-        # one half of the query bipart is a subset of one half of the tree bipart.
-        query1, query2 = bipart
-        topo = self.topology()
+        bip1, bip2 = bipart
+        if (bip1 | bip2) != self.leaves:
+            raise TreeError("Bipartition has different set of leaves than tree")
 
-        for bipartition in topo:
-            tree1, tree2 = bipartition
+        # Special case of startree: all bipartitions are compatible
+        if len(self.intnodes) == 1:
+            return (self.root, bip1)
 
-            # If no query set is a subset of any tree set, then bipart is not compatible with tree
-            if not (query1<=tree1 or query1<=tree2 or query2<=tree1 or query2<=tree2):
-                return False
+        # In all other cases: at least one part of bipartition will necessarily have root as its MRCA
+        # (because its members are present on both sides of root).
+        # It is the other part of the bipartition that can potentially be moved
+        # (Occasionally both parts have root as MRCA, but this will be covered by the more general
+        # solution below)
+        mrca1 = self.find_mrca(bip1)
+        mrca2 = self.find_mrca(bip2)
 
-        # If we fell of the end of the for loop without returning, then bipart must be compatible
-        return True
+        if mrca1 == self.root:
+            insertpoint = mrca2
+            active_bip = bip2
+        else:
+            insertpoint = mrca1
+            active_bip = bip1
+
+        # Determine which of insertpoint's children to move (namely all children
+        # that are either in the active bipartition OR children whose descendants are)
+        movelist = []
+        moveable_descendants = []
+        for child in self.children(insertpoint):
+            if child in active_bip:
+                movelist.append(child)
+                moveable_descendants.append(child)
+            else:
+                remkids = self.remote_children(child)
+                if remkids <= active_bip:
+                    movelist.append(child)
+                    moveable_descendants.extend(remkids)
+
+        # If moveable_descendants != active_bip, then bipartition is not compatible with tree
+        # Otherwise: if insertpoint is at bifurcation, then bipart is already in tree
+        # Final possibility: bipart is compatible but not present: return info about how to add
+        if set(moveable_descendants) != active_bip:
+            return False
+        elif self.is_bifurcation(insertpoint):
+            return True
+        else:
+            return (insertpoint, movelist)
 
     ###############################################################################################
 
@@ -2146,7 +2188,7 @@ class Tree():
     def insert_node(self, parent, childnodes, branchstruct):
         """Inserts an extra node between parent and children listed in childnodes list
         (so childnodes are now attached to newnode instead of parent).
-        The branchstruct is attached to the branch between parent and newnode.
+        The branchstruct will be attached to the branch between parent and newnode.
         Branches to childnodes retain their original branchstructs.
         The node number of the new node is returned"""
 
