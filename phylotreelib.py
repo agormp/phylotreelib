@@ -3438,24 +3438,30 @@ class TreeSummary():
             msg = "Consensus tree cutoff has to be at least 0.5"
             raise TreeError(msg)
 
-        # Create new bipdict, transfer branches with freq>cutoff
+        # Transfer biparts and branches with freq>cutoff to new bipdict, create tree
         conbipdict = {}
-        for bip, branch in self.bipartsummary.items():
-            if branch.freq > cutoff:
-                branch.label = f"{branch.freq:.{labeldigits}f}"
-                conbipdict[bip] = branch
-
-        # Build tree from bipartitions  in new bipdict
+        i = 0
+        for _, bip in self.sorted_biplist:
+            i += 1
+            branch = self.bipartsummary[bip]
+            if branch.freq < cutoff:
+                break
+            branch.label = f"{branch.freq:.{labeldigits}f}"
+            conbipdict[bip] = branch
         contree = Tree.from_biplist(conbipdict)
 
         # If allcompat has been requested: add remaining, compatible bipartitions to contree
         if allcompat:
-            for _, bipart in self.sorted_biplist:
+            for j in range(i, len(self.sorted_biplist)):
                 if self.is_resolved():
                     break
-                branch = self.bipartsummary[bipart]
+                _,bip = self.sorted_biplist[j]
+                branch = self.bipartsummary[bip]
                 branch.label= f"{branch.freq:.{labeldigits}f}"
-                contree.add_branch_if_compatible(bipart, branchstruct)
+                is_present, is_compatible, insert_tuple = self.check_bip_compatibility(bip)
+                if is_compatible and (not is_present):
+                    parentnode, childnodes = insert_tuple
+                    contree.insert_node(parentnode, childnodes, branch)
 
         return contree
 
