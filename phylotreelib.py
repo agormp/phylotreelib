@@ -888,7 +888,7 @@ class Tree():
     def sorted_intnodes(self, deepfirst=True):
         """Returns sorted intnode list for breadth-first traversal of tree"""
 
-        # "intnodelist" is a set, meaning iteration occurs in no defined order.
+        # "intnodes" is a set, meaning iteration occurs in no defined order.
         # This function returns a list sorted such that deep nodes generally go before
         # shallow nodes (deepfirst=False reverses this)
 
@@ -1131,8 +1131,11 @@ class Tree():
 
         min_numkids = len(self.leaves)
         mrca = self.root
-        for node in self.intnodes:
+        for node in self.sorted_intnodes(deepfirst=False):
             remkids = self.remote_children(node)
+            if remkids == leafset:
+                mrca = node
+                break
             if leafset <= remkids:
                 numkids = len(remkids)
                 if numkids < min_numkids:
