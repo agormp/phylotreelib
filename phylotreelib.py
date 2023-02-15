@@ -1793,26 +1793,29 @@ class Tree():
 
     ###############################################################################################
 
-    def is_compatible_with(self, bipart):
-        """Checks whether a given bipartition is compatible with the tree.
-        Possible return values:
-            False:
-                bipartition was not compatible with tree
-            True:
-                bipartition was compatible, and already present in tree
-            Tuple of (parentnode, childnodelist):
-                bipartition was compatible (not present, but could be added)
-                tuple (which is truth-ish) describes where bipartition fits in.
-                tuple can be used as parameters to the insert_node() function.
+    def check_bip_compatibility(self, bipart):
+        """Checks the compatibility between bipartition and tree.
+        Returns tuple of: is_present, is_compatible, insert_tuple
+                where insert_tuple = None or (parentnode, childmovelist)
+        is_present:
+            True if bipartition is already present in tree. Implies "is_compatible = True"
+        is_compatible:
+            True if bipartition is compatible with tree. "is_present" can be True or False
+        insert_tuple:
+            If is_compatible: Tuple of (parentnode, childmovelist) parameters for insert_node
+            If not is_compatible: None
         """
-
         bip1, bip2 = bipart
         if (bip1 | bip2) != self.leaves:
             raise TreeError("Bipartition has different set of leaves than tree")
 
-        # Special case of startree: all bipartitions are compatible
+        # Special case of startree: bip not present, but compatible
+        # Return right away to avoid rest of function being indented...
         if len(self.intnodes) == 1:
-            return (self.root, bip1)
+            is_present = False
+            is_compatible = True
+            insert_tuple = (self.root, bip1)
+            return is_present, is_compatible, insert_tuple
 
         # In all other cases: at least one part of bipartition will necessarily have root as its MRCA
         # (because its members are present on both sides of root).
@@ -1844,12 +1847,18 @@ class Tree():
                     moveable_descendants.extend(remkids)
 
         # If moveable_descendants != active_bip, then bipartition is not compatible with tree
-        # Otherwise: if insertpoint is at bifurcation, then bipart is already in tree
-        # Final possibility: bipart is compatible but not present: return info about how to add
+        # (and not present)
+        # Otherwise: if insertpoint is at bifurcation, then bipart is already present in tree
+        # (and compatible)
+        # Final possibility: bipart is compatible but not present
         if set(moveable_descendants) != active_bip:
-            return False
+            is_present = False
+            is_compatible = False
+            insert_tuple = None
         elif self.is_bifurcation(insertpoint):
-            return True
+            is_present = True
+            is_compatible = True
+            insert_tuple = (insertpoint, movelist)
         else:
             return (insertpoint, movelist)
 
