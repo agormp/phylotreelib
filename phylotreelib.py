@@ -1113,9 +1113,10 @@ class Tree():
 
     ###############################################################################################
 
-    def find_mrca(self, leafset):
+    def find_mrca(self, leaves):
         """Finds Most Recent Common Ancestor for the provided set of leaves"""
 
+        leafset = set(leaves)
         if not leafset <= self.leaves:
             # Construct string listing all entries in leafset (for error message)
             stringlist = []
@@ -1128,19 +1129,15 @@ class Tree():
             msg = "Some nodes in set are not part of tree: %s" % leafstring
             raise TreeError(msg)
 
-        # Build set of all nodes that are ancestral to leafset
-        ancestors = set()
+        min_numkids = len(self.leaves)
+        mrca = self.root
         for node in self.intnodes:
-            if leafset <= self.remote_children(node):
-                ancestors.add(node)
-
-        # Find ancestor with fewest offspring, this is MRCA
-        minoffspring = None
-        for node in ancestors:
-            no_offspring = len(self.remote_children(node))
-            if (minoffspring is None) or (no_offspring < minoffspring):
-                mrca = node
-                minoffspring = no_offspring
+            remkids = self.remote_children(node)
+            if leafset <= remkids:
+                numkids = len(remkids)
+                if numkids < min_numkids:
+                    mrca = node
+                    min_numkids = numkids
 
         return mrca
 
@@ -1166,7 +1163,7 @@ class Tree():
         # Find two most distant leafs in leaflist (which "spread out" subtree).
         # Then find the leaf that has approximately the same distance to these two
         # (interpreted as being in a sense halfway between them...)
-        basenode = self.find_mrca(set(leaflist))
+        basenode = self.find_mrca(leaflist)
         sub = self.subtree(basenode)
         (dist, leaf1, leaf2) = sub.diameter(return_leaves=True)
         smallest_diff = dist       # Pick value certain to be larger than all dist differences
@@ -1497,7 +1494,7 @@ class Tree():
         """Return average or median patristic distance from leaves to their MRCA"""
         # Python note: better to return list of pair distances, which can then be averaged etc.
 
-        ancnode = self.find_mrca(set(leaflist))
+        ancnode = self.find_mrca(leaflist)
         distlist = []
         for leaf in leaflist:
             distlist.append(self.nodedist(leaf, ancnode))
