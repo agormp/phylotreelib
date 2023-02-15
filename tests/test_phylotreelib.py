@@ -1069,7 +1069,7 @@ class Topologytests(TreeTestBase):
                         frozenset([frozenset(["s4", "s1", "s3"]), frozenset(["S5", "s2"])])]
 
         for bip in expectedbips:
-            self.assertTrue(mytree.is_compatible_with(bip))
+            assert mytree.is_compatible_with(bip)
 
         for bip in badbips:
             self.assertFalse(mytree.is_compatible_with(bip))
