@@ -1860,7 +1860,20 @@ class Tree():
             is_compatible = True
             insert_tuple = (insertpoint, movelist)
         else:
-            return (insertpoint, movelist)
+            is_present = False
+            is_compatible = True
+            insert_tuple = (insertpoint, movelist)
+
+        return is_present, is_compatible, insert_tuple
+
+    ###############################################################################################
+
+    def is_compatible_with(self, bipart):
+        """Checks whether a given bipartition is compatible with the tree.
+        Note: also returns True if bipartition is already in tree"""
+
+        is_present, is_compatible, insert_tuple = self.check_bip_compatibility(bipart)
+        return is_compatible
 
     ###############################################################################################
 
