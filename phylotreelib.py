@@ -952,7 +952,7 @@ class Tree():
         leafnamelist = self.leaflist()
         transdict = {}
         for i,leafname in enumerate(leafnamelist):
-            transdict[leafname] = "{}".format(i+1)
+            transdict[leafname] = f"{i+1}"
         return transdict
 
     ###############################################################################################
@@ -960,7 +960,7 @@ class Tree():
     def translateblock(self, transdict):
         translist = ["    translate\n"]
         for number,name in transdict.items():
-            translist.append("        {nam:<4s}  {num}".format(nam=name, num=number,))
+            translist.append(f"        {name:<4s}  number")
             translist.append(",\n")
         translist[-1] = "\n		;\n"
         translateblock = "".join(translist)
@@ -3250,6 +3250,8 @@ class TreeSummary():
 
     def __init__(self, interner=None):
         """TreeSummary constructor. Initializes relevant data structures"""
+        self.transdict = None
+        self.translateblock = None
         self.tree_count = 0
         self.tree_weight_sum = 0.0
         self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
