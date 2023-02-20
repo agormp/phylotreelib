@@ -962,7 +962,7 @@ class Tree():
         for number,name in transdict.items():
             translist.append(f"        {name:<4s}  {number}")
             translist.append(",\n")
-        translist[-1] = "\n		;\n"
+        translist[-1] = "\n    ;\n"
         translateblock = "".join(translist)
         return translateblock
 
