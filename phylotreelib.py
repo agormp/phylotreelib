@@ -3431,6 +3431,17 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def log_clade_credibility(self, topology):
+        """Compute log clade credibility for topology (sum of log(freq) for all branches)"""
+
+        bipartsummary = self.bipartsummary
+        logsum = 0.0
+        for bipartition in topology:
+            logsum += math.log(bipartsummary[bipartition].freq)
+        return logsum
+
+    ###############################################################################################
+
     def contree(self, cutoff=0.5, allcompat=False, labeldigits=3):
         """Returns a consensus tree built from selected bipartitions"""
 
@@ -3539,22 +3550,12 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def log_clade_credibility(self, topology, bipartsummary):
-        """Compute log clade credibility for topology (sum of log(freq) for all branches)"""
-
-        logsum = 0.0
-        for bipartition in topology:
-            logsum += math.log(bipartsummary[bipartition].freq)
-        return logsum
-
-    ###############################################################################################
-
     def max_clade_cred_tree(self, labeldigits=3):
         """Find and return maximum clade credibility tree"""
 
         maxlogcred = -math.inf
         for topology in self.toposummary:
-            logcred = self.log_clade_credibility(topology, self.bipartsummary)
+            logcred = self.log_clade_credibility(topology)
             if logcred > maxlogcred:
                 maxlogcred = logcred
                 maxlogcredtopo = topology
