@@ -3305,7 +3305,7 @@ class TreeSummary():
                     leafname = next(iter(bip1))
                     leafbips.append((leafname, bip))
                 elif len(bip2) == 1:
-                    leafname = next(iter(bip1))
+                    leafname = next(iter(bip2))
                     leafbips.append((leafname, bip))
                 else:
                     internalbips.append((branch.freq,bip))
