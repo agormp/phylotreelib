@@ -926,13 +926,16 @@ class Tree():
     ###############################################################################################
 
     def n_bipartitions(self):
-        """Returns the number of bipartitions (= number of internal branches) in tree"""
+        """Returns the number of bipartitions (= number of internal branches) in tree
+        Note: if root is at bifurcation, then those 2 branches = 1 bipartition"""
 
         nbip = 0
         for n1 in self.intnodes:
             for n2 in self.children(n1):
                 if n2 in self.intnodes:
                     nbip +=1
+        if self.is_bifurcation(self.root):
+            nbip -= 1
         return nbip
 
     ###############################################################################################
