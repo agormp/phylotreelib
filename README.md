@@ -42,31 +42,30 @@ python3 -m pip install --upgrade phylotreelib
 ## Quick start usage examples
 
 ### Read tree from file, perform minimum-variance rooting, find root-to-tip distances
-The code below will import phylotreelib, open a NEXUS file, read one Tree object from the file, perform minimum-variance rooting, find the node ID for the new rootnode,
-and finally print out the name and root-to-tip distance (measured along the branches) for all leaves in the tree:
+The code below will import phylotreelib, open a NEXUS tree file, read one Tree object from the file, perform minimum-variance rooting, find the node ID for the new rootnode, and finally print out the name and root-to-tip distance (measured along the branches) for all leaves in the tree. (Note that pt.Nexustreefile has been implemented as a context manager, and can be used with the `with` statement):
 
 ```python
 import phylotreelib as pt
-treefile = pt.Nexustreefile("mytreefile.nexus")
-mytree = treefile.readtree()
+with pt.Nexustreefile("mytreefile.nexus") as treefile:
+    mytree = treefile.readtree()
 mytree.rootminvar()
 rootnode = mytree.root
 for tip in mytree.leaves:
-	dist = mytree.nodedist(rootnode, tip)
-	print(f"{tip:<10s} \t {dist:.2f}")
+    dist = mytree.nodedist(rootnode, tip)
+    print(f"{tip:<10s} \t {dist:.2f}")
 ```
 
 Output:
 
 ```
-nitrificans	1879.84
-Is79A3    	1878.95
-GWW4      	1877.47
+nitrificans 1879.84
+Is79A3      1878.95
+GWW4        1877.47
 .
 .
 .
-A2        	1879.84
-communis  	1878.95
+A2          1879.84
+communis    1878.95
 ```
 
 -----
@@ -105,14 +104,14 @@ Human
 -----
 
 ### Read multiple trees from Nexus file, construct consensus tree, write in Newick format
-The code below opens a Nexus-formatted file with multiple trees, constructs a Treesummary object, and then extracts all Tree objects from the file by iterating over the file while adding the trees to the Treesummary object. Then a majority rule consensus tree is computed from the Treesummary object, the tree is midpoint rooted, and the resulting tree is finally written in Newick format to the output file "contree.newick"
+The code below constructs a Treesummary object, opens a Nexus-formatted file with multiple trees, and then extracts all Tree objects from the file by iterating over the file while adding the trees to the Treesummary object. After this a majority rule consensus tree is computed from the Treesummary object, the tree is midpoint rooted, and the resulting tree is finally written in Newick format to the output file "contree.newick"
 
 ```python
 import phylotreelib as pt
-beastfile = pt.Nexustreefile("BEAST_samples.trees")
 treesummary = pt.TreeSummary()
-for tree in beastfile:
-    treesummary.add_tree(tree)
+with pt.Nexustreefile("BEAST_samples.trees") as beastfile:
+    for tree in beastfile:
+        treesummary.add_tree(tree)
 consensus_tree = treesummary.contree()
 consensus_tree.rootmid()
 with open("contree.newick", "w") as outfile:
@@ -126,8 +125,8 @@ The code below opens a Nexus format file, reads one Tree object from the file, p
 
 ```python
 import phylotreelib as pt
-treefile = pt.Nexustreefile("SARSCoV2_all.tree")
-bigtree = treefile.readtree()
+with pt.Nexustreefile("SARSCoV2_all.tree") as treefile:
+    bigtree = treefile.readtree()
 smalltree = bigtree.prune_maxlen(nkeep=50)
 with open("SARSCoV2_50.tree", "w") as outfile:
     outfile.write(smalltree.nexus())
@@ -140,8 +139,8 @@ The code below opens a Newick file, reads one Tree object from the file, and the
 
 ```python
 import phylotreelib as pt
-treefile = pt.Newicktreefile("Comammox.newick")
-tree = treefile.readtree()
+with pt.Newicktreefile("Comammox.newick") as treefile:
+    tree = treefile.readtree()
 print(tree.nearest_n_leaves("nitrificans", 5))
 ```
 
@@ -186,6 +185,15 @@ treefile = phylotreelib.Nexustreefile(filename)
 
 These commands will return a file object with methods for reading the contents of the file.
 
+#### Treefile classes are context managers
+
+The classes phylotreelib.Newicktreefile and phylotreelib.Nexustreefile have been implemented as context managers, so it is possible to use them with the `with` statement:
+
+```
+with phylotreelib.Nexustreefile(filename) as treefile:
+    <read trees and do other stuff with treefile>
+```
+
 ### Reading one or more trees from a treefile
 
 To read one tree from an opened treefile:
@@ -196,7 +204,7 @@ tree = treefile.readtree()
 
 This returns a Tree object, which has methods for analysing and manipulating the tree (itself). By calling readtree() repeatedly, you can read additional trees from the file. The `readtree()` method returns `None` when all trees have been read.
 
-The `readtrees()` method returns all the trees in the file in the form of a Treeset object. Treeset objects contains a list of Tree objects and has methods for rooting and outputting all trees in the collection. Iterating over a Treeset object returns Tree objects.
+The `readtrees()` (plural) method returns all the trees in the file in the form of a Treeset object. Treeset objects contains a list of Tree objects and has methods for rooting and outputting all trees in the collection. Iterating over a Treeset object returns Tree objects.
 
 ```
 treeset = treefile.readtrees()
@@ -206,7 +214,16 @@ It is also possible to retrieve all the trees from an open treefile one at a tim
 
 ```
 for tree in treefile:
-	<do something with tree>
+    <do something with tree>
+```
+
+#### Reading trees using the with statement
+
+As mentioned, phylotreelib.Newicktreefile and phylotreelib.Nexustreefile have been implemented as context managers, and it is therefore possible (and probably safer) to read trees using the `with` statement:
+
+```
+with phylotreelib.Nexustreefile(filename) as treefile:
+    tree = treefile.readtree()
 ```
 
 ### Constructing Tree objects directly
@@ -231,7 +248,7 @@ tree = phylotreelib.Tree.from_leaves(leaflist)
 
 #### Constructing Tree object from lists of parent and child nodes corresponding to branches in tree
 
-The constructor Tree.from_branchinfo() constructs a tree from information about all individual branches in the tree. Specifically the input is a list of parent node IDs and a list of child node IDs (of the same length), such that each pairing of parentnode and  childnode corresponds to a branch in the tree. It is possible to add extra lists containing the corresponding branch lengths and comments. Using this constructor allows the specific naming of internal nodes (otherwise set automatically based on e.g. the order in which a newick string is parsed). **NOTE:** internal node IDs have to be integers, while leave IDs have to be strings.
+The constructor Tree.from_branchinfo() constructs a tree from information about all individual branches in the tree. Specifically the input is a list of parent node IDs and a list of child node IDs (of the same length), such that each pairing of parentnode and  childnode corresponds to a branch in the tree. It is possible to add extra lists containing the corresponding branch lengths and branc labels. Using this constructor allows the specific naming of internal nodes (which are otherwise set automatically based on e.g. the order in which a newick string is parsed). **NOTE:** internal node IDs have to be integers, while leaf IDs have to be strings.
 
 ```
 parentlist = [100, 100, 101, 101, 102, 102]
@@ -368,10 +385,10 @@ taxa = tree.leaves
 
 List of useful Tree object attributes:
 
-*	`.leaves` 	: Set of leaf names
-*	`.intnodes` : Set of internal node IDs
-*	`.nodes`	: Set of all nodes (= leaves + internal nodes)
-*	`.root`		: ID for root node (usually 0, but may change if re-rooted)
+*   `.leaves`   : Set of leaf names
+*   `.intnodes` : Set of internal node IDs
+*   `.nodes`    : Set of all nodes (= leaves + internal nodes)
+*   `.root`     : ID for root node (usually 0, but may change if re-rooted)
 
 
 ### Methods for analyzing and altering Tree objects.
@@ -399,14 +416,14 @@ Example usage:
 try:
     tree.rootout(outgroup)
 except phylotreelib.TreeError as err:
-	print("This error occurred: {}".format(err) )
+    print("This error occurred: {}".format(err) )
 ```
 
 Example usage 2:
 
 ```
 if nodename not in tree.nodes:
-	raise TreeError("Tree contains no leafs named {}".format(nodename))
+    raise TreeError("Tree contains no leafs named {}".format(nodename))
 ```
 
 ### Most important classes in phylotreelib
@@ -421,8 +438,6 @@ if nodename not in tree.nodes:
 
 
 ### Help for all classes and methods in phylotreelib
-
-(Output from pydoc on module, classes listed in alphabetical order)
 
 ```
 Help on module phylotreelib:
@@ -448,7 +463,7 @@ CLASSES
             Nexustreefile
     
     class BigTreeSummary(TreeSummary)
-     |  BigTreeSummary(interner=None)
+     |  BigTreeSummary(interner=None, store_trees=False)
      |  
      |  Class summarizing bipartitions, branch lengths, and topologies from many trees
      |  
@@ -459,35 +474,50 @@ CLASSES
      |  
      |  Methods defined here:
      |  
-     |  __init__(self, interner=None)
+     |  __init__(self, interner=None, store_trees=False)
      |      TreeSummary constructor. Initializes relevant data structures
      |  
      |  add_tree(self, curtree, weight=1.0)
      |      Add tree to treesummary, update all summaries
      |  
-     |  compute_topofreq(self)
-     |      Compute freq for topologies, add attribute to Topostructs
-     |  
-     |  get_toposummary(self)
-     |      Return summary of topologies as dict: {topology:Topostruct}
+     |  max_clade_cred_tree(self, labeldigits=3)
+     |      Find and return maximum clade credibility tree
      |  
      |  update(self, other)
-     |      Merge this class with other treesummary
+     |      Merge this object with other treesummary
+     |  
+     |  ----------------------------------------------------------------------
+     |  Readonly properties defined here:
+     |  
+     |  toposummary
+     |      Property method for lazy evaluation of topostruct.freq
      |  
      |  ----------------------------------------------------------------------
      |  Methods inherited from TreeSummary:
      |  
-     |  compute_bipfreq(self, digits=3)
-     |      Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs
+     |  __len__(self)
      |  
-     |  compute_blen_var_and_sem(self)
-     |      Compute var and standard error of branch lengths, add attributes to Branchstructs
+     |  add_branchid(self)
+     |      Adds attribute .branchID to all bipartitions in .bipartsummary
+     |      External bipartitions are labeled with the leafname.
+     |      Internal bipartitions are labeled with consecutive numbers by decreasing frequency
      |  
-     |  contree(self, cutoff=0.5, allcompat=False)
+     |  contree(self, cutoff=0.5, allcompat=False, labeldigits=3)
      |      Returns a consensus tree built from selected bipartitions
      |  
-     |  get_bipsummary(self)
-     |      Return summary of bipartitions as dict: {bipartition:Branchstruct}
+     |  log_clade_credibility(self, topology)
+     |      Compute log clade credibility for topology (sum of log(freq) for all branches)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Readonly properties inherited from TreeSummary:
+     |  
+     |  bipartsummary
+     |      Property method for lazy evaluation of freq, var, and sem for branches
+     |  
+     |  sorted_biplist
+     |      Return list of bipartitions.
+     |      First external (leaf) bipartitions sorted by leafname.
+     |      Then internal bipartitions sorted by freq
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors inherited from TreeSummary:
@@ -507,6 +537,9 @@ CLASSES
      |  
      |  __init__(self, length=0.0, label='')
      |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  copy(self)
+     |      Returns copy of Branchstruct object, with all attributes included
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
@@ -528,11 +561,21 @@ CLASSES
      |  __str__(self)
      |      Returns distance matrix as string
      |  
+     |  avdist(self)
+     |      Returns average dist in matrix (not including diagonal)
+     |  
+     |  clean_names(self, illegal=',:;()[]', rep='_')
+     |      Rename items to avoid characters that are problematic in Newick tree strings:
+     |      Replaces all occurrences of chars in 'illegal' by 'rep'
+     |  
      |  getdist(self, name1, name2)
      |      Returns distance between named entries
      |  
      |  nj(self)
      |      Computes neighbor joining tree, returns Tree object
+     |  
+     |  rename(self, oldname, newname)
+     |      Changes name of one item from oldname to newname
      |  
      |  setdist(self, name1, name2, dist)
      |      Sets distance between named entries
@@ -623,6 +666,20 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Methods inherited from Treefile:
      |  
+     |  __enter__(self)
+     |      Implements context manager behaviour for Treefile types.
+     |      Usage example:
+     |          with pt.Newicktreefile(filename) as tf:
+     |              mytree = tf.readtree()
+     |          mytree.rootminvar()
+     |  
+     |  __exit__(self, type, value, traceback)
+     |      Implements context manager behaviour for Treefile types.
+     |      Usage example:
+     |          with pt.Newicktreefile(filename) as tf:
+     |              mytree = tf.readtree()
+     |          mytree.rootminvar()
+     |  
      |  close(self)
      |      For explicit closing of Treefile before content exhausted
      |  
@@ -666,6 +723,20 @@ CLASSES
      |  ----------------------------------------------------------------------
      |  Methods inherited from Treefile:
      |  
+     |  __enter__(self)
+     |      Implements context manager behaviour for Treefile types.
+     |      Usage example:
+     |          with pt.Newicktreefile(filename) as tf:
+     |              mytree = tf.readtree()
+     |          mytree.rootminvar()
+     |  
+     |  __exit__(self, type, value, traceback)
+     |      Implements context manager behaviour for Treefile types.
+     |      Usage example:
+     |          with pt.Newicktreefile(filename) as tf:
+     |              mytree = tf.readtree()
+     |          mytree.rootminvar()
+     |  
      |  close(self)
      |      For explicit closing of Treefile before content exhausted
      |  
@@ -694,7 +765,7 @@ CLASSES
      |  
      |  freq
      |  
-     |  treestring
+     |  tree
      |  
      |  weight
     
@@ -718,7 +789,7 @@ CLASSES
      |  __str__(self)
      |      Prints table of parent-child relationships including branch lengths and labels
      |  
-     |  add_branch(self, bipart, blen=0.0, label='')
+     |  add_branch(self, bipart, branchstruct)
      |      Adds branch represented by bipartition to unresolved tree.
      |  
      |  average_ancdist(self, leaflist, return_median=False)
@@ -734,10 +805,22 @@ CLASSES
      |      Construct dictionary keeping track of all pairwise distances between nodes
      |  
      |  build_parent_dict(self)
-     |      Forces construction of parent_dict enabling faster lookups
+     |      Constructs _parent_dict enabling faster lookups, when needed
      |  
      |  build_path_dict(self)
      |      Construct dictionary keeping track of all pairwise paths between nodes
+     |  
+     |  check_bip_compatibility(self, bipart)
+     |      Checks the compatibility between bipartition and tree.
+     |      Returns tuple of: is_present, is_compatible, insert_tuple
+     |              where insert_tuple = None or (parentnode, childmovelist)
+     |      is_present:
+     |          True if bipartition is already present in tree. Implies "is_compatible = True"
+     |      is_compatible:
+     |          True if bipartition is compatible with tree. "is_present" can be True or False
+     |      insert_tuple:
+     |          If is_compatible: Tuple of (parentnode, childmovelist) parameters for insert_node
+     |          If not is_compatible: None
      |  
      |  children(self, parent)
      |      Returns set containing parent's immediate descendants
@@ -785,7 +868,7 @@ CLASSES
      |  find_most_distant(self, node1, nodeset)
      |      Finds node in nodeset that is most distant from node1
      |  
-     |  find_mrca(self, leafset)
+     |  find_mrca(self, leaves)
      |      Finds Most Recent Common Ancestor for the provided set of leaves
      |  
      |  findbasenode(self, leafset)
@@ -810,17 +893,19 @@ CLASSES
      |  height(self)
      |      Returns height of tree: Largest root-to-tip distance
      |  
-     |  insert_node(self, parent, childnodes, branchlength=0, lab='')
-     |      Inserts an extra node between parent and children listed in childnodes list.
-     |      
-     |      Length of inserted branch is 'branchlength' and defaults to zero. The node number
-     |      of the new node is returned
+     |  insert_node(self, parent, childnodes, branchstruct)
+     |      Inserts an extra node between parent and children listed in childnodes list
+     |      (so childnodes are now attached to newnode instead of parent).
+     |      The branchstruct will be attached to the branch between parent and newnode.
+     |      Branches to childnodes retain their original branchstructs.
+     |      The node number of the new node is returned
      |  
      |  is_bifurcation(self, node)
      |      Checks if internal node is at bifurcation (has two children)
      |  
      |  is_compatible_with(self, bipart)
-     |      Checks whether a given bipartition is compatible with the tree
+     |      Checks whether a given bipartition is compatible with the tree.
+     |      Note: also returns True if bipartition is already in tree
      |  
      |  is_resolved(self)
      |      Checks whether tree is fully resolved (no polytomies)
@@ -831,15 +916,19 @@ CLASSES
      |  length(self)
      |      Returns tree length (sum of all branch lengths)
      |  
-     |  match_intnodes(self, other)
-     |      Compares two identical trees with different internal node IDs. 
-     |      Returns tuple containing follorwing:
-     |          Dictionary giving mapping from intnode id in self to intnode id in other.
-     |          unmatched_root1: "None" or id of original root in self if root at bifurcation 
-     |          unmatched_root2: "None" or id of original root in other if root at bifurcation
+     |  match_nodes(self, other)
+     |      Compares two identical trees with potentially different internal node IDs.
+     |      Returns tuple containing following:
+     |          Dictionary giving mapping from nodeid in self to nodeid in other (also leaves)
+     |          unmatched_root1: "None" or id of unmatched root in self if root at bifurcation
+     |          unmatched_root2: "None" or id of unmatched root in other if root at bifurcation
+     |      
+     |      Note: The last two are only different from None if the trees dont have the same
+     |      exact rooting
      |  
      |  n_bipartitions(self)
      |      Returns the number of bipartitions (= number of internal branches) in tree
+     |      Note: if root is at bifurcation, then those 2 branches = 1 bipartition
      |  
      |  nameprune(self, sep='_', keep_pattern=None)
      |      Prune leaves based on name redundancy:
@@ -999,6 +1088,12 @@ CLASSES
      |      Constructor: tree with random topology from list of leaf names OR number of tips
      |  
      |  ----------------------------------------------------------------------
+     |  Readonly properties defined here:
+     |  
+     |  parent_dict
+     |      Lazy evaluation of _parent_dict when needed
+     |  
+     |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
      |  
      |  __dict__
@@ -1133,23 +1228,35 @@ CLASSES
      |  __init__(self, interner=None)
      |      TreeSummary constructor. Initializes relevant data structures
      |  
+     |  __len__(self)
+     |  
+     |  add_branchid(self)
+     |      Adds attribute .branchID to all bipartitions in .bipartsummary
+     |      External bipartitions are labeled with the leafname.
+     |      Internal bipartitions are labeled with consecutive numbers by decreasing frequency
+     |  
      |  add_tree(self, curtree, weight=1.0)
      |      Add tree object to treesummary, update all relevant bipartition summaries
      |  
-     |  compute_bipfreq(self, digits=3)
-     |      Compute freq for bipartitions, rounded to "digits" places, add attribute to Branchstructs
-     |  
-     |  compute_blen_var_and_sem(self)
-     |      Compute var and standard error of branch lengths, add attributes to Branchstructs
-     |  
-     |  contree(self, cutoff=0.5, allcompat=False)
+     |  contree(self, cutoff=0.5, allcompat=False, labeldigits=3)
      |      Returns a consensus tree built from selected bipartitions
      |  
-     |  get_bipsummary(self)
-     |      Return summary of bipartitions as dict: {bipartition:Branchstruct}
+     |  log_clade_credibility(self, topology)
+     |      Compute log clade credibility for topology (sum of log(freq) for all branches)
      |  
      |  update(self, other)
-     |      Merge this class with external treesummary
+     |      Merge this object with external treesummary
+     |  
+     |  ----------------------------------------------------------------------
+     |  Readonly properties defined here:
+     |  
+     |  bipartsummary
+     |      Property method for lazy evaluation of freq, var, and sem for branches
+     |  
+     |  sorted_biplist
+     |      Return list of bipartitions.
+     |      First external (leaf) bipartitions sorted by leafname.
+     |      Then internal bipartitions sorted by freq
      |  
      |  ----------------------------------------------------------------------
      |  Data descriptors defined here:
@@ -1166,6 +1273,20 @@ CLASSES
      |  Abstract base-class for representing tree file objects.
      |  
      |  Methods defined here:
+     |  
+     |  __enter__(self)
+     |      Implements context manager behaviour for Treefile types.
+     |      Usage example:
+     |          with pt.Newicktreefile(filename) as tf:
+     |              mytree = tf.readtree()
+     |          mytree.rootminvar()
+     |  
+     |  __exit__(self, type, value, traceback)
+     |      Implements context manager behaviour for Treefile types.
+     |      Usage example:
+     |          with pt.Newicktreefile(filename) as tf:
+     |              mytree = tf.readtree()
+     |          mytree.rootminvar()
      |  
      |  __init__(self, filename=None, filecontent=None)
      |      Initialize self.  See help(type(self)) for accurate signature.
@@ -1192,9 +1313,6 @@ CLASSES
      |      list of weak references to the object (if defined)
 
 FUNCTIONS
-    escape_metachars(text, metachars='.^$*+?{}[]\\|()')
-        Add backslashes to escape metachars in input string.
-    
     main()
         # # Placeholder: Insert test code here and run module in standalone mode
     
