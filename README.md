@@ -42,6 +42,7 @@ python3 -m pip install --upgrade phylotreelib
 ## Quick start usage examples
 
 ### Read tree from file, perform minimum-variance rooting, find root-to-tip distances
+
 The code below will import phylotreelib, open a NEXUS tree file, read one Tree object from the file, perform minimum-variance rooting, find the node ID for the new rootnode, and finally print out the name and root-to-tip distance (measured along the branches) for all leaves in the tree. (Note that pt.Nexustreefile has been implemented as a context manager, and can be used with the `with` statement):
 
 ```python
