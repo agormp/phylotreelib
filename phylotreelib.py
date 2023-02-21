@@ -3323,7 +3323,8 @@ class TreeSummary():
         External bipartitions are labeled with the leafname.
         Internal bipartitions are labeled with consecutive numbers by decreasing frequency"""
 
-        for freqrank, (sortkey,bipart) in enumerate(self.sorted_biplist):
+        # Python note: Start enumeration at 1
+        for freqrank, (sortkey,bipart) in enumerate(self.sorted_biplist, 1):
             if type(sortkey) == str:
                 self.bipartsummary[bipart].branchID = sortkey
             else:
