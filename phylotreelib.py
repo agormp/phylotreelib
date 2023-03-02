@@ -1989,6 +1989,16 @@ class Tree():
 
     ###############################################################################################
 
+    def set_nodeid_labels(self):
+        """Sets labels to be the same as the child node ID
+        Allows use of e.g. Figtree to show nodeIDs as nodelabels"""
+
+        for parent in self.intnodes:
+            for kid in self.children(parent):
+                self.setlabel(parent, kid, str(kid))
+
+    ###############################################################################################
+
     def subtree(self, basenode, return_basalbranch=False):
         """Returns subtree rooted at basenode as Tree object"""
 
