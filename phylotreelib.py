@@ -3492,6 +3492,22 @@ class TreeSummary():
 
         return contree
 
+    ###############################################################################################
+
+    def max_clade_cred_tree(self, treefile, labeldigits=3):
+        """Find and return maximum clade credibility tree.
+        Note: this version based on external treefile (and bipartsummary)"""
+
+        maxlogcred = -math.inf
+        with pt.Treefile(treefile) as tf:
+            for tree in tf:
+                topology = tree.topology()
+                logcred = self.log_clade_credibility(topology)
+                if logcred > maxlogcred:
+                    maxlogcred = logcred
+                    maxcredtree = tree
+        return maxcredtree, maxlogcred
+
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
