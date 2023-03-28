@@ -3591,7 +3591,7 @@ class BigTreeSummary(TreeSummary):
 ###################################################################################################
 
 
-class Treefile():
+class TreefileBase():
     """Abstract base-class for representing tree file objects."""
 
     # Classes for specific formats inherit from this class and add extra stuff as needed.
@@ -3601,7 +3601,7 @@ class Treefile():
 
         num_args = (filename is not None) + (filecontent is not None)
         if num_args != 1:
-            raise TreeError("Treefile __init__ requires either filename or filecontent (not both)")
+            raise TreeError("TreefileBase __init__ requires either filename or filecontent (not both)")
         elif filecontent:
             self.treefile = StringIO(filecontent)
         else:
@@ -3612,7 +3612,7 @@ class Treefile():
     ###############################################################################################
 
     def __enter__(self):
-        """Implements context manager behaviour for Treefile types.
+        """Implements context manager behaviour for TreefileBase types.
         Usage example:
             with pt.Newicktreefile(filename) as tf:
                 mytree = tf.readtree()
@@ -3623,7 +3623,7 @@ class Treefile():
     ###############################################################################################
 
     def __exit__(self, type, value, traceback):
-        """Implements context manager behaviour for Treefile types.
+        """Implements context manager behaviour for TreefileBase types.
         Usage example:
             with pt.Newicktreefile(filename) as tf:
                 mytree = tf.readtree()
@@ -3700,11 +3700,11 @@ class Treefile():
 ###################################################################################################
 
 
-class Newicktreefile(Treefile):
+class Newicktreefile(TreefileBase):
     """Class representing Newick tree file. Iteration returns tree-objects"""
 
     def __init__(self, filename=None, filecontent=None):
-        Treefile.__init__(self, filename, filecontent)
+        TreefileBase.__init__(self, filename, filecontent)
         # HACK!!! Minimal file format check:
         # Read first three lines in file, check whether any of them contains "#NEXUS".
         # If so then this is presumably NOT a Newick file (but a nexus file...) => exit.
@@ -3739,7 +3739,7 @@ class Newicktreefile(Treefile):
 ###################################################################################################
 
 
-class Nexustreefile(Treefile):
+class Nexustreefile(TreefileBase):
     """Class representing Nexus tree file. Iteration returns tree object or None"""
 
     ###############################################################################################
@@ -3747,7 +3747,7 @@ class Nexustreefile(Treefile):
     def __init__(self, filename=None, filecontent=None):
         """Read past NEXUS file header, parse translate block if present"""
 
-        Treefile.__init__(self, filename, filecontent)
+        TreefileBase.__init__(self, filename, filecontent)
 
         ###########################################################################################
 
@@ -3880,6 +3880,22 @@ class Nexustreefile(Treefile):
             return None
         else:
             return Tree.from_string(treestring, self.transdict)
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+class Treefile:
+    """Factory for making Newick or Nexus treefile objects. Autodetects fileformat"""
+
+    def __new__(klass, filename):
+        tempfile = open(filename)
+        firstline = tempfile.readline()
+        tempfile.close()
+        if firstline.lower().startswith("#nexus"):
+            return Nexustreefile(filename)
+        else:
+            return Newicktreefile(filename)
 
 ###################################################################################################
 ###################################################################################################
