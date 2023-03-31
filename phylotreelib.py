@@ -1938,8 +1938,20 @@ class Tree():
 
     ###############################################################################################
 
+    def set_branch_attribute(self, node1, node2, attrname, attrvalue):
+        """Set the value of any branch attribute.
+        attrname: Name of attribute (e.g., "length")
+        attrvalue: Value of attribute (e.g. 0.153)"""
+
+        branch = self.tree[node1][node2]
+        setattr(branch, attrname, attrvalue)
+
+    ###############################################################################################
+
     def setlength(self, node1, node2, length):
         """Sets length of branch connecting node1 and node2"""
+
+        # Python note: maybe deprecate and use set_branch_attribute for all such problems?
 
         if node1 == self.parent(node2):
             parent = node1
