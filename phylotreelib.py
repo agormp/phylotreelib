@@ -2380,8 +2380,10 @@ class Tree():
         self.intnodes.remove(child)
         self.nodes = self.leaves | self.intnodes
 
-        # Python note: would be simple to just update _parent_dict instead of setting to None
-        self._parent_dict = None
+        # Update _parent_dict
+        del self._parent_dict[child]
+        for grandchild in grandchildren:
+            self._parent_dict[grandchild] = parent
 
         # Update self.sorted_intnode_cache if it exists
         if self.sorted_intnode_cache is not None:
