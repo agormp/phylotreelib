@@ -1482,6 +1482,25 @@ class Tree():
 
     ###############################################################################################
 
+    def patristic_distdict(self):
+        """Return nested dictionary giving all pairwise, patristic distances:
+        dict[node1][node2] = patristic distance"""
+
+        # Initialize empty nested 2D dictionary with sequence names as keys.
+        distdict = dict.fromkeys(self.leaves)
+        for name in self.leaves:
+            distdict[name] = dict.fromkeys(self.leaves)
+
+        # Fill dictionary with values
+        for leaf1, leaf2 in itertools.combinations(self.leaves, 2):
+            dist = self.nodedist(leaf1,leaf2)
+            distdict[leaf1][leaf2] = dist
+            distdict[leaf2][leaf1] = dist
+
+        return distdict
+
+    ###############################################################################################
+
     def average_pairdist(self, leaflist, return_median=False):
         """Return average or median pairwise, patristic distance between leaves in leaflist"""
         # Python note: better to return list of pair distances, which can then be averaged etc.
