@@ -1215,6 +1215,7 @@ class TreeChanging(TreeTestBase):
         node1 = mytree.find_mrca({"HV1EL", "HV1Z2", "HV1Z8"})
         node2 = mytree.parent(node1)
         node2remotekids = mytree.remote_children(node2)
+        numkids = len(node2remotekids)
         removed_dist = mytree.nodedist(node1, node2)
         pre_len = mytree.length()
         pre_nodes = copy.copy(mytree.nodes)
@@ -1224,7 +1225,7 @@ class TreeChanging(TreeTestBase):
         self.assertRaises(pt.TreeError, mytree.children, node1)
         self.assertEqual(pre_nodes - {node1}, mytree.nodes)
         self.assertEqual(len(mytree.children(node2)), 3)
-        self.assertAlmostEqual(pre_len - removed_dist, mytree.length())
+        self.assertAlmostEqual(pre_len, mytree.length())
 
     def test_removeleaf(self):
         """Does remove_leaf() work correctly?"""
