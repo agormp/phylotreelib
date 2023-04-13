@@ -2626,8 +2626,9 @@ class Tree():
             maxdist = 0.0
             for (parent, child) in possible_branches:
                 for leaf in remote_children(child):
-                    if nodedist(parent,leaf) > maxdist:
-                        maxdist = nodedist(parent,leaf)
+                    dist = nodedist(parent,leaf)
+                    if dist > maxdist:
+                        maxdist = dist
                         node1, node2, keepleaf = parent, child, leaf
 
             # Add the found leaf to list of leaves.
