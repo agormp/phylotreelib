@@ -2346,13 +2346,10 @@ class Tree():
     ###############################################################################################
 
     def remove_branch(self, node1, node2):
-        """Removes branch connecting node1 and node2 (thereby creating polytomy)"""
-
-        # Python note: Length of removed branch is lost: treelength and patristic distances change
-        # Should I distribute lost branch length to retain treelength?
-        # Eg, retain treelength and patristic distances within subtree (+ blen/n to each child)
-        # Alternatively retain patristic distances to outside (+ blen to each child),
-        # but then treelength would increase
+        """Removes branch connecting node1 and node2 (thereby creating polytomy)
+        Length of removed branch is distributed among descendant branches.
+        This means tree length is conserved.
+        Descendant nodes will be farther apart from each other, but closer to outside nodes."""
 
         if node1 == self.parent(node2):
             parent = node1
@@ -2369,8 +2366,12 @@ class Tree():
             raise TreeError(msg)
 
         # Move children of "child" so they are attached directly to "parent"
-        for grandchild in self.children(child):
-            self.tree[parent][grandchild] = Branchstruct(self.tree[child][grandchild].length,
+        # Keep track of length of removed branch, so it can be distributed among descendants
+        lostlen = self.nodedist(parent,child)
+        grandchildren = self.children(child)
+        addlen = lostlen / len(grandchildren)
+        for grandchild in grandchildren :
+            self.tree[parent][grandchild] = Branchstruct(self.tree[child][grandchild].length + addlen,
                                                          self.tree[child][grandchild].label)
 
         # Delete "child" node and link from parent to child. Update intnodes and nodes
