@@ -2423,9 +2423,9 @@ class Tree():
         # If leaf is part of bifurcation but NOT attached directly to root, then parent
         # must also be removed from tree, and the remaining child needs to be grafted
         # onto grandparent with proper cumulated distance
-        # Only the branch label (if any) of the internal branch is kept
+        # Keep branch label (if any) of the branch from grandparent to parent
         elif len(childset) == 2:
-            [child2] = childset - {leaf}                      # Remaining item is other child
+            [child2] = childset - {leaf}                    # Remaining item is other child
             child2dist = self.tree[parent][child2].length   # Remember dist to other child
             grandparent = self.parent(parent)
 
@@ -2438,7 +2438,7 @@ class Tree():
             del self.tree[grandparent][parent]              # Also remove pointer from gp to p
             del self.parent_dict[leaf]                      # Remove unused entries in parent_dict
             del self.parent_dict[parent]
-            self.parent_dict[child2] = grandparent           # Update parent_dict for leaf2
+            self.parent_dict[child2] = grandparent          # Update parent_dict for leaf2
             self.intnodes.remove(parent)
             self.nodes.remove(parent)
 
