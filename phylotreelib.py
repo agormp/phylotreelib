@@ -2915,8 +2915,12 @@ class Tree():
 
             # New branch (from parent to newroot) will inherit all attributes from original branch
             # (from parent to child), except for length, which is split between the two branches
+            # Special case: if child is leaf, then original branch will have no branch support
+            # In this case set label to "1.0" (maybe only do this if rest of labels are branch support??)
             newbranch = self.tree[parent][child].copy()
             newbranch.length = parent_to_root_dist
+            if newbranch.label == "":
+                newbranch.label = "1.0"
             newroot = self.insert_node(parent, [child], newbranch)
             self.tree[newroot][child].length = root_to_child_dist
 
