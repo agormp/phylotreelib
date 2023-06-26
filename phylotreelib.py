@@ -208,7 +208,6 @@ class Tree():
         self._parent_dict = None         # Dict node:parent relationships (only built if required)
         self.dist_dict = None
         self.path_dict = None
-        self.sorted_intnode_cache = None
 
     ###############################################################################################
 
@@ -905,8 +904,6 @@ class Tree():
                 nextlevel.extend(self.children(node) & self.intnodes)
 
             curlevel = nextlevel
-
-        self.sorted_intnode_cache = sorted_nodes
 
         if not deepfirst:
             sorted_nodes.reverse()
@@ -2135,9 +2132,7 @@ class Tree():
         self.leaves.update( other.leaves )
 
         # Reset caches and lists
-        self.sorted_intnode_cache = None
         self._parent_dict = None
-        self.sorted_intnode_cache = None
         self.nodedist.cache_clear()
 
 
@@ -2282,9 +2277,6 @@ class Tree():
         self.intnodes.add(newnode)
         self.nodes.add(newnode)
 
-        # Erase caches
-        self.sorted_intnode_cache = None
-
         # Clear lru_caches (which cannot be edited manually)
         #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
@@ -2385,10 +2377,6 @@ class Tree():
         for grandchild in grandchildren:
             self._parent_dict[grandchild] = parent
 
-        # Update self.sorted_intnode_cache if it exists
-        if self.sorted_intnode_cache is not None:
-            self.sorted_intnode_cache.remove(child)
-
         # Clear lru_caches (which cannot be edited manually)
         #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
@@ -2436,27 +2424,43 @@ class Tree():
             self.tree[grandparent][child2].length += child2dist   # Cumulated distance
             del self.tree[parent]                           # Delete parent and leaf
             del self.tree[grandparent][parent]              # Also remove pointer from gp to p
-            del self.parent_dict[leaf]                      # Remove unused entries in parent_dict
-            del self.parent_dict[parent]
-            self.parent_dict[child2] = grandparent          # Update parent_dict for leaf2
+            del self._parent_dict[leaf]                      # Remove unused entries in parent_dict
+            del self._parent_dict[parent]
+            self._parent_dict[child2] = grandparent          # Update parent_dict for leaf2
             self.intnodes.remove(parent)
             self.nodes.remove(parent)
 
         # If leaf is part of multifurcation, then no special cleanup needed
         else:
             del self.tree[parent][leaf]
-            del self.parent_dict[leaf]
+            del self._parent_dict[leaf]
 
         # Remove leaf entry from global leaflist. Update intnodeslist
         self.leaves.remove(leaf)
         self.nodes.remove(leaf)
 
-        # Erase self.sorted_intnode_cache if it exists (could I salvage something?)
-        self.sorted_intnode_cache = None
-
         # Clear lru_caches (which cannot be edited manually)
         #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
+
+    ###############################################################################################
+
+    def add_leaf(self, parent, newleafname, branchstruct):
+        """Adds new leaf to existing intnode ´parent´"""
+
+        if parent not in self.intnodes:
+            raise TreeError(f"Parent is not an existing internal node: {parent}")
+        if newleafname in self.leaves:
+            raise TreeError(f"Leaf already exists: {newleafname}")
+        self.tree[parent][newleafname] = branchstruct
+        self.nodes.add(newleafname)
+        self.leaves.add(newleafname)
+
+        # Clear lru_caches (which cannot be edited manually)
+        # python note: i think there are more caches and properties that should be fixed...
+        self.nodedist.cache_clear()
+        if self._parent_dict != None:
+            self._parent_dict = None   # python note: Could just add entry...
 
     ###############################################################################################
 
@@ -2746,9 +2750,6 @@ class Tree():
         self.nodes.remove(oldnum)
         self.intnodes.add(newnum)
         self.intnodes.remove(oldnum)
-        if self.sorted_intnode_cache is not None:
-            i = self.sorted_intnode_cache.index(oldnum)
-            self.sorted_intnode_cache[i] = newnum
         self._parent_dict = None
         # if parent is not None:
         #     self.parent_dict[newnum] = self.parent_dict[oldnum]
@@ -2874,7 +2875,6 @@ class Tree():
             self.intnodes = set(self.tree.keys())
             #self.remote_children.cache_clear()
             self.nodedist.cache_clear()
-            self.sorted_intnode_cache = None
             self.dist_dict = None
             self._parent_dict = None
 
@@ -2939,7 +2939,6 @@ class Tree():
         # Python note: replace with lazy evaluation, using @property?
         #self.remote_children.cache_clear()
         self.nodedist.cache_clear()
-        self.sorted_intnode_cache = None
         self._parent_dict = None
 
         # Update root info:
