@@ -1019,6 +1019,23 @@ class Tree():
 
     ###############################################################################################
 
+    def get_branchstruct(self, node1, node2):
+        """Returns Branchstruct object from branch between node1 and node2"""
+
+        if node1 == self.parent(node2):
+            parent = node1
+            child = node2
+        elif node2 == self.parent(node1):
+            parent = node1
+            child = node2
+        else:
+            msg = f"Nodes {node1} and {node2} are not adjacent in tree. There is no branch between them"
+            raise TreeError(msg)
+
+        return self.tree[parent][child]
+
+    ###############################################################################################
+
     def match_nodes(self, other):
         """Compares two identical trees with potentially different internal node IDs.
         Returns tuple containing following:
