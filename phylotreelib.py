@@ -2056,10 +2056,14 @@ class Tree():
                 raise TreeError(msg)
             parent = self.parent(basenode)
             basalbranch = self.tree[parent][basenode]
+            basalbranchcopy = basalbranch.copy()
 
         # Special case: basenode is leaf => subtree is minimal tree with two nodes (root and leaf)
+        # Note: branchlength below leaf is used for the single branch in this tree
         if basenode in self.leaflist():
-            other = Tree.from_string("({});".format(basenode))
+            other = Tree.from_string(f"({basenode});")
+            blen = self.nodedist(self.parent(basenode), basenode)
+            other.setlength(other.root, basenode, blen)
 
         # If basenode is internal: subtree has more than one leaf
         else:
@@ -2088,13 +2092,14 @@ class Tree():
         # Python note: possibly bad idea to have different possible returnvalues.
         # Simplify and deal with it at consumer end
         if return_basalbranch:
-            return (other, basalbranch)
+            return (other, basalbranchcopy)
         else:
             return other
 
     ###############################################################################################
 
-    def graft(self, other, node1, node2=None, blen1=0, blen2=0, graftlabel=None):
+    def graft(self, other, node1, node2=None, blen1=0, blen2=0, graftlabel=None,
+                graft_with_other_root=False):
         """Graft other tree to self
 
         tree2 (other) intnodes will be renamed if names clash with those in tree1.
@@ -2102,7 +2107,9 @@ class Tree():
         node2: node in tree2 (other) below which tree2 will be attached (default is root of tree2)
         blen1: length of branch added to tree1 below graftpoint (lower of two newly created branches)
         blen2: length of branch above graft point and below tree2 (upper of two newly created branches)
-        graftlabel: prepend value of "label" to leaf names on t2 (e.g: "graft_s1")"""
+        graftlabel: prepend value of "label" to leaf names on t2 (e.g: "graft_s1")
+        graft_with_other_root: use root of other as graftpoint (i.e., do not add extra basal
+                               branch between other.root and self.graftpoint)"""
 
         # Check that node1 is not root in tree1 (self)
         if node1 == self.root:
@@ -2147,6 +2154,12 @@ class Tree():
         self.nodes.update( other.nodes )
         self.intnodes.update( other.intnodes )
         self.leaves.update( other.leaves )
+
+        # If requested: use other.root as graftpoint
+        # (remove branch between graftpoint and other.root)
+        # This is particularly useful if other consists of only root and single leaf
+        if graft_with_other_root:
+            self.remove_branch(graftpoint, other.root)
 
         # Reset caches and lists
         self._parent_dict = None
@@ -2355,7 +2368,7 @@ class Tree():
     ###############################################################################################
 
     def remove_branch(self, node1, node2):
-        """Removes branch connecting node1 and node2 (thereby creating polytomy)
+        """Removes branch connecting node1 and node2 (thereby possibly creating polytomy)
         Length of removed branch is distributed among descendant branches.
         This means tree length is conserved.
         Descendant nodes will be farther apart from each other, but closer to outside nodes."""
@@ -3179,21 +3192,25 @@ class Tree():
 
     ###############################################################################################
 
-    def spr(self,subtree_node, regraft_node):
+    def spr(self, subtree_node, regraft_node):
         """Subtree Pruning and Regrafting.
 
             subtree_node: basenode of subtree that will be pruned.
             regraft_node: node in tree below which subtree will be grafted"""
 
-        # Subtree Prune:
-        # Create Tree object corresponding to subtree. Remove subtree from self one leaf at a time
+        isleaf = subtree_node in self.leaves
+
         # Python note: should check that regraft node is in self after removing subtree
         subtree = self.subtree(subtree_node)
         for leaf in self.remote_children(subtree_node):
             self.remove_leaf(leaf)
 
         # Regraft: Add subtree back onto remaining tree
-        self.graft(subtree, regraft_node)
+        # Special treatment when pruning single leaf (to avoid superfluous internal node)
+        if isleaf:
+            self.graft(subtree, regraft_node, graft_with_other_root=True)
+        else:
+            self.graft(subtree, regraft_node, graft_with_other_root=False)
 
 ###################################################################################################
 ###################################################################################################
