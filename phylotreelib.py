@@ -1005,6 +1005,28 @@ class Tree():
 
     ###############################################################################################
 
+    def remote_nodes(self, parent):
+        """Returns set containing all nodes (intnodes and leaves) that are descendants of parent.
+        This set includes parent itself"""
+
+        # If "parent" is a leaf, then return a set consisting of only itself
+        if parent in self.leaves:
+            return {parent}
+
+        # Traverse the tree iteratively to find remote nodes:
+        kidstack = set( self.tree[parent] )
+        remotenodes = {parent}
+
+        while kidstack:
+            curnode = kidstack.pop()
+            remotenodes.add(curnode)
+            if curnode in self.intnodes:
+                kidstack.update( self.tree[curnode] )
+
+        return remotenodes
+
+    ###############################################################################################
+
     def parent(self, node):
         """Returns parent of node"""
 
@@ -3192,25 +3214,57 @@ class Tree():
 
     ###############################################################################################
 
-    def spr(self, subtree_node, regraft_node):
+    def spr(self, subtree_node=None, regraft_node=None):
         """Subtree Pruning and Regrafting.
 
-            subtree_node: basenode of subtree that will be pruned.
-            regraft_node: node in tree below which subtree will be grafted"""
+        subtree_node: basenode of subtree that will be pruned.
+        regraft_node: node in tree below which subtree will be grafted
 
+        If no parameters are specified (both are None): perform random SPR
+        If only subtree_node is specified: choose random regraft_node
+
+        Must specify either both parameters, no parameters, or only subtree_node
+        """
+
+        # Invalid argument check
+        if subtree_node is None and regraft_node is not None:
+            msg = ("You only specified regraft_node. "
+                   "Must specify either both parameters, no parameters, or only subtree_node")
+            raise TreeError(msg)
+
+        # Choosing random subtree_node if none was provided
+        if subtree_node is None:
+            subtree_node = random.choice(list(self.nodes))
+            print(f"subtree_node: {subtree_node}") #DEBUG
+
+        # Gathering possible regraft nodes
+        remote_nodes = self.remote_nodes(subtree_node)
+        possible_regraft_nodes = self.nodes - remote_nodes - {self.root}
+        subtree_parent = self.parent(subtree_node)
+        if self.is_bifurcation(subtree_parent):
+            possible_regraft_nodes = possible_regraft_nodes - {subtree_parent}
+        print(f"remote_nodes: {remote_nodes}") #DEBUG
+        print(f"possible_regraft_nodes: {possible_regraft_nodes}") #DEBUG
+
+        # Choosing random regraft_node if none was provided
+        if regraft_node is None:
+            regraft_node = random.choice(list(possible_regraft_nodes))
+            print(f"regraft_node: {regraft_node}") #DEBUG
+
+        elif regraft_node not in possible_regraft_nodes:
+            msg = "Specified regraft_node is not compatible with subtree_node"
+            raise TreeError(msg)
+
+        # Pruning: Remove subtree
         isleaf = subtree_node in self.leaves
-
-        # Python note: should check that regraft node is in self after removing subtree
         subtree = self.subtree(subtree_node)
         for leaf in self.remote_children(subtree_node):
             self.remove_leaf(leaf)
 
         # Regraft: Add subtree back onto remaining tree
         # Special treatment when pruning single leaf (to avoid superfluous internal node)
-        if isleaf:
-            self.graft(subtree, regraft_node, graft_with_other_root=True)
-        else:
-            self.graft(subtree, regraft_node, graft_with_other_root=False)
+        print(f"isleaf: {isleaf}")  #DEBUG
+        self.graft(subtree, regraft_node, graft_with_other_root=isleaf)
 
 ###################################################################################################
 ###################################################################################################
