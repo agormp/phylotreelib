@@ -3267,56 +3267,86 @@ class Tree():
 
     ###############################################################################################
 
-    def spr(self, subtree_node=None, regraft_node=None):
+    def possible_spr_prune_nodes(self):
+        """Utililty function when using spr function: where is it possible to prune"""
+
+        possible_prune_nodes = self.nodes - {self.root}
+        rootkids = list(self.children(self.root))
+        if len(rootkids) == 2:
+            if rootkids[0] in self.leaves and rootkids[1] in self.intnodes:
+                possible_prune_nodes = possible_prune_nodes - {rootkids[1]}
+            elif rootkids[1] in self.leaves and rootkids[0] in self.intnodes:
+                possible_prune_nodes = possible_prune_nodes - {rootkids[0]}
+
+        return possible_prune_nodes
+
+    ###############################################################################################
+
+    def possible_spr_regraft_nodes(self, prune_node):
+        """Utility function when using spr function: where is it possible to regraft
+        prune_node: the node below which pruning will take place (before regrafting)"""
+
+        # Python note: could return preprocessed subtree and treecopy to save computation
+        # but this is pretty fast and interface would be less clear.
+        # But in case of bottleneclk: also return subtree and treecopy perhaps
+
+        treecopy = self.copy_treeobject()
+        subtree = treecopy.subtree(prune_node)
+        for leaf in subtree.leaves:
+            treecopy.remove_leaf(leaf)
+        possible_regraft_nodes = treecopy.leaves - {treecopy.root}
+
+        return possible_regraft_nodes
+
+    ###############################################################################################
+
+    def spr(self, prune_node=None, regraft_node=None):
         """Subtree Pruning and Regrafting.
 
-        subtree_node: basenode of subtree that will be pruned.
-        regraft_node: node in tree below which subtree will be grafted
+        prune_node: basenode of subtree that will be pruned.
+        regraft_node: node in remaining treestump below which subtree will be grafted
 
         If no parameters are specified (both are None): perform random SPR
-        If only subtree_node is specified: choose random regraft_node
+        If only prune_node is specified: choose random regraft_node
 
-        Must specify either both parameters, no parameters, or only subtree_node
+        Must specify either both parameters, no parameters, or only prune_node
         """
 
+        # Sanity check: can't perfom SPR on tree with only two leaves
+        if len(self.leaves) == 2:
+            raise TreeError("Can not perform SPR on tree with only 2 leaves")
+
         # Invalid argument check
-        if subtree_node is None and regraft_node is not None:
+        if prune_node is None and regraft_node is not None:
             msg = ("You only specified regraft_node. "
-                   "Must specify either both parameters, no parameters, or only subtree_node")
+                   "Must specify either both parameters, no parameters, or only prune_node")
             raise TreeError(msg)
 
-        # Choosing random subtree_node if none was provided
-        if subtree_node is None:
-            subtree_node = random.choice(list(self.nodes))
-            print(f"subtree_node: {subtree_node}") #DEBUG
+        # Select random prune_node or check the one provided
+        possible_prune_nodes = self.possible_spr_prune_nodes()
+        if prune_node == None:
+            prune_node = random.choice(list(possible_prune_nodes))
+        else:
+            if prune_node not in possible_prune_nodes:
+                raise TreeError(f"Can not prune below {prune_node}")
 
-        # Gathering possible regraft nodes
-        remote_nodes = self.remote_nodes(subtree_node)
-        possible_regraft_nodes = self.nodes - remote_nodes - {self.root}
-        subtree_parent = self.parent(subtree_node)
-        if self.is_bifurcation(subtree_parent):
-            possible_regraft_nodes = possible_regraft_nodes - {subtree_parent}
-        print(f"remote_nodes: {remote_nodes}") #DEBUG
-        print(f"possible_regraft_nodes: {possible_regraft_nodes}") #DEBUG
-
-        # Choosing random regraft_node if none was provided
+        # Choose random regraft_node or check the one provided
+        possible_regraft_nodes = self.possible_spr_regraft_nodes(prune_node)
         if regraft_node is None:
             regraft_node = random.choice(list(possible_regraft_nodes))
-            print(f"regraft_node: {regraft_node}") #DEBUG
-
         elif regraft_node not in possible_regraft_nodes:
-            msg = "Specified regraft_node is not compatible with subtree_node"
+            msg = f"Specified regraft_node {regraft_node} is not compatible with prune_node"
             raise TreeError(msg)
 
         # Pruning: Remove subtree
-        isleaf = subtree_node in self.leaves
-        subtree = self.subtree(subtree_node)
-        for leaf in self.remote_children(subtree_node):
+        isleaf = prune_node in self.leaves
+        subtree = self.subtree(prune_node)
+        for leaf in self.remote_children(prune_node):
             self.remove_leaf(leaf)
 
         # Regraft: Add subtree back onto remaining tree
         # Special treatment when pruning single leaf (to avoid superfluous internal node)
-        print(f"isleaf: {isleaf}")  #DEBUG
+        isleaf = prune_node in self.leaves
         self.graft(subtree, regraft_node, graft_with_other_root=isleaf)
 
 ###################################################################################################
