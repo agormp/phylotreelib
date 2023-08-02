@@ -166,6 +166,30 @@ dmat = pt.Distmatrix.from_distdict(distdict)
 mytree = dmat.nj()
 ```
 
+-----
+
+### Construct random tree, perform random SPR moves on tree-copy, compute tree distances
+The code below constructs a random, bifurcating tree with 50 tips and random branch lengths, creates a copy of that tree, performs 5 random Subtree Pruning and Regrafting (SPR) moves, and finally computes three different measures of tree-distance between the original tree and the SPR-transformed tree: 
+
+* Robinson-Foulds symmetric distance
+* Normalised similarity (based on RF distance; 1 = identical)
+* Path difference distance (as described in [Steel and Penny, 1993](https://www.jstor.org/stable/2992536))
+
+```python
+import phylotreelib as pt
+tree1 = pt.Tree.randtree(ntips=50, randomlen=True)
+tree2 = tree1.copy_treeobject()
+for i in range(5):
+    tree2.spr()
+rf = tree1.treedist_RF(tree2)
+rfnorm = tree1.treedist_RF(tree2, normalise=True)
+rfsimnorm = 1 - rfnorm
+pd = tree1.treedist_pathdiff(tree2)
+print(f"Robinson-Foulds distance: {rf}")
+print(f"Normalised similarity (based on RF distance): {rfsimnorm:.2f}")
+print(f"Path difference distance: {pd:.2f}")
+```
+
 ## Using phylotreelib
 
 Typically, phylotreelib will be used for analysing (or manipulating) one or more trees that have been read from a textfile in Newick or Nexus format. Reading a tree from file will return a Tree object, which has methods for interrogating or altering itself (e.g. `mytree.rootmid()` will midpoint root the Tree object `mytree`).
