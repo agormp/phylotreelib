@@ -168,7 +168,7 @@ class Interner():
 ###################################################################################################
 ###################################################################################################
 
-class Branchstruct():
+class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
 
     def __init__(self, length=0.0, label=""):
@@ -180,16 +180,18 @@ class Branchstruct():
     def copy(self):
         """Returns copy of Branchstruct object, with all attributes included"""
 
-        # Python note: reconsider copying attributes besides blen and lab?
+        # Python note: deepcopy may be overkill and possibly costly.
+        # Maybe only copy blen and lab?
+
         obj = Branchstruct()
         for attrname, value in vars(self).items():
-            setattr(obj, attrname, value)
+            setattr(obj, attrname, copy.deepcopy(value))
         return obj
 
 ###################################################################################################
 ###################################################################################################
 
-class Topostruct():
+class Topostruct:
     """Class that emulates a struct. Keeps topology-related info"""
 
     __slots__ = ["weight", "tree", "freq"]
