@@ -55,64 +55,82 @@ import numpy as np
 # Various functions used by methods, that do not fit neatly in any class
 ###################################################################################################
 
-def remove_comments(text, leftdelim, rightdelim=None):
-    """Takes input string and strips away commented text, delimited by 'leftdelim' and 'rightdelim'.
-        Also deals with nested comments."""
+def remove_comments(input_string):
+    output_string = ''
+    comment_depth = 0
+    for c in input_string:
+        if c == '[':
+            comment_depth += 1
+        elif c == ']':
+            if comment_depth == 0:
+                raise TreeError('Unbalanced comment delimiters detected')
+            comment_depth -= 1
+        elif comment_depth == 0:
+            output_string += c
+    if comment_depth != 0:
+        raise TreeError('Unbalanced comment delimiters detected')
+    return output_string
 
-    # NOTE: only deals with block comments at present
-    # Python note: maybe this is too general. Will I ever use multichar delims?
-    def wordsoverlap(w1, w2):
-        for i in range(1, len(w2)):
-            if w1.startswith(w2[i:]):
-                return True
-        for i in range(1, len(w1)):
-            if w2.startswith(w1[i:]):
-                return True
-        return False
-
-    if leftdelim == rightdelim:
-        raise TreeError("Left and right delimiters are identical")
-    elif leftdelim in rightdelim:
-        raise TreeError("Left delimiter is substring of right delimiters")
-    elif rightdelim in leftdelim:
-        raise TreeError("Right delimiter is substring of left delimiters")
-    elif wordsoverlap(leftdelim, rightdelim):
-        raise TreeError("Right and left delimiters overlap")
-
-    # Preprocess delims for use in re etc
-    leftdelim = re.escape(leftdelim)
-    rightdelim = re.escape(rightdelim)
-
-    # Construct sorted list of tuples of the form [(0, 'start'), (5, 'stop'), (7, 'start'), ...]
-    delimlist = [(match.start(), match.end(), "start") for match in re.finditer(leftdelim, text)]
-    # If text contains no starts (=> no comments): return un-altered text
-    if not delimlist:
-        return text
-    else:
-        delimlist.extend([(match.start(), match.end(), "stop") for match in re.finditer(rightdelim, text)])
-        delimlist.sort()
-
-    # Traverse text; along the way copy text not inside comment-delimiter pairs.
-    # Use stack ("unmatched_starts") to keep track of nesting
-    unmatched_starts = 0
-    prevpos = 0
-    processed_text = []
-    for (match_start, match_end, match_type) in delimlist:
-        if match_type == "start":
-            unmatched_starts += 1
-            if unmatched_starts == 1:                               # Beginning of new comment region
-                processed_text.append(text[prevpos:match_start])
-        elif match_type == "stop":
-            unmatched_starts -= 1
-            if unmatched_starts == 0:                               # End of comment region
-                prevpos = match_end
-            elif unmatched_starts == -1:                            # Error: more right delims than left delims
-                raise Exception("Unmatched end-comment delimiter. Context: '{}'".format(text[prevpos-10:prevpos+10]))
-
-    # Add final block of text if relevant (i.e., if text does not stop with rightdelim), return processed text
-    if prevpos < len(text):
-        processed_text.append(text[prevpos:])
-    return "".join(processed_text)
+#
+#
+# def remove_comments(text, leftdelim, rightdelim=None):
+#     """Takes input string and strips away commented text, delimited by 'leftdelim' and 'rightdelim'.
+#         Also deals with nested comments."""
+#
+#     # NOTE: only deals with block comments at present
+#     # Python note: maybe this is too general. Will I ever use multichar delims?
+#     def wordsoverlap(w1, w2):
+#         for i in range(1, len(w2)):
+#             if w1.startswith(w2[i:]):
+#                 return True
+#         for i in range(1, len(w1)):
+#             if w2.startswith(w1[i:]):
+#                 return True
+#         return False
+#
+#     if leftdelim == rightdelim:
+#         raise TreeError("Left and right delimiters are identical")
+#     elif leftdelim in rightdelim:
+#         raise TreeError("Left delimiter is substring of right delimiters")
+#     elif rightdelim in leftdelim:
+#         raise TreeError("Right delimiter is substring of left delimiters")
+#     # elif wordsoverlap(leftdelim, rightdelim):
+#     #     raise TreeError("Right and left delimiters overlap")
+#
+#     # Preprocess delims for use in re etc
+#     leftdelim = re.escape(leftdelim)
+#     rightdelim = re.escape(rightdelim)
+#
+#     # Construct sorted list of tuples of the form [(0, 'start'), (5, 'stop'), (7, 'start'), ...]
+#     delimlist = [(match.start(), match.end(), "start") for match in re.finditer(leftdelim, text)]
+#     # If text contains no starts (=> no comments): return un-altered text
+#     if not delimlist:
+#         return text
+#     else:
+#         delimlist.extend([(match.start(), match.end(), "stop") for match in re.finditer(rightdelim, text)])
+#         delimlist.sort()
+#
+#     # Traverse text; along the way copy text not inside comment-delimiter pairs.
+#     # Use stack ("unmatched_starts") to keep track of nesting
+#     unmatched_starts = 0
+#     prevpos = 0
+#     processed_text = []
+#     for (match_start, match_end, match_type) in delimlist:
+#         if match_type == "start":
+#             unmatched_starts += 1
+#             if unmatched_starts == 1:                               # Beginning of new comment region
+#                 processed_text.append(text[prevpos:match_start])
+#         elif match_type == "stop":
+#             unmatched_starts -= 1
+#             if unmatched_starts == 0:                               # End of comment region
+#                 prevpos = match_end
+#             elif unmatched_starts == -1:                            # Error: more right delims than left delims
+#                 raise Exception("Unmatched end-comment delimiter. Context: '{}'".format(text[prevpos-10:prevpos+10]))
+#
+#     # Add final block of text if relevant (i.e., if text does not stop with rightdelim), return processed text
+#     if prevpos < len(text):
+#         processed_text.append(text[prevpos:])
+#     return "".join(processed_text)
 
 ###################################################################################################
 ###################################################################################################
@@ -4002,7 +4020,7 @@ class Newicktreefile(TreefileBase):
             self.treefile.close()
             raise StopIteration
         else:
-            treestring =  remove_comments(treestring, leftdelim = "[", rightdelim="]")
+            treestring =  remove_comments(treestring)
             return Tree.from_string(treestring)
 
 ###################################################################################################
@@ -4033,7 +4051,7 @@ class Nexustreefile(TreefileBase):
 
             # Now we should have an equal number of "[" and "]"
             # Remove comments
-            return remove_comments(line, leftdelim = "[", rightdelim="]")
+            return remove_comments(line)
 
         ###########################################################################################
 
@@ -4138,7 +4156,7 @@ class Nexustreefile(TreefileBase):
         # remove comments in brackets if present
         # remove leading "tree NAME =" (compiled regexp "tree_header_pattern")
         # Implementation note: does not deal with figtree comments!
-        treestring = remove_comments(treestring, leftdelim = "[", rightdelim="]")
+        treestring = remove_comments(treestring)
         treestring = self.tree_header_pattern.sub("", treestring)
 
         # If "end;" statement has been reached: terminate for loop, do NOT return tree object
