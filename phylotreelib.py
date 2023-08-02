@@ -71,13 +71,13 @@ def remove_comments(text, leftdelim, rightdelim=None):
         return False
 
     if leftdelim == rightdelim:
-        raise SeqError("Left and right delimiters are identical")
+        raise TreeError("Left and right delimiters are identical")
     elif leftdelim in rightdelim:
-        raise SeqError("Left delimiter is substring of right delimiters")
+        raise TreeError("Left delimiter is substring of right delimiters")
     elif rightdelim in leftdelim:
-        raise ExcepSeqErrortion("Right delimiter is substring of left delimiters")
+        raise TreeError("Right delimiter is substring of left delimiters")
     elif wordsoverlap(leftdelim, rightdelim):
-        raise SeqError("Right and left delimiters overlap")
+        raise TreeError("Right and left delimiters overlap")
 
     # Preprocess delims for use in re etc
     leftdelim = re.escape(leftdelim)
