@@ -2891,7 +2891,7 @@ class Tree():
 
     def treedist_pathdiff(self, other):
         """Compute path difference tree-distance between self and other:
-        Euclidean distance between node-dist matrices considered as vectors.
+        Euclidean distance between nodepath-dist matrices considered as vectors.
         Measure described in M.A. Steel, D. Penny, Syst. Biol. 42 (1993) 126–141
         """
 
@@ -3312,7 +3312,6 @@ class Tree():
                 possible_prune_nodes = possible_prune_nodes - {rootkids[1]}
             elif rootkids[1] in self.leaves and rootkids[0] in self.intnodes:
                 possible_prune_nodes = possible_prune_nodes - {rootkids[0]}
-
         return possible_prune_nodes
 
     ###############################################################################################
@@ -3330,7 +3329,6 @@ class Tree():
         for leaf in subtree.leaves:
             treecopy.remove_leaf(leaf)
         possible_regraft_nodes = treecopy.leaves - {treecopy.root}
-
         return possible_regraft_nodes
 
     ###############################################################################################
@@ -3374,14 +3372,13 @@ class Tree():
             raise TreeError(msg)
 
         # Pruning: Remove subtree
-        isleaf = prune_node in self.leaves
+        isleaf = prune_node in self.leaves      # Has to be set before pruning!
         subtree = self.subtree(prune_node)
         for leaf in self.remote_children(prune_node):
             self.remove_leaf(leaf)
 
         # Regraft: Add subtree back onto remaining tree
         # Special treatment when pruning single leaf (to avoid superfluous internal node)
-        isleaf = prune_node in self.leaves
         self.graft(subtree, regraft_node, graft_with_other_root=isleaf)
 
 ###################################################################################################
