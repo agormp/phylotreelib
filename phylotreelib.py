@@ -2868,8 +2868,43 @@ class Tree():
 
     ###############################################################################################
 
+    def _pathdist_as_ndarray(self):
+        """Utillity function for treedist_pathdiff: return pathdiff matrix as vector:
+        For each pair of leaves: count number of edges on path between them,
+        return flattened version of pairwise matrix (in alphabetical leaf-pair order)
+        Note: traversing root counts as one edge (so I deroot treecopy before counting)"""
+
+        def dist_iterator(tree, namepairs):
+            for n1, n2 in namepairs:
+                yield len(tree.nodepath(n1,n2)) - 1
+
+        tree = self.copy_treeobject()
+        tree.deroot()
+        leafnames = tree.leaflist()     # Sorted alphabetically
+        namepairs = itertools.combinations(leafnames, 2)
+        nleaves = len(leafnames)
+        npairs = nleaves * (nleaves - 1) // 2
+        distarray = np.fromiter(dist_iterator(tree, namepairs), dtype=float, count=npairs)
+        return distarray
+
+    ###############################################################################################
+
+    def treedist_pathdiff(self, other):
+        """Compute path difference tree-distance between self and other:
+        Euclidean distance between node-dist matrices considered as vectors.
+        Measure described in M.A. Steel, D. Penny, Syst. Biol. 42 (1993) 126–141
+        """
+
+        self_distvec = self._pathdist_as_ndarray()
+        other_distvec = other._pathdist_as_ndarray()
+
+        return np.linalg.norm(self_distvec - other_distvec)
+
+    ###############################################################################################
+
     def treedist(self, other, normalise=True, verbose=False):
-        """Compute symmetric tree distance (Robinson Foulds) between self and other tree.
+        """Deprecated: Use treedist_RF instead.
+        Compute symmetric tree distance (Robinson Foulds) between self and other tree.
         Normalised measure returned by default"""
 
         # Check that trees are comparable (have identical leaf sets)
