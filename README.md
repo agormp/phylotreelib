@@ -990,6 +990,13 @@ CLASSES
      |      Return nested dictionary giving all pairwise, patristic distances:
      |      dict[node1][node2] = patristic distance
      |  
+     |  possible_spr_prune_nodes(self)
+     |      Utililty function when using spr function: where is it possible to prune
+     |  
+     |  possible_spr_regraft_nodes(self, prune_node)
+     |      Utility function when using spr function: where is it possible to regraft
+     |      prune_node: the node below which pruning will take place (before regrafting)
+     |  
      |  prune_maxlen(self, nkeep, return_leaves=False)
      |      Prune tree so remaining nkeep leaves spread out maximal percentage of branch length
      |  
@@ -1054,16 +1061,16 @@ CLASSES
      |  sorted_intnodes(self, deepfirst=True)
      |      Returns sorted intnode list for breadth-first traversal of tree
      |  
-     |  spr(self, subtree_node=None, regraft_node=None)
+     |  spr(self, prune_node=None, regraft_node=None)
      |      Subtree Pruning and Regrafting.
      |      
-     |      subtree_node: basenode of subtree that will be pruned.
-     |      regraft_node: node in tree below which subtree will be grafted
+     |      prune_node: basenode of subtree that will be pruned.
+     |      regraft_node: node in remaining treestump below which subtree will be grafted
      |      
      |      If no parameters are specified (both are None): perform random SPR
-     |      If only subtree_node is specified: choose random regraft_node
+     |      If only prune_node is specified: choose random regraft_node
      |      
-     |      Must specify either both parameters, no parameters, or only subtree_node
+     |      Must specify either both parameters, no parameters, or only prune_node
      |  
      |  subtree(self, basenode, return_basalbranch=False)
      |      Returns subtree rooted at basenode as Tree object
@@ -1080,8 +1087,19 @@ CLASSES
      |      Translate all leaf names using oldname/newname pairs in namefile
      |  
      |  treedist(self, other, normalise=True, verbose=False)
+     |      Deprecated: Use treedist_RF instead.
      |      Compute symmetric tree distance (Robinson Foulds) between self and other tree.
      |      Normalised measure returned by default
+     |  
+     |  treedist_RF(self, other, normalise=False, rooted=False)
+     |      Compute symmetric tree distance (Robinson Foulds) between self and other tree.
+     |      normalise: divide RF distance by the total number of bipartitions in the two trees
+     |      rooted: take position of root into account
+     |  
+     |  treedist_pathdiff(self, other)
+     |      Compute path difference tree-distance between self and other:
+     |      Euclidean distance between nodepath-dist matrices considered as vectors.
+     |      Measure described in M.A. Steel, D. Penny, Syst. Biol. 42 (1993) 126–141
      |  
      |  treesim(self, other, verbose=False)
      |      Compute normalised symmetric similarity between self and other tree
