@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-# Unit tests for phylotreelib.py
-# UNDER CONSTRUCTION (I know - should have been written prior to the code...)
-# Simple usage: python3 test_phylotreelib.py
-# verbose output: python3 test_phylotreelib.py -v
 
 import phylotreelib as pt
 import unittest
