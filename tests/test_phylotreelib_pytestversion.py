@@ -275,3 +275,75 @@ class Test_randtree:
                 assert length >= 0   # since lognormvariate will always produce positive values
                 assert isinstance(length, float)
 
+###################################################################################################
+
+class Test_TreeIteration:
+    """Tests iteration over file with several trees"""
+
+    def test_iterate_newick(self, treedata, tmp_path):
+        """Does iteration over tree objects from treefile work? """
+
+        # First: construct treefile
+        filename = tmp_path / "tempfile"
+        trees = pt.TreeSet()
+        for treestring in treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            trees.addtree(mytree)
+        with open(filename, 'w') as file:
+            file.write(trees.newick())
+
+        # Secondly: iterate over treefile
+        treefile = pt.Newicktreefile(filename)
+        for tree in treefile:
+            assert isinstance(tree, pt.Tree)
+
+    def test_read_correctly_newick(self, treedata, tmp_path):
+        """Do I also get the correctly read trees from treefile"""
+
+        # First: construct treefile
+        filename = tmp_path / "tempfile"
+        treelist = []
+        trees = pt.TreeSet()
+        for treestring in treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            treelist.append(mytree)
+            trees.addtree(mytree)
+        with open(filename, 'w') as file:
+            file.write(trees.newick())
+
+        # Secondly: iterate over treefile, check that read trees correspond to written trees
+        treefile = pt.Newicktreefile(filename)
+        for i, tree in enumerate(treefile):
+            assert tree == treelist[i]
+
+    def test_iterate_nexus(self, treedata, tmp_path):
+        """Does iteration over tree objects from nexus treefile work? """
+
+        # First: construct treefile
+        filename = tmp_path / "tempfile"
+        with open(filename, 'w') as file:
+            for treestring in treedata.values():
+                mytree = pt.Tree.from_string(treestring)
+                file.write(mytree.nexus())
+
+        # Secondly: iterate over treefile
+        treefile = pt.Nexustreefile(filename)
+        for tree in treefile:
+            assert isinstance(tree, pt.Tree)
+
+    def test_read_correctly_nexus(self, treedata, tmp_path):
+        """Do I also get the correctly read trees from nexus treefile"""
+
+        # First: construct treefile
+        filename = tmp_path / "tempfile"
+        treelist = []
+        with open(filename, 'w') as file:
+            for treestring in treedata.values():
+                mytree = pt.Tree.from_string(treestring)
+                treelist.append(mytree)
+                file.write(mytree.nexus())
+
+        # Secondly: iterate over treefile, check that read trees correspond to written trees
+        treefile = pt.Nexustreefile(filename)
+        for i, tree in enumerate(treefile):
+            assert tree == treelist[i]
