@@ -203,3 +203,15 @@ class Test_from_topology:
 
 ###################################################################################################
 
+class Test_from_leaf:
+    """Tests from_leaf() constructor"""
+
+    def test_fromleaf(self):
+        """Does Tree.from_leaf() work correctly?"""
+        # Note: this constructor relies mostly on from_string, so testing is minimal...
+        leaves = ["A", "B", "C", "D", "E"]
+        mytree = pt.Tree.from_leaves(leaves)
+        assert isinstance(mytree, pt.Tree)
+        assert mytree.children(mytree.root) == {"A", "B", "C", "D", "E"}
+        assert len(mytree.intnodes) == 1
+        assert len(mytree.leaves) == 5

@@ -338,23 +338,6 @@ class TreeRead(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
-class LeafConstruction(unittest.TestCase):
-    """Tests from_leaf() constructor"""
-
-    def test_fromleaf(self):
-        """Does Tree.from_leaf() work correctly?"""
-        # Note: this constructor relies mostly on from_string, so testing is minimal...
-        leaves = ["A", "B", "C", "D", "E"]
-        self.assertTrue(isinstance(pt.Tree.from_leaves(leaves), pt.Tree))
-        mytree = pt.Tree.from_leaves(leaves)
-        self.assertEqual(mytree.children(mytree.root), {"A", "B", "C", "D", "E"})
-        self.assertEqual(len(mytree.intnodes), 1)
-        self.assertEqual(len(mytree.leaves), 5)
-
-
-########################################################################################
-########################################################################################
-
 class BranchinfoConstruction(TreeTestBase):
     """Tests from_branchinfo() constructor"""
 
