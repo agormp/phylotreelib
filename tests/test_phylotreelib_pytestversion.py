@@ -159,6 +159,26 @@ class Test_parent_dict:
         expected_dict = {0:None, 1:0, "s4":0, "s5":0, 2:1, "s3":1, "s1":2, "s2":2}
         assert pd == expected_dict
 
+    # Python note: add tests for whether dict is cleared in relevant situations
 
+###################################################################################################
 
+class Test_from_biplist:
+    """Tests from_biplist() constructor"""
 
+    def test_frombip(self):
+        biplist = {frozenset([frozenset(["A"]), frozenset(["B", "C", "D"])]): pt.Branchstruct(0.1),
+                   frozenset([frozenset(["B"]), frozenset(["A", "C", "D"])]): pt.Branchstruct(0.2),
+                   frozenset([frozenset(["C"]), frozenset(["B", "A", "D"])]): pt.Branchstruct(0.3),
+                   frozenset([frozenset(["D"]), frozenset(["B", "C", "A"])]): pt.Branchstruct(0.4),
+                   frozenset([frozenset(["A", "B"]), frozenset(["C", "D"])]): pt.Branchstruct(0.5)}
+
+        mytree = pt.Tree.from_biplist(biplist)
+        assert isinstance(mytree, pt.Tree)
+        assert mytree.leaves == {"A", "B", "C", "D"}
+        assert mytree.intnodes == {0, 1}
+        assert abs(mytree.length() - 1.5) < 1e-9  # compare floating point values with a small tolerance
+        assert mytree.parent("A") == mytree.parent("B")
+        assert mytree.parent("C") == mytree.parent("D")
+
+###################################################################################################

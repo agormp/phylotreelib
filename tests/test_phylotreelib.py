@@ -355,29 +355,6 @@ class LeafConstruction(unittest.TestCase):
 ########################################################################################
 ########################################################################################
 
-class BiplistConstructor(unittest.TestCase):
-    """Tests from_biplist() constructor"""
-
-    def test_frombip(self):
-        """Does Tree.from_biplist() work correctly?"""
-
-        biplist = {frozenset([frozenset(["A"]), frozenset(["B", "C", "D"])]): pt.Branchstruct(0.1),
-                   frozenset([frozenset(["B"]), frozenset(["A", "C", "D"])]): pt.Branchstruct(0.2),
-                   frozenset([frozenset(["C"]), frozenset(["B", "A", "D"])]): pt.Branchstruct(0.3),
-                   frozenset([frozenset(["D"]), frozenset(["B", "C", "A"])]): pt.Branchstruct(0.4),
-                   frozenset([frozenset(["A", "B"]), frozenset(["C", "D"])]): pt.Branchstruct(0.5)}
-
-        self.assertTrue(isinstance(pt.Tree.from_biplist(biplist), pt.Tree))
-        mytree = pt.Tree.from_biplist(biplist)
-        # print("\n##############################################\nIn test_frombip\n\n")
-        # print(mytree)
-        self.assertEqual(mytree.leaves, {"A", "B", "C", "D"})
-        self.assertEqual(mytree.intnodes, {0, 1})
-        self.assertAlmostEqual(mytree.length(), 1.5)
-
-########################################################################################
-########################################################################################
-
 class BranchinfoConstruction(TreeTestBase):
     """Tests from_branchinfo() constructor"""
 
