@@ -18,14 +18,14 @@ class TreeTestBase(unittest.TestCase):
     """Base class for test cases: contains tree data used by many tests"""
 
     treedata = {"simplestring" :
-                        "(((s1:0.12500,s2:0.12500):0.25000,s3:0.12500):0.12500,s4:0.12500,S5:0.12500);",
+                        "(((s1:0.12500,s2:0.12500):0.25000,s3:0.12500):0.12500,s4:0.12500,s5:0.12500);",
 
                "string_with_blanks" :
-                        "(((s1:0.12500, s2:0.12500): 0.25000,s3: 0.12500): 0.12500, s4:0.12500 ,S5:0.12500);",
+                        "(((s1:0.12500, s2:0.12500): 0.25000,s3: 0.12500): 0.12500, s4:0.12500 ,s5:0.12500);",
 
                "string_with_newlines" :
                          """(((s1:0.12500,s2:0.12500):0.25000,
-                                            s3:0.12500):0.12500,s4:0.12500,S5:0.12500);""",
+                                            s3:0.12500):0.12500,s4:0.12500,s5:0.12500);""",
 
                "string_with_label" :
                          """(KL0F07689: 0.101408, KW081_13: 0.071355,
@@ -684,13 +684,13 @@ class PathMethods(TreeTestBase):
         self.assertAlmostEqual(mytree.nodedist("s1", "s2"), 0.25)
         self.assertAlmostEqual(mytree.nodedist("s1", "s3"), 0.5)
         self.assertAlmostEqual(mytree.nodedist("s1", "s4"), 0.625)
-        self.assertAlmostEqual(mytree.nodedist("s1", "S5"), 0.625)
+        self.assertAlmostEqual(mytree.nodedist("s1", "s5"), 0.625)
         self.assertAlmostEqual(mytree.nodedist("s2", "s3"), mytree.nodedist("s1", "s3"))
         self.assertAlmostEqual(mytree.nodedist("s2", "s4"), mytree.nodedist("s1", "s4"))
-        self.assertAlmostEqual(mytree.nodedist("s2", "S5"), mytree.nodedist("s1", "S5"))
+        self.assertAlmostEqual(mytree.nodedist("s2", "s5"), mytree.nodedist("s1", "s5"))
         self.assertAlmostEqual(mytree.nodedist("s3", "s4"), 0.375)
-        self.assertAlmostEqual(mytree.nodedist("s3", "S5"), 0.375)
-        self.assertAlmostEqual(mytree.nodedist("s4", "S5"), 0.25)
+        self.assertAlmostEqual(mytree.nodedist("s3", "s5"), 0.375)
+        self.assertAlmostEqual(mytree.nodedist("s4", "s5"), 0.25)
 
         # Check a few pairwise distances in HIVtree
         treestring = self.treedata["HIVtree"]
@@ -959,13 +959,13 @@ class Topologytests(TreeTestBase):
         mytree = pt.Tree.from_string(treestring)
         bipdict = mytree.bipdict()
 
-        expectedkeys = [frozenset([frozenset(["s4", "S5"]), frozenset(["s1", "s2", "s3"])]),
-                        frozenset([frozenset(["s4", "S5", "s3"]), frozenset(["s1", "s2"])]),
-                        frozenset([frozenset(["s4", "S5", "s3", "s2"]), frozenset(["s1"])]),
-                        frozenset([frozenset(["s4", "S5", "s3", "s1"]), frozenset(["s2"])]),
-                        frozenset([frozenset(["s4", "S5", "s1", "s2"]), frozenset(["s3"])]),
-                        frozenset([frozenset(["s1", "S5", "s3", "s2"]), frozenset(["s4"])]),
-                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["S5"])])]
+        expectedkeys = [frozenset([frozenset(["s4", "s5"]), frozenset(["s1", "s2", "s3"])]),
+                        frozenset([frozenset(["s4", "s5", "s3"]), frozenset(["s1", "s2"])]),
+                        frozenset([frozenset(["s4", "s5", "s3", "s2"]), frozenset(["s1"])]),
+                        frozenset([frozenset(["s4", "s5", "s3", "s1"]), frozenset(["s2"])]),
+                        frozenset([frozenset(["s4", "s5", "s1", "s2"]), frozenset(["s3"])]),
+                        frozenset([frozenset(["s1", "s5", "s3", "s2"]), frozenset(["s4"])]),
+                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["s5"])])]
 
         expectedvals = [0.125, 0.25, 0.125, 0.125, 0.125, 0.125, 0.125]
 
@@ -987,13 +987,13 @@ class Topologytests(TreeTestBase):
         mytree = pt.Tree.from_string(treestring)
         topology = mytree.topology()
 
-        expectedtop = frozenset([frozenset([frozenset(["s4", "S5"]), frozenset(["s1", "s2", "s3"])]),
-                        frozenset([frozenset(["s4", "S5", "s3"]), frozenset(["s1", "s2"])]),
-                        frozenset([frozenset(["s4", "S5", "s3", "s2"]), frozenset(["s1"])]),
-                        frozenset([frozenset(["s4", "S5", "s3", "s1"]), frozenset(["s2"])]),
-                        frozenset([frozenset(["s4", "S5", "s1", "s2"]), frozenset(["s3"])]),
-                        frozenset([frozenset(["s1", "S5", "s3", "s2"]), frozenset(["s4"])]),
-                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["S5"])])])
+        expectedtop = frozenset([frozenset([frozenset(["s4", "s5"]), frozenset(["s1", "s2", "s3"])]),
+                        frozenset([frozenset(["s4", "s5", "s3"]), frozenset(["s1", "s2"])]),
+                        frozenset([frozenset(["s4", "s5", "s3", "s2"]), frozenset(["s1"])]),
+                        frozenset([frozenset(["s4", "s5", "s3", "s1"]), frozenset(["s2"])]),
+                        frozenset([frozenset(["s4", "s5", "s1", "s2"]), frozenset(["s3"])]),
+                        frozenset([frozenset(["s1", "s5", "s3", "s2"]), frozenset(["s4"])]),
+                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["s5"])])])
 
         self.assertEqual(topology, expectedtop)
 
@@ -1003,16 +1003,16 @@ class Topologytests(TreeTestBase):
         treestring = self.treedata["simplestring"]
         mytree = pt.Tree.from_string(treestring)
 
-        expectedbips = [frozenset([frozenset(["s4", "S5"]), frozenset(["s1", "s2", "s3"])]),
-                        frozenset([frozenset(["s4", "S5", "s3"]), frozenset(["s1", "s2"])]),
-                        frozenset([frozenset(["s4", "S5", "s3", "s2"]), frozenset(["s1"])]),
-                        frozenset([frozenset(["s4", "S5", "s3", "s1"]), frozenset(["s2"])]),
-                        frozenset([frozenset(["s4", "S5", "s1", "s2"]), frozenset(["s3"])]),
-                        frozenset([frozenset(["s1", "S5", "s3", "s2"]), frozenset(["s4"])]),
-                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["S5"])])]
+        expectedbips = [frozenset([frozenset(["s4", "s5"]), frozenset(["s1", "s2", "s3"])]),
+                        frozenset([frozenset(["s4", "s5", "s3"]), frozenset(["s1", "s2"])]),
+                        frozenset([frozenset(["s4", "s5", "s3", "s2"]), frozenset(["s1"])]),
+                        frozenset([frozenset(["s4", "s5", "s3", "s1"]), frozenset(["s2"])]),
+                        frozenset([frozenset(["s4", "s5", "s1", "s2"]), frozenset(["s3"])]),
+                        frozenset([frozenset(["s1", "s5", "s3", "s2"]), frozenset(["s4"])]),
+                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["s5"])])]
 
-        badbips  = [frozenset([frozenset(["s3", "S5"]), frozenset(["s1", "s2", "s4"])]),
-                        frozenset([frozenset(["s4", "s1", "s3"]), frozenset(["S5", "s2"])])]
+        badbips  = [frozenset([frozenset(["s3", "s5"]), frozenset(["s1", "s2", "s4"])]),
+                        frozenset([frozenset(["s4", "s1", "s3"]), frozenset(["s5", "s2"])])]
 
         for bip in expectedbips:
             assert mytree.is_compatible_with(bip)
@@ -1300,7 +1300,7 @@ class RootTester(TreeTestBase):
         self.assertAlmostEqual(mytree.nodedist("s2"), 0.3125)
         self.assertAlmostEqual(mytree.nodedist("s3"), 0.1875)
         self.assertAlmostEqual(mytree.nodedist("s4"), 0.3125)
-        self.assertAlmostEqual(mytree.nodedist("S5"), 0.3125)
+        self.assertAlmostEqual(mytree.nodedist("s5"), 0.3125)
 
         treestring = self.treedata["HIVtree_HV1A2root"]
         mytree = pt.Tree.from_string(treestring)
