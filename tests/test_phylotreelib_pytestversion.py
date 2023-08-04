@@ -182,3 +182,24 @@ class Test_from_biplist:
         assert mytree.parent("C") == mytree.parent("D")
 
 ###################################################################################################
+
+class Test_from_topology:
+    """Tests from_topology() constructor"""
+
+    def test_frombip(self):
+        topology = {frozenset([frozenset(["A"]), frozenset(["B", "C", "D"])]),
+                   frozenset([frozenset(["B"]), frozenset(["A", "C", "D"])]),
+                   frozenset([frozenset(["C"]), frozenset(["B", "A", "D"])]),
+                   frozenset([frozenset(["D"]), frozenset(["B", "C", "A"])]),
+                   frozenset([frozenset(["A", "B"]), frozenset(["C", "D"])])}
+
+        mytree = pt.Tree.from_topology(topology)
+        assert isinstance(mytree, pt.Tree)
+        assert mytree.leaves == {"A", "B", "C", "D"}
+        assert mytree.intnodes == {0, 1}
+        assert mytree.length() == 0.0
+        assert mytree.parent("A") == mytree.parent("B")
+        assert mytree.parent("C") == mytree.parent("D")
+
+###################################################################################################
+
