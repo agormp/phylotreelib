@@ -1,4 +1,5 @@
 import phylotreelib as pt
+import math
 import pytest
 import random
 
@@ -242,4 +243,35 @@ class Test_from_branchinfo:
 
 ###################################################################################################
 
+class Test_randtree:
+
+    def test_randtree_leaflist(self):
+        """Does Tree.randtree() work correctly when leaflist is provided?"""
+        leaflist = ['leaf1', 'leaf2', 'leaf3', 'leaf4', 'leaf5']
+        mytree = pt.Tree.randtree(leaflist=leaflist)
+
+        assert isinstance(mytree, pt.Tree)
+        assert set(mytree.leaves) == set(leaflist)
+        assert mytree.is_resolved()
+
+    def test_randtree_ntips(self):
+        """Does Tree.randtree() work correctly when ntips is provided?"""
+        ntips = 5
+        mytree = pt.Tree.randtree(ntips=ntips)
+
+        assert isinstance(mytree, pt.Tree)
+        assert len(mytree.leaves) == ntips
+        assert mytree.is_resolved()
+
+    def test_randtree_randomlen(self):
+        """Does Tree.randtree() correctly assign random lengths when randomlen is True?"""
+        ntips = 5
+        mytree = pt.Tree.randtree(ntips=ntips, randomlen=True)
+
+        assert isinstance(mytree, pt.Tree)
+        for parent in mytree.intnodes:
+            for child in mytree.tree[parent]:
+                length = mytree.tree[parent][child].length
+                assert length >= 0   # since lognormvariate will always produce positive values
+                assert isinstance(length, float)
 
