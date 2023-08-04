@@ -215,3 +215,31 @@ class Test_from_leaf:
         assert mytree.children(mytree.root) == {"A", "B", "C", "D", "E"}
         assert len(mytree.intnodes) == 1
         assert len(mytree.leaves) == 5
+
+###################################################################################################
+
+class Test_from_branchinfo:
+    """Tests from_branchinfo() constructor"""
+
+    def test_frombranchinfo(self, treedata):
+        """Does Tree.from_branchinfo() work correctly?"""
+        # Testing is done by reading trees from treedata, converting them to lists,
+        # recreating tree from lists, and comparing to original tree
+        for treestring in treedata.values():
+            origtree = pt.Tree.from_string(treestring)
+            parentlist = []
+            childlist = []
+            lenlist = []
+            lablist = []
+            for parent in origtree.intnodes:
+                for child in origtree.children(parent):
+                    parentlist.append(parent)
+                    childlist.append(child)
+                    lenlist.append(origtree.nodedist(parent, child))
+                    lablist.append(origtree.getlabel(parent, child))
+            newtree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist, lablist)
+            assert origtree == newtree
+
+###################################################################################################
+
+
