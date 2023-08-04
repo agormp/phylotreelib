@@ -124,56 +124,6 @@ class TreeTestBase(unittest.TestCase):
                                 HV2NZ:0.10411):0.01652,(SIVM1:0.04787,(SIVML:0.00784,SIVMK:0.008):0.03629):0.1025):0.198733);"""
                             }
 
-########################################################################################
-########################################################################################
-
-class StringConstruction(TreeTestBase):
-    """Tests whether Tree.from_string can parse various valid newick strings and return corresponding Tree object"""
-
-    def test_parse_simplestring(self):
-        """Can Tree.from_string parse simple newick string and return Tree object?"""
-        treestring = self.treedata["simplestring"]
-        self.assertTrue(isinstance(pt.Tree.from_string(treestring), pt.Tree))
-
-    def test_parse_blanks(self):
-        """Can Tree.from_string parse newick string with blanks and return Tree object?"""
-        treestring = self.treedata["string_with_blanks"]
-        self.assertTrue(isinstance(pt.Tree.from_string(treestring), pt.Tree))
-
-    def test_parse_newline(self):
-        """Can Tree.from_string parse newick string with newlines and return Tree object?"""
-        treestring = self.treedata["string_with_newlines"]
-        self.assertTrue(isinstance(pt.Tree.from_string(treestring), pt.Tree))
-
-    def test_parse_label(self):
-        """Can Tree.from_string parse newick string with branch labels and return Tree object?"""
-        treestring = self.treedata["string_with_label"]
-        self.assertTrue(isinstance(pt.Tree.from_string(treestring), pt.Tree))
-
-    def test_parse_complexstring(self):
-        """Can Tree.from_string parse complex newick string and return Tree object?"""
-        treestring = self.treedata["complexstring"]
-        self.assertTrue(isinstance(pt.Tree.from_string(treestring), pt.Tree))
-
-    def test_parse_spuriousnewlines(self):
-        """Can Tree.from_string parse newick string with newlines in unexpected places?"""
-        treestring = self.treedata["string_with_weird_newlines"]
-        self.assertTrue(isinstance(pt.Tree.from_string(treestring), pt.Tree))
-
-    def test_return_correct(self):
-        """Is Tree object correct?"""
-        # Note: only tested on one treestring so far. Assumed to be representative
-        treestring = self.treedata["string_with_label"]
-        mytree = pt.Tree.from_string(treestring)
-        expected_leaves = {"KL0F07689", "KW081_13", "SBC669_26", "YAL016W"}
-        expected_intnodes = {0, 1}
-        expected_nodes = expected_leaves | expected_intnodes
-
-        self.assertEqual(mytree.leaves, expected_leaves)
-        self.assertEqual(mytree.intnodes, expected_intnodes)
-        self.assertEqual(mytree.nodes, expected_nodes)
-        self.assertEqual(mytree.children(0), {1, "KL0F07689", "KW081_13"})
-        self.assertEqual(mytree.children(1), {"SBC669_26", "YAL016W"})
 
 ########################################################################################
 ########################################################################################

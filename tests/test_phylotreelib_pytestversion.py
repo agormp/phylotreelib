@@ -101,3 +101,42 @@ class Test_create_Topostruct:
 ###################################################################################################
 ###################################################################################################
 
+class Test_from_string:
+    def test_parse_simplestring(self, treedata):
+        treestring = treedata["simplestring"]
+        assert isinstance(pt.Tree.from_string(treestring), pt.Tree)
+
+    def test_parse_blanks(self, treedata):
+        treestring = treedata["string_with_blanks"]
+        assert isinstance(pt.Tree.from_string(treestring), pt.Tree)
+
+    def test_parse_newline(self, treedata):
+        treestring = treedata["string_with_newlines"]
+        assert isinstance(pt.Tree.from_string(treestring), pt.Tree)
+
+    def test_parse_label(self, treedata):
+        treestring = treedata["string_with_label"]
+        assert isinstance(pt.Tree.from_string(treestring), pt.Tree)
+
+    def test_parse_complexstring(self, treedata):
+        treestring = treedata["complexstring"]
+        assert isinstance(pt.Tree.from_string(treestring), pt.Tree)
+
+    def test_parse_spuriousnewlines(self, treedata):
+        treestring = treedata["string_with_weird_newlines"]
+        assert isinstance(pt.Tree.from_string(treestring), pt.Tree)
+
+    def test_return_correct(self, treedata):
+        treestring = treedata["string_with_label"]
+        mytree = pt.Tree.from_string(treestring)
+        expected_leaves = {"KL0F07689", "KW081_13", "SBC669_26", "YAL016W"}
+        expected_intnodes = {0, 1}
+        expected_nodes = expected_leaves | expected_intnodes
+
+        assert mytree.leaves == expected_leaves
+        assert mytree.intnodes == expected_intnodes
+        assert mytree.nodes == expected_nodes
+        assert mytree.children(0) == {1, "KL0F07689", "KW081_13"}
+        assert mytree.children(1) == {"SBC669_26", "YAL016W"}
+
+
