@@ -85,7 +85,9 @@ class Test_create_Topostruct:
         t = "(A,(B,(C,D)));"  # not actually a tree but fine for testing...
         f = 0.97
         x = "not supposed to be an attribute"
-        ts.weight = w    # Note: if exception is raised here then test fails
+        # Note: main test here is to see if class accepts (only) attribues named in __slots__
+        # Assertion is done implicitly: if exception is raised here then test fails
+        ts.weight = w
         ts.tree = t
         ts.freq = f
         with pytest.raises(AttributeError):
