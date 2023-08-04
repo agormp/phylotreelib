@@ -139,4 +139,26 @@ class Test_from_string:
         assert mytree.children(0) == {1, "KL0F07689", "KW081_13"}
         assert mytree.children(1) == {"SBC669_26", "YAL016W"}
 
+###################################################################################################
+
+class Test_parent_dict:
+
+    def test_parentdict_not_set_by_default(self, treedata):
+        mytree = pt.Tree.from_string(treedata["simplestring"])
+        assert mytree._parent_dict == None
+
+    def test_build_parentdict(self, treedata):
+        mytree = pt.Tree.from_string(treedata["simplestring"])
+        mytree.build_parent_dict()
+        expected_dict = {0:None, 1:0, "s4":0, "s5":0, 2:1, "s3":1, "s1":2, "s2":2}
+        assert mytree._parent_dict == expected_dict
+
+    def test_parentdict_property(self, treedata):
+        mytree = pt.Tree.from_string(treedata["simplestring"])
+        pd = mytree.parent_dict
+        expected_dict = {0:None, 1:0, "s4":0, "s5":0, 2:1, "s3":1, "s1":2, "s2":2}
+        assert pd == expected_dict
+
+
+
 
