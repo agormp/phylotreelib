@@ -3,20 +3,6 @@ import pytest
 
 ############################################################################################
 
-@pytest.fixture
-def balanced_input():
-    return 'Hello [comment] World!\n[newline]'
-
-@pytest.fixture
-def unbalanced_input():
-    return 'Hello [comment World!\n[newline'
-
-@pytest.fixture
-def nested_comments():
-    return 'Hello [outer [inner] comment] World!'
-
-############################################################################################
-
 @pytest.fixture()
 def treedata():
 
