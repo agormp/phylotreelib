@@ -126,20 +126,13 @@ class Interner():
         self.topo = {}
 
     def intern_leafset(self, leafset):
-        if leafset not in self.leafsets:
-            self.leafsets[leafset]=leafset
-        return self.leafsets[leafset]
+        return self.leafsets.setdefault(leafset, leafset)
 
     def intern_bipart(self, bipart):
-        if bipart not in self.biparts:
-            self.biparts[bipart]=bipart
-        return self.biparts[bipart]
+        return self.biparts.setdefault(bipart, bipart)
 
     def intern_topology(self, topology):
-        if topology not in self.topo:
-            self.topo[topology]=topology
-        return self.topo[topology]
-
+        return self.topo.setdefault(topology, topology)
 
 ###################################################################################################
 ###################################################################################################
