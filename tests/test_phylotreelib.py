@@ -237,46 +237,6 @@ class TreeRead(TreeTestBase):
         # Clean up
         os.remove(filename)
 
-
-########################################################################################
-########################################################################################
-
-class EqualityTest(TreeTestBase):
-    """Tests special method __eq__() for Tree objects"""
-
-    def test_equality(self):
-        """Sanity check: can Tree.__eq__() differentiate between set of known trees?"""
-        for treestring in self.treedata.values():
-            mytree1 = pt.Tree.from_string(treestring)
-            mytree2 = pt.Tree.from_string(treestring)
-            self.assertEqual(mytree1, mytree2)
-
-        stringlist = []
-        stringlist.append(self.treedata["simplestring"])
-        stringlist.append(self.treedata["complexstring"])
-        stringlist.append(self.treedata["HIVtree"])
-        for i in range(len(stringlist) - 1):
-            for j in range(i+1, len(stringlist) - 1):
-                mytree1 = pt.Tree.from_string(stringlist[i])
-                mytree2 = pt.Tree.from_string(stringlist[j])
-                self.assertNotEqual(mytree1, mytree2)
-
-    def test_diffblens(self):
-        """Check that different branch lengths results in non-equality"""
-        for treestring in self.treedata.values():
-            t1 = pt.Tree.from_string(treestring)
-            t2 = pt.Tree.from_string(treestring)
-            for parent in t2.intnodes:
-                for kid in t2.children(parent):
-                    origblen = t2.nodedist(parent,kid)
-                    t2.setlength(parent,kid,origblen*1.5)
-            self.assertNotEqual(t1, t2)
-
-########################################################################################
-########################################################################################
-
-# To be implemented: test of sorted_intnodes
-
 ########################################################################################
 ########################################################################################
 
@@ -313,80 +273,9 @@ class Has_same_root(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
-class Is_bifurcation(TreeTestBase):
-    """Tests for is_bifurcation function"""
-    def test_bifurcations(self):
-        """Check returns True: internal nodes with two descendants"""
-        for i in range(10):
-            t = pt.Tree.randtree(ntips=50)
-            for intnode in t.intnodes:
-                self.assertTrue(t.is_bifurcation(intnode))
-
-    def test_trifurcations(self):
-        """Check returns False: internal nodes with three descendants"""
-        for i in range(10):
-            t = pt.Tree.randtree(ntips=50)
-            for intnode in t.intnodes:
-                kid = t.children(intnode).pop()
-                if kid not in t.leaves:
-                    t.remove_branch(intnode, kid)
-                    self.assertFalse(t.is_bifurcation(intnode))
-                    break
-
-
-########################################################################################
-########################################################################################
-
 class Baseml_rstfile(TreeTestBase):
     """Tests for class Baseml_rstfile"""
     pass
-
-########################################################################################
-########################################################################################
-
-class Copy_treeobject(TreeTestBase):
-    """Tests for copy_treeobject function"""
-
-    def test_blen_lab(self):
-        """Test copy_treeobject with copylengths=True, copylabels=True"""
-        for treestring in self.treedata.values():
-            t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=True, copylabels=True)
-            self.assertEqual(t1,t2)
-            self.assertEqual(t1.root, t2.root)
-            self.assertTrue(t1.has_same_root(t2))
-            for parent in t1.intnodes:
-                for kid in t1.children(parent):
-                    t1lab = t1.getlabel(parent, kid)
-                    t2lab = t2.getlabel(parent, kid)
-                    self.assertEqual(t1lab,t2lab)
-
-    def test_blen_nolab(self):
-        """Test copy_treeobject with copylengths=True, copylabels=False"""
-        for treestring in self.treedata.values():
-            t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=True, copylabels=False)
-            self.assertEqual(t1,t2)
-            self.assertEqual(t1.root, t2.root)
-            self.assertTrue(t1.has_same_root(t2))
-            for parent in t2.intnodes:
-                for kid in t2.children(parent):
-                    t2lab = t2.getlabel(parent, kid)
-                    self.assertEqual("",t2lab)
-
-    def test_noblen_nolab(self):
-        """Test copy_treeobject with copylengths=True, copylabels=False"""
-        for treestring in self.treedata.values():
-            t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=False, copylabels=False)
-            self.assertEqual(t1.topology(),t2.topology())
-            self.assertEqual(t1.root, t2.root)
-            self.assertTrue(t1.has_same_root(t2))
-            for parent in t2.intnodes:
-                for kid in t2.children(parent):
-                    t2lab = t2.getlabel(parent, kid)
-                    self.assertEqual("",t2lab)
-
 
 ########################################################################################
 ########################################################################################
@@ -1055,72 +944,6 @@ class TreeChanging(TreeTestBase):
         self.assertTrue("Monkey_Seq" in mytree.leaves)
 
         self.assertRaises(pt.TreeError, mytree.rename_leaf, "Not_there", "new_name")
-
-########################################################################################
-########################################################################################
-
-class DistPathTester(TreeTestBase):
-    """Tests for constructing dist and path dictionaries"""
-
-    def test_distdict(self):
-        """Test that dist_dict is constructed correctly and agrees with nodedist function"""
-        for treestring in self.treedata.values():
-            mytree = pt.Tree.from_string(treestring)
-            mytree.build_dist_dict()
-            for n1 in mytree.nodes:
-                for n2 in mytree.nodes:
-                    self.assertAlmostEqual(mytree.nodedist(n1, n2), mytree.dist_dict[n1][n2])
-
-        treestring = self.treedata["simplestring"]
-        mytree = pt.Tree.from_string(treestring)
-        mytree.build_dist_dict()
-        self.assertAlmostEqual(mytree.dist_dict["s4"]["s1"], 0.625)
-        self.assertAlmostEqual(mytree.dist_dict["s2"]["s1"], 0.25)
-        self.assertAlmostEqual(mytree.dist_dict["s3"][0], 0.25)
-        self.assertAlmostEqual(mytree.dist_dict[0]["s1"], 0.5)
-
-        # Check that things still work after changing root
-        for treestring in self.treedata.values():
-            mytree = pt.Tree.from_string(treestring)
-            mytree.rootmid()
-            mytree.build_dist_dict()
-            for n1 in mytree.intnodes:
-                for n2 in mytree.leaves:
-                    self.assertAlmostEqual(mytree.nodedist(n1, n2), mytree.dist_dict[n1][n2])
-
-        treestring = self.treedata["simplestring"]
-        mytree = pt.Tree.from_string(treestring)
-        mytree.rootmid()
-        mytree.build_dist_dict()
-        self.assertAlmostEqual(mytree.dist_dict["s4"]["s1"], 0.625)
-        self.assertAlmostEqual(mytree.dist_dict["s2"]["s1"], 0.25)
-        self.assertAlmostEqual(mytree.dist_dict["s3"][0], 0.25)
-        self.assertAlmostEqual(mytree.dist_dict[0]["s1"], 0.5)
-
-
-
-    def test_pathdict(self):
-        """Test that path_dict is constructed correctly and agrees with nodepath function"""
-        for treestring in self.treedata.values():
-            mytree = pt.Tree.from_string(treestring)
-            mytree.build_path_dict()
-            for n1 in mytree.intnodes:
-                for n2 in mytree.leaves:
-                    npath = mytree.nodepath(n1, n2)
-                    npathnew = [n1]
-                    n = n1
-                    while n != n2:
-                        n = mytree.path_dict[n][n2]
-                        npathnew.append(n)
-                    self.assertEqual(npath, npathnew)
-
-        treestring = self.treedata["simplestring"]
-        mytree = pt.Tree.from_string(treestring)
-        mytree.build_path_dict()
-        self.assertEqual(mytree.path_dict["s4"]["s1"], 0)
-        self.assertEqual(mytree.path_dict[0]["s1"], 1)
-        self.assertEqual(mytree.path_dict[1]["s1"], 2)
-        self.assertEqual(mytree.path_dict[2]["s1"], "s1")
 
 ########################################################################################
 ########################################################################################

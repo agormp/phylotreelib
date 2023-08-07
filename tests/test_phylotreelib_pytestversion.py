@@ -2,6 +2,9 @@ import phylotreelib as pt
 import math
 import pytest
 import random
+import textwrap
+from string import ascii_lowercase, digits
+
 
 ###################################################################################################
 ###################################################################################################
@@ -347,3 +350,359 @@ class Test_TreeIteration:
         treefile = pt.Nexustreefile(filename)
         for i, tree in enumerate(treefile):
             assert tree == treelist[i]
+
+###################################################################################################
+
+class Test_str:
+
+    def test_tree_str_representation(treedata):
+        """Test the string representation of a Tree object"""
+
+        parentlist = [0,0,0,1,1]
+        childlist = ["A", "B", 1, "C", "D"]
+        lenlist = [2.0, 2.0, 1.0, 1.0, 1.0]
+        lablist = ["", "", "0.95", "", ""]
+        my_tree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist, lablist)
+
+        # Expected representation
+        expected_str_lines =   ["|-----------------------------------------|",
+                                "|  Node  |  Child  |  Distance  |  Label  |",
+                                "|-----------------------------------------|",
+                                "|     0  |      1  |         1  |   0.95  |",
+                                "|     0  |      A  |         2  |         |",
+                                "|     0  |      B  |         2  |         |",
+                                "|     1  |      C  |         1  |         |",
+                                "|     1  |      D  |         1  |         |",
+                                "|-----------------------------------------|",
+                                "",
+                                "4 Leafs:",
+                                "-----",
+                                "A",
+                                "B",
+                                "C",
+                                "D"]
+        tree_str_lines = str(my_tree).splitlines()
+        # Note: intnodes are in sorted_intnode order, but order of kids not really defined??
+        # therefore: test that all lines are the same, while ignoring order
+        assert set(expected_str_lines) == set(tree_str_lines)
+
+###################################################################################################
+
+class Test_eq:
+    """Tests special method __eq__() for Tree objects"""
+
+    def test_equality(self, treedata):
+        """Sanity check: can Tree.__eq__() differentiate between set of known trees?"""
+        for treestring in treedata.values():
+            mytree1 = pt.Tree.from_string(treestring)
+            mytree2 = pt.Tree.from_string(treestring)
+            assert mytree1 == mytree2
+
+        stringlist = [
+            treedata["simplestring"],
+            treedata["complexstring"],
+            treedata["HIVtree"]
+        ]
+        for i in range(len(stringlist) - 1):
+            for j in range(i+1, len(stringlist)):
+                mytree1 = pt.Tree.from_string(stringlist[i])
+                mytree2 = pt.Tree.from_string(stringlist[j])
+                assert mytree1 != mytree2
+
+    def test_diffblens(self, treedata):
+        """Check that different branch lengths results in non-equality"""
+        for treestring in treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            for parent in t2.intnodes:
+                for kid in t2.children(parent):
+                    origblen = t2.nodedist(parent,kid)
+                    t2.setlength(parent,kid,origblen*1.5)
+            assert t1 != t2
+
+###################################################################################################
+
+class Test_hash:
+
+    def test_same_object_same_hash(self):
+        """Check that the same object produces the same hash value every time it's hashed."""
+        tree = pt.Tree()
+        assert hash(tree) == hash(tree)
+
+    def test_different_objects_different_hashes(self):
+        """Check that different objects produce different hash values."""
+        tree1 = pt.Tree.randtree(ntips=4)
+        tree2 = pt.Tree.randtree(ntips=4)
+
+        assert tree1 is not tree2  # They are different objects
+        assert hash(tree1) != hash(tree2)
+
+    def test_use_as_dict_key(self):
+        """Check that Tree objects can be used as dictionary keys."""
+        tree1 = pt.Tree.randtree(ntips=4)
+        tree2 = pt.Tree.randtree(ntips=4)
+
+        my_dict = {tree1: 'value1'}
+
+        assert tree1 in my_dict
+        assert tree2 not in my_dict
+
+        my_dict[tree2] = 'value2'
+        assert tree2 in my_dict
+
+    # If you decide to have a more complicated hash method in the future, add tests for it.
+
+###################################################################################################
+
+class Test_copy_treeobject:
+    """Tests for copy_treeobject function"""
+
+    def test_blen_lab(self, treedata):
+        """Test copy_treeobject with copylengths=True, copylabels=True"""
+        for treestring in treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = t1.copy_treeobject(copylengths=True, copylabels=True)
+            assert t1 == t2
+            assert t1.root == t2.root
+            assert t1.has_same_root(t2)
+            for parent in t1.intnodes:
+                for kid in t1.children(parent):
+                    t1lab = t1.getlabel(parent, kid)
+                    t2lab = t2.getlabel(parent, kid)
+                    assert t1lab == t2lab
+
+    def test_blen_nolab(self, treedata):
+        """Test copy_treeobject with copylengths=True, copylabels=False"""
+        for treestring in treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = t1.copy_treeobject(copylengths=True, copylabels=False)
+            assert t1 == t2
+            assert t1.root == t2.root
+            assert t1.has_same_root(t2)
+            for parent in t2.intnodes:
+                for kid in t2.children(parent):
+                    t2lab = t2.getlabel(parent, kid)
+                    assert t2lab == ""
+
+    def test_noblen_nolab(self, treedata):
+        """Test copy_treeobject with copylengths=False, copylabels=False"""
+        for treestring in treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = t1.copy_treeobject(copylengths=False, copylabels=False)
+            assert t1.topology() == t2.topology()
+            assert t1.root == t2.root
+            assert t1.has_same_root(t2)
+            for parent in t2.intnodes:
+                for kid in t2.children(parent):
+                    t2lab = t2.getlabel(parent, kid)
+                    assert t2lab == ""
+
+###################################################################################################
+
+class Test_build_dist_dict:
+
+    def test_distdict(self, treedata):
+        """Test that dist_dict is constructed correctly and agrees with nodedist function"""
+
+        # First set of tests
+        for treestring in treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            mytree.build_dist_dict()
+            for n1 in mytree.nodes:
+                for n2 in mytree.nodes:
+                    assert pytest.approx(mytree.nodedist(n1, n2)) == mytree.dist_dict[n1][n2]
+
+        # Specific node distance checks
+        treestring = treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        mytree.build_dist_dict()
+        assert pytest.approx(mytree.dist_dict["s4"]["s1"]) == 0.625
+        assert pytest.approx(mytree.dist_dict["s2"]["s1"]) == 0.25
+        assert pytest.approx(mytree.dist_dict["s3"][0]) == 0.25
+        assert pytest.approx(mytree.dist_dict[0]["s1"]) == 0.5
+
+        # Check after changing root
+        for treestring in treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            mytree.rootmid()
+            mytree.build_dist_dict()
+            for n1 in mytree.intnodes:
+                for n2 in mytree.leaves:
+                    assert pytest.approx(mytree.nodedist(n1, n2)) == mytree.dist_dict[n1][n2]
+
+        # Specific node distance checks after changing root
+        treestring = treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        mytree.rootmid()
+        mytree.build_dist_dict()
+        assert pytest.approx(mytree.dist_dict["s4"]["s1"]) == 0.625
+        assert pytest.approx(mytree.dist_dict["s2"]["s1"]) == 0.25
+        assert pytest.approx(mytree.dist_dict["s3"][0]) == 0.25
+        assert pytest.approx(mytree.dist_dict[0]["s1"]) == 0.5
+
+###################################################################################################
+
+class Test_build_path_dict:
+
+    def test_pathdict(self, treedata):
+        """Test that path_dict is constructed correctly and agrees with nodepath function"""
+
+        # First set of tests
+        for treestring in treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            mytree.build_path_dict()
+            for n1 in mytree.intnodes:
+                for n2 in mytree.leaves:
+                    npath = mytree.nodepath(n1, n2)
+                    npathnew = [n1]
+                    n = n1
+                    while n != n2:
+                        n = mytree.path_dict[n][n2]
+                        npathnew.append(n)
+                    assert npath == npathnew
+
+        # Specific node path checks
+        treestring = treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        mytree.build_path_dict()
+        assert mytree.path_dict["s4"]["s1"] == 0
+        assert mytree.path_dict[0]["s1"] == 1
+        assert mytree.path_dict[1]["s1"] == 2
+        assert mytree.path_dict[2]["s1"] == "s1"
+
+###################################################################################################
+
+class Test_sorted_intnodes:
+
+    def test_basic_functionality(self, treedata):
+        for treestring in treedata.values():
+            tree = pt.Tree.from_string(treestring)
+            sorted_nodes = tree.sorted_intnodes()
+
+            # All nodes in the sorted list should be internal nodes
+            assert set(sorted_nodes) == tree.intnodes
+
+            # There should be no duplicates
+            assert len(sorted_nodes) == len(set(sorted_nodes))
+
+    def test_ordering(self, treedata):
+        for treestring in treedata.values():
+            tree = pt.Tree.from_string(treestring)
+
+            sorted_nodes_deepfirst = tree.sorted_intnodes(deepfirst=True)
+            sorted_nodes_shallowfirst = tree.sorted_intnodes(deepfirst=False)
+
+            # The reversed list of deepfirst should be equal to shallowfirst
+            assert list(reversed(sorted_nodes_deepfirst)) == sorted_nodes_shallowfirst
+
+    def test_tree_consistency(self, treedata):
+
+        # children of node should appear before it in list when deepfirst=False
+        # and after it when deepfirst=True.
+
+        for treestring in treedata.values():
+            tree = pt.Tree.from_string(treestring)
+
+            # Check for deepfirst=True
+            sorted_nodes = tree.sorted_intnodes(deepfirst=True)
+            for i, node in enumerate(sorted_nodes):
+                children = set(tree.children(node)) & tree.intnodes
+                for child in children:
+                    assert sorted_nodes.index(child) > i
+
+            # Check for deepfirst=False
+            sorted_nodes = tree.sorted_intnodes(deepfirst=False)
+            for i, node in enumerate(sorted_nodes):
+                children = set(tree.children(node)) & tree.intnodes
+                for child in children:
+                    assert sorted_nodes.index(child) < i
+
+    def test_simplestring_sorted_intnodes(self, treedata):
+        t = pt.Tree.from_string(treedata["simplestring"])
+        result = t.sorted_intnodes(deepfirst=True)
+        expected_result = [0,1,2]
+
+        # Assert that the result matches the expected result
+        assert result == expected_result
+
+###################################################################################################
+
+class Test_is_bifurcation:
+
+    def test_bifurcations(self):
+        """Check returns True: internal nodes with two descendants"""
+        for i in range(10):
+            t = pt.Tree.randtree(ntips=50)
+            for intnode in t.intnodes:
+                assert t.is_bifurcation(intnode)
+
+    def test_trifurcations(self):
+        """Check returns False: internal nodes with three descendants"""
+        for i in range(10):
+            t = pt.Tree.randtree(ntips=50)
+            for intnode in t.intnodes:
+                kid = t.children(intnode).pop()
+                if kid not in t.leaves:
+                    t.remove_branch(intnode, kid)
+                    assert not t.is_bifurcation(intnode)
+                    break
+
+###################################################################################################
+
+class Test_n_bipartitions:
+
+    def test_bifurcating_trees(self):
+        for ntips in range(10,20):
+            t = pt.Tree.randtree(ntips=ntips)
+            expected_nbip = ntips - 3
+            assert t.n_bipartitions() == expected_nbip
+
+    def test_nonbifurcating_trees(self):
+        for ntips in range(10,20):
+            expected_nbip = ntips - 3
+            t = pt.Tree.randtree(ntips=ntips)
+            c = random.choice(list(t.intnodes - {t.root}))
+            p = t.parent(c)
+            if (p == t.root) and (t.is_bifurcation(p)):
+                expected_nbip = expected_nbip
+            else:
+                expected_nbip = expected_nbip -1
+            t.remove_branch(p,c)
+            assert t.n_bipartitions() == expected_nbip
+
+###################################################################################################
+
+class Test_leaflist:
+
+    def test_leaflist_sorted(self):
+        chars = ascii_lowercase + digits
+        namelist = [''.join(random.choices(chars, k=6)) for _ in range(25)]
+        t = pt.Tree.randtree(leaflist=namelist)
+        leafnames = t.leaflist()
+        assert leafnames == sorted(namelist)
+
+###################################################################################################
+
+class Test_transdict:
+    def test_transdict_correct_keys(self):
+        ntips = random.randint(10,50)
+        t = pt.Tree.randtree(ntips=ntips)
+        trans_dictionary = t.transdict()
+        assert set(trans_dictionary.keys()) == set(t.leaflist()), "Transdict keys do not match leaf names."
+
+    def test_transdict_values_are_sequential(self):
+        ntips = random.randint(10,50)
+        t = pt.Tree.randtree(ntips=ntips)
+        trans_dictionary = t.transdict()
+        expected_values = [str(i) for i in range(1, len(trans_dictionary) + 1)]
+        assert set(trans_dictionary.values()) == set(expected_values), "Transdict values are not sequential."
+
+    def test_transdict_correct_key_value_pairs(self):
+        ntips = random.randint(10,50)
+        t = pt.Tree.randtree(ntips=ntips)
+        trans_dictionary = t.transdict()
+        sorted_leaves = t.leaflist()
+        for idx, leaf in enumerate(sorted_leaves):
+            assert trans_dictionary[leaf] == str(idx + 1), f"Leaf: {leaf} does not have expected value."
+
+###################################################################################################
