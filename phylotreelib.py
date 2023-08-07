@@ -59,70 +59,46 @@ def remove_comments(text):
     """Takes input string and strips away commented text, delimited by '[' and ']'.
         Also deals with nested comments."""
 
+    # Python note: could be simplified
+
+    # Before spending any time:
+    # bail if there are no comment delimiters in string
+    # raise exception if comment delimiters not balanced
     if "[" not in text:
         return text
     elif text.count("[") != text.count("]"):
         raise TreeError("String contains different number of left and right comment delimiters")
 
-    output_string_list = []
-    comment_depth = 0
-    for c in text:
-        if c == '[':
-            comment_depth += 1
-        elif c == ']':
-            if comment_depth == 0:
-                raise TreeError('Unbalanced comment delimiters detected')
-            comment_depth -= 1
-        elif comment_depth == 0:
-            output_string_list.append(c)
-    if comment_depth != 0:
-        raise TreeError('Unbalanced comment delimiters detected')
-    return "".join(output_string_list)
+    # Preprocess delims for use in re etc
+    leftdelim = re.escape("[")
+    rightdelim = re.escape("]")
 
-# def remove_comments(text):
-#     """Takes input string and strips away commented text, delimited by '[' and ']'.
-#         Also deals with nested comments."""
-#
-#     # Python note: could be simplified
-#
-#     # Before spending any time:
-#     # bail if there are no comment delimiters in string
-#     # raise exception if comment delimiters not balanced
-#     if "[" not in text:
-#         return text
-#     elif text.count("[") != text.count("]"):
-#         raise TreeError("String contains different number of left and right comment delimiters")
-#
-#     # Preprocess delims for use in re etc
-#     leftdelim = re.escape("[")
-#     rightdelim = re.escape("]")
-#
-#     # Construct sorted list of tuples of the form [(0, 'start'), (5, 'stop'), (7, 'start'), ...]
-#     delimlist = [(match.start(), match.end(), "start") for match in re.finditer(leftdelim, text)]
-#     delimlist.extend([(match.start(), match.end(), "stop") for match in re.finditer(rightdelim, text)])
-#     delimlist.sort()
-#
-#     # Traverse text; along the way copy text not inside comment-delimiter pairs.
-#     # Use stack ("unmatched_starts") to keep track of nesting
-#     unmatched_starts = 0
-#     prevpos = 0
-#     processed_text = []
-#     for (match_start, match_end, match_type) in delimlist:
-#         if match_type == "start":
-#             unmatched_starts += 1
-#             if unmatched_starts == 1:                               # Beginning of new comment region
-#                 processed_text.append(text[prevpos:match_start])
-#         elif match_type == "stop":
-#             unmatched_starts -= 1
-#             if unmatched_starts == 0:                               # End of comment region
-#                 prevpos = match_end
-#             elif unmatched_starts == -1:                            # Error: more right delims than left delims
-#                 raise TreeError("Unmatched end-comment delimiter. Context: '{}'".format(text[prevpos-10:prevpos+10]))
-#
-#     # Add final block of text if relevant (i.e., if text does not stop with rightdelim), return processed text
-#     if prevpos < len(text):
-#         processed_text.append(text[prevpos:])
-#     return "".join(processed_text)
+    # Construct sorted list of tuples of the form [(0, 'start'), (5, 'stop'), (7, 'start'), ...]
+    delimlist = [(match.start(), match.end(), "start") for match in re.finditer(leftdelim, text)]
+    delimlist.extend([(match.start(), match.end(), "stop") for match in re.finditer(rightdelim, text)])
+    delimlist.sort()
+
+    # Traverse text; along the way copy text not inside comment-delimiter pairs.
+    # Use stack ("unmatched_starts") to keep track of nesting
+    unmatched_starts = 0
+    prevpos = 0
+    processed_text = []
+    for (match_start, match_end, match_type) in delimlist:
+        if match_type == "start":
+            unmatched_starts += 1
+            if unmatched_starts == 1:                               # Beginning of new comment region
+                processed_text.append(text[prevpos:match_start])
+        elif match_type == "stop":
+            unmatched_starts -= 1
+            if unmatched_starts == 0:                               # End of comment region
+                prevpos = match_end
+            elif unmatched_starts == -1:                            # Error: more right delims than left delims
+                raise TreeError("Unmatched end-comment delimiter. Context: '{}'".format(text[prevpos-10:prevpos+10]))
+
+    # Add final block of text if relevant (i.e., if text does not stop with rightdelim), return processed text
+    if prevpos < len(text):
+        processed_text.append(text[prevpos:])
+    return "".join(processed_text)
 
 ###################################################################################################
 ###################################################################################################
