@@ -706,3 +706,37 @@ class Test_transdict:
             assert trans_dictionary[leaf] == str(idx + 1), f"Leaf: {leaf} does not have expected value."
 
 ###################################################################################################
+
+class Test_translateblock:
+
+    def test_translateblock(self, treedata):
+        for treestring in treedata.values():
+            t = pt.Tree.from_string(treestring)
+            trans_dictionary = t.transdict()
+            result = t.translateblock(trans_dictionary)
+            assert result.startswith("    translate\n"), "Output does not start with '    translate\n'"
+            assert result.endswith("    ;\n"), "Output does not end with '    ;\n'"
+            lines = result.split("\n")
+            for line in lines[1:-3]:  # exclude the start and end lines
+                assert line.strip().endswith(','), "Intermediate lines should end with a comma"
+                number, name_with_comma = line.strip().split()
+                assert number.isdigit(), "Number part should only contain digits"
+                assert name_with_comma.endswith(",")
+
+    def test_translateblock_key_value_formatting(self, treedata):
+        for treestring in treedata.values():
+            t = pt.Tree.from_string(treestring)
+            trans_dictionary = t.transdict()
+            result = t.translateblock(trans_dictionary)
+            lines = result.split("\n")[1:-2]  # exclude the start and end lines
+            nameset = set()
+            for line in lines:
+                number, name_with_comma = line.strip().split()
+                name = name_with_comma.replace(",", "")
+                nameset.add(name)
+                assert name in t.leaves
+                assert trans_dictionary[name] == number
+            assert nameset == t.leaves
+
+###################################################################################################
+
