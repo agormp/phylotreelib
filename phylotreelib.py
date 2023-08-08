@@ -979,25 +979,8 @@ class Tree():
                     remdict[parent].update(remdict[curnode])
                 else:
                     kidstack.extend(self.tree[curnode])
-
-    ###############################################################################################
-
-    def build_remotechildren_dict2(self):
-        """Constructs dict of all {parent:{remotechildren}} pairs in efficient manner.
-        This dict can then be used directly or by remote_children() to speed up enquiries."""
-
-        remdict = self.remotechildren_dict = dict.fromkeys(self.intnodes)
-        for parent in self.sorted_intnodes(deepfirst=False):
-            remdict[parent] = set()
-            kidstack = list(self.tree[parent])
-            while kidstack:
-                curnode = kidstack.pop()
-                if curnode in self.leaves:
-                    remdict[parent].add(curnode)
-                elif curnode in remdict:
-                    remdict[parent].update(remdict[curnode])
-                else:
-                    kidstack.extend(self.tree[curnode])
+        for node in self.leaves:
+            remdict[node] = {node}
 
     ###############################################################################################
 
