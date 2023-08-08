@@ -1765,8 +1765,6 @@ class Tree():
         # The entire tree is represented as a dictionary where the keys are bipartitions
         # The values are Branchstructs
         # Interning: store bipartitions in global dict to avoid duplicating object
-        # This is probably mostly useful when creating toposummaries in BigTreeSummary
-
         bipartition_dict = {}
         if interner:
             leaves = interner.intern_leafset(frozenset(self.leaves))
@@ -1781,23 +1779,19 @@ class Tree():
         # DEBUG 2: interning in global dict does help with toposummary, but may cause problems
         # because there is a reference to all bipartitions regardless of what happens to them
         # which means they cant be garbage collected.
-        for node1 in self.intnodes:
-            for node2 in self.children(node1):
+        self.build_remotechildren_dict()
+        for child, child_remkids in self.remotechildren_dict.items():
+            if child != self.root:
+                parent = self.parent(child)
                 if interner:
-                    bipart1 = interner.intern_leafset(frozenset(self.remote_children(node2)))
+                    bipart1 = interner.intern_leafset(frozenset(child_remkids))
                     bipart2 = interner.intern_leafset(leaves - bipart1)
                     bipartition = interner.intern_bipart(frozenset([bipart1, bipart2]))
                 else:
-                    bipart1 = frozenset(self.remote_children(node2))
+                    bipart1 = frozenset(child_remkids)
                     bipart2 = leaves - bipart1
                     bipartition = frozenset([bipart1, bipart2])
-
-                # Interning:
-                # Bipartitions can be kept in global dict to avoid redundant saving (they can be huge)
-                # This is especially useful in connection with toposummaries, where potentially
-                # tens of thousands of trees all contain tens of bipartitions, but where a large
-                # fraction of the bipartitions are used in most trees).
-                bipartition_dict[bipartition] = self.tree[node1][node2]
+                bipartition_dict[bipartition] = self.tree[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, compare labels)
@@ -1809,11 +1803,11 @@ class Tree():
             # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
             if interner:
-                bipart1 = interner.intern_leafset(frozenset(self.remote_children(kid1)))
+                bipart1 = interner.intern_leafset(frozenset(self.remotechildren_dict[kid1]))
                 bipart2 = interner.intern_leafset(leaves - bipart1)
                 bipartition = interner.intern_bipart(frozenset([bipart1, bipart2]))
             else:
-                bipart1 = frozenset(self.remote_children(kid1))
+                bipart1 = frozenset(self.remotechildren_dict[kid1])
                 bipart2 = leaves - bipart1
                 bipartition = frozenset([bipart1, bipart2])
 
