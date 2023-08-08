@@ -189,6 +189,7 @@ class Tree():
         self._parent_dict = None         # Dict node:parent relationships (only built if required)
         self.dist_dict = None
         self.path_dict = None
+        self.remotechildren_dict = None     # Python note: Change to property?
 
     ###############################################################################################
 
@@ -961,7 +962,46 @@ class Tree():
             raise TreeError(msg) from err
 
     ###############################################################################################
-    #@functools.lru_cache(maxsize=None)
+
+    def build_remotechildren_dict(self):
+        """Constructs dict of all {parent:{remotechildren}} pairs in efficient manner.
+        This dict can then be used directly or by remote_children() to speed up enquiries."""
+
+        remdict = self.remotechildren_dict = {}
+        for parent in self.sorted_intnodes(deepfirst=False):
+            remdict[parent] = set()
+            kidstack = list(self.tree[parent])
+            while kidstack:
+                curnode = kidstack.pop()
+                if curnode in self.leaves:
+                    remdict[parent].add(curnode)
+                elif curnode in remdict:
+                    remdict[parent].update(remdict[curnode])
+                else:
+                    kidstack.extend(self.tree[curnode])
+
+    ###############################################################################################
+
+    def build_remotechildren_dict2(self):
+        """Constructs dict of all {parent:{remotechildren}} pairs in efficient manner.
+        This dict can then be used directly or by remote_children() to speed up enquiries."""
+
+        remdict = self.remotechildren_dict = dict.fromkeys(self.intnodes)
+        for parent in self.sorted_intnodes(deepfirst=False):
+            remdict[parent] = set()
+            kidstack = list(self.tree[parent])
+            while kidstack:
+                curnode = kidstack.pop()
+                if curnode in self.leaves:
+                    remdict[parent].add(curnode)
+                elif curnode in remdict:
+                    remdict[parent].update(remdict[curnode])
+                else:
+                    kidstack.extend(self.tree[curnode])
+
+    ###############################################################################################
+
+    # @functools.lru_cache(maxsize=None)
     def remote_children(self, parent):
         """Returns set containing all leaves that are descendants of parent"""
 
@@ -1571,6 +1611,11 @@ class Tree():
         for (oldname, newname) in zip(tmpnames, newnames):
             self.rename_leaf(oldname, newname)
 
+        # Clear lru_caches (which cannot be edited manually)
+        # self.remote_children.cache_clear()
+        self.nodedist.cache_clear()
+        self._parent_dict = None   # python note: Could just add entry...
+
     ###############################################################################################
 
     def cladegrep(self, pattern, minsize = 2):
@@ -1748,14 +1793,12 @@ class Tree():
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
         # Other part is then found as diff between all leaves and bipart1
-        # Python note: Sorting pays off because remote_children cache is built in rational order
-        sortedintnodes = self.sorted_intnodes(deepfirst=False)
 
         # DEBUG: I think root should be removed from sortedintnodes (dealt with separately below)
         # DEBUG 2: interning in global dict does help with toposummary, but may cause problems
         # because there is a reference to all bipartitions regardless of what happens to them
         # which means they cant be garbage collected.
-        for node1 in sortedintnodes:
+        for node1 in self.intnodes:
             for node2 in self.children(node1):
                 if interner:
                     bipart1 = interner.intern_leafset(frozenset(self.remote_children(node2)))
@@ -2311,7 +2354,7 @@ class Tree():
         self.nodes.add(newnode)
 
         # Clear lru_caches (which cannot be edited manually)
-        #self.remote_children.cache_clear()
+        # self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
         return newnode
@@ -2365,7 +2408,7 @@ class Tree():
             self.insert_node(insertpoint, movelist, branchstruct)
 
         # Clear lru_caches (which cannot be edited manually)
-        #self.remote_children.cache_clear()
+        # self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2411,7 +2454,7 @@ class Tree():
             self._parent_dict[grandchild] = parent
 
         # Clear lru_caches (which cannot be edited manually)
-        #self.remote_children.cache_clear()
+        # self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2473,7 +2516,7 @@ class Tree():
         self.nodes.remove(leaf)
 
         # Clear lru_caches (which cannot be edited manually)
-        #self.remote_children.cache_clear()
+        # self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2491,6 +2534,7 @@ class Tree():
 
         # Clear lru_caches (which cannot be edited manually)
         # python note: i think there are more caches and properties that should be fixed...
+        # self.remote_children.cache_clear()
         self.nodedist.cache_clear()
         if self._parent_dict != None:
             self._parent_dict = None   # python note: Could just add entry...
@@ -2747,7 +2791,7 @@ class Tree():
         #     del self.parent_dict[oldname]
 
         # Clear lru_caches (which cannot be edited manually)
-        #self.remote_children.cache_clear()
+        # self.remote_children.cache_clear()
         self.nodedist.cache_clear()
 
     ###############################################################################################
@@ -2791,7 +2835,7 @@ class Tree():
         #     self.parent_dict[child] = newnum
 
         # Clear lru_caches (which cannot be edited manually)
-        #self.remote_children.cache_clear()
+        # self.remote_children.()
         self.nodedist.cache_clear()
 
     ###############################################################################################
