@@ -1766,10 +1766,7 @@ class Tree():
         # The values are Branchstructs
         # Interning: store bipartitions in global dict to avoid duplicating object
         bipartition_dict = {}
-        if interner:
-            leaves = interner.intern_leafset(frozenset(self.leaves))
-        else:
-            leaves = frozenset(self.leaves)
+        leaves = frozenset(self.leaves)
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
