@@ -210,7 +210,7 @@ class NewickStringParser:
 
         # Remove whitespace from treestring
         # (string methods are much faster than regexp.sub)
-        treestring = orig_treestring.replace(" ", "")
+        treestring = treestring.replace(" ", "")
         treestring = treestring.replace("\t", "")
         treestring = treestring.replace("\n", "")
         treestring = treestring.replace("\r", "")
@@ -229,12 +229,12 @@ class NewickStringParser:
     def parse(self):
         """Returns instance of Tree. Used in Tree.from_string()"""
 
-        state = "BEGIN_TREE"
+        state = "TREE_START"
         dispatch = NewickStringParser.dispatch
         for token_type, token_value in self._tokenizer():
             # dict.get: ensure appropriate default method is called if token_type wrong
             handler = dispatch[state].get(token_type, dispatch[state]['default'])
-            state = handler(token_value)
+            state = handler(self, token_value)
         return self.tree
 
     ###############################################################################################
@@ -250,7 +250,7 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_add_root_intnode(self):
+    def _handle_add_root_intnode(self, token_value):
         self.nodeno = 0
         self.tree.child_dict[self.nodeno] = {}  # Create child-list for new node
         self.node_stack.append(self.nodeno)     # Push new node onto stack
@@ -265,13 +265,14 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_add_intnode(self):
+    def _handle_add_intnode(self, token_value):
         self.nodeno += 1
         self.tree.child_dict[self.nodeno] = {}  # Create child-list for new node
         parent = self.node_stack[-1]            # Add new node to previous node's list of children
-        self.tree.child_dict[parent][nodeno] = Branchstruct()
+        self.tree.child_dict[parent][self.nodeno] = Branchstruct()
         self.node_stack.append(self.nodeno)     # Push new node onto stack
         self.tree.intnodes.add(self.nodeno)     # Add node to list of internal nodes
+        return "INTNODE_START"
 
     ###############################################################################################
 
@@ -298,12 +299,13 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_transition_brlen_1(self):
+    def _handle_transition_brlen_1(self, token_value):
         return "EXPECTING_BRLEN_1"
 
     ###############################################################################################
 
-    def _handle_transition_child_2plus(self):
+    def _handle_transition_child_2plus(self, token_value):
+        self.node_stack.pop()
         return "EXPECTING_CHILD_2+"
 
     ###############################################################################################
@@ -358,12 +360,12 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_transition_brlen_2plus(self):
+    def _handle_transition_brlen_2plus(self, token_value):
         return "EXPECTING_BRLEN_2+"
 
     ###############################################################################################
 
-    def _handle_intnode_end(self):
+    def _handle_intnode_end(self, token_value):
         self.node_stack.pop()
         return "INTNODE_END"
 
@@ -390,7 +392,7 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_transition_tree_end(self):
+    def _handle_transition_tree_end(self, token_value):
         self.node_stack.pop()
         return "TREE_END"
 
@@ -402,7 +404,7 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _placeholderend(self):
+    def _placeholderend(self, token_value):
         print("after end??")
 
     ###############################################################################################
@@ -413,7 +415,7 @@ class NewickStringParser:
     # Python note: initialized this way because otherwise handler functions would need
     # to be defined first
 
-    DISPATCH_DICT = {
+    dispatch = {
         "TREE_START": {
             "LEFTPAREN":    _handle_add_root_intnode,
             "default":      _handle_error_root
