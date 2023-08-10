@@ -177,7 +177,300 @@ class TreeError(Exception):
 ###################################################################################################
 ###################################################################################################
 
-class Tree():
+class NewickStringParser:
+    """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
+
+    ###############################################################################################
+
+    # Regex for tokenizer. Defined at class-level to avoid recompilation and to save memory
+    token_specification = [
+        ('LEFTPAREN',   r'\('),
+        ('RIGHTPAREN',  r'\)'),
+        ('COMMA',       r','),
+        ('SEMICOLON',   r';'),
+        ('COLON',       r':'),
+        ('NUMBER',      r'[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?'),
+        ('NAME',  r'[\w\-\/\.\*\|]+')
+    ]
+    pattern_string = '|'.join(f'(?P<{name}>{regex})' for (name, regex) in token_specification)
+    tree_parts = re.compile(pattern_string)
+
+    ###############################################################################################
+
+    def __init__(self, treestring, transdict=None):
+
+        # Construct Tree object that will be filled out by parser
+        tree = Tree()
+        tree.child_dict = {}            # Essentially a "child-list"
+        tree.leaves = set()             # Set of leaf names. For speedy lookups
+        tree.intnodes = set()           # Set of internal node IDs. For speedy lookups
+        tree.root = 0                   # Root is node zero at start. (May change)
+        tree.belowroot = None
+        self.tree = tree
+
+        # Remove whitespace from treestring
+        # (string methods are much faster than regexp.sub)
+        treestring = orig_treestring.replace(" ", "")
+        treestring = treestring.replace("\t", "")
+        treestring = treestring.replace("\n", "")
+        treestring = treestring.replace("\r", "")
+        treestring = treestring.replace("\f", "")
+        self.treestring = treestring
+
+        # For keeping track of tree state during parsing (different from parser state)
+        self.nodeno = -1
+        self.node_stack = []
+
+        # Possibly transdict was supplied
+        self.transdict = transdict
+
+    ###############################################################################################
+
+    def parse(self):
+        """Returns instance of Tree. Used in Tree.from_string()"""
+
+        state = "BEGIN_TREE"
+        dispatch = NewickStringParser.dispatch
+        for token_type, token_value in self._tokenizer():
+            # dict.get: ensure appropriate default method is called if token_type wrong
+            handler = dispatch[state].get(token_type, dispatch[state]['default'])
+            state = handler(token_value)
+        return self.tree
+
+    ###############################################################################################
+
+    def _tokenizer(self):
+        """Tokenizes self.treestring: yields (token_type, token_value) tuples"""
+
+        tree_parts = NewickStringParser.tree_parts
+        for match_object in tree_parts.finditer(self.treestring):
+            token_type = match_object.lastgroup
+            token_value = match_object.group()
+            yield(token_type, token_value)
+
+    ###############################################################################################
+
+    def _handle_add_root_intnode(self):
+        self.nodeno = 0
+        self.tree.child_dict[self.nodeno] = {}  # Create child-list for new node
+        self.node_stack.append(self.nodeno)     # Push new node onto stack
+        self.tree.intnodes.add(self.nodeno)     # Add node to list of internal nodes
+        return "INTNODE_START"                  # New state
+
+    ###############################################################################################
+
+    def _handle_error_root(self, token_value):
+        msg = f"Error in treestring: expecting '(' at beginning of tree: {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_add_intnode(self):
+        self.nodeno += 1
+        self.tree.child_dict[self.nodeno] = {}  # Create child-list for new node
+        parent = self.node_stack[-1]            # Add new node to previous node's list of children
+        self.tree.child_dict[parent][nodeno] = Branchstruct()
+        self.node_stack.append(self.nodeno)     # Push new node onto stack
+        self.tree.intnodes.add(self.nodeno)     # Add node to list of internal nodes
+
+    ###############################################################################################
+
+    def _handle_add_leaf_1(self, name):
+        # Python note: maybe make more efficient? Dont test every time?
+        if self.transdict:
+            child = sys.intern(self.transdict[name])
+        else:
+            child = sys.intern(name)
+        if child in self.tree.leaves:
+            msg = f"Leaf name present more than once: {child}"
+            raise TreeError(msg)
+        parent=self.node_stack[-1]
+        self.tree.child_dict[parent][child] = Branchstruct()
+        self.node_stack.append(child)
+        self.tree.leaves.add(child)
+        return "LEAF_1"
+
+    ###############################################################################################
+
+    def _handle_error_intnode(self, token_value):
+        msg = f"Error in treestring: expecting '(' or NAME after '(': {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_transition_brlen_1(self):
+        return "EXPECTING_BRLEN_1"
+
+    ###############################################################################################
+
+    def _handle_transition_child_2plus(self):
+        return "EXPECTING_CHILD_2+"
+
+    ###############################################################################################
+
+    def _handle_error_leaf_1(self, token_value):
+        msg = f"Error in treestring: expecting ':' or ',' after leaf name: {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_add_brlen_1(self, brlen_string):
+        brlen = float(brlen_string)
+        child = self.node_stack[-1]
+        parent = self.node_stack[-2]
+        self.tree.child_dict[parent][child].length = brlen
+        return "BRLEN_1"
+
+    ###############################################################################################
+
+    def _handle_error_expecting_brlen(self, token_value):
+        msg = f"Error in treestring: expecting number after ':': {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_error_brlen_1(self, token_value):
+        msg = f"Expecting ',' after branch length: {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_add_leaf_2plus(self, name):
+        # Python note: maybe make more efficient? Dont test every time?
+        if self.transdict:
+            child = sys.intern(self.transdict[name])
+        else:
+            child = sys.intern(name)
+        if child in self.tree.leaves:
+            msg = f"Leaf name present more than once: {child}"
+            raise TreeError(msg)
+        parent=self.node_stack[-1]
+        self.tree.child_dict[parent][child] = Branchstruct()
+        self.node_stack.append(child)
+        self.tree.leaves.add(child)
+        return "LEAF_2+"
+
+    ###############################################################################################
+
+    def _handle_error_expecting_child2plus(self, token_value):
+        msg = f"Error in treestring: expecting '(' or NAME after ',': {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_transition_brlen_2plus(self):
+        return "EXPECTING_BRLEN_2+"
+
+    ###############################################################################################
+
+    def _handle_intnode_end(self):
+        self.node_stack.pop()
+        return "INTNODE_END"
+
+    ###############################################################################################
+
+    def _handle_error_leaf_2plus(self, token_value):
+        msg = f"Expecting ':', ',', or ')' after leaf name 2+: {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_add_brlen_2plus(self, brlen_string):
+        brlen = float(brlen_string)
+        child = self.node_stack[-1]
+        parent = self.node_stack[-2]
+        self.tree.child_dict[parent][child].length = brlen
+        return "BRLEN_2+"
+
+    ###############################################################################################
+
+    def _handle_error_brlen_2plus(self, token_value):
+        msg = f"Expecting ',' or ')' after branch length: {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _handle_transition_tree_end(self):
+        self.node_stack.pop()
+        return "TREE_END"
+
+    ###############################################################################################
+
+    def _handle_error_intnode_end(self, token_value):
+        msg = f"Expecting ',', ')', ':', or ';' after ')': {token_value}"
+        raise TreeError(msg)
+
+    ###############################################################################################
+
+    def _placeholderend(self):
+        print("after end??")
+
+    ###############################################################################################
+
+    # Dispatch dictionary: specifies which function to use for any given combination of
+    # state and token-type. Functions return next state, and use token-value as input
+    # Defined as class-level attribute: created once and shared among instances of class
+    # Python note: initialized this way because otherwise handler functions would need
+    # to be defined first
+
+    DISPATCH_DICT = {
+        "TREE_START": {
+            "LEFTPAREN":    _handle_add_root_intnode,
+            "default":      _handle_error_root
+        },
+        "INTNODE_START": {
+            "LEFTPAREN":    _handle_add_intnode,
+            "NAME":         _handle_add_leaf_1,
+            "default":      _handle_error_intnode
+        },
+        "LEAF_1": {
+            "COLON":        _handle_transition_brlen_1,
+            "COMMA":        _handle_transition_child_2plus,
+            "default":      _handle_error_leaf_1
+        },
+        "EXPECTING_BRLEN_1": {
+            "NUMBER":       _handle_add_brlen_1,
+            "default":      _handle_error_expecting_brlen
+        },
+        "BRLEN_1": {
+            "COMMA":        _handle_transition_child_2plus,
+            "default":      _handle_error_brlen_1
+        },
+        "EXPECTING_CHILD_2+": {
+            "LEFTPAREN":    _handle_add_intnode,
+            "NAME":         _handle_add_leaf_2plus,
+            "default":      _handle_error_expecting_child2plus
+        },
+        "LEAF_2+": {
+            "COMMA":        _handle_transition_child_2plus,
+            "COLON":        _handle_transition_brlen_2plus,
+            "RIGHTPAREN":   _handle_intnode_end,
+            "default":      _handle_error_leaf_2plus
+        },
+        "EXPECTING_BRLEN_2+": {
+            "NUMBER":       _handle_add_brlen_2plus,
+            "default":      _handle_error_expecting_brlen
+        },
+        "BRLEN_2+": {
+            "COMMA":        _handle_transition_child_2plus,
+            "RIGHTPAREN":   _handle_intnode_end,
+            "default":      _handle_error_brlen_2plus
+        },
+        "INTNODE_END": {
+            "COMMA":        _handle_transition_child_2plus,
+            "COLON":        _handle_transition_brlen_2plus,
+            "SEMICOLON":    _handle_transition_tree_end,
+            "default":      _handle_error_intnode_end
+        },
+        "TREE_END": {
+            "default":      _placeholderend
+        }
+    }
+
+###################################################################################################
+###################################################################################################
+
+class Tree:
     """Class representing basic phylogenetic tree object."""
 
     # Implementation note: Tree objects can be constructed from several different kinds of things:
