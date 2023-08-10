@@ -207,7 +207,7 @@ class Tree():
 
         self._parent_dict = {}
         for parent in self.intnodes:
-            for child in self.tree[parent]:
+            for child in self.child_dict[parent]:
                 self._parent_dict[child] = parent
         self._parent_dict[self.root] = None     # Add special value "None" as parent of root
 
@@ -257,8 +257,8 @@ class Tree():
         # associated value that is itself a dictionary listing the children: keys are
         # child nodes, values are Branchstructs containing "length" and "label" fields.
         # Leafs are identified by a string instead of a number
-        # NOTE: self.tree should ONLY be used by this object. Make pseudo-private?
-        obj.tree = {}                  # Essentially a "child-list"
+        # NOTE: self.child_dict should ONLY be used by this object. Make pseudo-private?
+        obj.child_dict = {}                  # Essentially a "child-list"
         obj.leaves = set()             # Set of leaf names. For speedy lookups
         obj.intnodes = set()           # Set of internal node IDs. For speedy lookups
         obj.root = 0                   # Root is node zero at start. (May change)
@@ -286,11 +286,11 @@ class Tree():
             # A left parenthesis indicates that we are about to examine a new internal node.
             if part == "(" :
                 nodeno += 1
-                obj.tree[nodeno] = {}           # Create child-list for new node
+                obj.child_dict[nodeno] = {}           # Create child-list for new node
 
                 if nodeno != 0:                 # If we are not at the root then add new node
                     parent = node_stack[-1]     # to previous node's list of children
-                    obj.tree[parent][nodeno] = Branchstruct()
+                    obj.child_dict[parent][nodeno] = Branchstruct()
 
                 node_stack.append(nodeno)       # Push new node onto stack
                 obj.intnodes.add(nodeno)        # Add node to list of internal nodes
@@ -305,7 +305,7 @@ class Tree():
                 dist = float(part[1:])          # Remove colon and convert to float
                 child = node_stack[-1]
                 parent = node_stack[-2]
-                obj.tree[parent][child].length =  dist # Add dist to relevant child-list
+                obj.child_dict[parent][child].length =  dist # Add dist to relevant child-list
 
             # A comma indicates that we have finished examining a node
             elif part == ",":
@@ -321,7 +321,7 @@ class Tree():
             elif prevpart in [")", "leafname"]:
                 child = node_stack[-1]
                 parent = node_stack[-2]
-                obj.tree[parent][child].label = part
+                obj.child_dict[parent][child].label = part
 
             # Last possibility (I hope): the name is a leafname
             else:
@@ -338,7 +338,7 @@ class Tree():
                     raise TreeError(msg)
 
                 parent=node_stack[-1]                      # Add new leaf node to previous node's
-                obj.tree[parent][child] = Branchstruct()   # list of children
+                obj.child_dict[parent][child] = Branchstruct()   # list of children
 
                 node_stack.append(child)                   # Push new leaf node onto stack
                 obj.leaves.add(child)                      # Also update list of leaves
@@ -381,14 +381,14 @@ class Tree():
         # Leafs are identified by a string instead of a number
 
         # Construct tree dictionary (main data structure, essentially a child list)
-        obj.tree = {}
-        obj.tree[0]={}
+        obj.child_dict = {}
+        obj.child_dict[0]={}
         maxnode = 0
 
         # Start by building star-tree, this is resolved branch-by-branch later on
         # Python note: use startree constructor?
         for leaf in obj.leaves:
-            obj.tree[0][leaf]= None
+            obj.child_dict[0][leaf]= None
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for (bip1, bip2), branchstruct in biplist.items():
@@ -401,7 +401,7 @@ class Tree():
                     (leaf, ) = bip2
 
                 # Find childdict containing leaf, and update branchstruct
-                for childdict in obj.tree.values():
+                for childdict in obj.child_dict.values():
                     if leaf in childdict:
                         childdict[leaf] = branchstruct
                         break
@@ -434,14 +434,14 @@ class Tree():
 
                 # Construct new internal node (and therefore branch), transfer Branchstruct
                 maxnode += 1
-                obj.tree[maxnode] = {}
-                obj.tree[insertpoint][maxnode] = branchstruct
+                obj.child_dict[maxnode] = {}
+                obj.child_dict[insertpoint][maxnode] = branchstruct
                 obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
 
                 # Move relevant children to new node, transfer Branchstructs
                 for child in moveset:
-                    obj.tree[maxnode][child] = obj.tree[insertpoint][child]
-                    del obj.tree[insertpoint][child]
+                    obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
+                    del obj.child_dict[insertpoint][child]
 
         obj.nodes = set(obj.leaves | obj.intnodes)
         return obj
@@ -472,13 +472,13 @@ class Tree():
         # Leafs are identified by a string instead of a number
 
         # Construct tree dictionary (main data structure, essentially a child list)
-        obj.tree = {}
-        obj.tree[0]={}
+        obj.child_dict = {}
+        obj.child_dict[0]={}
         maxnode = 0
 
         # Start by building star-tree, this is resolved branch-by-branch later on
         for leaf in obj.leaves:
-            obj.tree[0][leaf]= Branchstruct()
+            obj.child_dict[0][leaf]= Branchstruct()
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for bip1, bip2 in topology:
@@ -511,14 +511,14 @@ class Tree():
 
                 # Construct new internal node (and therefore branch)
                 maxnode += 1
-                obj.tree[maxnode] = {}
-                obj.tree[insertpoint][maxnode] = Branchstruct()
+                obj.child_dict[maxnode] = {}
+                obj.child_dict[insertpoint][maxnode] = Branchstruct()
                 obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
 
                 # Move relevant children to new node, transfer Branchstructs
                 for child in moveset:
-                    obj.tree[maxnode][child] = obj.tree[insertpoint][child]
-                    del obj.tree[insertpoint][child]
+                    obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
+                    del obj.child_dict[insertpoint][child]
 
         obj.nodes = set(obj.leaves | obj.intnodes)
         return obj
@@ -568,7 +568,7 @@ class Tree():
                 raise TreeError(msg)
 
         obj = cls()                    # Ensures class will be correct also for subclasses of Tree
-        obj.tree = {}
+        obj.child_dict = {}
         obj.leaves = set()
         obj.intnodes = set()
 
@@ -577,10 +577,10 @@ class Tree():
             child = childlist[i]
             blen = lenlist[i]
             lab = lablist[i]
-            if parent in obj.tree:
-                obj.tree[parent][child] = Branchstruct(blen, lab)
+            if parent in obj.child_dict:
+                obj.child_dict[parent][child] = Branchstruct(blen, lab)
             else:
-                obj.tree[parent] = { child:Branchstruct(blen, lab) }
+                obj.child_dict[parent] = { child:Branchstruct(blen, lab) }
             obj.intnodes.add(parent)
             if isinstance(child, str):
                 obj.leaves.add(child)
@@ -630,8 +630,8 @@ class Tree():
 
         if randomlen:
             for parent in tree.intnodes:
-                for child in tree.tree[parent]:
-                    tree.tree[parent][child].length = random.lognormvariate(math.log(0.2), 0.3)
+                for child in tree.child_dict[parent]:
+                    tree.child_dict[parent][child].length = random.lognormvariate(math.log(0.2), 0.3)
 
         return tree
 
@@ -681,8 +681,8 @@ class Tree():
             for kid in self.children(node):
                 nodstr = str(node)
                 kidstr = str(kid)
-                dist = "{num:.6g}".format(num=self.tree[node][kid].length)
-                label = self.tree[node][kid].label
+                dist = "{num:.6g}".format(num=self.child_dict[node][kid].length)
+                label = self.child_dict[node][kid].label
                 table.append([nodstr, kidstr, dist, label])
 
         # Find widest string in each column
@@ -767,9 +767,9 @@ class Tree():
         obj.leaves = self.leaves.copy()
         obj.intnodes = self.intnodes.copy()
         obj.nodes = self.nodes.copy()
-        obj.tree = {}
-        origtree = self.tree
-        newtree = obj.tree
+        obj.child_dict = {}
+        origtree = self.child_dict
+        newtree = obj.child_dict
         for parent in origtree:
             newtree[parent] = {}
             for child in origtree[parent]:
@@ -801,7 +801,7 @@ class Tree():
         dist = self.dist_dict = dict.fromkeys(self.nodes)
         for key in dist:
             dist[key] = {}
-        tree = self.tree
+        tree = self.child_dict
         combinations = itertools.combinations
 
         # Traverse tree starting from root, breadth-first (sorted_intnodes)
@@ -842,7 +842,7 @@ class Tree():
         path = self.path_dict = dict.fromkeys(self.nodes)
         for key in path:
             path[key] = {}
-        tree = self.tree
+        tree = self.child_dict
         combinations = itertools.combinations
 
         # Traverse tree starting from root, breadth-first (sorted_intnodes)
@@ -954,7 +954,7 @@ class Tree():
         # Python note: does not seem to benefit from lru_caching, and leads to multiple problems
 
         try:
-            return set(self.tree[parent].keys())
+            return set(self.child_dict[parent].keys())
         except KeyError as err:
             msg = "Node %s is not an internal node" % parent
             raise TreeError(msg) from err
@@ -968,7 +968,7 @@ class Tree():
         remdict = self.remotechildren_dict = {}
         for parent in self.sorted_intnodes(deepfirst=False):
             remdict[parent] = set()
-            kidstack = list(self.tree[parent])
+            kidstack = list(self.child_dict[parent])
             while kidstack:
                 curnode = kidstack.pop()
                 if curnode in self.leaves:
@@ -976,7 +976,7 @@ class Tree():
                 elif curnode in remdict:
                     remdict[parent].update(remdict[curnode])
                 else:
-                    kidstack.extend(self.tree[curnode])
+                    kidstack.extend(self.child_dict[curnode])
         for node in self.leaves:
             remdict[node] = {node}
 
@@ -993,7 +993,7 @@ class Tree():
         # Traverse the tree iteratively to find remote children:
         #       if kid is leaf: add it to list of remote children.
         #       if kid is intnode: push its children on stack
-        kidstack = set( self.tree[parent] )
+        kidstack = set( self.child_dict[parent] )
         remotechildren = set()
 
         while kidstack:
@@ -1001,7 +1001,7 @@ class Tree():
             if curnode in self.leaves:
                 remotechildren.add(curnode)
             else:
-                kidstack.update( self.tree[curnode] )
+                kidstack.update( self.child_dict[curnode] )
 
         return remotechildren
 
@@ -1016,14 +1016,14 @@ class Tree():
             return {parent}
 
         # Traverse the tree iteratively to find remote nodes:
-        kidstack = set( self.tree[parent] )
+        kidstack = set( self.child_dict[parent] )
         remotenodes = {parent}
 
         while kidstack:
             curnode = kidstack.pop()
             remotenodes.add(curnode)
             if curnode in self.intnodes:
-                kidstack.update( self.tree[curnode] )
+                kidstack.update( self.child_dict[curnode] )
 
         return remotenodes
 
@@ -1056,7 +1056,7 @@ class Tree():
             msg = f"Nodes {node1} and {node2} are not adjacent in tree. There is no branch between them"
             raise TreeError(msg)
 
-        return self.tree[parent][child]
+        return self.child_dict[parent][child]
 
     ###############################################################################################
 
@@ -1327,7 +1327,7 @@ class Tree():
         # Local copies to speed up access
         root = self.root
         pdict = self.parent_dict
-        tree = self.tree
+        tree = self.child_dict
 
         # Find path from node1 back to root Keep track of cumulated distances along the way
         child1 = node1
@@ -1450,7 +1450,7 @@ class Tree():
         treelength = 0.0
         for node in self.intnodes:
             for child in self.children(node):
-                treelength += self.tree[node][child].length
+                treelength += self.child_dict[node][child].length
 
         return treelength
 
@@ -1658,7 +1658,7 @@ class Tree():
 
             for child in self.children(parentnode):
 
-                branchstruct = self.tree[parentnode][child]
+                branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
                 label = getattr(branchstruct, labelfield)
 
@@ -1786,7 +1786,7 @@ class Tree():
                     bipart1 = frozenset(child_remkids)
                     bipart2 = leaves - bipart1
                     bipartition = frozenset([bipart1, bipart2])
-                bipartition_dict[bipartition] = self.tree[parent][child]
+                bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, compare labels)
@@ -1807,15 +1807,15 @@ class Tree():
                 bipartition = frozenset([bipart1, bipart2])
 
             # Create new branch
-            bipartition_dict[bipartition] = Branchstruct(self.tree[root][kid1].length,
-                                                         self.tree[root][kid1].label)
+            bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
+                                                         self.child_dict[root][kid1].label)
 
             # Now, add distance to other kid
-            bipartition_dict[bipartition].length += self.tree[root][kid2].length
+            bipartition_dict[bipartition].length += self.child_dict[root][kid2].length
 
             # Deal with labels intelligently
-            lab1 = self.tree[root][kid1].label
-            lab2 = self.tree[root][kid2].label
+            lab1 = self.child_dict[root][kid1].label
+            lab2 = self.child_dict[root][kid2].label
 
             # If only one label is set use  that.
             if (lab1 is not None) and (lab2 is None):
@@ -1952,7 +1952,7 @@ class Tree():
         # Find nodes with > 2 children, add to list of nodes needing to be resolved
         unresolved_nodes = []
         for node in self.intnodes:
-            numkids = len(self.tree[node])   # Note: not safe to use .children() method while
+            numkids = len(self.child_dict[node])   # Note: not safe to use .children() method while
                                              # changing tree (cache will break)
             if numkids > 2:
                 unresolved_nodes.append(node)
@@ -1960,7 +1960,7 @@ class Tree():
         # Keep adding extra internal nodes until there are no unresolved nodes left
         while unresolved_nodes:
             intnode1 = unresolved_nodes.pop()
-            kids = self.tree[intnode1].keys()
+            kids = self.child_dict[intnode1].keys()
             kids = list(kids)
 
             # Divide children into two random subsets
@@ -1994,7 +1994,7 @@ class Tree():
         attrname: Name of attribute (e.g., "length")
         attrvalue: Value of attribute (e.g. 0.153)"""
 
-        branch = self.tree[node1][node2]
+        branch = self.child_dict[node1][node2]
         setattr(branch, attrname, attrvalue)
 
     ###############################################################################################
@@ -2014,7 +2014,7 @@ class Tree():
             msg = "There is no branch connecting node {} and {}".format(node1, node2)
             raise TreeError(msg)
 
-        self.tree[parent][child].length = length
+        self.child_dict[parent][child].length = length
 
     ###############################################################################################
 
@@ -2031,7 +2031,7 @@ class Tree():
             msg = "There is no branch connecting node %s and %s" % (node1, node2)
             raise TreeError(msg)
 
-        self.tree[parent][child].label = label
+        self.child_dict[parent][child].label = label
 
     ###############################################################################################
 
@@ -2048,7 +2048,7 @@ class Tree():
             msg = "There is no branch connecting node %s and %s" % (node1, node2)
             raise TreeError(msg)
 
-        return self.tree[parent][child].label
+        return self.child_dict[parent][child].label
 
     ###############################################################################################
 
@@ -2073,7 +2073,7 @@ class Tree():
                 msg = "Can not return branch below root node"
                 raise TreeError(msg)
             parent = self.parent(basenode)
-            basalbranch = self.tree[parent][basenode]
+            basalbranch = self.child_dict[parent][basenode]
             basalbranchcopy = basalbranch.copy()
 
         # Special case: basenode is leaf => subtree is minimal tree with two nodes (root and leaf)
@@ -2087,7 +2087,7 @@ class Tree():
         else:
             # Create empty Tree object. Transfer relevant subset of self's data structure to other
             other = Tree()
-            other.tree = {}
+            other.child_dict = {}
             other.intnodes = {basenode}
             other.leaves = set()
             other.root = basenode
@@ -2095,10 +2095,10 @@ class Tree():
             while curlevel:
                 nextlevel = []
                 for parent in curlevel:
-                    other.tree[parent] = {}
+                    other.child_dict[parent] = {}
                     kids = self.children(parent)
                     for kid in kids:
-                        other.tree[parent][kid] = copy.deepcopy(self.tree[parent][kid])
+                        other.child_dict[parent][kid] = copy.deepcopy(self.child_dict[parent][kid])
                     intnode_kids = kids & self.intnodes
                     other.intnodes.update(intnode_kids)
                     nextlevel.extend(intnode_kids)
@@ -2163,10 +2163,10 @@ class Tree():
                 newname = "{}{}".format(graftlabel, oldname)
                 other.rename_leaf(oldname, newname)
 
-        # Update main data structure (self.tree dictionary) by merging with dict from other
-        self.tree.update(other.tree)
-        # Link subtree to graftpoint in self.tree
-        self.tree[graftpoint][other.root] = Branchstruct(length=blen2)
+        # Update main data structure (self.child_dict dictionary) by merging with dict from other
+        self.child_dict.update(other.child_dict)
+        # Link subtree to graftpoint in self.child_dict
+        self.child_dict[graftpoint][other.root] = Branchstruct(length=blen2)
 
         # Update look-up lists and caches
         self.nodes.update( other.nodes )
@@ -2210,7 +2210,7 @@ class Tree():
         # will be formed by cutting downstream of it)
 
         # Python note: Lazy implementation where I use .nodedist() function for each node in tree.
-        # Could probably be sped up by using information already in .tree dict (thereby essentially
+        # Could probably be sped up by using information already in .child_dict dict (thereby essentially
         # looking at lower branches only once)
 
         # PYTHON NOTE: simplify. Maybe always return list of leaf-sets.
@@ -2224,7 +2224,7 @@ class Tree():
 
         # Find nodeheights and number of emanating branches for all internal nodes
         nodeheightlist = []
-        for parent, kid_dict in self.tree.items():
+        for parent, kid_dict in self.child_dict.items():
             pheight = self.nodedist(parent)
             nkids = len(kid_dict)
             nodeheightlist.append((pheight, nkids))
@@ -2254,7 +2254,7 @@ class Tree():
         # If so: add node above it to list of base nodes
         clusterlist = []                # list of sets of leaves (each set is one cluster)
         cluster_basenodes = []          # List of basenodes of clusters
-        for parent, kid_dict in self.tree.items():
+        for parent, kid_dict in self.child_dict.items():
             for kid in kid_dict:
                 if kid_dict[kid].parent_height <= cutoff < kid_dict[kid].kid_height:
                     cluster = self.remote_children(kid)
@@ -2308,7 +2308,7 @@ class Tree():
             raise TreeError(msg)
 
         # Local copies for faster access
-        tree = self.tree
+        tree = self.child_dict
 
         newnode = max(self.intnodes) + 1
         tree[newnode] = {}
@@ -2411,12 +2411,12 @@ class Tree():
         grandchildren = self.children(child)
         addlen = lostlen / len(grandchildren)
         for grandchild in grandchildren :
-            self.tree[parent][grandchild] = Branchstruct(self.tree[child][grandchild].length + addlen,
-                                                         self.tree[child][grandchild].label)
+            self.child_dict[parent][grandchild] = Branchstruct(self.child_dict[child][grandchild].length + addlen,
+                                                         self.child_dict[child][grandchild].label)
 
         # Delete "child" node and link from parent to child. Update intnodes and nodes
-        del self.tree[child]
-        del self.tree[parent][child]
+        del self.child_dict[child]
+        del self.child_dict[parent][child]
         self.intnodes.remove(child)
         self.nodes = self.leaves | self.intnodes
 
@@ -2450,7 +2450,7 @@ class Tree():
         # the "other child" of the root must become the new root
         if (len(childset) == 2) and (leaf in self.children(root)):
             [child2] = childset - {leaf}                    # Remaining item is other child
-            del self.tree[root]                             # Remove entry for old root
+            del self.child_dict[root]                             # Remove entry for old root
             self.intnodes.remove(root)
             self.nodes.remove(root)
             self.root = child2                              # child2 is new root
@@ -2462,16 +2462,16 @@ class Tree():
         # Keep branch label (if any) of the branch from grandparent to parent
         elif len(childset) == 2:
             [child2] = childset - {leaf}                    # Remaining item is other child
-            child2dist = self.tree[parent][child2].length   # Remember dist to other child
+            child2dist = self.child_dict[parent][child2].length   # Remember dist to other child
             grandparent = self.parent(parent)
 
             # Add remaining child to grandparent
-            # self.tree[grandparent][leaf2] = Branchstruct(self.tree[grandparent][parent].length,
-            #                                              self.tree[grandparent][parent].label)
-            self.tree[grandparent][child2] = self.tree[grandparent][parent]
-            self.tree[grandparent][child2].length += child2dist   # Cumulated distance
-            del self.tree[parent]                           # Delete parent and leaf
-            del self.tree[grandparent][parent]              # Also remove pointer from gp to p
+            # self.child_dict[grandparent][leaf2] = Branchstruct(self.child_dict[grandparent][parent].length,
+            #                                              self.child_dict[grandparent][parent].label)
+            self.child_dict[grandparent][child2] = self.child_dict[grandparent][parent]
+            self.child_dict[grandparent][child2].length += child2dist   # Cumulated distance
+            del self.child_dict[parent]                           # Delete parent and leaf
+            del self.child_dict[grandparent][parent]              # Also remove pointer from gp to p
             del self._parent_dict[leaf]                      # Remove unused entries in parent_dict
             del self._parent_dict[parent]
             self._parent_dict[child2] = grandparent          # Update parent_dict for leaf2
@@ -2480,7 +2480,7 @@ class Tree():
 
         # If leaf is part of multifurcation, then no special cleanup needed
         else:
-            del self.tree[parent][leaf]
+            del self.child_dict[parent][leaf]
             del self._parent_dict[leaf]
 
         # Remove leaf entry from global leaflist. Update intnodeslist
@@ -2500,7 +2500,7 @@ class Tree():
             raise TreeError(f"Parent is not an existing internal node: {parent}")
         if newleafname in self.leaves:
             raise TreeError(f"Leaf already exists: {newleafname}")
-        self.tree[parent][newleafname] = branchstruct
+        self.child_dict[parent][newleafname] = branchstruct
         self.nodes.add(newleafname)
         self.leaves.add(newleafname)
 
@@ -2748,8 +2748,8 @@ class Tree():
 
         parent = self.parent(oldname)
         self._parent_dict = None
-        self.tree[parent][newname] = self.tree[parent][oldname]
-        del self.tree[parent][oldname]
+        self.child_dict[parent][newname] = self.child_dict[parent][oldname]
+        del self.child_dict[parent][oldname]
 
         # Update self.leaves and self.nodes
         self.leaves.add(newname)
@@ -2783,16 +2783,16 @@ class Tree():
         kidlist = self.children(oldnum)
         parent = self.parent(oldnum)            # Will be None if oldnum is root
 
-        # Update main data structure (child list in self.tree)
-        self.tree[newnum] = {}
+        # Update main data structure (child list in self.child_dict)
+        self.child_dict[newnum] = {}
         for child in kidlist:
-            self.tree[newnum][child] = self.tree[oldnum][child]
-        del self.tree[oldnum]
+            self.child_dict[newnum][child] = self.child_dict[oldnum][child]
+        del self.child_dict[oldnum]
         if oldnum == self.root:
             self.root = newnum
         else:
-            self.tree[parent][newnum] = self.tree[parent][oldnum]
-            del self.tree[parent][oldnum]
+            self.child_dict[parent][newnum] = self.child_dict[parent][oldnum]
+            del self.child_dict[parent][oldnum]
 
         # Update look-up lists, caches, and root-marker if relevant
         self.nodes.add(newnum)
@@ -2945,7 +2945,7 @@ class Tree():
     def treesim(self, other, verbose=False):
         """Compute normalised symmetric similarity between self and other tree"""
 
-        symdif, symdif_norm, n_shared, n_uniq1, n_uniq2, n_bip1, n_bip2 = self.treedist(other, verbose=True)
+        symdif, symdif_norm, n_shared, n_uniq1, n_uniq2, n_bip1, n_bip2 = self.child_dictdist(other, verbose=True)
         symsim_norm = 1.0 - symdif_norm
 
         if verbose:
@@ -2981,12 +2981,12 @@ class Tree():
             kid1, kid2 = rootkids
 
             # Length of new, combined branch is sum of distances
-            distsum = self.tree[root][kid1].length + self.tree[root][kid2].length
+            distsum = self.child_dict[root][kid1].length + self.child_dict[root][kid2].length
 
             # Deal with labels semi-intelligently
             # If only one label set: use that. Otherwise pick lab1
-            lab1 = self.tree[root][kid1].label
-            lab2 = self.tree[root][kid2].label
+            lab1 = self.child_dict[root][kid1].label
+            lab2 = self.child_dict[root][kid2].label
             if lab1 != "" and lab2 == "":
                 lab = lab1
             elif lab1 == ""  and lab2 != "":
@@ -2997,19 +2997,19 @@ class Tree():
             # Python note: should handle situation where Branchstruct has additional attributes
             # Use introspection to find attributes and combine intelligently?
             if kid1 in self.intnodes:
-                self.tree[kid1][kid2] = Branchstruct(length = distsum, label = lab)
+                self.child_dict[kid1][kid2] = Branchstruct(length = distsum, label = lab)
                 self.root = kid1
             elif kid2 in self.intnodes:
-                self.tree[kid2][kid1] = Branchstruct(length = distsum, label = lab)
+                self.child_dict[kid2][kid1] = Branchstruct(length = distsum, label = lab)
                 self.root = kid2
             else:
                 raise TreeError("Cannot deroot tree: only leaves are present")
 
             # remove previous root
-            del self.tree[root]
+            del self.child_dict[root]
 
             # update intnodelist and delete caches, which are now unreliable
-            self.intnodes = set(self.tree.keys())
+            self.intnodes = set(self.child_dict.keys())
             #self.remote_children.cache_clear()
             self.nodedist.cache_clear()
             self.dist_dict = None
@@ -3054,12 +3054,12 @@ class Tree():
             # (from parent to child), except for length, which is split between the two branches
             # Special case: if child is leaf, then original branch will have no branch support
             # In this case set label to "1.0" (maybe only do this if rest of labels are branch support??)
-            newbranch = self.tree[parent][child].copy()
+            newbranch = self.child_dict[parent][child].copy()
             newbranch.length = parent_to_root_dist
             if newbranch.label == "":
                 newbranch.label = "1.0"
             newroot = self.insert_node(parent, [child], newbranch)
-            self.tree[newroot][child].length = root_to_child_dist
+            self.child_dict[newroot][child].length = root_to_child_dist
 
         # Things that were already downstream of newroot do not need to be moved, but things that
         # were previously upstream need to be moved downstream, which is done by reversing the
@@ -3068,8 +3068,8 @@ class Tree():
         path_to_old = self.nodepath(newroot, oldroot)
         for i in range( len(path_to_old) - 1 ):
             newparent, oldparent = path_to_old[i], path_to_old[i+1]
-            self.tree[newparent][oldparent] = self.tree[oldparent][newparent]
-            del self.tree[oldparent][newparent]
+            self.child_dict[newparent][oldparent] = self.child_dict[oldparent][newparent]
+            del self.child_dict[oldparent][newparent]
             # self.parent_dict[oldparent] = newparent
 
         # Clean up: clear caches, which are now unreliable

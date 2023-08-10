@@ -273,8 +273,8 @@ class Test_randtree:
 
         assert isinstance(mytree, pt.Tree)
         for parent in mytree.intnodes:
-            for child in mytree.tree[parent]:
-                length = mytree.tree[parent][child].length
+            for child in mytree.child_dict[parent]:
+                length = mytree.child_dict[parent][child].length
                 assert length >= 0   # since lognormvariate will always produce positive values
                 assert isinstance(length, float)
 
