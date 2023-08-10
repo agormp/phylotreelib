@@ -248,12 +248,10 @@ class Tree():
                 :[+-]?\d*\.?\d+(?:[eE][-+]?\d+)? |  # (5) a colon followed by a branch length
                                                     #     possibly negative,
                                                     #     possibly using exponential notation
-                [\w\-\/\.\*\|]+                  |  # (6) a name/label (one or more alphanumeric)
-                \[.*?\]                             # (7) a bracketted comment
-                                                    #     typically from FigTree
-                                                    #     placed as branch label
+                [\w\-\/\.\*\|]+                     # (6) a name/label (one or more alphanumeric)
                 """, re.VERBOSE)
         tree_parts_list = tree_parts.findall(treestring)
+
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
         # are the internal nodes which are numbered consecutively. Each key has an
         # associated value that is itself a dictionary listing the children: keys are
@@ -288,34 +286,34 @@ class Tree():
             # A left parenthesis indicates that we are about to examine a new internal node.
             if part == "(" :
                 nodeno += 1
-                obj.tree[nodeno] = {}          # Create child-list for new node
+                obj.tree[nodeno] = {}           # Create child-list for new node
 
                 if nodeno != 0:                 # If we are not at the root then add new node
                     parent = node_stack[-1]     # to previous node's list of children
                     obj.tree[parent][nodeno] = Branchstruct()
 
                 node_stack.append(nodeno)       # Push new node onto stack
-                obj.intnodes.add(nodeno)       # Add node to list of internal nodes
+                obj.intnodes.add(nodeno)        # Add node to list of internal nodes
 
             # A right parenthesis indicates that we have finished examining a node
             # I should maybe catch the "IndexError: pop from empty list" somewhere
             elif part == ")":
-                del node_stack[-1]              # Remove last examined node from stack
+                node_stack.pop()                # Remove last examined node from stack
 
             # A colon indicates this is a distance
             elif part[0] == ":":
-                dist = float(part[1:])                  # Remove colon and convert to float
+                dist = float(part[1:])          # Remove colon and convert to float
                 child = node_stack[-1]
                 parent = node_stack[-2]
                 obj.tree[parent][child].length =  dist # Add dist to relevant child-list
 
             # A comma indicates that we have finished examining a node
             elif part == ",":
-                del node_stack[-1]                      # Remove last examined node from stack
+                node_stack.pop()                # Remove last examined node from stack
 
             # A semicolon indicates the end of the treestring has been reached
             elif part == ";":
-                del node_stack[-1]                      # Clean up stack
+                node_stack.pop()                # Clean up stack
 
             # If nothing else matched then this must be a name or label
             # If previous part was simultaneously a right parenthesis or a leaf name,
