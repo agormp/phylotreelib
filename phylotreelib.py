@@ -4479,10 +4479,34 @@ class Treefile:
     """Factory for making Newick or Nexus treefile objects. Autodetects fileformat"""
 
     def __new__(klass, filename):
-        tempfile = open(filename)
-        firstline = tempfile.readline()
-        tempfile.close()
-        if firstline.lower().startswith("#nexus"):
+
+        def read_until_non_comment(filename):
+            with open(filename, 'r') as file:
+                content = []
+                comment_level = 0  # Counter to track the nesting level of comments
+                for line in file:
+                    stripped_line = ""
+                    i = 0
+                    while i < len(line):
+                        char = line[i]
+                        if char == '[':  # Start of a comment or deeper nesting
+                            comment_level += 1
+                        elif char == ']':  # End of a comment or moving up a nesting level
+                            comment_level -= 1
+                            if comment_level < 0:  # Malformed comment structure
+                                raise ValueError("Mismatched comment brackets in the file.")
+                            i += 1  # Skip the closing bracket
+                            continue
+                        elif comment_level == 0:  # Not inside a comment
+                            stripped_line += char
+                        i += 1
+                    content.append(line)
+                    if stripped_line.strip():  # If there's any non-commented text
+                        break
+                return ''.join(content)
+
+        headertext = read_until_non_comment(filename)
+        if "#nexus" in headertext.lower():
             return Nexustreefile(filename)
         else:
             return Newicktreefile(filename)
