@@ -536,8 +536,8 @@ class Tree:
     def from_string(cls, orig_treestring, transdict=None):
         """Constructor: Tree object from tree-string in Newick format"""
 
-        parser = NewickStringParser(orig_treestring, transdict)
-        return parser.parse()
+        # parser = NewickStringParser(orig_treestring, transdict)
+        # return parser.parse()
 
         obj = cls()
 
