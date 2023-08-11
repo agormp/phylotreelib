@@ -4407,7 +4407,7 @@ class Nexustreefile(TreefileBase):
             raise TreeError(msg)
 
         # Read past first "tree <NAME> =" statement. Keep text that was read in buffer
-        self.buffer = read_until(self.tree_header_pattern)
+        self.buffer = read_until(self.tree_header_pattern, skipcomment=True)
 
         # If buffer contains a "translate" block: parse it
         if re.search("translate", self.buffer, re.IGNORECASE):
