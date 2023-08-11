@@ -180,19 +180,40 @@ class TreeError(Exception):
 class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
+    # ###############################################################################################
+    #
+    # # Regex for tokenizer. Defined at class-level to avoid recompilation and to save memory
+    # token_specification = [
+    #     ('LEFTPAREN',   r'\('),
+    #     ('RIGHTPAREN',  r'\)'),
+    #     ('COMMA',       r','),
+    #     ('SEMICOLON',   r';'),
+    #     ('NAME',        r'[\w\-\/\.\*\|]+'),
+    #     ('COLON_BRLEN', r':[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?')
+    # ]
+    # pattern_string = '|'.join(f'(?P<{name}>{regex})' for (name, regex) in token_specification)
+    # tree_parts = re.compile(pattern_string)
+    #
     ###############################################################################################
 
-    # Regex for tokenizer. Defined at class-level to avoid recompilation and to save memory
-    token_specification = [
-        ('LEFTPAREN',   r'\('),
-        ('RIGHTPAREN',  r'\)'),
-        ('COMMA',       r','),
-        ('SEMICOLON',   r';'),
-        ('NAME',        r'[\w\-\/\.\*\|]+'),
-        ('COLON_BRLEN', r':[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?')
-    ]
-    pattern_string = '|'.join(f'(?P<{name}>{regex})' for (name, regex) in token_specification)
-    tree_parts = re.compile(pattern_string)
+    treeparts_regex = re.compile(r"""                   # Save the following sub-patterns:
+                                                   \( | # (1) a left parenthesis
+                                                   \) | # (2) a right parenthesis
+                                                    , | # (3) a comma
+                                                    ; | # (4) a semicolon
+                    :-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)? | # (5) a colon followed by a branch length
+                                                        #     possibly negative,
+                                                        #     possibly using exponential notation
+                                        [\w\.\*\/\|-]+  # (6) a name/label (one or more alphanumeric)
+                    """, re.VERBOSE)
+
+    lexerdict = {
+        ":" : "COLON_BRLEN",
+        ";" : "SEMICOLON",
+        "(" : "LEFTPAREN",
+        ")" : "RIGHTPAREN",
+        "," : "COMMA"
+    }
 
     ###############################################################################################
 
@@ -213,7 +234,7 @@ class NewickStringParser:
         treestring = treestring.replace("\t", "")
         treestring = treestring.replace("\n", "")
         treestring = treestring.replace("\r", "")
-        treestring = treestring.replace("\f", "")
+        # treestring = treestring.replace("\f", "")
         self.treestring = treestring
 
         # For keeping track of tree state during parsing (different from parser state)
@@ -230,24 +251,29 @@ class NewickStringParser:
 
         state = "TREE_START"
         dispatch = NewickStringParser.dispatch
-        for token_type, token_value in self._tokenizer():
-            # dict.get: ensure appropriate default method is called if token_type wrong
+        treeparts_regex = NewickStringParser.treeparts_regex
+        lexerdict = NewickStringParser.lexerdict
+
+        treeparts_list = treeparts_regex.findall(self.treestring)
+        for token_value in treeparts_list:
+            firstchar = token_value[0]
+            token_type = lexerdict.get(firstchar, "NAME")
             handler = dispatch[state].get(token_type, dispatch[state]['default'])
             state = handler(self, token_value)
         self.tree.nodes = self.tree.leaves | self.tree.intnodes
         return self.tree
 
-    ###############################################################################################
-
-    def _tokenizer(self):
-        """Tokenizes self.treestring: yields (token_type, token_value) tuples"""
-
-        tree_parts = NewickStringParser.tree_parts
-        for match_object in tree_parts.finditer(self.treestring):
-            token_type = match_object.lastgroup
-            token_value = match_object.group()
-            yield(token_type, token_value)
-
+    # ###############################################################################################
+    #
+    # def _tokenizer(self):
+    #     """Tokenizes self.treestring: yields (token_type, token_value) tuples"""
+    #
+    #     tree_parts = NewickStringParser.tree_parts
+    #     for match_object in tree_parts.finditer(self.treestring):
+    #         token_type = match_object.lastgroup
+    #         token_value = match_object.group()
+    #         yield(token_type, token_value)
+    #
     ###############################################################################################
 
     def _handle_add_root_intnode(self, token_value):
