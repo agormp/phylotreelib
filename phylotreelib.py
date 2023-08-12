@@ -536,6 +536,7 @@ class Tree:
     def from_string(cls, orig_treestring, transdict=None):
         """Constructor: Tree object from tree-string in Newick format"""
 
+        # Activate when switching to using NewickStringParser (delete all below)
         # parser = NewickStringParser(orig_treestring, transdict)
         # return parser.parse()
 
