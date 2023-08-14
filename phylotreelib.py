@@ -196,15 +196,12 @@ class NewickStringParser:
     #
     ###############################################################################################
 
-    treeparts_regex = re.compile(r"""                   # Save the following sub-patterns:
-                                                   \( | # (1) a left parenthesis
-                                                   \) | # (2) a right parenthesis
-                                                    , | # (3) a comma
-                                                    ; | # (4) a semicolon
-                    :-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)? | # (5) a colon followed by a branch length
-                                                        #     possibly negative,
-                                                        #     possibly using exponential notation
-                                        [\w\.\*\/\|-]+  # (6) a name/label (one or more alphanumeric)
+    treeparts_regex = re.compile(r"""       # Save the following sub-patterns:
+                                [,;()]    | # (1-4) comma, semicolon, l/r-parenthesis
+        :-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)? | # (5) a colon followed by a branch length
+                                            #     possibly negative,
+                                            #     possibly using exponential notation
+                            [\w\.\*\/\|-]+  # (6) a name/label (one or more alphanumeric)
                     """, re.VERBOSE)
 
     lexerdict = {
