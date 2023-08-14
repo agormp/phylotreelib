@@ -560,16 +560,13 @@ class Tree:
         # Python note: characters that are not one of the below, will be quietly discarded
         # this includes things such as quotes, ampersands, dollarsigns etc.
         # possibly this is a good idea, but may cause trouble (figtree format for instance)
-        tree_parts = re.compile(r"""                # Save the following sub-patterns:
-                \(          |                       # (1) a left parenthesis
-                \)          |                       # (2) a right parenthesis
-                ,           |                       # (3) a comma
-                ;           |                       # (4) a semicolon
-                :[+-]?\d*\.?\d+(?:[eE][-+]?\d+)? |  # (5) a colon followed by a branch length
-                                                    #     possibly negative,
-                                                    #     possibly using exponential notation
-                [\w\-\/\.\*\|]+                     # (6) a name/label (one or more alphanumeric)
-                """, re.VERBOSE)
+        tree_parts = re.compile(r"""            # Save the following sub-patterns:
+                                    [,;()]    | # (1-4) comma, semicolon, l/r-parenthesis
+            :-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)? | # (5) a colon followed by a branch length
+                                                #     possibly negative,
+                                                #     possibly using exponential notation
+                                [\w\.\*\/\|-]+  # (6) a name/label (one or more alphanumeric)
+                        """, re.VERBOSE)
         tree_parts_list = tree_parts.findall(treestring)
 
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
