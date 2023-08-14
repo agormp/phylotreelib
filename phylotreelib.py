@@ -225,14 +225,8 @@ class NewickStringParser:
         tree.belowroot = None
         self.tree = tree
 
-        # Remove whitespace from treestring
-        # (string methods are much faster than regexp.sub)
-        treestring = treestring.replace(" ", "")
-        treestring = treestring.replace("\t", "")
-        treestring = treestring.replace("\n", "")
-        treestring = treestring.replace("\r", "")
-        # treestring = treestring.replace("\f", "")
-        self.treestring = treestring
+        # Hack to remove whitespace from treestring
+        self.treestring = "".join(treestring.split())
 
         # For keeping track of tree state during parsing (different from parser state)
         self.nodeno = -1
@@ -542,12 +536,8 @@ class Tree:
         # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
         # an internal node). The label is attached to the same branch as the branch length
 
-        # Remove whitespace (string methods are much faster than regexp.sub)
-        treestring = orig_treestring.replace(" ", "")
-        treestring = treestring.replace("\t", "")
-        treestring = treestring.replace("\n", "")
-        treestring = treestring.replace("\r", "")
-        treestring = treestring.replace("\f", "")
+        # Remove whitespace
+        treestring = "".join(orig_treestring.split())
 
         # Sanity check: number of left- and right-parentheses should match
         if treestring.count("(") != treestring.count(")"):
