@@ -180,40 +180,6 @@ class TreeError(Exception):
 class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
-    # ###############################################################################################
-    #
-    # # Regex for tokenizer. Defined at class-level to avoid recompilation and to save memory
-    # token_specification = [
-    #     ('LEFTPAREN',   r'\('),
-    #     ('RIGHTPAREN',  r'\)'),
-    #     ('COMMA',       r','),
-    #     ('SEMICOLON',   r';'),
-    #     ('NAME',        r'[\w\-\/\.\*\|]+'),
-    #     ('COLON_BRLEN', r':[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?')
-    # ]
-    # pattern_string = '|'.join(f'(?P<{name}>{regex})' for (name, regex) in token_specification)
-    # tree_parts = re.compile(pattern_string)
-    #
-    ###############################################################################################
-
-    treeparts_regex = re.compile(r"""       # Save the following sub-patterns:
-                                [,;()]    | # (1-4) comma, semicolon, l/r-parenthesis
-        :-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)? | # (5) a colon followed by a branch length
-                                            #     possibly negative,
-                                            #     possibly using exponential notation
-                            [\w\.\*\/\|-]+  # (6) a name/label (one or more alphanumeric)
-                    """, re.VERBOSE)
-
-    lexerdict = {
-        ":" : "COLON_BRLEN",
-        ";" : "SEMICOLON",
-        "(" : "LEFTPAREN",
-        ")" : "RIGHTPAREN",
-        "," : "COMMA"
-    }
-
-    ###############################################################################################
-
     def __init__(self, treestring, transdict=None):
 
         # Construct Tree object that will be filled out by parser
@@ -240,31 +206,40 @@ class NewickStringParser:
     def parse(self):
         """Returns instance of Tree. Used in Tree.from_string()"""
 
-        state = "TREE_START"
         dispatch = NewickStringParser.dispatch
-        treeparts_regex = NewickStringParser.treeparts_regex
-        lexerdict = NewickStringParser.lexerdict
+        delimset = set(",;:()")
+        state = "TREE_START"
+        tree_parts_list = re.split(r'([(),;:])', self.treestring)
+        tree_parts_list = list(filter(None, tree_parts_list))   # Remove empty strings from split
+        for token_value in tree_parts_list:
+            if token_value in delimset:
+                token_type = token_value
+            else:
+                token_type = "NUM_NAME"
+            try:
+                handler = dispatch[state][token_type]
+                state = handler(self, token_value)
+            except KeyError:
+                self._handle_parse_error(state, token_value, token_type, self.treestring)
 
-        treeparts_list = treeparts_regex.findall(self.treestring)
-        for token_value in treeparts_list:
-            firstchar = token_value[0]
-            token_type = lexerdict.get(firstchar, "NAME")
-            handler = dispatch[state].get(token_type, dispatch[state]['default'])
-            state = handler(self, token_value)
+        # Sanity check: if nodes remain on stack, then something went wront:
+        if self.node_stack:
+            msg = f"Error in treestring: nodes remaining on stack after parsing: {self.node_stack}"
+            raise TreeError(msg)
+
         self.tree.nodes = self.tree.leaves | self.tree.intnodes
         return self.tree
 
-    # ###############################################################################################
-    #
-    # def _tokenizer(self):
-    #     """Tokenizes self.treestring: yields (token_type, token_value) tuples"""
-    #
-    #     tree_parts = NewickStringParser.tree_parts
-    #     for match_object in tree_parts.finditer(self.treestring):
-    #         token_type = match_object.lastgroup
-    #         token_value = match_object.group()
-    #         yield(token_type, token_value)
-    #
+    ###############################################################################################
+
+    def _handle_parse_error(self, state, token_value, token_type, treestring):
+        msg = ("Error parsing treestring:\n"
+               f"Parser state: {state}\n"
+               f"Token-value:  {token_value}\n"
+               f"Token_type:   {token_type}\n"
+               f"Tree-string:  {treestring}\n")
+        raise TreeError(msg)
+
     ###############################################################################################
 
     def _handle_add_root_intnode(self, token_value):
@@ -273,12 +248,6 @@ class NewickStringParser:
         self.node_stack.append(self.nodeno)     # Push new node onto stack
         self.tree.intnodes.add(self.nodeno)     # Add node to list of internal nodes
         return "INTNODE_START"                  # New state
-
-    ###############################################################################################
-
-    def _handle_error_root(self, token_value):
-        msg = f"Expecting ( at beginning of tree: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
 
     ###############################################################################################
 
@@ -293,7 +262,7 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_add_leaf_1(self, name):
+    def _handle_add_leaf(self, name):
         # Python note: maybe make more efficient? Dont test every time?
         if self.transdict:
             child = sys.intern(self.transdict[name])
@@ -306,90 +275,36 @@ class NewickStringParser:
         self.tree.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
         self.tree.leaves.add(child)
-        return "LEAF_1"
+        return "LEAF"
 
     ###############################################################################################
 
-    def _handle_error_intnode(self, token_value):
-        msg = f"Expecting ( or NAME after (: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
-
-    ###############################################################################################
-
-    def _handle_transition_child_2plus(self, token_value):
+    def _handle_transition_child(self, token_value):
         self.node_stack.pop()
-        return "EXPECTING_CHILD_2+"
+        return "EXPECTING_CHILD"
 
     ###############################################################################################
 
-    def _handle_error_leaf_1(self, token_value):
-        msg = f"Expecting one of :, after leaf name: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
+    def _handle_transition_brlen(self, token_value):
+        return "EXPECTING_BRLEN"
 
     ###############################################################################################
 
-    def _handle_add_brlen_1(self, brlen_string):
-        brlen = float(brlen_string[1:])
-        child = self.node_stack[-1]
-        parent = self.node_stack[-2]
-        self.tree.child_dict[parent][child].length = brlen
-        return "BRLEN_1"
-
-    ###############################################################################################
-
-    def _handle_error_brlen_1(self, token_value):
-        msg = f"Expecting , after branch length 1: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
-
-    ###############################################################################################
-
-    def _handle_add_leaf_2plus(self, name):
-        # Python note: maybe make more efficient? Dont test every time?
-        if self.transdict:
-            child = sys.intern(self.transdict[name])
-        else:
-            child = sys.intern(name)
-        if child in self.tree.leaves:
-            msg = f"Leaf name present more than once: {child}"
-            raise TreeError(msg)
-        parent=self.node_stack[-1]
-        self.tree.child_dict[parent][child] = Branchstruct()
-        self.node_stack.append(child)
-        self.tree.leaves.add(child)
-        return "LEAF_2+"
-
-    ###############################################################################################
-
-    def _handle_error_expecting_child2plus(self, token_value):
-        msg = f"Expecting ( or NAME after ,: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
+    def _handle_add_brlen(self, brlen_string):
+        try:
+            brlen = float(brlen_string)
+            child = self.node_stack[-1]
+            parent = self.node_stack[-2]
+            self.tree.child_dict[parent][child].length = brlen
+            return "BRLEN"
+        except ValueError:
+            raise TreeError(f"Expected branch length: {brlen_string}")
 
     ###############################################################################################
 
     def _handle_intnode_end(self, token_value):
         self.node_stack.pop()
         return "INTNODE_END"
-
-    ###############################################################################################
-
-    def _handle_error_leaf_2plus(self, token_value):
-        msg = f"Expecting one of :,) after leaf name 2+: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
-
-    ###############################################################################################
-
-    def _handle_add_brlen_2plus(self, brlen_string):
-        brlen = float(brlen_string[1:])
-        child = self.node_stack[-1]
-        parent = self.node_stack[-2]
-        self.tree.child_dict[parent][child].length = brlen
-        return "BRLEN_2+"
-
-    ###############################################################################################
-
-    def _handle_error_brlen_2plus(self, token_value):
-        msg = f"Expecting one of ,) after branch length 2+: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
 
     ###############################################################################################
 
@@ -401,86 +316,51 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_error_label(self, label):
-        msg = f"Expecting one of ,:) after LABEL: {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
-
-    ###############################################################################################
-
     def _handle_transition_tree_end(self, token_value):
         self.node_stack.pop()
         return "TREE_END"
 
     ###############################################################################################
 
-    def _handle_error_intnode_end(self, token_value):
-        msg = f"Expecting one of ,):; or NAME after ): {token_value}\n{self.treestring}\n"
-        raise TreeError(msg)
-
-    ###############################################################################################
-
-    def _placeholderend(self, token_value):
-        print("after end??")
-
-    ###############################################################################################
-
     # Dispatch dictionary: specifies which function to use for any given combination of
     # state and token-type. Functions return next state, and use token-value as input
     # Defined as class-level attribute: created once and shared among instances of class
-    # Python note: initialized this way because otherwise handler functions would need
-    # to be defined first
 
     dispatch = {
         "TREE_START": {
-            "LEFTPAREN":    _handle_add_root_intnode,
-            "default":      _handle_error_root
+            "(":            _handle_add_root_intnode
         },
         "INTNODE_START": {
-            "LEFTPAREN":    _handle_add_intnode,
-            "NAME":         _handle_add_leaf_1,
-            "default":      _handle_error_intnode
+            "(":            _handle_add_intnode,
+            "NUM_NAME":     _handle_add_leaf
         },
-        "LEAF_1": {
-            "COLON_BRLEN":  _handle_add_brlen_1,
-            "COMMA":        _handle_transition_child_2plus,
-            "default":      _handle_error_leaf_1
+        "LEAF": {
+            ":":            _handle_transition_brlen,
+            ",":            _handle_transition_child,
+            ")":            _handle_intnode_end
         },
-        "BRLEN_1": {
-            "COMMA":        _handle_transition_child_2plus,
-            "default":      _handle_error_brlen_1
+        "EXPECTING_BRLEN": {
+            "NUM_NAME":     _handle_add_brlen
         },
-        "EXPECTING_CHILD_2+": {
-            "LEFTPAREN":    _handle_add_intnode,
-            "NAME":         _handle_add_leaf_2plus,
-            "default":      _handle_error_expecting_child2plus
+        "BRLEN": {
+            ",":            _handle_transition_child,
+            ")":            _handle_intnode_end
         },
-        "LEAF_2+": {
-            "COMMA":        _handle_transition_child_2plus,
-            "COLON_BRLEN":  _handle_add_brlen_2plus,
-            "RIGHTPAREN":   _handle_intnode_end,
-            "default":      _handle_error_leaf_2plus
-        },
-        "BRLEN_2+": {
-            "COMMA":        _handle_transition_child_2plus,
-            "RIGHTPAREN":   _handle_intnode_end,
-            "default":      _handle_error_brlen_2plus
+        "EXPECTING_CHILD": {
+            "(":            _handle_add_intnode,
+            "NUM_NAME":     _handle_add_leaf
         },
         "INTNODE_END": {
-            "RIGHTPAREN":   _handle_intnode_end,
-            "COMMA":        _handle_transition_child_2plus,
-            "COLON_BRLEN":  _handle_add_brlen_2plus,
-            "NAME":         _handle_label,
-            "SEMICOLON":    _handle_transition_tree_end,
-            "default":      _handle_error_intnode_end
+            ")":            _handle_intnode_end,
+            ",":            _handle_transition_child,
+            ":":            _handle_transition_brlen,
+            "NUM_NAME":     _handle_label,
+            ";":            _handle_transition_tree_end
         },
         "LABEL": {
-            "RIGHTPAREN":   _handle_intnode_end,
-            "COMMA":        _handle_transition_child_2plus,
-            "COLON_BRLEN":  _handle_add_brlen_2plus,
-            "default":      _handle_error_label
-        },
-        "TREE_END": {
-            "default":      _placeholderend
+            ")":            _handle_intnode_end,
+            ",":            _handle_transition_child,
+            ":":            _handle_transition_brlen
         }
     }
 
@@ -528,8 +408,8 @@ class Tree:
         """Constructor: Tree object from tree-string in Newick format"""
 
         # Activate when switching to using NewickStringParser (delete all below)
-        # parser = NewickStringParser(orig_treestring, transdict)
-        # return parser.parse()
+        parser = NewickStringParser(orig_treestring, transdict)
+        return parser.parse()
 
         obj = cls()
 
