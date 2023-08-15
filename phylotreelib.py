@@ -199,18 +199,60 @@ class NewickStringParser:
         self.node_stack = []
 
         # Possibly transdict was supplied
-        self.transdict = transdict
+        if transdict:
+            self.transdict = transdict
+            self._handle_add_leaf = self._handle_add_leaf_with_transdict
+
+        # Dispatch dictionary: specifies which function to use for any given combination of
+        # state and token-type. Functions use token-value as input an return next state.
+        self.dispatch = {
+            "TREE_START": {
+                "(":            self._handle_add_root_intnode
+            },
+            "INTNODE_START": {
+                "(":            self._handle_add_intnode,
+                "NUM_NAME":     self._handle_add_leaf
+            },
+            "LEAF": {
+                ":":            self._handle_transition_brlen,
+                ",":            self._handle_transition_child,
+                ")":            self._handle_intnode_end
+            },
+            "EXPECTING_BRLEN": {
+                "NUM_NAME":     self._handle_add_brlen
+            },
+            "BRLEN": {
+                ",":            self._handle_transition_child,
+                ")":            self._handle_intnode_end
+            },
+            "EXPECTING_CHILD": {
+                "(":            self._handle_add_intnode,
+                "NUM_NAME":     self._handle_add_leaf
+            },
+            "INTNODE_END": {
+                ")":            self._handle_intnode_end,
+                ",":            self._handle_transition_child,
+                ":":            self._handle_transition_brlen,
+                "NUM_NAME":     self._handle_label,
+                ";":            self._handle_transition_tree_end
+            },
+            "LABEL": {
+                ")":            self._handle_intnode_end,
+                ",":            self._handle_transition_child,
+                ":":            self._handle_transition_brlen
+            }
+        }
 
     ###############################################################################################
 
     def parse(self):
         """Returns instance of Tree. Used in Tree.from_string()"""
 
-        dispatch = NewickStringParser.dispatch
+        dispatch = self.dispatch
         delimset = set(",;:()")
         state = "TREE_START"
         tree_parts_list = re.split(r'([(),;:])', self.treestring)
-        tree_parts_list = list(filter(None, tree_parts_list))   # Remove empty strings from split
+        tree_parts_list = list(filter(None, tree_parts_list))   # Remove empty strings after split
         for token_value in tree_parts_list:
             if token_value in delimset:
                 token_type = token_value
@@ -218,13 +260,13 @@ class NewickStringParser:
                 token_type = "NUM_NAME"
             try:
                 handler = dispatch[state][token_type]
-                state = handler(self, token_value)
+                state = handler(token_value)
             except KeyError:
                 self._handle_parse_error(state, token_value, token_type, self.treestring)
 
-        # Sanity check: if nodes remain on stack, then something went wront:
+        # Sanity check: if nodes remain on stack after parsing, then something went wrong:
         if self.node_stack:
-            msg = f"Error in treestring: nodes remaining on stack after parsing: {self.node_stack}"
+            msg = f"Nodes remaining on stack after parsing treestring: {self.node_stack}"
             raise TreeError(msg)
 
         self.tree.nodes = self.tree.leaves | self.tree.intnodes
@@ -233,10 +275,10 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_parse_error(self, state, token_value, token_type, treestring):
-        msg = ("Error parsing treestring:\n"
+        msg = ("Parsing error: unexpected token-type for this state:\n"
                f"Parser state: {state}\n"
-               f"Token-value:  {token_value}\n"
                f"Token_type:   {token_type}\n"
+               f"Token-value:  {token_value}\n"
                f"Tree-string:  {treestring}\n")
         raise TreeError(msg)
 
@@ -263,14 +305,23 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_add_leaf(self, name):
-        # Python note: maybe make more efficient? Dont test every time?
-        if self.transdict:
-            child = sys.intern(self.transdict[name])
-        else:
-            child = sys.intern(name)
-        if child in self.tree.leaves:
-            msg = f"Leaf name present more than once: {child}"
-            raise TreeError(msg)
+        child = sys.intern(name)
+        # if child in self.tree.leaves:
+        #     msg = f"Leaf name present more than once: {child}"
+        #     raise TreeError(msg)
+        parent=self.node_stack[-1]
+        self.tree.child_dict[parent][child] = Branchstruct()
+        self.node_stack.append(child)
+        self.tree.leaves.add(child)
+        return "LEAF"
+
+    ###############################################################################################
+
+    def _handle_add_leaf_with_transdict(self, name):
+        child = sys.intern(self.transdict[name])
+        # if child in self.tree.leaves:
+        #     msg = f"Leaf name present more than once: {child}"
+        #     raise TreeError(msg)
         parent=self.node_stack[-1]
         self.tree.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
@@ -319,50 +370,6 @@ class NewickStringParser:
     def _handle_transition_tree_end(self, token_value):
         self.node_stack.pop()
         return "TREE_END"
-
-    ###############################################################################################
-
-    # Dispatch dictionary: specifies which function to use for any given combination of
-    # state and token-type. Functions return next state, and use token-value as input
-    # Defined as class-level attribute: created once and shared among instances of class
-
-    dispatch = {
-        "TREE_START": {
-            "(":            _handle_add_root_intnode
-        },
-        "INTNODE_START": {
-            "(":            _handle_add_intnode,
-            "NUM_NAME":     _handle_add_leaf
-        },
-        "LEAF": {
-            ":":            _handle_transition_brlen,
-            ",":            _handle_transition_child,
-            ")":            _handle_intnode_end
-        },
-        "EXPECTING_BRLEN": {
-            "NUM_NAME":     _handle_add_brlen
-        },
-        "BRLEN": {
-            ",":            _handle_transition_child,
-            ")":            _handle_intnode_end
-        },
-        "EXPECTING_CHILD": {
-            "(":            _handle_add_intnode,
-            "NUM_NAME":     _handle_add_leaf
-        },
-        "INTNODE_END": {
-            ")":            _handle_intnode_end,
-            ",":            _handle_transition_child,
-            ":":            _handle_transition_brlen,
-            "NUM_NAME":     _handle_label,
-            ";":            _handle_transition_tree_end
-        },
-        "LABEL": {
-            ")":            _handle_intnode_end,
-            ",":            _handle_transition_child,
-            ":":            _handle_transition_brlen
-        }
-    }
 
 ###################################################################################################
 ###################################################################################################
