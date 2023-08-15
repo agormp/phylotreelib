@@ -184,9 +184,9 @@ class NewickStringParser:
 
         # Construct Tree object that will be filled out by parser
         tree = Tree()
-        tree.child_dict = {}            # Essentially a "child-list"
-        tree.leaves = set()             # Set of leaf names. For speedy lookups
-        tree.intnodes = set()           # Set of internal node IDs. For speedy lookups
+        tree.child_dict = {}
+        tree.leaves = set()
+        tree.intnodes = set()
         tree.root = 0                   # Root is node zero at start. (May change)
         tree.belowroot = None
         self.tree = tree
@@ -198,7 +198,10 @@ class NewickStringParser:
         self.nodeno = -1
         self.node_stack = []
 
-        # Possibly transdict was supplied
+        # For checking if there are duplicated leaf names after parsing
+        self.ntips = 0
+
+        # If transdict was supplied: use corresponding handler when adding leaves
         if transdict:
             self.transdict = transdict
             self._handle_add_leaf = self._handle_add_leaf_with_transdict
@@ -263,14 +266,18 @@ class NewickStringParser:
                 state = handler(token_value)
             except KeyError:
                 self._handle_parse_error(state, token_value, token_type, self.treestring)
+        self.tree.nodes = self.tree.leaves | self.tree.intnodes
+        self.sanitychecks()
+        return self.tree
 
-        # Sanity check: if nodes remain on stack after parsing, then something went wrong:
+    ###############################################################################################
+
+    def sanitychecks(self):
         if self.node_stack:
             msg = f"Nodes remaining on stack after parsing treestring: {self.node_stack}"
             raise TreeError(msg)
-
-        self.tree.nodes = self.tree.leaves | self.tree.intnodes
-        return self.tree
+        if self.ntips > len(self.tree.leaves):
+            raise TreeError(f"Duplicated leafnames in treestring:\n{self.treestring}")
 
     ###############################################################################################
 
@@ -313,6 +320,7 @@ class NewickStringParser:
         self.tree.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
         self.tree.leaves.add(child)
+        self.ntips +=1
         return "LEAF"
 
     ###############################################################################################
