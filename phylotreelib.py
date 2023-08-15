@@ -3822,7 +3822,7 @@ class TreeSummary():
             with Treefile(fname) as tf:
                 if skiplist:
                     for j in range(skiplist[i]):
-                        tf.readtree()
+                        tf.readtree(returntree=False)
                 for tree in tf:
                     topology = tree.topology()
                     logcred = self.log_clade_credibility(topology)
@@ -4010,11 +4010,12 @@ class TreefileBase():
 
     ###############################################################################################
 
-    def readtree(self):
-        """Reads one tree from file and returns as Tree object. Returns None when exhausted file"""
+    def readtree(self, returntree=True):
+        """Reads one treestring from file and returns as Tree object if requested.
+        Returns None when exhausted file"""
 
         try:
-            tree = next(self)
+            tree = self.__next__(returntree)
             return tree
         except StopIteration:
             self.treefile.close()
@@ -4073,14 +4074,15 @@ class Newicktreefile(TreefileBase):
 
     ###############################################################################################
 
-    def __next__(self):
+    def __next__(self, returntree=True):
         treestring = self.get_treestring()
         if treestring is None:
             self.treefile.close()
             raise StopIteration
         else:
             treestring = remove_comments(treestring)
-            return Tree.from_string(treestring)
+            if returntree:
+                return Tree.from_string(treestring)
 
 ###################################################################################################
 ###################################################################################################
@@ -4205,7 +4207,7 @@ class Nexustreefile(TreefileBase):
 
     ###############################################################################################
 
-    def __next__(self, noreturn=False):
+    def __next__(self, returntree=True):
 
         treestring = self.get_treestring()
         if treestring is None:
@@ -4224,9 +4226,7 @@ class Nexustreefile(TreefileBase):
             raise StopIteration
 
         # Return tree object if requested
-        if noreturn:
-            return None
-        else:
+        if returntree:
             return Tree.from_string(treestring, self.transdict)
 
 ###################################################################################################
