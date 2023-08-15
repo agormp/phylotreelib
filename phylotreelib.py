@@ -183,6 +183,12 @@ class NewickStringParser:
     def __init__(self, treestring, transdict=None):
 
         # Construct Tree object that will be filled out by parser
+        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
+        # are the internal nodes which are numbered consecutively. Each key has an
+        # associated value that is itself a dictionary listing the children: keys are
+        # child nodes, values are Branchstructs containing "length" and "label" fields.
+        # Leafs are identified by a string instead of a number
+        obj.child_dict = {}                  # Essentially a "child-list"
         tree = Tree()
         tree.child_dict = {}
         tree.leaves = set()
@@ -282,6 +288,14 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_parse_error(self, state, token_value, token_type, treestring):
+
+        # If unexpected token-type was encountered: first check if parentheses are balanced:
+        if treestring.count("(") != treestring.count(")"):
+            msg = "Imbalance in tree-string: different number of left- and right-parentheses\n"
+            msg += f"Left: ({treestring.count('(')}  Right: {treestring.count(')')})"
+            raise TreeError(msg)
+
+        # If that was not the problem: report current parser-state, token-type, and token-value
         msg = ("Parsing error: unexpected token-type for this state:\n"
                f"Parser state: {state}\n"
                f"Token_type:   {token_type}\n"
