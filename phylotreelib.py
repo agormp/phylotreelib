@@ -188,7 +188,6 @@ class NewickStringParser:
         # associated value that is itself a dictionary listing the children: keys are
         # child nodes, values are Branchstructs containing "length" and "label" fields.
         # Leafs are identified by a string instead of a number
-        obj.child_dict = {}                  # Essentially a "child-list"
         tree = Tree()
         tree.child_dict = {}
         tree.leaves = set()
@@ -201,7 +200,6 @@ class NewickStringParser:
         self.treestring = "".join(treestring.split())
 
         # For keeping track of tree state during parsing (different from parser state)
-        self.nodeno = -1
         self.node_stack = []
 
         # For checking if there are duplicated leaf names after parsing
@@ -294,14 +292,14 @@ class NewickStringParser:
             msg = "Imbalance in tree-string: different number of left- and right-parentheses\n"
             msg += f"Left: ({treestring.count('(')}  Right: {treestring.count(')')})"
             raise TreeError(msg)
-
-        # If that was not the problem: report current parser-state, token-type, and token-value
-        msg = ("Parsing error: unexpected token-type for this state:\n"
-               f"Parser state: {state}\n"
-               f"Token_type:   {token_type}\n"
-               f"Token-value:  {token_value}\n"
-               f"Tree-string:  {treestring}\n")
-        raise TreeError(msg)
+        else:
+            # If that was not the problem: report current parser-state, token-type, and token-value
+            msg = ("Parsing error: unexpected token-type for this state:\n"
+                   f"Parser state: {state}\n"
+                   f"Token_type:   {token_type}\n"
+                   f"Token-value:  {token_value}\n"
+                   f"Tree-string:  {treestring}\n")
+            raise TreeError(msg)
 
     ###############################################################################################
 
@@ -327,9 +325,6 @@ class NewickStringParser:
 
     def _handle_add_leaf(self, name):
         child = sys.intern(name)
-        # if child in self.tree.leaves:
-        #     msg = f"Leaf name present more than once: {child}"
-        #     raise TreeError(msg)
         parent=self.node_stack[-1]
         self.tree.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
@@ -341,9 +336,6 @@ class NewickStringParser:
 
     def _handle_add_leaf_with_transdict(self, name):
         child = sys.intern(self.transdict[name])
-        # if child in self.tree.leaves:
-        #     msg = f"Leaf name present more than once: {child}"
-        #     raise TreeError(msg)
         parent=self.node_stack[-1]
         self.tree.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
