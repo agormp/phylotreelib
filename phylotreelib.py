@@ -180,7 +180,7 @@ class TreeError(Exception):
 class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
-    def __init__(self, treestring, transdict=None):
+    def __init__(self, treeclass, treestring, transdict=None):
 
         # Construct Tree object that will be filled out by parser
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
@@ -188,7 +188,10 @@ class NewickStringParser:
         # associated value that is itself a dictionary listing the children: keys are
         # child nodes, values are Branchstructs containing "length" and "label" fields.
         # Leafs are identified by a string instead of a number
-        tree = Tree()
+
+        # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
+        # an internal node). The label is attached to the same branch as the branch length
+        tree = treeclass()
         tree.child_dict = {}
         tree.leaves = set()
         tree.intnodes = set()
@@ -428,143 +431,12 @@ class Tree:
     def from_string(cls, orig_treestring, transdict=None):
         """Constructor: Tree object from tree-string in Newick format"""
 
-        # Activate when switching to using NewickStringParser (delete all below)
-        parser = NewickStringParser(orig_treestring, transdict)
+        # All action is in NewickStringParser
+        parser = NewickStringParser(cls, orig_treestring, transdict)
         return parser.parse()
 
-        obj = cls()
-
-        # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
-        # an internal node). The label is attached to the same branch as the branch length
-
-        # Remove whitespace
-        treestring = "".join(orig_treestring.split())
-
-        # Sanity check: number of left- and right-parentheses should match
-        if treestring.count("(") != treestring.count(")"):
-            msg = "Imbalance in tree-string: different number of left- and right-parentheses\n"
-            msg += "Left: ({0}  Right: {1})".format(treestring.count("("), treestring.count(")"))
-            raise TreeError(msg)
-
-        # Break treestring up into a list of parentheses, commas, names, and branch lengths
-        # ("tokenize")
-        # Python note: characters that are not one of the below, will be quietly discarded
-        # this includes things such as quotes, ampersands, dollarsigns etc.
-        # possibly this is a good idea, but may cause trouble (figtree format for instance)
-        tree_parts = re.compile(r"""            # Save the following sub-patterns:
-                                    [,;()]    | # (1-4) comma, semicolon, l/r-parenthesis
-            :-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)? | # (5) a colon followed by a branch length
-                                                #     possibly negative,
-                                                #     possibly using exponential notation
-                                [\w\.\*\/\|-]+  # (6) a name/label (one or more alphanumeric)
-                        """, re.VERBOSE)
-        tree_parts_list = tree_parts.findall(treestring)
-
-        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
-        # are the internal nodes which are numbered consecutively. Each key has an
-        # associated value that is itself a dictionary listing the children: keys are
-        # child nodes, values are Branchstructs containing "length" and "label" fields.
-        # Leafs are identified by a string instead of a number
-        # NOTE: self.child_dict should ONLY be used by this object. Make pseudo-private?
-        obj.child_dict = {}                  # Essentially a "child-list"
-        obj.leaves = set()             # Set of leaf names. For speedy lookups
-        obj.intnodes = set()           # Set of internal node IDs. For speedy lookups
-        obj.root = 0                   # Root is node zero at start. (May change)
-        obj.belowroot = None
-
-        # Preprocess parts list to remove and store any labels or lengths below root node
-        # Any text here (between the semicolon and the last right parenthesis)
-        # will be stores as _one_ string in "self.belowroot"
-        i = -2
-        extraparts = []
-        while tree_parts_list[i] != ")":
-            extraparts.append(tree_parts_list[i])
-            i -= 1
-        if extraparts:
-            extraparts.reverse()
-            obj.belowroot = "".join(extraparts)
-            del tree_parts_list[(i+1):-1]
-
-        # Parse tree_parts_list left to right. Use a stack to keep track of current node
-        nodeno = -1
-        node_stack = []
-
-        for part in tree_parts_list:
-
-            # A left parenthesis indicates that we are about to examine a new internal node.
-            if part == "(" :
-                nodeno += 1
-                obj.child_dict[nodeno] = {}           # Create child-list for new node
-
-                if nodeno != 0:                 # If we are not at the root then add new node
-                    parent = node_stack[-1]     # to previous node's list of children
-                    obj.child_dict[parent][nodeno] = Branchstruct()
-
-                node_stack.append(nodeno)       # Push new node onto stack
-                obj.intnodes.add(nodeno)        # Add node to list of internal nodes
-
-            # A right parenthesis indicates that we have finished examining a node
-            # I should maybe catch the "IndexError: pop from empty list" somewhere
-            elif part == ")":
-                node_stack.pop()                # Remove last examined node from stack
-
-            # A colon indicates this is a distance
-            elif part[0] == ":":
-                dist = float(part[1:])          # Remove colon and convert to float
-                child = node_stack[-1]
-                parent = node_stack[-2]
-                obj.child_dict[parent][child].length =  dist # Add dist to relevant child-list
-
-            # A comma indicates that we have finished examining a node
-            elif part == ",":
-                node_stack.pop()                # Remove last examined node from stack
-
-            # A semicolon indicates the end of the treestring has been reached
-            elif part == ";":
-                node_stack.pop()                # Clean up stack
-
-            # If nothing else matched then this must be a name or label
-            # If previous part was simultaneously a right parenthesis or a leaf name,
-            # then the token must be a branch label
-            elif prevpart in [")", "leafname"]:
-                child = node_stack[-1]
-                parent = node_stack[-2]
-                obj.child_dict[parent][child].label = part
-
-            # Last possibility (I hope): the name is a leafname
-            else:
-                # If translation dictionary was supplied: change name accordingly
-                if transdict:
-                    child = sys.intern(transdict[part])  # Already interned. Not sure this is needed...
-                else:
-                    child = sys.intern(part)    # "Intern" strings so only one copy in memory
-                                                # (may happen automatically anyway?...)
-
-                # Check for duplicated leaf names
-                if child in obj.leaves:
-                    msg = "Leaf name present more than once: {}".format(child)
-                    raise TreeError(msg)
-
-                parent=node_stack[-1]                      # Add new leaf node to previous node's
-                obj.child_dict[parent][child] = Branchstruct()   # list of children
-
-                node_stack.append(child)                   # Push new leaf node onto stack
-                obj.leaves.add(child)                      # Also update list of leaves
-
-                part = "leafname"
-
-            prevpart = part
-
-        # If nodes remain on stack after parsing, then something was wrong with tree-string
-        if node_stack:
-            msg = "Imbalance in tree-string: '%s'" % orig_treestring
-            raise TreeError(msg)
-
-
-        obj.nodes = obj.leaves | obj.intnodes
-        return obj
-
     ###############################################################################################
+
     @classmethod
     def from_biplist(cls, biplist):
         """Constructor: Tree object from bipartition list"""
