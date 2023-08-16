@@ -2,7 +2,7 @@
 # Anders Gorm Pedersen
 # Section for Bioinformatics, DTU Health Technology, Technical University of Denmark
 # agpe@dtu.dk
-
+print("### Entering current phylotreelib") #DEBUG
 import copy
 import functools
 import itertools
@@ -181,7 +181,6 @@ class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
     def __init__(self, treeclass, treestring, transdict=None):
-
         # Construct Tree object that will be filled out by parser
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
         # are the internal nodes which are numbered consecutively. Each key has an
@@ -195,7 +194,7 @@ class NewickStringParser:
         tree.child_dict = {}
         tree.leaves = set()
         tree.intnodes = set()
-        tree.root = 0                   # Root is node zero at start. (May change)
+        tree.root = 0
         tree.belowroot = None
         self.tree = tree
 
@@ -211,58 +210,58 @@ class NewickStringParser:
         # If transdict was supplied: use corresponding handler when adding leaves
         if transdict:
             self.transdict = transdict
-            self._handle_add_leaf = self._handle_add_leaf_with_transdict
+            self._handle_add_leaf = NewickStringParser._handle_add_leaf_with_transdict
+        else:
+            self._handle_add_leaf = NewickStringParser._handle_add_leaf
 
         # Dispatch dictionary: specifies which function to use for any given combination of
         # state and token-type. Functions use token-value as input an return next state.
         self.dispatch = {
             "TREE_START": {
-                "(":            self._handle_add_root_intnode
+                "(": NewickStringParser._handle_add_root_intnode
             },
             "INTNODE_START": {
-                "(":            self._handle_add_intnode,
-                "NUM_NAME":     self._handle_add_leaf
+                "(": NewickStringParser._handle_add_intnode,
+                "NUM_NAME": self._handle_add_leaf
             },
             "LEAF": {
-                ":":            self._handle_transition_brlen,
-                ",":            self._handle_transition_child,
-                ")":            self._handle_intnode_end
+                ":": NewickStringParser._handle_transition_brlen,
+                ",": NewickStringParser._handle_transition_child,
+                ")": NewickStringParser._handle_intnode_end
             },
             "EXPECTING_BRLEN": {
-                "NUM_NAME":     self._handle_add_brlen
+                "NUM_NAME": NewickStringParser._handle_add_brlen
             },
             "BRLEN": {
-                ",":            self._handle_transition_child,
-                ")":            self._handle_intnode_end
+                ",": NewickStringParser._handle_transition_child,
+                ")": NewickStringParser._handle_intnode_end
             },
             "EXPECTING_CHILD": {
-                "(":            self._handle_add_intnode,
-                "NUM_NAME":     self._handle_add_leaf
+                "(": NewickStringParser._handle_add_intnode,
+                "NUM_NAME": self._handle_add_leaf
             },
             "INTNODE_END": {
-                ")":            self._handle_intnode_end,
-                ",":            self._handle_transition_child,
-                ":":            self._handle_transition_brlen,
-                "NUM_NAME":     self._handle_label,
-                ";":            self._handle_transition_tree_end
+                ")": NewickStringParser._handle_intnode_end,
+                ",": NewickStringParser._handle_transition_child,
+                ":": NewickStringParser._handle_transition_brlen,
+                "NUM_NAME": NewickStringParser._handle_label,
+                ";": NewickStringParser._handle_transition_tree_end
             },
             "LABEL": {
-                ")":            self._handle_intnode_end,
-                ",":            self._handle_transition_child,
-                ":":            self._handle_transition_brlen
+                ")": NewickStringParser._handle_intnode_end,
+                ",": NewickStringParser._handle_transition_child,
+                ":": NewickStringParser._handle_transition_brlen
             }
         }
 
     ###############################################################################################
 
     def parse(self):
-        """Returns instance of Tree. Used in Tree.from_string()"""
-
         dispatch = self.dispatch
         delimset = set(",;:()")
         state = "TREE_START"
         tree_parts_list = re.split(r'([(),;:])', self.treestring)
-        tree_parts_list = list(filter(None, tree_parts_list))   # Remove empty strings after split
+        tree_parts_list = list(filter(None, tree_parts_list))  # Remove empty strings from split()
         for token_value in tree_parts_list:
             if token_value in delimset:
                 token_type = token_value
@@ -270,7 +269,7 @@ class NewickStringParser:
                 token_type = "NUM_NAME"
             try:
                 handler = dispatch[state][token_type]
-                state = handler(token_value)
+                state = handler(self, token_value)
             except KeyError:
                 self._handle_parse_error(state, token_value, token_type, self.treestring)
         self.tree.nodes = self.tree.leaves | self.tree.intnodes
@@ -289,7 +288,6 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_parse_error(self, state, token_value, token_type, treestring):
-
         # If unexpected token-type was encountered: first check if parentheses are balanced:
         if treestring.count("(") != treestring.count(")"):
             msg = "Imbalance in tree-string: different number of left- and right-parentheses\n"
@@ -306,87 +304,97 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_add_root_intnode(self, token_value):
-        self.nodeno = 0
-        self.tree.child_dict[self.nodeno] = {}  # Create child-list for new node
-        self.node_stack.append(self.nodeno)     # Push new node onto stack
-        self.tree.intnodes.add(self.nodeno)     # Add node to list of internal nodes
-        return "INTNODE_START"                  # New state
-
-    ###############################################################################################
-
-    def _handle_add_intnode(self, token_value):
-        self.nodeno += 1
-        self.tree.child_dict[self.nodeno] = {}  # Create child-list for new node
-        parent = self.node_stack[-1]            # Add new node to previous node's list of children
-        self.tree.child_dict[parent][self.nodeno] = Branchstruct()
-        self.node_stack.append(self.nodeno)     # Push new node onto stack
-        self.tree.intnodes.add(self.nodeno)     # Add node to list of internal nodes
+    @staticmethod
+    def _handle_add_root_intnode(instance, token_value):
+        instance.nodeno = 0
+        instance.tree.child_dict[instance.nodeno] = {}
+        instance.node_stack.append(instance.nodeno)
+        instance.tree.intnodes.add(instance.nodeno)
         return "INTNODE_START"
 
     ###############################################################################################
 
-    def _handle_add_leaf(self, name):
+    @staticmethod
+    def _handle_add_intnode(instance, token_value):
+        instance.nodeno += 1
+        instance.tree.child_dict[instance.nodeno] = {}
+        parent = instance.node_stack[-1]
+        instance.tree.child_dict[parent][instance.nodeno] = Branchstruct()
+        instance.node_stack.append(instance.nodeno)
+        instance.tree.intnodes.add(instance.nodeno)
+        return "INTNODE_START"
+
+    ###############################################################################################
+
+    @staticmethod
+    def _handle_add_leaf(instance, name):
         child = sys.intern(name)
-        parent=self.node_stack[-1]
-        self.tree.child_dict[parent][child] = Branchstruct()
-        self.node_stack.append(child)
-        self.tree.leaves.add(child)
-        self.ntips +=1
+        parent = instance.node_stack[-1]
+        instance.tree.child_dict[parent][child] = Branchstruct()
+        instance.node_stack.append(child)
+        instance.tree.leaves.add(child)
+        instance.ntips += 1
         return "LEAF"
 
     ###############################################################################################
 
-    def _handle_add_leaf_with_transdict(self, name):
-        child = sys.intern(self.transdict[name])
-        parent=self.node_stack[-1]
-        self.tree.child_dict[parent][child] = Branchstruct()
-        self.node_stack.append(child)
-        self.tree.leaves.add(child)
+    @staticmethod
+    def _handle_add_leaf_with_transdict(instance, name):
+        child = sys.intern(instance.transdict[name])
+        parent = instance.node_stack[-1]
+        instance.tree.child_dict[parent][child] = Branchstruct()
+        instance.node_stack.append(child)
+        instance.tree.leaves.add(child)
         return "LEAF"
 
     ###############################################################################################
 
-    def _handle_transition_child(self, token_value):
-        self.node_stack.pop()
+    @staticmethod
+    def _handle_transition_child(instance, token_value):
+        instance.node_stack.pop()
         return "EXPECTING_CHILD"
 
     ###############################################################################################
 
-    def _handle_transition_brlen(self, token_value):
+    @staticmethod
+    def _handle_transition_brlen(instance, token_value):
         return "EXPECTING_BRLEN"
 
     ###############################################################################################
 
-    def _handle_add_brlen(self, brlen_string):
+    @staticmethod
+    def _handle_add_brlen(instance, brlen_string):
         try:
             brlen = float(brlen_string)
-            child = self.node_stack[-1]
-            parent = self.node_stack[-2]
-            self.tree.child_dict[parent][child].length = brlen
+            child = instance.node_stack[-1]
+            parent = instance.node_stack[-2]
+            instance.tree.child_dict[parent][child].length = brlen
             return "BRLEN"
         except ValueError:
             raise TreeError(f"Expected branch length: {brlen_string}")
 
     ###############################################################################################
 
-    def _handle_intnode_end(self, token_value):
-        self.node_stack.pop()
+    @staticmethod
+    def _handle_intnode_end(instance, token_value):
+        instance.node_stack.pop()
         return "INTNODE_END"
 
     ###############################################################################################
 
-    def _handle_label(self, label):
-        child = self.node_stack[-1]
-        parent = self.node_stack[-2]
-        self.tree.child_dict[parent][child].label = label
+    @staticmethod
+    def _handle_label(instance, label):
+        child = instance.node_stack[-1]
+        parent = instance.node_stack[-2]
+        instance.tree.child_dict[parent][child].label = label
         return "LABEL"
 
     ###############################################################################################
 
-    def _handle_transition_tree_end(self, token_value):
-        self.node_stack.pop()
-        return "TREE_END"
+    @staticmethod
+    def _handle_transition_tree_end(instance, token_value):
+        instance.node_stack.pop()
+        return "TREE"
 
 ###################################################################################################
 ###################################################################################################
