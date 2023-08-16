@@ -102,16 +102,6 @@ def remove_comments(text):
 ###################################################################################################
 ###################################################################################################
 
-class Globals():
-    """Class containing globally used functions and labels."""
-
-    # I'm not convinced this is the way to go. Module instead?"""
-    # Global repository for bipartitions, to avoid redundant saving in topologies etc.
-    biparts = {}
-
-###################################################################################################
-###################################################################################################
-
 class Interner():
     """Class used for interning various objects."""
 
@@ -158,6 +148,42 @@ class Topostruct:
 
     # Python note: perhaps replace with dataclass, available since python 3.7
     pass
+
+###################################################################################################
+###################################################################################################
+
+class Bipartition:
+    """Class that represents a bipartition: the split of leaves in two sets that corresponds
+    to a branch in a tree. Class has a fast method for hashing and therefore useful when
+    comparing Bipartitions"""
+
+    __slots__ = ['data', '_hash_value']
+
+    def __init__(self, leafset1, leafset2):
+        # Ensure consistent order for hashing
+        leafset1 = frozenset(leafset1)
+        leafset2 = frozenset(leafset2)
+        if hash(leafset1) <= hash(leafset2):
+            self.data = (leafset1, leafset2)
+        else:
+            self.data = (leafset2, leafset1)
+
+        # Compute the hash value once and store it
+        self._hash_value = hash(self.data[0]) ^ hash(self.data[1])
+
+    def __hash__(self):
+        # Return the precomputed hash value
+        return self._hash_value
+
+    def __eq__(self, other):
+        if not isinstance(other, Bipartition):
+            return NotImplemented
+        return self.data == other.data
+
+    # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
+    def __iter__(self):
+        return iter(self.data)
+
 
 ###################################################################################################
 ###################################################################################################
@@ -1861,7 +1887,7 @@ class Tree:
                 parent = self.parent(child)
                 bipart1 = frozenset(child_remkids)
                 bipart2 = leaves - bipart1
-                bipartition = frozenset([bipart1, bipart2])
+                bipartition = Bipartition(bipart1, bipart2)
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
@@ -1875,7 +1901,7 @@ class Tree:
             kid1, kid2 = rootkids
             bipart1 = frozenset(self.remotechildren_dict[kid1])
             bipart2 = leaves - bipart1
-            bipartition = frozenset([bipart1, bipart2])
+            bipartition = Bipartition(bipart1, bipart2)
 
             # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
@@ -3591,7 +3617,7 @@ class TreeSummary():
     def bipartsummary(self):
         """Property method for lazy evaluation of freq, var, and sem for branches"""
         if not self._bipartsummary_processed:
-            for bipartition, branch in self._bipartsummary.items():
+            for branch in self._bipartsummary.values():
                 branch.freq = branch.SUMW / self.tree_weight_sum
                 n = branch.bip_count
                 if n > 1:
@@ -3617,7 +3643,7 @@ class TreeSummary():
             internalbips = []
 
             for bip, branch in self.bipartsummary.items():
-                bip1,bip2 = bip
+                (bip1,bip2) = bip
                 if len(bip1) == 1:
                     leafname = next(iter(bip1))
                     leafbips.append((leafname, bip))
