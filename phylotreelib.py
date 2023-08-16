@@ -433,7 +433,9 @@ class Tree:
 
         # All action is in NewickStringParser
         parser = NewickStringParser(cls, orig_treestring, transdict)
-        return parser.parse()
+        tree = parser.parse()
+        del parser
+        return tree
 
     ###############################################################################################
 
