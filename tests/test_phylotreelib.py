@@ -569,9 +569,9 @@ class Treesummarytests(TreeTestBase):
         self.mbresdict = {}
         for line in mbresults:
             names1, names2, meanvar = line.strip().split("|")
-            bip1 = frozenset(names1.strip().split())
-            bip2 = frozenset(names2.strip().split())
-            bipart = frozenset([bip1,bip2])
+            bip1 = names1.strip().split()
+            bip2 = names2.strip().split()
+            bipart = pt.Bipartition(bip1,bip2)
             vals = meanvar.strip().split()
             mean = float(vals[0])
             var = float(vals[1])
@@ -672,12 +672,12 @@ class Topologytests(TreeTestBase):
         bipdict = mytree.bipdict()
 
         # Test that key for central branch is present, and that length and label are as expected
-        expectedkey = frozenset([frozenset(["YAL016W", "SBC669_26"]),
-                               frozenset(["KW081_13", "KL0F07689"])])
+        expectedkey = pt.Bipartition(["YAL016W", "SBC669_26"],
+                                     ["KW081_13", "KL0F07689"])
         expectedlen = 0.124263
         expectedlab = "0.0507"
 
-        self.assertTrue(expectedkey in list(bipdict.keys()))
+        self.assertTrue(expectedkey in bipdict)
         self.assertAlmostEqual(bipdict[expectedkey].length, expectedlen)
         self.assertEqual(bipdict[expectedkey].label, expectedlab)
 
@@ -686,13 +686,13 @@ class Topologytests(TreeTestBase):
         mytree = pt.Tree.from_string(treestring)
         bipdict = mytree.bipdict()
 
-        expectedkeys = [frozenset([frozenset(["s4", "s5"]), frozenset(["s1", "s2", "s3"])]),
-                        frozenset([frozenset(["s4", "s5", "s3"]), frozenset(["s1", "s2"])]),
-                        frozenset([frozenset(["s4", "s5", "s3", "s2"]), frozenset(["s1"])]),
-                        frozenset([frozenset(["s4", "s5", "s3", "s1"]), frozenset(["s2"])]),
-                        frozenset([frozenset(["s4", "s5", "s1", "s2"]), frozenset(["s3"])]),
-                        frozenset([frozenset(["s1", "s5", "s3", "s2"]), frozenset(["s4"])]),
-                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["s5"])])]
+        expectedkeys = [pt.Bipartition(["s4", "s5"], ["s1", "s2", "s3"]),
+                        pt.Bipartition(["s4", "s5", "s3"], ["s1", "s2"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s2"], ["s1"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s1"], ["s2"]),
+                        pt.Bipartition(["s4", "s5", "s1", "s2"], ["s3"]),
+                        pt.Bipartition(["s1", "s5", "s3", "s2"], ["s4"]),
+                        pt.Bipartition(["s4", "s1", "s3", "s2"], ["s5"])]
 
         expectedvals = [0.125, 0.25, 0.125, 0.125, 0.125, 0.125, 0.125]
 
@@ -704,8 +704,6 @@ class Topologytests(TreeTestBase):
             val = expectedvals[i]
             self.assertAlmostEqual(val, bipdict[key].length)
 
-
-
     def test_topology(self):
         """Does topology() return expected result?"""
 
@@ -714,13 +712,13 @@ class Topologytests(TreeTestBase):
         mytree = pt.Tree.from_string(treestring)
         topology = mytree.topology()
 
-        expectedtop = frozenset([frozenset([frozenset(["s4", "s5"]), frozenset(["s1", "s2", "s3"])]),
-                        frozenset([frozenset(["s4", "s5", "s3"]), frozenset(["s1", "s2"])]),
-                        frozenset([frozenset(["s4", "s5", "s3", "s2"]), frozenset(["s1"])]),
-                        frozenset([frozenset(["s4", "s5", "s3", "s1"]), frozenset(["s2"])]),
-                        frozenset([frozenset(["s4", "s5", "s1", "s2"]), frozenset(["s3"])]),
-                        frozenset([frozenset(["s1", "s5", "s3", "s2"]), frozenset(["s4"])]),
-                        frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["s5"])])])
+        expectedtop = frozenset([pt.Bipartition(["s4", "s5"], ["s1", "s2", "s3"]),
+                        pt.Bipartition(["s4", "s5", "s3"], ["s1", "s2"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s2"], ["s1"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s1"], ["s2"]),
+                        pt.Bipartition(["s4", "s5", "s1", "s2"], ["s3"]),
+                        pt.Bipartition(["s1", "s5", "s3", "s2"], ["s4"]),
+                        pt.Bipartition(["s4", "s1", "s3", "s2"], ["s5"])])
 
         self.assertEqual(topology, expectedtop)
 
