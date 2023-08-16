@@ -2,7 +2,6 @@
 # Anders Gorm Pedersen
 # Section for Bioinformatics, DTU Health Technology, Technical University of Denmark
 # agpe@dtu.dk
-print("### Entering current phylotreelib") #DEBUG
 import copy
 import functools
 import itertools
