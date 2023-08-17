@@ -157,33 +157,46 @@ class Bipartition:
     to a branch in a tree. Class has a fast method for hashing and therefore useful when
     comparing Bipartitions"""
 
+    TOTAL_LEAVES = None
+
     __slots__ = ['data', '_hash_value']
 
-    def __init__(self, leafset1, leafset2):
-        # Ensure consistent order for hashing
-        leafset1 = frozenset(leafset1)
-        leafset2 = frozenset(leafset2)
-        if hash(leafset1) <= hash(leafset2):
-            self.data = (leafset1, leafset2)
-        else:
-            self.data = (leafset2, leafset1)
+    @classmethod
+    def set_total_leaves(cls, leaves):
+        """This method needs to be called before creating any Bipartition objects"""
+        cls.TOTAL_LEAVES = frozenset(leaves)
 
-        # Compute the hash value once and store it
-        self._hash_value = hash(self.data[0]) ^ hash(self.data[1])
+    def __init__(self, leafset1, leafset2):
+            leafset1 = frozenset(leafset1)
+            leafset2 = frozenset(leafset2)
+
+            # Store only the smaller frozenset to save space
+            self.data = leafset1 if len(leafset1) <= len(leafset2) else leafset2
+
+            # Compute the hash value once and store it
+            self._hash_value = hash(self.data)
 
     def __hash__(self):
         # Return the precomputed hash value
         return self._hash_value
 
     def __eq__(self, other):
-        if not isinstance(other, Bipartition):
+        if self is other:
+            return True
+        if type(self) is not type(other):
             return NotImplemented
+        # Quick length check before actual comparison
+        if len(self.data) != len(other.data):
+            return False
         return self.data == other.data
 
     # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
     def __iter__(self):
-        return iter(self.data)
+        complement = Bipartition.TOTAL_LEAVES - self.data
+        return iter((self.data, complement))
 
+    def get_bipartitions(self):
+        return self.data, TOTAL_LEAVES - self.data
 
 ###################################################################################################
 ###################################################################################################
@@ -1872,6 +1885,7 @@ class Tree:
         # Interning: store bipartitions in global dict to avoid duplicating object
         bipartition_dict = {}
         leaves = frozenset(self.leaves)
+        Bipartition.set_total_leaves(leaves)
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
