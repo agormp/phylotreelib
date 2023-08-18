@@ -173,19 +173,20 @@ class Bipartition:
             # Store only one half of bipart. Decide which based on len or hash
             # Python note: assumes there will not be tie for both (fix?)
             l1, l2 = len(leafset1), len(leafset2)
-            h1, h2 = hash(leafset1), hash(leafset2)
             if l1 < l2:
                 self.data = leafset1
-                self._hash_value = h1
-            if l1 > l2:
+                self._hash_value = hash(leafset1)
+            elif l1 > l2:
                 self.data = leafset2
-                self._hash_value = h2
-            if h1 < h2:
-                self.data = leafset1
-                self._hash_value = h1
+                self._hash_value = hash(leafset2)
             else:
-                self.data = leafset2
-                self._hash_value = h2
+                h1, h2 = hash(leafset1), hash(leafset2)
+                if h1 < h2:
+                    self.data = leafset1
+                    self._hash_value = h1
+                else:
+                    self.data = leafset2
+                    self._hash_value = h2
 
     def __hash__(self):
         # Return the precomputed hash value
