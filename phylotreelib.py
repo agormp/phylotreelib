@@ -102,16 +102,6 @@ def remove_comments(text):
 ###################################################################################################
 ###################################################################################################
 
-class Globals():
-    """Class containing globally used functions and labels."""
-
-    # I'm not convinced this is the way to go. Module instead?"""
-    # Global repository for bipartitions, to avoid redundant saving in topologies etc.
-    biparts = {}
-
-###################################################################################################
-###################################################################################################
-
 class Interner():
     """Class used for interning various objects."""
 
@@ -120,18 +110,10 @@ class Interner():
     # Could perhaps just use one dict for interning *anything*, but worry about hash collisions?
 
     def __init__(self):
-        self.leafsets = {}
-        self.biparts = {}
-        self.topo = {}
+        self.nodesets = {}
 
-    def intern_leafset(self, leafset):
-        return self.leafsets.setdefault(leafset, leafset)
-
-    def intern_bipart(self, bipart):
-        return self.biparts.setdefault(bipart, bipart)
-
-    def intern_topology(self, topology):
-        return self.topo.setdefault(topology, topology)
+    def intern_nodeset(self, nodeset):
+        return self.nodesets.setdefault(nodeset, nodeset)
 
 ###################################################################################################
 ###################################################################################################
@@ -166,6 +148,71 @@ class Topostruct:
 
     # Python note: perhaps replace with dataclass, available since python 3.7
     pass
+
+###################################################################################################
+###################################################################################################
+
+class Bipartition:
+    """Class that represents a bipartition: the split of leaves in two sets that corresponds
+    to a branch in a tree. Class has a fast method for hashing and therefore useful when
+    comparing Bipartitions"""
+
+    LEAF_LIST = []  # Sorted list of all leaves
+    LEAF_SET = None # Set of all leaves
+
+    __slots__ = ['indices', '_hash_value']
+
+    @classmethod
+    def initialise_class(cls, leaves):
+        """This method needs to be called before creating any Bipartition objects"""
+        cls.LEAF_LIST = sorted(leaves)
+        cls.LEAF_SET = frozenset(leaves)
+        cls.REVERSE_LOOKUP = {leaf: idx for idx, leaf in enumerate(cls.LEAF_LIST)}
+
+    def __init__(self, leafset1):
+        # Store only one half of bipart. Decide which based on len or hash
+        nleaves = len(Bipartition.LEAF_LIST)
+        l1 = len(leafset1)
+        l2 = nleaves - l1
+        if l1 < l2:
+            self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
+            self._hash_value = hash(frozenset(leafset1))
+        elif l2 < l1:
+            leafset2 = Bipartition.LEAF_SET - frozenset(leafset1)
+            self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
+            self._hash_value = hash(leafset2)
+        else:
+            leafset2 = Bipartition.LEAF_SET - frozenset(leafset1)
+            h1, h2 = hash(frozenset(leafset1)), hash(leafset2)
+            if h1 < h2:
+                indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
+                self.indices = indices
+                self._hash_value = h1
+            else:
+                indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
+                self.indices = indices
+                self._hash_value = h2
+
+    def __hash__(self):
+        # Return the precomputed hash value
+        return self._hash_value
+
+    def __eq__(self, other):
+        return self._hash_value == other._hash_value
+
+    # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
+    #@profile
+    def __iter__(self):
+        # Convert indices to leaf values using set comprehension
+        primary_set = {Bipartition.LEAF_LIST[i] for i in self.indices}
+        complement_set = Bipartition.LEAF_SET - primary_set
+        return iter((primary_set, complement_set))
+
+    def get_bipartitions(self):
+        # Convert to sets before returning
+        primary_set = {Bipartition.LEAF_LIST[i] for i in self.indices}
+        complement_set = Bipartition.LEAF_SET - primary_set
+        return (primary_set, complement_set)
 
 ###################################################################################################
 ###################################################################################################
@@ -1844,7 +1891,8 @@ class Tree:
 
     ###############################################################################################
 
-    def bipdict(self, interner=None):
+    #@profile
+    def bipdict(self):
         """Returns tree in the form of a "bipartition dictionary" """
 
         # Names of leaves on one side of a branch are represented as an immutable set
@@ -1854,6 +1902,7 @@ class Tree:
         # Interning: store bipartitions in global dict to avoid duplicating object
         bipartition_dict = {}
         leaves = frozenset(self.leaves)
+        Bipartition.initialise_class(leaves)
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
@@ -1867,14 +1916,8 @@ class Tree:
         for child, child_remkids in self.remotechildren_dict.items():
             if child != self.root:
                 parent = self.parent(child)
-                if interner:
-                    bipart1 = interner.intern_leafset(frozenset(child_remkids))
-                    bipart2 = interner.intern_leafset(leaves - bipart1)
-                    bipartition = interner.intern_bipart(frozenset([bipart1, bipart2]))
-                else:
-                    bipart1 = frozenset(child_remkids)
-                    bipart2 = leaves - bipart1
-                    bipartition = frozenset([bipart1, bipart2])
+                bipart1 = frozenset(child_remkids)
+                bipartition = Bipartition(bipart1)
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
@@ -1886,14 +1929,8 @@ class Tree:
 
             # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
-            if interner:
-                bipart1 = interner.intern_leafset(frozenset(self.remotechildren_dict[kid1]))
-                bipart2 = interner.intern_leafset(leaves - bipart1)
-                bipartition = interner.intern_bipart(frozenset([bipart1, bipart2]))
-            else:
-                bipart1 = frozenset(self.remotechildren_dict[kid1])
-                bipart2 = leaves - bipart1
-                bipartition = frozenset([bipart1, bipart2])
+            bipart1 = frozenset(self.remotechildren_dict[kid1])
+            bipartition = Bipartition(bipart1)
 
             # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
@@ -3046,6 +3083,7 @@ class Tree:
 
     def has_same_root(self, other):
         """Compares two trees. Returns True if topologies are same and rooted in same place"""
+
         if self.topology() != other.topology():
             raise TreeError("Tree topologies are different: Rootings can not be compared")
         else:
@@ -3588,7 +3626,7 @@ class TreeSet():
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
-    def __init__(self, interner=None):
+    def __init__(self):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -3597,11 +3635,6 @@ class TreeSummary():
         self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
         self._sorted_biplist = None
-        if not interner:
-            self.interner = Interner()
-        else:
-            self.interner = interner    # To enable sharing interned bipartition info between
-                                        # different TreeSummary instances
 
     ###############################################################################################
 
@@ -3614,7 +3647,7 @@ class TreeSummary():
     def bipartsummary(self):
         """Property method for lazy evaluation of freq, var, and sem for branches"""
         if not self._bipartsummary_processed:
-            for bipartition, branch in self._bipartsummary.items():
+            for branch in self._bipartsummary.values():
                 branch.freq = branch.SUMW / self.tree_weight_sum
                 n = branch.bip_count
                 if n > 1:
@@ -3630,6 +3663,7 @@ class TreeSummary():
     ###############################################################################################
 
     @property
+    #@profile
     def sorted_biplist(self):
         """Return list of bipartitions.
         First external (leaf) bipartitions sorted by leafname.
@@ -3640,7 +3674,7 @@ class TreeSummary():
             internalbips = []
 
             for bip, branch in self.bipartsummary.items():
-                bip1,bip2 = bip
+                (bip1,bip2) = bip
                 if len(bip1) == 1:
                     leafname = next(iter(bip1))
                     leafbips.append((leafname, bip))
@@ -3658,6 +3692,7 @@ class TreeSummary():
 
     ###############################################################################################
 
+    #@profile
     def add_branchid(self):
         """Adds attribute .branchID to all bipartitions in .bipartsummary
         External bipartitions are labeled with the leafname.
@@ -3672,6 +3707,7 @@ class TreeSummary():
 
     ###############################################################################################
 
+    #@profile
     def add_tree(self, curtree, weight=1.0):
         """Add tree object to treesummary, update all relevant bipartition summaries"""
 
@@ -3692,7 +3728,7 @@ class TreeSummary():
 
         self.tree_count += 1
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
-        bipdict = curtree.bipdict(interner=self.interner)
+        bipdict = curtree.bipdict()
 
         # I am interested in being able to compute weighted frequency of a bipartition as well as
         # the weighted mean and weighted variance of the branch length for that bipartition.
@@ -3859,8 +3895,8 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, interner=None, store_trees=False):
-        TreeSummary.__init__(self, interner=None)
+    def __init__(self, store_trees=False):
+        TreeSummary.__init__(self)
         self._toposummary = {}
         self._toposummary_processed = False
         self.store_trees = store_trees
@@ -3892,7 +3928,7 @@ class BigTreeSummary(TreeSummary):
         # If topology HAS been seen before then update count
         # Python: A bit messy that interning is here done in add_tree() and not in topology()
         # This is to avoid recomputing bipdict in topology function (or storing bipdictcache)
-        topology = self.interner.intern_topology(frozenset(bipdict.keys()))
+        topology = frozenset(bipdict.keys())
         if topology in self._toposummary:
             self._toposummary[topology].weight += weight
         else:
