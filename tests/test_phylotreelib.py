@@ -567,6 +567,11 @@ class Treesummarytests(TreeTestBase):
         with open(mbres_fname) as mbfile:
             mbresults = mbfile.readlines()
         self.mbresdict = {}
+        names1, names2, meanvar = mbresults[0].strip().split("|")
+        bip1 = names1.strip().split()
+        bip2 = names2.strip().split()
+        total_leaves = bip1 + bip2
+        pt.Bipartition.set_total_leaves(total_leaves)
         for line in mbresults:
             names1, names2, meanvar = line.strip().split("|")
             bip1 = names1.strip().split()
