@@ -157,34 +157,35 @@ class Bipartition:
     to a branch in a tree. Class has a fast method for hashing and therefore useful when
     comparing Bipartitions"""
 
-    TOTAL_LEAVES = None
+    TOTAL_LEAVES = []  # List of all leaves
 
-    __slots__ = ['data', '_hash_value']
+    __slots__ = ['indices', '_hash_value']
 
     @classmethod
     def set_total_leaves(cls, leaves):
         """This method needs to be called before creating any Bipartition objects"""
-        cls.TOTAL_LEAVES = frozenset(leaves)
+        cls.TOTAL_LEAVES = sorted(leaves)
+        cls.REVERSE_LOOKUP = {leaf: idx for idx, leaf in enumerate(cls.TOTAL_LEAVES)}
 
     def __init__(self, leafset1, leafset2):
-            leafset1 = frozenset(leafset1)
-            leafset2 = frozenset(leafset2)
-
-            # Store only one half of bipart. Decide which based on len or hash
-            # Python note: assumes there will not be tie for both (fix?)
-            l1, l2 = len(leafset1), len(leafset2)
-            h1, h2 = hash(leafset1), hash(leafset2)
-            if l1 < l2:
-                self.data = leafset1
-                self._hash_value = h1
-            if l1 > l2:
-                self.data = leafset2
-                self._hash_value = h2
+        # Store only one half of bipart. Decide which based on len or hash
+        leafset1,leafset2 = frozenset(leafset1),frozenset(leafset2)
+        l1, l2 = len(leafset1), len(leafset2)
+        h1, h2 = hash(leafset1), hash(leafset2)
+        if l1 < l2:
+            self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
+            self._hash_value = h1
+        elif l2 < l1:
+            self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
+            self._hash_value = h2
+        else:
             if h1 < h2:
-                self.data = leafset1
+                indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
+                self.indices = indices
                 self._hash_value = h1
             else:
-                self.data = leafset2
+                indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
+                self.indices = indices
                 self._hash_value = h2
 
     def __hash__(self):
@@ -197,17 +198,22 @@ class Bipartition:
         if type(self) is not type(other):
             return NotImplemented
         # Quick length check before actual comparison
-        if len(self.data) != len(other.data):
+        if len(self.indices) != len(other.indices):
             return False
-        return self.data == other.data
+        return self.indices == other.indices
 
     # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
     def __iter__(self):
-        complement = Bipartition.TOTAL_LEAVES - self.data
-        return iter((self.data, complement))
+        complement_indices = sorted(set(range(len(Bipartition.TOTAL_LEAVES))) - set(self.indices))
+        # Convert to sets before returning
+        return iter((set([Bipartition.TOTAL_LEAVES[i] for i in self.indices]),
+                     set([Bipartition.TOTAL_LEAVES[i] for i in complement_indices])))
 
     def get_bipartitions(self):
-        return self.data, TOTAL_LEAVES - self.data
+        complement_indices = sorted(set(range(len(Bipartition.TOTAL_LEAVES))) - set(self.indices))
+        # Convert to sets before returning
+        return (set([Bipartition.TOTAL_LEAVES[i] for i in self.indices]),
+                set([Bipartition.TOTAL_LEAVES[i] for i in complement_indices]))
 
 ###################################################################################################
 ###################################################################################################
