@@ -166,20 +166,24 @@ class Bipartition:
     def initialise_class(cls, leaves):
         """This method needs to be called before creating any Bipartition objects"""
         cls.LEAF_LIST = sorted(leaves)
-        cls.LEAF_SET = set(leaves)
+        cls.LEAF_SET = frozenset(leaves)
         cls.REVERSE_LOOKUP = {leaf: idx for idx, leaf in enumerate(cls.LEAF_LIST)}
 
-    def __init__(self, leafset1, leafset2):
+    def __init__(self, leafset1):
         # Store only one half of bipart. Decide which based on len or hash
-        l1, l2 = len(leafset1), len(leafset2)
+        nleaves = len(Bipartition.LEAF_LIST)
+        l1 = len(leafset1)
+        l2 = nleaves - l1
         if l1 < l2:
             self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
             self._hash_value = hash(frozenset(leafset1))
         elif l2 < l1:
+            leafset2 = Bipartition.LEAF_SET - frozenset(leafset1)
             self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
-            self._hash_value = hash(frozenset(leafset2))
+            self._hash_value = hash(leafset2)
         else:
-            h1, h2 = hash(frozenset(leafset1)), hash(frozenset(leafset2))
+            leafset2 = Bipartition.LEAF_SET - frozenset(leafset1)
+            h1, h2 = hash(frozenset(leafset1)), hash(leafset2)
             if h1 < h2:
                 indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
                 self.indices = indices
@@ -1913,8 +1917,7 @@ class Tree:
             if child != self.root:
                 parent = self.parent(child)
                 bipart1 = frozenset(child_remkids)
-                bipart2 = leaves - bipart1
-                bipartition = Bipartition(bipart1, bipart2)
+                bipartition = Bipartition(bipart1)
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
@@ -1927,8 +1930,7 @@ class Tree:
             # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
             bipart1 = frozenset(self.remotechildren_dict[kid1])
-            bipart2 = leaves - bipart1
-            bipartition = Bipartition(bipart1, bipart2)
+            bipartition = Bipartition(bipart1)
 
             # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
