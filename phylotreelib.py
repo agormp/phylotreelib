@@ -157,28 +157,29 @@ class Bipartition:
     to a branch in a tree. Class has a fast method for hashing and therefore useful when
     comparing Bipartitions"""
 
-    TOTAL_LEAVES = []  # List of all leaves
+    LEAF_LIST = []  # Sorted list of all leaves
+    LEAF_SET = None # Set of all leaves
 
     __slots__ = ['indices', '_hash_value']
 
     @classmethod
-    def set_total_leaves(cls, leaves):
+    def initialise_class(cls, leaves):
         """This method needs to be called before creating any Bipartition objects"""
-        cls.TOTAL_LEAVES = sorted(leaves)
-        cls.REVERSE_LOOKUP = {leaf: idx for idx, leaf in enumerate(cls.TOTAL_LEAVES)}
+        cls.LEAF_LIST = sorted(leaves)
+        cls.LEAF_SET = set(leaves)
+        cls.REVERSE_LOOKUP = {leaf: idx for idx, leaf in enumerate(cls.LEAF_LIST)}
 
     def __init__(self, leafset1, leafset2):
         # Store only one half of bipart. Decide which based on len or hash
-        leafset1,leafset2 = frozenset(leafset1),frozenset(leafset2)
         l1, l2 = len(leafset1), len(leafset2)
-        h1, h2 = hash(leafset1), hash(leafset2)
         if l1 < l2:
             self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
-            self._hash_value = h1
+            self._hash_value = hash(frozenset(leafset1))
         elif l2 < l1:
             self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
-            self._hash_value = h2
+            self._hash_value = hash(frozenset(leafset2))
         else:
+            h1, h2 = hash(frozenset(leafset1)), hash(frozenset(leafset2))
             if h1 < h2:
                 indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
                 self.indices = indices
@@ -193,27 +194,21 @@ class Bipartition:
         return self._hash_value
 
     def __eq__(self, other):
-        if self is other:
-            return True
-        if type(self) is not type(other):
-            return NotImplemented
-        # Quick length check before actual comparison
-        if len(self.indices) != len(other.indices):
-            return False
-        return self.indices == other.indices
+        return self._hash_value == other._hash_value
 
     # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
+    #@profile
     def __iter__(self):
-        complement_indices = sorted(set(range(len(Bipartition.TOTAL_LEAVES))) - set(self.indices))
-        # Convert to sets before returning
-        return iter((set([Bipartition.TOTAL_LEAVES[i] for i in self.indices]),
-                     set([Bipartition.TOTAL_LEAVES[i] for i in complement_indices])))
+        # Convert indices to leaf values using set comprehension
+        primary_set = {Bipartition.LEAF_LIST[i] for i in self.indices}
+        complement_set = Bipartition.LEAF_SET - primary_set
+        return iter((primary_set, complement_set))
 
     def get_bipartitions(self):
-        complement_indices = sorted(set(range(len(Bipartition.TOTAL_LEAVES))) - set(self.indices))
         # Convert to sets before returning
-        return (set([Bipartition.TOTAL_LEAVES[i] for i in self.indices]),
-                set([Bipartition.TOTAL_LEAVES[i] for i in complement_indices]))
+        primary_set = {Bipartition.LEAF_LIST[i] for i in self.indices}
+        complement_set = Bipartition.LEAF_SET - primary_set
+        return (primary_set, complement_set)
 
 ###################################################################################################
 ###################################################################################################
@@ -1892,6 +1887,7 @@ class Tree:
 
     ###############################################################################################
 
+    #@profile
     def bipdict(self):
         """Returns tree in the form of a "bipartition dictionary" """
 
@@ -1902,7 +1898,7 @@ class Tree:
         # Interning: store bipartitions in global dict to avoid duplicating object
         bipartition_dict = {}
         leaves = frozenset(self.leaves)
-        Bipartition.set_total_leaves(leaves)
+        Bipartition.initialise_class(leaves)
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
@@ -3665,6 +3661,7 @@ class TreeSummary():
     ###############################################################################################
 
     @property
+    #@profile
     def sorted_biplist(self):
         """Return list of bipartitions.
         First external (leaf) bipartitions sorted by leafname.
@@ -3693,6 +3690,7 @@ class TreeSummary():
 
     ###############################################################################################
 
+    #@profile
     def add_branchid(self):
         """Adds attribute .branchID to all bipartitions in .bipartsummary
         External bipartitions are labeled with the leafname.
@@ -3707,6 +3705,7 @@ class TreeSummary():
 
     ###############################################################################################
 
+    #@profile
     def add_tree(self, curtree, weight=1.0):
         """Add tree object to treesummary, update all relevant bipartition summaries"""
 
