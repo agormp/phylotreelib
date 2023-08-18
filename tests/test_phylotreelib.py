@@ -576,7 +576,7 @@ class Treesummarytests(TreeTestBase):
             names1, names2, meanvar = line.strip().split("|")
             bip1 = names1.strip().split()
             bip2 = names2.strip().split()
-            bipart = pt.Bipartition(bip1,bip2)
+            bipart = pt.Bipartition(bip1)
             vals = meanvar.strip().split()
             mean = float(vals[0])
             var = float(vals[1])
@@ -674,11 +674,11 @@ class Topologytests(TreeTestBase):
         # Note: I am exploring just two cases in detail
         treestring = self.treedata["string_with_label"]
         mytree = pt.Tree.from_string(treestring)
+        pt.Bipartition.initialise_class(["s4", "s1", "s3", "s2", "s5"])
         bipdict = mytree.bipdict()
 
         # Test that key for central branch is present, and that length and label are as expected
-        expectedkey = pt.Bipartition(["YAL016W", "SBC669_26"],
-                                     ["KW081_13", "KL0F07689"])
+        expectedkey = pt.Bipartition(["YAL016W", "SBC669_26"])
         expectedlen = 0.124263
         expectedlab = "0.0507"
 
@@ -689,15 +689,15 @@ class Topologytests(TreeTestBase):
         # Case #2 - check that all keys are present, and point to expected branch length
         treestring = self.treedata["simplestring"]
         mytree = pt.Tree.from_string(treestring)
+        pt.Bipartition.initialise_class(["s4", "s1", "s3", "s2", "s5"])
         bipdict = mytree.bipdict()
-
-        expectedkeys = [pt.Bipartition(["s4", "s5"], ["s1", "s2", "s3"]),
-                        pt.Bipartition(["s4", "s5", "s3"], ["s1", "s2"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s2"], ["s1"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s1"], ["s2"]),
-                        pt.Bipartition(["s4", "s5", "s1", "s2"], ["s3"]),
-                        pt.Bipartition(["s1", "s5", "s3", "s2"], ["s4"]),
-                        pt.Bipartition(["s4", "s1", "s3", "s2"], ["s5"])]
+        expectedkeys = [pt.Bipartition(["s4", "s5"]),
+                        pt.Bipartition(["s4", "s5"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s2"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s1"]),
+                        pt.Bipartition(["s4", "s5", "s1", "s2"]),
+                        pt.Bipartition(["s1", "s5", "s3", "s2"]),
+                        pt.Bipartition(["s4", "s1", "s3", "s2"])]
 
         expectedvals = [0.125, 0.25, 0.125, 0.125, 0.125, 0.125, 0.125]
 
@@ -717,13 +717,13 @@ class Topologytests(TreeTestBase):
         mytree = pt.Tree.from_string(treestring)
         topology = mytree.topology()
 
-        expectedtop = frozenset([pt.Bipartition(["s4", "s5"], ["s1", "s2", "s3"]),
-                        pt.Bipartition(["s4", "s5", "s3"], ["s1", "s2"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s2"], ["s1"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s1"], ["s2"]),
-                        pt.Bipartition(["s4", "s5", "s1", "s2"], ["s3"]),
-                        pt.Bipartition(["s1", "s5", "s3", "s2"], ["s4"]),
-                        pt.Bipartition(["s4", "s1", "s3", "s2"], ["s5"])])
+        expectedtop = frozenset([pt.Bipartition(["s4", "s5"]),
+                        pt.Bipartition(["s4", "s5", "s3"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s2"]),
+                        pt.Bipartition(["s4", "s5", "s3", "s1"]),
+                        pt.Bipartition(["s4", "s5", "s1", "s2"]),
+                        pt.Bipartition(["s1", "s5", "s3", "s2"]),
+                        pt.Bipartition(["s4", "s1", "s3", "s2"])])
 
         self.assertEqual(topology, expectedtop)
 
