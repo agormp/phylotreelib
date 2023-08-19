@@ -172,7 +172,7 @@ class Bipartition:
 
         Last 3 params will typically point to attributes in parent Tree object"""
 
-        self.leaf_set = frozenset(all_leaves_set)
+        self.leaf_set = all_leaves_set
         self.leaf_list = sorted_leaf_list
         self.leaf2index = leaf2index
         leafset1 = frozenset(leafset1)
@@ -184,11 +184,11 @@ class Bipartition:
             self.indices = sorted([leaf2index[leaf] for leaf in leafset1])
             self._hash_value = hash(leafset1)
         elif l2 < l1:
-            leafset2 = self.leaf_set - leafset1
+            leafset2 = frozenset(self.leaf_set) - leafset1
             self.indices = sorted([leaf2index[leaf] for leaf in leafset2])
             self._hash_value = hash(leafset2)
         else:
-            leafset2 = self.leaf_set - frozenset(leafset1)
+            leafset2 = frozenset(self.leaf_set) - frozenset(leafset1)
             h1, h2 = hash(leafset1), hash(leafset2)
             if h1 < h2:
                 indices = sorted([leaf2index[leaf] for leaf in leafset1])
@@ -213,13 +213,13 @@ class Bipartition:
     def __iter__(self):
         # Convert indices to leaf values using set comprehension
         primary_set = frozenset({self.leaf_list[i] for i in self.indices})
-        complement_set = self.leaf_set - primary_set
+        complement_set = frozenset(self.leaf_set) - primary_set
         return iter((primary_set, complement_set))
 
     def get_bipartitions(self):
         # Convert to sets before returning
         primary_set = frozenset({self.leaf_list[i] for i in self.indices})
-        complement_set = self.leaf_set - primary_set
+        complement_set = frozenset(self.leaf_set) - primary_set
         return (primary_set, complement_set)
 
 ###################################################################################################
