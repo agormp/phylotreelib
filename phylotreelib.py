@@ -209,7 +209,6 @@ class Bipartition:
         return self._hash_value == other._hash_value
 
     # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
-    #@profile
     def __iter__(self):
         # Convert indices to leaf values using set comprehension
         primary_set = frozenset({self.leaf_list[i] for i in self.indices})
@@ -1928,7 +1927,6 @@ class Tree:
 
     ###############################################################################################
 
-    #@profile
     def bipdict(self):
         """Returns tree in the form of a "bipartition dictionary" """
 
@@ -3701,7 +3699,6 @@ class TreeSummary():
     ###############################################################################################
 
     @property
-    #@profile
     def sorted_biplist(self):
         """Return list of bipartitions.
         First external (leaf) bipartitions sorted by leafname.
@@ -3730,7 +3727,6 @@ class TreeSummary():
 
     ###############################################################################################
 
-    #@profile
     def add_branchid(self):
         """Adds attribute .branchID to all bipartitions in .bipartsummary
         External bipartitions are labeled with the leafname.
@@ -3745,7 +3741,6 @@ class TreeSummary():
 
     ###############################################################################################
 
-    #@profile
     def add_tree(self, curtree, weight=1.0):
         """Add tree object to treesummary, update all relevant bipartition summaries"""
 
