@@ -571,12 +571,13 @@ class Treesummarytests(TreeTestBase):
         bip1 = names1.strip().split()
         bip2 = names2.strip().split()
         total_leaves = bip1 + bip2
-        pt.Bipartition.initialise_class(total_leaves)
+        sorted_leaves = sorted(total_leaves)
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaves)}
         for line in mbresults:
             names1, names2, meanvar = line.strip().split("|")
             bip1 = names1.strip().split()
             bip2 = names2.strip().split()
-            bipart = pt.Bipartition(bip1)
+            bipart = pt.Bipartition(bip1, total_leaves, sorted_leaves, leaf2index)
             vals = meanvar.strip().split()
             mean = float(vals[0])
             var = float(vals[1])
@@ -674,11 +675,13 @@ class Topologytests(TreeTestBase):
         # Note: I am exploring just two cases in detail
         treestring = self.treedata["string_with_label"]
         mytree = pt.Tree.from_string(treestring)
-        pt.Bipartition.initialise_class(["s4", "s1", "s3", "s2", "s5"])
+        total_leaves = set(["KL0F07689", "KW081_13", "SBC669_26", "YAL016W"])
+        sorted_leaflist = sorted(total_leaves)
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaflist)}
         bipdict = mytree.bipdict()
 
         # Test that key for central branch is present, and that length and label are as expected
-        expectedkey = pt.Bipartition(["YAL016W", "SBC669_26"])
+        expectedkey = pt.Bipartition(["YAL016W", "SBC669_26"], total_leaves, sorted_leaflist, leaf2index)
         expectedlen = 0.124263
         expectedlab = "0.0507"
 
@@ -689,17 +692,19 @@ class Topologytests(TreeTestBase):
         # Case #2 - check that all keys are present, and point to expected branch length
         treestring = self.treedata["simplestring"]
         mytree = pt.Tree.from_string(treestring)
-        pt.Bipartition.initialise_class(["s4", "s1", "s3", "s2", "s5"])
+        total_leaves = set(["s4", "s1", "s3", "s2", "s5"])
+        sorted_leaflist = sorted(total_leaves)
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaflist)}
         bipdict = mytree.bipdict()
-        expectedkeys = [pt.Bipartition(["s4", "s5"]),
-                        pt.Bipartition(["s4", "s5"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s2"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s1"]),
-                        pt.Bipartition(["s4", "s5", "s1", "s2"]),
-                        pt.Bipartition(["s1", "s5", "s3", "s2"]),
-                        pt.Bipartition(["s4", "s1", "s3", "s2"])]
+        expectedkeys = [pt.Bipartition(["s1"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s2"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s3"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s4"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s5"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s4", "s5"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s1", "s2"],total_leaves, sorted_leaflist, leaf2index)]
 
-        expectedvals = [0.125, 0.25, 0.125, 0.125, 0.125, 0.125, 0.125]
+        expectedvals = [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.25]
 
         for key in bipdict:
             self.assertTrue(key in expectedkeys)
@@ -716,14 +721,17 @@ class Topologytests(TreeTestBase):
         treestring = self.treedata["simplestring"]
         mytree = pt.Tree.from_string(treestring)
         topology = mytree.topology()
+        total_leaves = set(["s4", "s1", "s3", "s2", "s5"])
+        sorted_leaflist = sorted(total_leaves)
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaflist)}
 
-        expectedtop = frozenset([pt.Bipartition(["s4", "s5"]),
-                        pt.Bipartition(["s4", "s5", "s3"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s2"]),
-                        pt.Bipartition(["s4", "s5", "s3", "s1"]),
-                        pt.Bipartition(["s4", "s5", "s1", "s2"]),
-                        pt.Bipartition(["s1", "s5", "s3", "s2"]),
-                        pt.Bipartition(["s4", "s1", "s3", "s2"])])
+        expectedtop = frozenset([pt.Bipartition(["s4", "s5"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s4", "s5", "s3"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s4", "s5", "s3", "s2"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s4", "s5", "s3", "s1"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s4", "s5", "s1", "s2"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s1", "s5", "s3", "s2"],total_leaves, sorted_leaflist, leaf2index),
+                        pt.Bipartition(["s4", "s1", "s3", "s2"],total_leaves, sorted_leaflist, leaf2index)])
 
         self.assertEqual(topology, expectedtop)
 
