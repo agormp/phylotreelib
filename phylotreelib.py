@@ -157,39 +157,45 @@ class Bipartition:
     to a branch in a tree. Class has a fast method for hashing and therefore useful when
     comparing Bipartitions"""
 
-    LEAF_LIST = []  # Sorted list of all leaves
-    LEAF_SET = None # Set of all leaves
+    __slots__ = ["leaf_set", "leaf_list", "leaf2index",
+                 'indices', '_hash_value']
 
-    __slots__ = ['indices', '_hash_value']
+    def __init__(self, leafset1, all_leaves_set, sorted_leaf_list, leaf2index):
+        """Initialise bipartition objects based on only one half of bipartition.
+        If the complement of leafset1 is smaller, than that will be stored instead.
+        If they have same size: store leafset with smaller hash.
 
-    @classmethod
-    def initialise_class(cls, leaves):
-        """This method needs to be called before creating any Bipartition objects"""
-        cls.LEAF_LIST = sorted(leaves)
-        cls.LEAF_SET = frozenset(leaves)
-        cls.REVERSE_LOOKUP = {leaf: idx for idx, leaf in enumerate(cls.LEAF_LIST)}
+        leafset1: one half of bipartition (to save time in caller)
+        all_leaves_set: set of all leaf names
+        sorted_leaf_list: sorted list of all leaf names
+        leaf2index: dict of {leaf:index in sorted_leaf_list}
 
-    def __init__(self, leafset1):
-        # Store only one half of bipart. Decide which based on len or hash
-        nleaves = len(Bipartition.LEAF_LIST)
+        Last 3 params will typically point to attributes in parent Tree object"""
+
+        self.leaf_set = frozenset(all_leaves_set)
+        self.leaf_list = sorted_leaf_list
+        self.leaf2index = leaf2index
+        leafset1 = frozenset(leafset1)
+
+        nleaves = len(self.leaf_set)
         l1 = len(leafset1)
         l2 = nleaves - l1
         if l1 < l2:
-            self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
-            self._hash_value = hash(frozenset(leafset1))
+            self.indices = sorted([leaf2index[leaf] for leaf in leafset1])
+            self._hash_value = hash(leafset1)
         elif l2 < l1:
-            leafset2 = Bipartition.LEAF_SET - frozenset(leafset1)
-            self.indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
+            leafset2 = self.leaf_set - leafset1
+            self.indices = sorted([leaf2index[leaf] for leaf in leafset2])
             self._hash_value = hash(leafset2)
         else:
-            leafset2 = Bipartition.LEAF_SET - frozenset(leafset1)
-            h1, h2 = hash(frozenset(leafset1)), hash(leafset2)
+            leafset2 = self.leaf_set - frozenset(leafset1)
+            h1, h2 = hash(leafset1), hash(leafset2)
             if h1 < h2:
-                indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset1])
+                indices = sorted([leaf2index[leaf] for leaf in leafset1])
                 self.indices = indices
                 self._hash_value = h1
             else:
-                indices = sorted([Bipartition.REVERSE_LOOKUP[leaf] for leaf in leafset2])
+                indices = sorted([leaf2index[leaf] for leaf in leafset2])
                 self.indices = indices
                 self._hash_value = h2
 
@@ -198,20 +204,22 @@ class Bipartition:
         return self._hash_value
 
     def __eq__(self, other):
+        # Python note: assumes hash collisions will never occur!
+        # Empirically this seems to be the case for realistic data, but is not guaranteed
         return self._hash_value == other._hash_value
 
     # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
     #@profile
     def __iter__(self):
         # Convert indices to leaf values using set comprehension
-        primary_set = {Bipartition.LEAF_LIST[i] for i in self.indices}
-        complement_set = Bipartition.LEAF_SET - primary_set
+        primary_set = frozenset({self.leaf_list[i] for i in self.indices})
+        complement_set = self.leaf_set - primary_set
         return iter((primary_set, complement_set))
 
     def get_bipartitions(self):
         # Convert to sets before returning
-        primary_set = {Bipartition.LEAF_LIST[i] for i in self.indices}
-        complement_set = Bipartition.LEAF_SET - primary_set
+        primary_set = frozenset({self.leaf_list[i] for i in self.indices})
+        complement_set = self.leaf_set - primary_set
         return (primary_set, complement_set)
 
 ###################################################################################################
@@ -454,7 +462,9 @@ class Tree:
     # The main constructor "__init__" is therefore mostly empty
 
     def __init__(self):
-        self._parent_dict = None         # Dict node:parent relationships (only built if required)
+        self._parent_dict = None            # Property with lazy evaluation
+        self._sorted_leaf_list = None       # Property with lazy evaluation
+        self._leaf2index = None             # Property with lazy evaluation
         self.dist_dict = None
         self.path_dict = None
         self.remotechildren_dict = None     # Python note: Change to property?
@@ -478,6 +488,24 @@ class Tree:
             for child in self.child_dict[parent]:
                 self._parent_dict[child] = parent
         self._parent_dict[self.root] = None     # Add special value "None" as parent of root
+
+    ###############################################################################################
+
+    @property
+    def sorted_leaf_list(self):
+        if self._sorted_leaf_list == None:
+            self._sorted_leaf_list = sorted(self.leaves)
+        return self._sorted_leaf_list
+
+    ###############################################################################################
+
+    @property
+    def leaf2index(self):
+        if self._leaf2index == None:
+            self._leaf2index = {}
+            for i,leaf in enumerate(self.sorted_leaf_list):
+                self._leaf2index[leaf] = i
+        return self._leaf2index
 
     ###############################################################################################
 
@@ -1902,7 +1930,6 @@ class Tree:
         # Interning: store bipartitions in global dict to avoid duplicating object
         bipartition_dict = {}
         leaves = frozenset(self.leaves)
-        Bipartition.initialise_class(leaves)
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
@@ -1917,7 +1944,8 @@ class Tree:
             if child != self.root:
                 parent = self.parent(child)
                 bipart1 = frozenset(child_remkids)
-                bipartition = Bipartition(bipart1)
+                bipartition = Bipartition(bipart1, self.leaves,
+                                          self.sorted_leaf_list, self.leaf2index)
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
@@ -1930,7 +1958,8 @@ class Tree:
             # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
             bipart1 = frozenset(self.remotechildren_dict[kid1])
-            bipartition = Bipartition(bipart1)
+            bipartition = Bipartition(bipart1, self.leaves,
+                                      self.sorted_leaf_list, self.leaf2index)
 
             # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
