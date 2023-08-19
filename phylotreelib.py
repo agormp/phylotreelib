@@ -105,15 +105,14 @@ def remove_comments(text):
 class Interner():
     """Class used for interning various objects."""
 
-    # Stores dictionaries of leafset, bipartitions, and topologies
-    # Interner methods returns *pointer* to leafset or bipartition
-    # Could perhaps just use one dict for interning *anything*, but worry about hash collisions?
-
+    # Stores dictionaries of objects to be interned
+    # Interner methods returns *pointer* to object
+    # Python note: is there a potential issue with hash collisions
     def __init__(self):
-        self.nodesets = {}
+        self.interndict = {}
 
-    def intern_nodeset(self, nodeset):
-        return self.nodesets.setdefault(nodeset, nodeset)
+    def intern(self, intern_object):
+        return self.interndict.setdefault(intern_object, intern_object)
 
 ###################################################################################################
 ###################################################################################################
