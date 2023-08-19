@@ -463,6 +463,7 @@ class Tree:
 
     def __init__(self):
         self._parent_dict = None            # Property with lazy evaluation
+        self._frozenset_leaves = None       # Property with lazy evaluation
         self._sorted_leaf_list = None       # Property with lazy evaluation
         self._leaf2index = None             # Property with lazy evaluation
         self.dist_dict = None
@@ -488,6 +489,14 @@ class Tree:
             for child in self.child_dict[parent]:
                 self._parent_dict[child] = parent
         self._parent_dict[self.root] = None     # Add special value "None" as parent of root
+
+    ###############################################################################################
+
+    @property
+    def frozenset_leaves(self):
+        if self._frozenset_leaves == None:
+            self._frozenset_leaves = frozenset(self.leaves)
+        return self._frozenset_leaves
 
     ###############################################################################################
 
@@ -1944,7 +1953,7 @@ class Tree:
             if child != self.root:
                 parent = self.parent(child)
                 bipart1 = frozenset(child_remkids)
-                bipartition = Bipartition(bipart1, self.leaves,
+                bipartition = Bipartition(bipart1, self.frozenset_leaves,
                                           self.sorted_leaf_list, self.leaf2index)
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
@@ -1958,7 +1967,7 @@ class Tree:
             # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
             bipart1 = frozenset(self.remotechildren_dict[kid1])
-            bipartition = Bipartition(bipart1, self.leaves,
+            bipartition = Bipartition(bipart1, self.frozenset_leaves,
                                       self.sorted_leaf_list, self.leaf2index)
 
             # Create new branch
