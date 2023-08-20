@@ -470,6 +470,31 @@ class Tree:
 
     ###############################################################################################
 
+    @staticmethod
+    def is_property(cls, attr):
+        return isinstance(getattr(cls, attr, None), property)
+
+    def clear_attributes(self, remlist=None, keeplist=None):
+        if remlist and keeplist:
+            raise ValueError("Only one of 'remlist' and 'keeplist' can be provided.")
+
+        if not remlist and not keeplist:
+            raise ValueError("One of 'remlist' or 'keeplist' must be provided.")
+
+        all_attributes = set(dir(self))
+
+        if keeplist:
+            attrs_to_remove = all_attributes - set(keeplist)
+        elif remlist:
+            attrs_to_remove = set(remlist)
+
+        for attr in attrs_to_remove:
+            # Avoid properties, methods, and special attributes (those that start with '__')
+            if not attr.startswith("__") and not self.is_property(Tree, attr) and not callable(getattr(self, attr)) :
+                setattr(self, attr, None)
+
+    ###############################################################################################
+
     @property
     def parent_dict(self):
         """Lazy evaluation of _parent_dict when needed"""
