@@ -2017,6 +2017,10 @@ class Tree:
 
             bipartition_dict[bipartition].label = lab
 
+        # Python note: to save memory. Maybe this should be dealt with centrally?
+        if not keep_remchild_dict:
+            self.remotechildren_dict = None
+
         return bipartition_dict
 
     ###############################################################################################
