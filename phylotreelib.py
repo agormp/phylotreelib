@@ -105,7 +105,7 @@ def remove_comments(text):
 class Interner():
     """Class used for interning various objects."""
 
-    # Stores dictionaries of objects to be interned
+    # Stores dictionaries of objects to be interned: {obj:obj}
     # Interner methods returns *pointer* to object
     # Python note: is there a potential issue with hash collisions
     def __init__(self):
@@ -1926,14 +1926,13 @@ class Tree:
 
     ###############################################################################################
 
-    def bipdict(self):
+    def bipdict(self, interner=None, keep_remchild_dict = False):
         """Returns tree in the form of a "bipartition dictionary" """
 
         # Names of leaves on one side of a branch are represented as an immutable set
         # A bipartition is represented as an immutable set of two such (complementary) sets
         # The entire tree is represented as a dictionary where the keys are bipartitions
         # The values are Branchstructs
-        # Interning: store bipartitions in global dict to avoid duplicating object
         bipartition_dict = {}
         leaves = frozenset(self.leaves)
 
@@ -1952,6 +1951,8 @@ class Tree:
                 bipart1 = frozenset(child_remkids)
                 bipartition = Bipartition(bipart1, self.frozenset_leaves,
                                           self.sorted_leaf_list, self.leaf2index)
+                if interner:
+                    bipartition = interner.intern(bipartition)
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
@@ -1966,6 +1967,8 @@ class Tree:
             bipart1 = frozenset(self.remotechildren_dict[kid1])
             bipartition = Bipartition(bipart1, self.frozenset_leaves,
                                       self.sorted_leaf_list, self.leaf2index)
+            if interner:
+                bipartition = interner.intern(bipartition)
 
             # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
@@ -3661,7 +3664,7 @@ class TreeSet():
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
-    def __init__(self):
+    def __init__(self, interner=None):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -3670,6 +3673,7 @@ class TreeSummary():
         self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
         self._sorted_biplist = None
+        self.interner = interner
 
     ###############################################################################################
 
@@ -3760,7 +3764,7 @@ class TreeSummary():
 
         self.tree_count += 1
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
-        bipdict = curtree.bipdict()
+        bipdict = curtree.bipdict(interner=self.interner)
 
         # I am interested in being able to compute weighted frequency of a bipartition as well as
         # the weighted mean and weighted variance of the branch length for that bipartition.
@@ -3927,8 +3931,8 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, store_trees=False):
-        TreeSummary.__init__(self)
+    def __init__(self, interner=None, store_trees=False):
+        TreeSummary.__init__(self, interner=interner)
         self._toposummary = {}
         self._toposummary_processed = False
         self.store_trees = store_trees
@@ -3954,12 +3958,11 @@ class BigTreeSummary(TreeSummary):
 
         # Superclass method takes care of updating n_trees and all bipart-related info
         # Also returns bipdict so we wont have to recompute here
+        # Biparts will be interned (superclass was initialised with interner)
         bipdict = TreeSummary.add_tree(self, curtree, weight)
 
         # If topology has never been seen before, then add it and initialize count
         # If topology HAS been seen before then update count
-        # Python: A bit messy that interning is here done in add_tree() and not in topology()
-        # This is to avoid recomputing bipdict in topology function (or storing bipdictcache)
         topology = frozenset(bipdict.keys())
         if topology in self._toposummary:
             self._toposummary[topology].weight += weight
