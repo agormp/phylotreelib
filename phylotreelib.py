@@ -110,9 +110,17 @@ class Interner():
     # Python note: is there a potential issue with hash collisions
     def __init__(self):
         self.interndict = {}
+        self.unhashable_dict = {}
 
     def intern(self, intern_object):
         return self.interndict.setdefault(intern_object, intern_object)
+
+    def store_unhashable(self, name, obj):
+        """
+        Stores the unhashable object only if it hasn't been stored before.
+        Always returns the stored object (whether newly stored or previously stored).
+        """
+        return self.unhashable_dict.setdefault(name, obj)
 
 ###################################################################################################
 ###################################################################################################
@@ -232,7 +240,7 @@ class TreeError(Exception):
 class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
-    def __init__(self, treeclass, treestring, transdict=None):
+    def __init__(self, treeobj, treestring, transdict=None):
         # Construct Tree object that will be filled out by parser
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
         # are the internal nodes which are numbered consecutively. Each key has an
@@ -242,13 +250,12 @@ class NewickStringParser:
 
         # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
         # an internal node). The label is attached to the same branch as the branch length
-        tree = treeclass()
-        tree.child_dict = {}
-        tree.leaves = set()
-        tree.intnodes = set()
-        tree.root = 0
-        tree.belowroot = None
-        self.tree = tree
+        treeobj.child_dict = {}
+        treeobj.leaves = set()
+        treeobj.intnodes = set()
+        treeobj.root = 0
+        treeobj.belowroot = None
+        self.tree = treeobj
 
         # Hack to remove whitespace from treestring
         self.treestring = "".join(treestring.split())
@@ -324,8 +331,10 @@ class NewickStringParser:
                 state = handler(self, token_value)
             except KeyError:
                 self._handle_parse_error(state, token_value, token_type, self.treestring)
-        self.tree.nodes = self.tree.leaves | self.tree.intnodes
+
         self.sanitychecks()
+        self.tree.nodes = self.tree.leaves | self.tree.intnodes
+
         return self.tree
 
     ###############################################################################################
@@ -518,7 +527,10 @@ class Tree:
     @property
     def frozenset_leaves(self):
         if self._frozenset_leaves == None:
-            self._frozenset_leaves = frozenset(self.leaves)
+            if self.interner:
+                self._frozenset_leaves = self.interner.intern(frozenset(self.leaves))
+            else:
+                self._frozenset_leaves = frozenset(self.leaves)
         return self._frozenset_leaves
 
     ###############################################################################################
@@ -526,7 +538,11 @@ class Tree:
     @property
     def sorted_leaf_list(self):
         if self._sorted_leaf_list == None:
-            self._sorted_leaf_list = sorted(self.leaves)
+            sl = sorted(self.leaves)
+            if self.interner:
+                self._sorted_leaf_list = self.interner.store_unhashable(sl, "sorted_leaf_list")
+            else:
+                self._sorted_leaf_list = sl
         return self._sorted_leaf_list
 
     ###############################################################################################
@@ -537,24 +553,32 @@ class Tree:
             self._leaf2index = {}
             for i,leaf in enumerate(self.sorted_leaf_list):
                 self._leaf2index[leaf] = i
+            if self.interner:
+                self._leaf2index = self.interner.store_unhashable(self._leaf2index, "leaf2index")
         return self._leaf2index
 
     ###############################################################################################
 
     @classmethod
-    def from_string(cls, orig_treestring, transdict=None):
+    def from_string(cls, orig_treestring, transdict=None, interner=None):
         """Constructor: Tree object from tree-string in Newick format"""
 
         # All action is in NewickStringParser
-        parser = NewickStringParser(cls, orig_treestring, transdict)
-        tree = parser.parse()
+        obj = cls()
+        parser = NewickStringParser(obj, orig_treestring, transdict)
+        obj = parser.parse()
+        obj.interner = interner
+        if obj.interner:
+            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
+            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
+            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
         del parser
-        return tree
+        return obj
 
     ###############################################################################################
 
     @classmethod
-    def from_biplist(cls, biplist):
+    def from_biplist(cls, biplist, interner=None):
         """Constructor: Tree object from bipartition list"""
 
         # Input is a bipartitionlist (actually a dictionary of bipartition:Branchstruct pairs):
@@ -640,11 +664,16 @@ class Tree:
                     del obj.child_dict[insertpoint][child]
 
         obj.nodes = set(obj.leaves | obj.intnodes)
+        obj.interner = interner
+        if obj.interner:
+            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
+            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
+            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
         return obj
 
     ###############################################################################################
     @classmethod
-    def from_topology(cls, topology):
+    def from_topology(cls, topology, interner=None):
         """Constructor: Tree object from topology"""
 
         # Input is a topology, i.e., a set of bipartitions
@@ -717,11 +746,18 @@ class Tree:
                     del obj.child_dict[insertpoint][child]
 
         obj.nodes = set(obj.leaves | obj.intnodes)
+
+        obj.interner = interner
+        if obj.interner:
+            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
+            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
+            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
+
         return obj
 
     ###############################################################################################
     @classmethod
-    def from_leaves(cls, leaflist):
+    def from_leaves(cls, leaflist, interner=None):
         """Constructor: star-tree object from list of leaves"""
 
         treelist = ["("]
@@ -730,11 +766,11 @@ class Tree:
             treelist.append(",")
         del treelist[-1]
         treelist.append(");")
-        return cls.from_string("".join(treelist))
+        return cls.from_string("".join(treelist), interner)
 
     ###############################################################################################
     @classmethod
-    def from_branchinfo(cls, parentlist, childlist, lenlist=None, lablist=None):
+    def from_branchinfo(cls, parentlist, childlist, lenlist=None, lablist=None, interner=None):
         """Constructor: Tree object from information about all branches in tree
 
         Information about one branch is conceptually given as:
@@ -786,11 +822,18 @@ class Tree:
         obj.root = diffset.pop()
 
         obj.nodes = obj.leaves | obj.intnodes
+
+        obj.interner = interner
+        if obj.interner:
+            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
+            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
+            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
+
         return obj
 
     ###############################################################################################
     @classmethod
-    def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
+    def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s", interner=None):
         """Constructor: tree with random topology from list of leaf names OR number of tips"""
 
         # Implementation note: random trees are constructed by randomly resolving star-tree
@@ -809,7 +852,7 @@ class Tree:
         # If leaflist given:
         #   construct startree using names, then resolve to random bifurcating topology
         if leaflist is not None and ntips is None:
-            tree = cls.from_leaves(leaflist)
+            tree = cls.from_leaves(leaflist, interner)
 
         # If ntips given:
         #   construct list of zeropadded, numbered, names,
@@ -820,7 +863,7 @@ class Tree:
             for i in range(ntips):
                 name = "{prefix}{num:0{width}d}".format(prefix=name_prefix, num=i, width=ndigits)
                 namelist.append( name )
-            tree = cls.from_leaves(namelist)   # Star tree with given number of leaves
+            tree = cls.from_leaves(namelist, interner)   # Star tree with given number of leaves
 
         tree.resolve()                         # Randomly resolve to bifurcating tree
 
@@ -952,7 +995,7 @@ class Tree:
 
     ###############################################################################################
 
-    def copy_treeobject(self, copylengths=True, copylabels=True):
+    def copy_treeobject(self, copylengths=True, copylabels=True, interner=None):
         """Returns copy of Tree object. Copies structure and branch lengths.
         Caches and any user-added attributes are not copied.
         Similar to effect of copy.deepcopy but customized and much faster"""
@@ -963,6 +1006,7 @@ class Tree:
         obj.leaves = self.leaves.copy()
         obj.intnodes = self.intnodes.copy()
         obj.nodes = self.nodes.copy()
+        obj.interner = interner
         obj.child_dict = {}
         origtree = self.child_dict
         newtree = obj.child_dict
@@ -1951,7 +1995,7 @@ class Tree:
 
     ###############################################################################################
 
-    def bipdict(self, interner=None, keep_remchild_dict = False):
+    def bipdict(self, keep_remchild_dict = False):
         """Returns tree in the form of a "bipartition dictionary" """
 
         # Names of leaves on one side of a branch are represented as an immutable set
@@ -1976,8 +2020,8 @@ class Tree:
                 bipart1 = frozenset(child_remkids)
                 bipartition = Bipartition(bipart1, self.frozenset_leaves,
                                           self.sorted_leaf_list, self.leaf2index)
-                if interner:
-                    bipartition = interner.intern(bipartition)
+                if self.interner:
+                    bipartition = self.interner.intern(bipartition)
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
@@ -1992,8 +2036,8 @@ class Tree:
             bipart1 = frozenset(self.remotechildren_dict[kid1])
             bipartition = Bipartition(bipart1, self.frozenset_leaves,
                                       self.sorted_leaf_list, self.leaf2index)
-            if interner:
-                bipartition = interner.intern(bipartition)
+            if self.interner:
+                bipartition = self.interner.intern(bipartition)
 
             # Create new branch
             bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
@@ -3693,7 +3737,7 @@ class TreeSet():
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
-    def __init__(self, interner=None):
+    def __init__(self):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -3702,7 +3746,6 @@ class TreeSummary():
         self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
         self._sorted_biplist = None
-        self.interner = interner
 
     ###############################################################################################
 
@@ -3793,7 +3836,7 @@ class TreeSummary():
 
         self.tree_count += 1
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
-        bipdict = curtree.bipdict(interner=self.interner)
+        bipdict = curtree.bipdict()
 
         # I am interested in being able to compute weighted frequency of a bipartition as well as
         # the weighted mean and weighted variance of the branch length for that bipartition.
@@ -3960,8 +4003,8 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, interner=None, store_trees=False):
-        TreeSummary.__init__(self, interner=interner)
+    def __init__(self, store_trees=False):
+        TreeSummary.__init__(self)
         self._toposummary = {}
         self._toposummary_processed = False
         self.store_trees = store_trees
@@ -3987,7 +4030,6 @@ class BigTreeSummary(TreeSummary):
 
         # Superclass method takes care of updating n_trees and all bipart-related info
         # Also returns bipdict so we wont have to recompute here
-        # Biparts will be interned (superclass was initialised with interner)
         bipdict = TreeSummary.add_tree(self, curtree, weight)
 
         # If topology has never been seen before, then add it and initialize count
@@ -4054,7 +4096,7 @@ class TreefileBase():
     # Classes for specific formats inherit from this class and add extra stuff as needed.
     # NOTE: i am opening files in "read text" with encoding UTF-8. Will this work across platforms?
 
-    def __init__(self, filename=None, filecontent=None):
+    def __init__(self, filename, filecontent, interner):
 
         num_args = (filename is not None) + (filecontent is not None)
         if num_args != 1:
@@ -4064,6 +4106,7 @@ class TreefileBase():
         else:
             self.treefile = open(filename, mode="rt", encoding="UTF-8")
 
+        self.interner = interner
         self.buffer = ""                # Used for keeping leftovers after reading whole line
 
     ###############################################################################################
@@ -4161,8 +4204,8 @@ class TreefileBase():
 class Newicktreefile(TreefileBase):
     """Class representing Newick tree file. Iteration returns tree-objects"""
 
-    def __init__(self, filename=None, filecontent=None):
-        TreefileBase.__init__(self, filename, filecontent)
+    def __init__(self, filename=None, filecontent=None, interner=None):
+        TreefileBase.__init__(self, filename, filecontent, interner)
         # HACK!!! Minimal file format check:
         # Read first three lines in file, check whether any of them contains "#NEXUS".
         # If so then this is presumably NOT a Newick file (but a nexus file...) => exit.
@@ -4191,7 +4234,7 @@ class Newicktreefile(TreefileBase):
         else:
             treestring = remove_comments(treestring)
             if returntree:
-                return Tree.from_string(treestring)
+                return Tree.from_string(treestring, self.interner)
 
 ###################################################################################################
 ###################################################################################################
@@ -4203,10 +4246,10 @@ class Nexustreefile(TreefileBase):
 
     ###############################################################################################
 
-    def __init__(self, filename=None, filecontent=None):
+    def __init__(self, filename=None, filecontent=None, interner=None):
         """Read past NEXUS file header, parse translate block if present"""
 
-        TreefileBase.__init__(self, filename, filecontent)
+        TreefileBase.__init__(self, filename, filecontent, interner)
 
         ###########################################################################################
 
@@ -4336,7 +4379,7 @@ class Nexustreefile(TreefileBase):
 
         # Return tree object if requested
         if returntree:
-            return Tree.from_string(treestring, self.transdict)
+            return Tree.from_string(treestring, self.transdict, self.interner)
 
 ###################################################################################################
 ###################################################################################################
