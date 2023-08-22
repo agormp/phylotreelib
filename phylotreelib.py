@@ -540,7 +540,7 @@ class Tree:
         if self._sorted_leaf_list == None:
             sl = sorted(self.leaves)
             if self.interner:
-                self._sorted_leaf_list = self.interner.store_unhashable(sl, "sorted_leaf_list")
+                self._sorted_leaf_list = self.interner.store_unhashable("sorted_leaf_list", sl)
             else:
                 self._sorted_leaf_list = sl
         return self._sorted_leaf_list
@@ -554,7 +554,7 @@ class Tree:
             for i,leaf in enumerate(self.sorted_leaf_list):
                 self._leaf2index[leaf] = i
             if self.interner:
-                self._leaf2index = self.interner.store_unhashable(self._leaf2index, "leaf2index")
+                self._leaf2index = self.interner.store_unhashable("leaf2index", self._leaf2index)
         return self._leaf2index
 
     ###############################################################################################
@@ -569,9 +569,9 @@ class Tree:
         obj = parser.parse()
         obj.interner = interner
         if obj.interner:
-            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
-            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
-            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
+            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
+            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
+            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
         del parser
         return obj
 
@@ -666,9 +666,9 @@ class Tree:
         obj.nodes = set(obj.leaves | obj.intnodes)
         obj.interner = interner
         if obj.interner:
-            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
-            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
-            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
+            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
+            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
+            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
         return obj
 
     ###############################################################################################
@@ -749,9 +749,9 @@ class Tree:
 
         obj.interner = interner
         if obj.interner:
-            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
-            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
-            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
+            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
+            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
+            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
 
         return obj
 
@@ -825,9 +825,9 @@ class Tree:
 
         obj.interner = interner
         if obj.interner:
-            obj.leaves = obj.interner.store_unhashable(obj.leaves, "leaves")
-            obj.intnodes = obj.interner.store_unhashable(obj.intnodes, "intnodes")
-            obj.nodes = obj.interner.store_unhashable(obj.nodes, "nodes")
+            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
+            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
+            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
 
         return obj
 
