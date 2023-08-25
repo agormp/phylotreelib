@@ -479,86 +479,6 @@ class Tree:
 
     ###############################################################################################
 
-    @staticmethod
-    def is_property(cls, attr):
-        return isinstance(getattr(cls, attr, None), property)
-
-    def clear_attributes(self, remlist=None, keeplist=None):
-        if remlist and keeplist:
-            raise ValueError("Only one of 'remlist' and 'keeplist' can be provided.")
-
-        if not remlist and not keeplist:
-            raise ValueError("One of 'remlist' or 'keeplist' must be provided.")
-
-        all_attributes = set(dir(self))
-
-        if keeplist:
-            attrs_to_remove = all_attributes - set(keeplist)
-        elif remlist:
-            attrs_to_remove = set(remlist)
-
-        for attr in attrs_to_remove:
-            # Avoid properties, methods, and special attributes (those that start with '__')
-            if not attr.startswith("__") and not self.is_property(Tree, attr) and not callable(getattr(self, attr)) :
-                setattr(self, attr, None)
-
-    ###############################################################################################
-
-    @property
-    def parent_dict(self):
-        """Lazy evaluation of _parent_dict when needed"""
-        if self._parent_dict == None:
-            self.build_parent_dict()
-        return self._parent_dict
-
-    ###############################################################################################
-
-    def build_parent_dict(self):
-        """Constructs _parent_dict enabling faster lookups, when needed"""
-
-        self._parent_dict = {}
-        for parent in self.intnodes:
-            for child in self.child_dict[parent]:
-                self._parent_dict[child] = parent
-        self._parent_dict[self.root] = None     # Add special value "None" as parent of root
-
-    ###############################################################################################
-
-    @property
-    def frozenset_leaves(self):
-        if self._frozenset_leaves == None:
-            if self.interner:
-                self._frozenset_leaves = self.interner.intern(frozenset(self.leaves))
-            else:
-                self._frozenset_leaves = frozenset(self.leaves)
-        return self._frozenset_leaves
-
-    ###############################################################################################
-
-    @property
-    def sorted_leaf_list(self):
-        if self._sorted_leaf_list == None:
-            sl = sorted(self.leaves)
-            if self.interner:
-                self._sorted_leaf_list = self.interner.store_unhashable("sorted_leaf_list", sl)
-            else:
-                self._sorted_leaf_list = sl
-        return self._sorted_leaf_list
-
-    ###############################################################################################
-
-    @property
-    def leaf2index(self):
-        if self._leaf2index == None:
-            self._leaf2index = {}
-            for i,leaf in enumerate(self.sorted_leaf_list):
-                self._leaf2index[leaf] = i
-            if self.interner:
-                self._leaf2index = self.interner.store_unhashable("leaf2index", self._leaf2index)
-        return self._leaf2index
-
-    ###############################################################################################
-
     @classmethod
     def from_string(cls, orig_treestring, transdict=None, interner=None):
         """Constructor: Tree object from tree-string in Newick format"""
@@ -992,6 +912,86 @@ class Tree:
         # NOTE: this does NOT live up to reasonable hash-criteria... Change at some point.
         # NOTE2: Also unsure about effect on performance
         return id(self)
+
+    ###############################################################################################
+
+    @staticmethod
+    def is_property(cls, attr):
+        return isinstance(getattr(cls, attr, None), property)
+
+    def clear_attributes(self, remlist=None, keeplist=None):
+        if remlist and keeplist:
+            raise ValueError("Only one of 'remlist' and 'keeplist' can be provided.")
+
+        if not remlist and not keeplist:
+            raise ValueError("One of 'remlist' or 'keeplist' must be provided.")
+
+        all_attributes = set(dir(self))
+
+        if keeplist:
+            attrs_to_remove = all_attributes - set(keeplist)
+        elif remlist:
+            attrs_to_remove = set(remlist)
+
+        for attr in attrs_to_remove:
+            # Avoid properties, methods, and special attributes (those that start with '__')
+            if not attr.startswith("__") and not self.is_property(Tree, attr) and not callable(getattr(self, attr)) :
+                setattr(self, attr, None)
+
+    ###############################################################################################
+
+    @property
+    def parent_dict(self):
+        """Lazy evaluation of _parent_dict when needed"""
+        if self._parent_dict == None:
+            self.build_parent_dict()
+        return self._parent_dict
+
+    ###############################################################################################
+
+    def build_parent_dict(self):
+        """Constructs _parent_dict enabling faster lookups, when needed"""
+
+        self._parent_dict = {}
+        for parent in self.intnodes:
+            for child in self.child_dict[parent]:
+                self._parent_dict[child] = parent
+        self._parent_dict[self.root] = None     # Add special value "None" as parent of root
+
+    ###############################################################################################
+
+    @property
+    def frozenset_leaves(self):
+        if self._frozenset_leaves == None:
+            if self.interner:
+                self._frozenset_leaves = self.interner.intern(frozenset(self.leaves))
+            else:
+                self._frozenset_leaves = frozenset(self.leaves)
+        return self._frozenset_leaves
+
+    ###############################################################################################
+
+    @property
+    def sorted_leaf_list(self):
+        if self._sorted_leaf_list == None:
+            sl = sorted(self.leaves)
+            if self.interner:
+                self._sorted_leaf_list = self.interner.store_unhashable("sorted_leaf_list", sl)
+            else:
+                self._sorted_leaf_list = sl
+        return self._sorted_leaf_list
+
+    ###############################################################################################
+
+    @property
+    def leaf2index(self):
+        if self._leaf2index == None:
+            self._leaf2index = {}
+            for i,leaf in enumerate(self.sorted_leaf_list):
+                self._leaf2index[leaf] = i
+            if self.interner:
+                self._leaf2index = self.interner.store_unhashable("leaf2index", self._leaf2index)
+        return self._leaf2index
 
     ###############################################################################################
 
