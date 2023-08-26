@@ -549,20 +549,22 @@ class Tree:
 
             # If bipartition represents internal branch: add branch to tree, transfer Branchstruct
             else:
-                mrca1 = obj.find_mrca(bip1)
-                mrca2 = obj.find_mrca(bip2)
+                if len(bip1) > len(bip2):
+                    bip1,bip2 = bip2,bip1
 
                 # Determine which group of leaves to move
                 # Note: one part of bipartition will necessarily have root as its MRCA
                 # since the members are present on both sides of root. It is the other part of
                 # the bipartition (where all members are on same side of root) that should be moved
                 # For a star-tree the resolution will be random (both have root as their MRCA)
-                if mrca1 == 0:                  # If mrca is root, move other group
-                    insertpoint = mrca2
-                    active_bip = bip2
-                else:
+                mrca1 = obj.find_mrca(bip1)
+                if mrca1 != 0:
                     insertpoint = mrca1
                     active_bip = bip1
+                else:
+                    mrca2 = obj.find_mrca(bip2)
+                    insertpoint = mrca2
+                    active_bip = bip2
 
                 # Determine which of insertpoints children to move, namely all children
                 # that are either in the active bipartition OR children whose descendants are
@@ -2126,15 +2128,18 @@ class Tree:
         # It is the other part of the bipartition that can potentially be moved
         # (Occasionally both parts have root as MRCA, but this will be covered by the more general
         # solution below)
-        mrca1 = self.find_mrca(bip1)
-        mrca2 = self.find_mrca(bip2)
 
-        if mrca1 == self.root:
-            insertpoint = mrca2
-            active_bip = bip2
-        else:
+        # First: set bip1 to smallest bip (increases probability that we wont have to compute mrca(bip2))
+        if len(bip1) > len(bip2):
+            bip1,bip2 = bip2,bip1
+        mrca1 = self.find_mrca(bip1)
+        if mrca1 != self.root:
             insertpoint = mrca1
             active_bip = bip1
+        else:
+            mrca2 = self.find_mrca(bip2)
+            insertpoint = mrca2
+            active_bip = bip2
 
         # Determine which of insertpoint's children to move (namely all children
         # that are either in the active bipartition OR children whose descendants are)
@@ -2593,8 +2598,8 @@ class Tree:
             raise TreeError("Bipartition is not compatible with tree: %s" % bipart)
 
         part1, part2 = bipart
-        mrca1 = self.find_mrca(part1)
-        mrca2 = self.find_mrca(part2)
+        if len(part1) > len(part2):
+            part1,part2 = part2,part1    # Increases probability we wont have to compute mrca(part2)
 
         # Determine where to insert new node
         # In the special case of a star tree: add two new internal nodes, and move each half of
@@ -2610,12 +2615,14 @@ class Tree:
         #       It is the other part of the bipartition that should be moved
         #       (the one where all members are on same side of root)
         else:
-            if mrca1 == self.root:      # If mrca1 is root, insert at mrca2, and move part2
-                insertpoint = mrca2
-                active_bip = part2
-            else:                       # If mrca2 is root, insert at mrca1, and move part1
+            mrca1 = self.find_mrca(part1)
+            if mrca1 != self.root:      # If mrca2 is root, insert at mrca1, and move part1
                 insertpoint = mrca1
                 active_bip = part1
+            else:                       # If mrca1 is root, insert at mrca2, and move part2
+                mrca2 = self.find_mrca(part2)
+                insertpoint = mrca2
+                active_bip = part2
 
             # Determine which of insertpoint's children to move (namely all children
             # that are either in the active bipartition OR children whose descendants are)
