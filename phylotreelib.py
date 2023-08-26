@@ -3090,21 +3090,18 @@ class Tree:
 
         # Find set of bipartitions in each tree
         # If rooted measure requested: first copy trees, then add extra leaf to root nodes
-        # Recall that: Names of leafs on one side of a branch are represented as an immutable set.
-        # A bipartition is represented as an immutable set of two such (complementary) sets
-        # The entire tree topology is represented as a set of bipartitions
         if rooted:
             tree1 = self.copy_treeobject()
-            tree1.add_leaf(tree1.root, "ghostleaf", Branchstruct())
+            tree1.add_leaf(tree1.root, "root", Branchstruct())
             tree2 = other.copy_treeobject()
-            tree2.add_leaf(tree2.root, "ghostleaf", Branchstruct())
+            tree2.add_leaf(tree2.root, "root", Branchstruct())
         else:
             tree1 = self
             tree2 = other
         tree1_biparts = tree1.topology()
         tree2_biparts = tree2.topology()
 
-        # Find bipartitions unique to tree1 and tree2 (using set arithemtic)
+        # Find bipartitions unique to tree1 and tree2
         tree1_unique_biparts = tree1_biparts - tree2_biparts
         tree2_unique_biparts = tree2_biparts - tree1_biparts
 
