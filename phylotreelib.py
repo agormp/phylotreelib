@@ -477,6 +477,9 @@ class Tree:
         self.dist_dict = None
         self.path_dict = None
         self._remotechildren_dict = None     # Python note: Change to property?
+        self.interner = None
+        self._sorted_intnodes_deep = None
+        self._sorted_intnodes_shallow = None
 
     ###############################################################################################
 
