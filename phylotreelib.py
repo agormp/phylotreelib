@@ -1433,7 +1433,7 @@ class Tree:
             if remkids == leafset:
                 mrca = node
                 break
-            if leafset <= remkids:
+            elif leafset <= remkids:
                 numkids = len(remkids)
                 if numkids < min_numkids:
                     mrca = node
