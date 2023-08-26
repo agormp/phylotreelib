@@ -3070,10 +3070,14 @@ class Tree:
 
     ###############################################################################################
 
-    def treedist_RF(self, other, normalise=False, rooted=False):
+    def treedist_RF(self, other, normalise=False, rooted=False, return_details=False):
         """Compute symmetric tree distance (Robinson Foulds) between self and other tree.
         normalise: divide RF distance by the total number of bipartitions in the two trees
-        rooted: take position of root into account"""
+        rooted: take position of root into account.
+        return_details: return list including intermediate values also:
+            [treedist, n_shared, n_uniq1, n_uniq2, n_bip1, n_bip2,
+             tree1_unique_biparts, tree2_unique_biparts, shared_biparts]
+            where the last three are sets of bipartitions"""
 
         # Python note: the rooted measure is found by adding an extra leaf to the root node
         # before computing distance. This is the same as counting clades for internal branches
@@ -3113,13 +3117,15 @@ class Tree:
         n_uniq2 = len(tree2_unique_biparts)
         n_bip1 = len(tree1_biparts) - len(tree1.leaves)        # Only internal branches counts!!!
         n_bip2 = len(tree2_biparts) - len(tree2.leaves)       # Only internal branches counts!!!
-        symdif = n_uniq1 + n_uniq2
-        symdif_norm = symdif / (n_bip1 + n_bip2)
-
+        treedist = n_uniq1 + n_uniq2
         if normalise:
-            return symdif_norm
+            treedist = treedist / (n_bip1 + n_bip2)
+
+        if return_details:
+            return [treedist, n_shared, n_uniq1, n_uniq2, n_bip1, n_bip2,
+                    tree1_unique_biparts, tree2_unique_biparts, shared_biparts]
         else:
-            return symdif
+            return treedist
 
     ###############################################################################################
 
