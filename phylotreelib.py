@@ -470,12 +470,13 @@ class Tree:
 
     def __init__(self):
         self._parent_dict = None            # Property with lazy evaluation
+        self._remotechildren_dict = None    # Property with lazy evaluation
         self._frozenset_leaves = None       # Property with lazy evaluation
         self._sorted_leaf_list = None       # Property with lazy evaluation
         self._leaf2index = None             # Property with lazy evaluation
         self.dist_dict = None
         self.path_dict = None
-        self.remotechildren_dict = None     # Python note: Change to property?
+        self._remotechildren_dict = None     # Python note: Change to property?
 
     ###############################################################################################
 
@@ -582,6 +583,10 @@ class Tree:
                 for child in moveset:
                     obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
                     del obj.child_dict[insertpoint][child]
+
+                # reset remchild_dict which is now obsolete
+                # Python note: check if it really is beneficial to use property here (alternative: use method)
+                obj._remotechildren_dict = None
 
         obj.nodes = set(obj.leaves | obj.intnodes)
         obj.interner = interner
@@ -961,6 +966,36 @@ class Tree:
     ###############################################################################################
 
     @property
+    def remotechildren_dict(self):
+        """Lazy evaluation of _remotechildren_dict when needed"""
+        if self._remotechildren_dict == None:
+            self.build_remotechildren_dict()
+        return self._remotechildren_dict
+
+    ###############################################################################################
+
+    def build_remotechildren_dict(self):
+        """Constructs dict of all {parent:{remotechildren}} pairs in efficient manner.
+        This dict can then be used directly or by remote_children() to speed up enquiries."""
+
+        remdict = self._remotechildren_dict = {}
+        for parent in self.sorted_intnodes(deepfirst=False):
+            remdict[parent] = set()
+            kidstack = list(self.child_dict[parent])
+            while kidstack:
+                curnode = kidstack.pop()
+                if curnode in self.leaves:
+                    remdict[parent].add(curnode)
+                elif curnode in remdict:
+                    remdict[parent].update(remdict[curnode])
+                else:
+                    kidstack.extend(self.child_dict[curnode])
+        for node in self.leaves:
+            remdict[node] = {node}
+
+    ###############################################################################################
+
+    @property
     def frozenset_leaves(self):
         if self._frozenset_leaves == None:
             if self.interner:
@@ -1201,27 +1236,6 @@ class Tree:
 
     ###############################################################################################
 
-    def build_remotechildren_dict(self):
-        """Constructs dict of all {parent:{remotechildren}} pairs in efficient manner.
-        This dict can then be used directly or by remote_children() to speed up enquiries."""
-
-        remdict = self.remotechildren_dict = {}
-        for parent in self.sorted_intnodes(deepfirst=False):
-            remdict[parent] = set()
-            kidstack = list(self.child_dict[parent])
-            while kidstack:
-                curnode = kidstack.pop()
-                if curnode in self.leaves:
-                    remdict[parent].add(curnode)
-                elif curnode in remdict:
-                    remdict[parent].update(remdict[curnode])
-                else:
-                    kidstack.extend(self.child_dict[curnode])
-        for node in self.leaves:
-            remdict[node] = {node}
-
-    ###############################################################################################
-
     # @functools.lru_cache(maxsize=None)
     def remote_children(self, parent):
         """Returns set containing all leaves that are descendants of parent"""
@@ -1412,8 +1426,8 @@ class Tree:
 
         min_numkids = len(self.leaves)
         mrca = self.root
-        for node in self.sorted_intnodes(deepfirst=False):
-            remkids = self.remote_children(node)
+        for node in self.sorted_intnodes(deepfirst=True):
+            remkids = self.remotechildren_dict[node]
             if remkids == leafset:
                 mrca = node
                 break
@@ -2013,7 +2027,6 @@ class Tree:
         # DEBUG 2: interning in global dict does help with toposummary, but may cause problems
         # because there is a reference to all bipartitions regardless of what happens to them
         # which means they cant be garbage collected.
-        self.build_remotechildren_dict()
         for child, child_remkids in self.remotechildren_dict.items():
             if child != self.root:
                 parent = self.parent(child)
@@ -2063,7 +2076,7 @@ class Tree:
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
-            self.remotechildren_dict = None
+            self._remotechildren_dict = None
 
         return bipartition_dict
 
@@ -2132,7 +2145,7 @@ class Tree:
                 movelist.append(child)
                 moveable_descendants.append(child)
             else:
-                remkids = self.remote_children(child)
+                remkids = self.remotechildren_dict[child]
                 if remkids <= active_bip:
                     movelist.append(child)
                     moveable_descendants.extend(remkids)
@@ -2610,7 +2623,7 @@ class Tree:
             for child in self.children(insertpoint):
                 if child in active_bip:
                     movelist.append(child)
-                elif (child not in self.leaves) and (self.remote_children(child) <= active_bip):
+                elif (child not in self.leaves) and (self.remotechildren_dict[child] <= active_bip):
                     movelist.append(child)
 
             # Add branch at determined position
@@ -2619,6 +2632,7 @@ class Tree:
         # Clear lru_caches (which cannot be edited manually)
         # self.remote_children.cache_clear()
         self.nodedist.cache_clear()
+        self._remotechildren_dict = None
 
     ###############################################################################################
 
@@ -3960,7 +3974,7 @@ class TreeSummary():
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
-
+                    contree._remotechildren_dict = None
         return contree
 
     ###############################################################################################
