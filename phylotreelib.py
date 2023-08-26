@@ -1035,6 +1035,22 @@ class Tree:
 
     ###############################################################################################
 
+    def clear_caches(self):
+        self._parent_dict = None            # Property with lazy evaluation
+        self._remotechildren_dict = None    # Property with lazy evaluation
+        self._frozenset_leaves = None       # Property with lazy evaluation
+        self._sorted_leaf_list = None       # Property with lazy evaluation
+        self._leaf2index = None             # Property with lazy evaluation
+        self.dist_dict = None
+        self.path_dict = None
+        self._remotechildren_dict = None     # Python note: Change to property?
+        self.interner = None
+        self._sorted_intnodes_deep = None
+        self._sorted_intnodes_shallow = None
+        self.nodedist.cache_clear()
+
+    ###############################################################################################
+
     def copy_treeobject(self, copylengths=True, copylabels=True, interner=None):
         """Returns copy of Tree object. Copies structure and branch lengths.
         Caches and any user-added attributes are not copied.
@@ -1853,8 +1869,7 @@ class Tree:
 
         # Clear lru_caches (which cannot be edited manually)
         # self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
-        self._parent_dict = None   # python note: Could just add entry...
+        self.clear_caches()
 
     ###############################################################################################
 
@@ -2438,9 +2453,7 @@ class Tree:
             self.remove_branch(graftpoint, other.root)
 
         # Reset caches and lists
-        self._parent_dict = None
-        self.nodedist.cache_clear()
-
+        self.clear_caches()
 
     ###############################################################################################
 
@@ -2583,9 +2596,7 @@ class Tree:
         self.intnodes.add(newnode)
         self.nodes.add(newnode)
 
-        # Clear lru_caches (which cannot be edited manually)
-        # self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
+        self.clear_caches()
 
         return newnode
 
@@ -2641,9 +2652,8 @@ class Tree:
 
         # Clear lru_caches (which cannot be edited manually)
         # self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
-        self._remotechildren_dict = None
-
+        self.clear_caches()
+        
     ###############################################################################################
 
     def remove_branch(self, node1, node2):
@@ -2686,10 +2696,8 @@ class Tree:
         for grandchild in grandchildren:
             self._parent_dict[grandchild] = parent
 
-        # Clear lru_caches (which cannot be edited manually)
-        # self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
-
+        self.clear_caches()
+        
     ###############################################################################################
 
     def remove_leaves(self, leaflist):
@@ -2748,10 +2756,8 @@ class Tree:
         self.leaves.remove(leaf)
         self.nodes.remove(leaf)
 
-        # Clear lru_caches (which cannot be edited manually)
-        # self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
-
+        self.clear_caches()
+        
     ###############################################################################################
 
     def add_leaf(self, parent, newleafname, branchstruct):
@@ -2765,13 +2771,8 @@ class Tree:
         self.nodes.add(newleafname)
         self.leaves.add(newleafname)
 
-        # Clear lru_caches (which cannot be edited manually)
-        # python note: i think there are more caches and properties that should be fixed...
-        # self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
-        if self._parent_dict != None:
-            self._parent_dict = None   # python note: Could just add entry...
-
+        self.clear_caches()
+        
     ###############################################################################################
 
     def collapse_clade(self, leaflist, newname="clade"):
@@ -3023,10 +3024,8 @@ class Tree:
         #     self.parent_dict[newname] = self.parent_dict[oldname]
         #     del self.parent_dict[oldname]
 
-        # Clear lru_caches (which cannot be edited manually)
-        # self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
-
+        self.clear_caches()
+        
     ###############################################################################################
 
     def rename_intnode(self, oldnum, newnum):
@@ -3067,10 +3066,8 @@ class Tree:
         # for child in kidlist:
         #     self.parent_dict[child] = newnum
 
-        # Clear lru_caches (which cannot be edited manually)
-        # self.remote_children.()
-        self.nodedist.cache_clear()
-
+        self.clear_caches()
+        
     ###############################################################################################
 
     def treedist_RF(self, other, normalise=False, rooted=False, return_details=False):
@@ -3275,11 +3272,8 @@ class Tree:
 
             # update intnodelist and delete caches, which are now unreliable
             self.intnodes = set(self.child_dict.keys())
-            #self.remote_children.cache_clear()
-            self.nodedist.cache_clear()
-            self.dist_dict = None
-            self._parent_dict = None
-
+            self.clear_caches()
+            
     ###############################################################################################
 
     def reroot(self, node1, node2=None, polytomy=False, node1dist=0.0):
@@ -3337,12 +3331,8 @@ class Tree:
             del self.child_dict[oldparent][newparent]
             # self.parent_dict[oldparent] = newparent
 
-        # Clean up: clear caches, which are now unreliable
-        # Python note: replace with lazy evaluation, using @property?
-        #self.remote_children.cache_clear()
-        self.nodedist.cache_clear()
-        self._parent_dict = None
-
+        self.clear_caches()
+        
         # Update root info:
         self.root = newroot
 
