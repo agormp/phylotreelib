@@ -2280,6 +2280,8 @@ class Tree:
         branch = self.child_dict[node1][node2]
         setattr(branch, attrname, attrvalue)
 
+        self.clear_caches()    # Python note: only lengthrelated caches actually - refactor
+
     ###############################################################################################
 
     def setlength(self, node1, node2, length):
@@ -2298,6 +2300,8 @@ class Tree:
             raise TreeError(msg)
 
         self.child_dict[parent][child].length = length
+
+        self.clear_caches()    # Python note: only lengthrelated caches actually - refactor
 
     ###############################################################################################
 
@@ -2389,6 +2393,8 @@ class Tree:
                     other.leaves.update(leaf_kids)
                 curlevel = nextlevel
             other.nodes = other.leaves | other.intnodes
+
+        self.clear_caches()
 
         # Python note: possibly bad idea to have different possible returnvalues.
         # Simplify and deal with it at consumer end
@@ -2811,6 +2817,8 @@ class Tree:
             self.rename_leaf(leaflist[0], newname)
             self.setlength(mrca_parent, newname, avdist)
 
+        self.clear_caches()
+
     ###############################################################################################
 
     def nameprune(self, sep="_", keep_pattern=None):
@@ -2904,6 +2912,8 @@ class Tree:
                 keep_leaf = self.find_central_leaf(list(cluster))
             keepset.add(keep_leaf)
 
+        self.clear_caches()
+
         # If requested: return selected leaves without pruning tree
         if return_leaves:
             return keepset
@@ -2970,6 +2980,8 @@ class Tree:
                 for child2 in otherkids:
                     if (parent, child2) not in used_branches:
                         possible_branches.add( (parent, child2) )
+
+        self.clear_caches()
 
         # If requested: return selected leaves without pruning tree
         # Otherwise: prune tree so only leaves in keepset are retained
