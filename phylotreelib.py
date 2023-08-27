@@ -575,7 +575,7 @@ class Tree:
                 for child in obj.children(insertpoint):
                     if child in active_bip:
                         moveset.append(child)
-                    elif (child not in obj.leaves) and (obj.remote_children(child) <= active_bip):
+                    elif (child not in obj.leaves) and (obj.remotechildren_dict[child] <= active_bip):
                         moveset.append(child)
 
                 # Construct new internal node (and therefore branch), transfer Branchstruct
@@ -589,9 +589,8 @@ class Tree:
                     obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
                     del obj.child_dict[insertpoint][child]
 
-                # reset remchild_dict which is now obsolete
-                # Python note: check if it really is beneficial to use property here (alternative: use method)
-                obj._remotechildren_dict = None
+                # reset obj caches which are now obsolete
+                obj.clear_caches()
 
         obj.nodes = set(obj.leaves | obj.intnodes)
         obj.interner = interner
@@ -1166,6 +1165,10 @@ class Tree:
         # "intnodes" is a set, meaning iteration occurs in no defined order.
         # This function returns a list sorted such that deep nodes generally go before
         # shallow nodes (deepfirst=False reverses this)
+        if deepfirst and self._sorted_intnodes_deep:
+            return self._sorted_intnodes_deep
+        if not deepfirst and self._sorted_intnodes_shallow:
+            return self._sorted_intnodes_shallow
 
         # Add nodes one tree-level at a time.
         # First root, then children of root, then children of those, etc
@@ -1181,8 +1184,10 @@ class Tree:
 
             curlevel = nextlevel
 
+        self._sorted_intnodes_deep = sorted_nodes.copy()
         if not deepfirst:
             sorted_nodes.reverse()
+            self._sorted_intnodes_shallow = sorted_nodes.copy()
 
         return sorted_nodes
 
@@ -2653,7 +2658,7 @@ class Tree:
         # Clear lru_caches (which cannot be edited manually)
         # self.remote_children.cache_clear()
         self.clear_caches()
-        
+
     ###############################################################################################
 
     def remove_branch(self, node1, node2):
@@ -2697,7 +2702,7 @@ class Tree:
             self._parent_dict[grandchild] = parent
 
         self.clear_caches()
-        
+
     ###############################################################################################
 
     def remove_leaves(self, leaflist):
@@ -2757,7 +2762,7 @@ class Tree:
         self.nodes.remove(leaf)
 
         self.clear_caches()
-        
+
     ###############################################################################################
 
     def add_leaf(self, parent, newleafname, branchstruct):
@@ -2772,7 +2777,7 @@ class Tree:
         self.leaves.add(newleafname)
 
         self.clear_caches()
-        
+
     ###############################################################################################
 
     def collapse_clade(self, leaflist, newname="clade"):
@@ -3025,7 +3030,7 @@ class Tree:
         #     del self.parent_dict[oldname]
 
         self.clear_caches()
-        
+
     ###############################################################################################
 
     def rename_intnode(self, oldnum, newnum):
@@ -3067,7 +3072,7 @@ class Tree:
         #     self.parent_dict[child] = newnum
 
         self.clear_caches()
-        
+
     ###############################################################################################
 
     def treedist_RF(self, other, normalise=False, rooted=False, return_details=False):
@@ -3273,7 +3278,7 @@ class Tree:
             # update intnodelist and delete caches, which are now unreliable
             self.intnodes = set(self.child_dict.keys())
             self.clear_caches()
-            
+
     ###############################################################################################
 
     def reroot(self, node1, node2=None, polytomy=False, node1dist=0.0):
@@ -3332,7 +3337,7 @@ class Tree:
             # self.parent_dict[oldparent] = newparent
 
         self.clear_caches()
-        
+
         # Update root info:
         self.root = newroot
 
