@@ -639,20 +639,22 @@ class Tree:
 
             # If bipartition represents internal branch: add branch to tree
             if len(bip1) > 1 and len(bip2) > 1:
-                mrca1 = obj.find_mrca(bip1)
-                mrca2 = obj.find_mrca(bip2)
+                if len(bip1) > len(bip2):
+                    bip1,bip2 = bip2,bip1
 
                 # Determine which group of leaves to move
                 # Note: one part of bipartition will necessarily have root as its MRCA
                 # since the members are present on both sides of root. It is the other part of
                 # the bipartition (where all members are on same side of root) that should be moved
                 # For a star-tree the resolution will be random (both have root as their MRCA)
-                if mrca1 == 0:                  # If mrca is root, move other group
-                    insertpoint = mrca2
-                    active_bip = bip2
-                else:
+                mrca1 = obj.find_mrca(bip1)
+                if mrca1 != 0:
                     insertpoint = mrca1
                     active_bip = bip1
+                else:
+                    mrca2 = obj.find_mrca(bip2)
+                    insertpoint = mrca2
+                    active_bip = bip2
 
                 # Determine which of insertpoints children to move, namely all children
                 # that are either in the active bipartition OR children whose descendants are
@@ -660,7 +662,7 @@ class Tree:
                 for child in obj.children(insertpoint):
                     if child in active_bip:
                         moveset.append(child)
-                    elif (child not in obj.leaves) and (obj.remote_children(child) <= active_bip):
+                    elif (child not in obj.leaves) and (obj.remotechildren_dict[child] <= active_bip):
                         moveset.append(child)
 
                 # Construct new internal node (and therefore branch)
@@ -673,6 +675,9 @@ class Tree:
                 for child in moveset:
                     obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
                     del obj.child_dict[insertpoint][child]
+
+            # Reset obj caches which are now obsolete
+            obj.clear_caches()
 
         obj.nodes = set(obj.leaves | obj.intnodes)
 
