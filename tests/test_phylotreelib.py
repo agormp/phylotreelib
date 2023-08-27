@@ -530,24 +530,14 @@ class TreeOutput(TreeTestBase):
         # Generate a random tree, create 10 variants using random spr, compute consensus tree
         # This function only checks that nexus string can be parsed, not that contree is correct
         treesummary = pt.TreeSummary()
-        rand_tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
         for i in range(10):
-            tree = rand_tree.copy_treeobject()
-            most_distant, maxdist = tree.find_most_distant(tree.root, tree.leaves)
-            parent = tree.parent(most_distant)
-            grandparent = tree.parent(parent)
-            subtree_leaves = tree.remote_children(grandparent)
-            rest_leaves = tree.leaves - subtree_leaves
-            try:
-                regraft_node = random.choice(list(rest_leaves))
-            except:
-                print(rest_leaves)
-            tree.spr(grandparent, regraft_node)
+            tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
             treesummary.add_tree(tree)
         contree = treesummary.contree()
         nexus_string = contree.nexus(print_leaflabels=False)
         nexusfile = pt.Nexustreefile(filecontent=nexus_string)
         mytree = next(nexusfile)
+        self.assertEqual(contree,mytree)
 
 ########################################################################################
 ########################################################################################
