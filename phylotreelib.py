@@ -1444,31 +1444,19 @@ class Tree:
 
         leafset = set(leaves)
         if not leafset <= self.leaves:
-            # Construct string listing all entries in leafset (for error message)
-            stringlist = []
-            for leaf in leafset:
-                stringlist.append(str(leaf))
-                stringlist.append(", ")
-            leafstring = "".join(stringlist)
-            leafstring = leafstring[:-2]    # Remove trailing comma and blank
-
+            leafstring = ", ".join(map(str, leafset))
             msg = "Some nodes in set are not part of tree: %s" % leafstring
             raise TreeError(msg)
 
-        min_numkids = len(self.leaves)
-        mrca = self.root
-        for node in self.sorted_intnodes(deepfirst=True):
-            remkids = self.remotechildren_dict[node]
-            if remkids == leafset:
-                mrca = node
-                break
-            elif leafset <= remkids:
-                numkids = len(remkids)
-                if numkids < min_numkids:
-                    mrca = node
-                    min_numkids = numkids
+        # pick random starting node among leafset, and find its parent node
+        random_leaf = next(iter(leafset))
+        parent = self.parent(random_leaf)
 
-        return mrca
+        # Walk down the tree from the initially picked node, until remkids include all of "leafset"
+        while not leafset <= self.remotechildren_dict[parent]:
+            parent = self.parent(parent)
+
+        return parent
 
     ###############################################################################################
 
