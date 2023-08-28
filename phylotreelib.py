@@ -1439,24 +1439,6 @@ class Tree:
 
     ###############################################################################################
 
-    def find_lca(self, node1, node2):
-        """Find lowest common ancestor (LCA) for two nodes (nodes can be leaf or internal)"""
-
-        # Naive method: find path back to root for node1,
-        # then find path back from node2 to node1 path - intersection is LCA
-        node1ancs = {node1}
-        curnode = node1
-        while curnode != self.root:
-            curnode = self.parent(curnode)
-            node1ancs.add(curnode)
-        curnode = node2
-        while curnode not in node1ancs:
-            curnode = self.parent(curnode)
-
-        return curnode
-
-    ###############################################################################################
-
     def find_mrca(self, leaves):
         """Finds Most Recent Common Ancestor for the provided set of leaves"""
 
@@ -2155,6 +2137,18 @@ class Tree:
             is_present = False
             is_compatible = True
             insert_tuple = (self.root, bip1)
+            return is_present, is_compatible, insert_tuple
+
+        # Special case where bipartition corresponds to leaf branch: always compatible
+        if len(bip1) == 1 or len(bip2) == 1:
+            if len(bip1) == 1:
+                leaf = next(iter(bip1))
+            else:
+                leaf = next(iter(bip2))
+            parent = self.parent(leaf)
+            is_present = True
+            is_compatible = True
+            insert_tuple = (parent, leaf)
             return is_present, is_compatible, insert_tuple
 
         # In all other cases: at least one part of bipartition will necessarily have root as its MRCA
