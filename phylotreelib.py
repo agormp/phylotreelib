@@ -1439,6 +1439,24 @@ class Tree:
 
     ###############################################################################################
 
+    def find_lca(self, node1, node2):
+        """Find lowest common ancestor (LCA) for two nodes (nodes can be leaf or internal)"""
+
+        # Naive method: find path back to root for node1,
+        # then find path back from node2 to node1 path - intersection is LCA
+        node1ancs = {node1}
+        curnode = node1
+        while curnode != self.root:
+            curnode = self.parent(curnode)
+            node1ancs.add(curnode)
+        curnode = node2
+        while curnode not in node1ancs:
+            curnode = self.parent(curnode)
+
+        return curnode
+
+    ###############################################################################################
+
     def find_mrca(self, leaves):
         """Finds Most Recent Common Ancestor for the provided set of leaves"""
 
