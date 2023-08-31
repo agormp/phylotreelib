@@ -1223,6 +1223,15 @@ class Tree:
 
     ###############################################################################################
 
+    def n_branches(self):
+        """Returns the number of branches in tree"""
+        nbr = 0
+        for node in self.intnodes:
+            nbr += len(self.child_dict[node])
+        return nbr
+
+    ###############################################################################################
+
     def leaflist(self):
         """Returns list of leaf names sorted alphabetically"""
 
