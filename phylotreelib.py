@@ -4206,6 +4206,15 @@ class TreefileBase():
         treestring = "".join([stringparts[0], ";"])
         self.buffer = "".join(stringparts[1:])
 
+        # Finally: check if there is information below the root node,
+        # i.e., between last right parenthesis and the semicolon.
+        # If so then save as self.below_root
+        # Python note: can possibly be done smarter. And what should happen with below root part?
+        last_right_paren = treestring.rfind(')')
+        if last_right_paren != -1:
+            self.below_root = treestring[last_right_paren + 1:-1]
+            if self.below_root:
+                treestring = treestring[:last_right_paren + 1] + ";"
         return treestring
 
     ###############################################################################################
