@@ -2048,11 +2048,8 @@ class Tree:
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
         # Other part is then found as diff between all leaves and bipart1
-
-        # DEBUG: I think root should be removed from sortedintnodes (dealt with separately below)
-        # DEBUG 2: interning in global dict does help with toposummary, but may cause problems
-        # because there is a reference to all bipartitions regardless of what happens to them
-        # which means they cant be garbage collected.
+        # Note: if root has two kids, then the root bipartition is added twice
+        # This will be dealt with below
         for child, child_remkids in self.remotechildren_dict.items():
             if child != self.root:
                 parent = self.parent(child)
@@ -2065,29 +2062,22 @@ class Tree:
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, compare labels)
-        root = self.root
-        rootkids = self.children(root)
-
+        rootkids = self.children(self.root)
         if len(rootkids) == 2:
-
-            # First: find out what bipartition root is involved in.
             kid1, kid2 = rootkids
             bipart1 = frozenset(self.remotechildren_dict[kid1])
-            bipartition = Bipartition(bipart1, self.frozenset_leaves,
+            rootbip = Bipartition(bipart1, self.frozenset_leaves,
                                       self.sorted_leaf_list, self.leaf2index)
             if self.interner:
-                bipartition = self.interner.intern(bipartition)
+                rootbip = self.interner.intern(rootbip)
 
-            # Create new branch
-            bipartition_dict[bipartition] = Branchstruct(self.child_dict[root][kid1].length,
-                                                         self.child_dict[root][kid1].label)
-
-            # Now, add distance to other kid
-            bipartition_dict[bipartition].length += self.child_dict[root][kid2].length
+            # Sum distances from both kids
+            bipartition_dict[rootbip].length = (self.child_dict[self.root][kid1].length +
+                                                self.child_dict[self.root][kid2].length)
 
             # Deal with labels intelligently
-            lab1 = self.child_dict[root][kid1].label
-            lab2 = self.child_dict[root][kid2].label
+            lab1 = self.child_dict[self.root][kid1].label
+            lab2 = self.child_dict[self.root][kid2].label
 
             # If only one label is set use  that.
             if (lab1 is not None) and (lab2 is None):
@@ -2098,7 +2088,7 @@ class Tree:
             else:
                 lab = lab1
 
-            bipartition_dict[bipartition].label = lab
+            bipartition_dict[rootbip].label = lab
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
