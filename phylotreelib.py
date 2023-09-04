@@ -2044,7 +2044,6 @@ class Tree:
         # The entire tree is represented as a dictionary where the keys are bipartitions
         # The values are Branchstructs
         bipartition_dict = {}
-        leaves = frozenset(self.leaves)
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
