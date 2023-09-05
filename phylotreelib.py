@@ -3798,7 +3798,7 @@ class TreeSet():
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
-    def __init__(self):
+    def __init__(self, trackroot=False):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -3807,6 +3807,11 @@ class TreeSummary():
         self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
         self._sorted_biplist = None
+        self.trackroot = trackroot
+        if trackroot:
+            self._rootbip_summary = {}
+        else:
+            self._rootbip_summary = None
 
     ###############################################################################################
 
@@ -3892,7 +3897,7 @@ class TreeSummary():
             self.transdict = curtree.transdict()
             self.translateblock = curtree.translateblock(self.transdict)
         elif curtree.leaves != self.leaves:
-            msg = "Leaves on tree number {} are different than previous trees".format(self.tree_count)
+            msg = f"Leaves on tree number {self.tree_count} are different than previous trees"
             raise TreeError(msg)
 
         self.tree_count += 1
@@ -3930,6 +3935,16 @@ class TreeSummary():
                 self._bipartsummary[bipart].SUMW = weight
                 self._bipartsummary[bipart].length = brlen
                 self._bipartsummary[bipart].T = 0.0
+
+        # If requested: keep track of where root is attached
+        if self.trackroot:
+            rootbips = curtree.rootbips()
+            for rootbip in rootbips:
+                if rootbip in self._rootbip_summary:
+                    self._rootbip_summary[rootbip].count += 1
+                else:
+                    self._rootbip_summary[rootbip] = Branchstruct()
+                    self._rootbip_summary[rootbip].count = 1
 
         return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
 
@@ -3973,6 +3988,16 @@ class TreeSummary():
             # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
             else:
                 self_bipsum[bipart] = other_bipsum[bipart]
+
+        # Merge ._rootbip_summaries if present
+        if self.trackroot:
+            other_rootbipsum = other._rootbip_summary
+            self_rootbipsum = self._rootbip_summary
+            for rootbip in other_rootbipsum:
+                if rootbip in self_rootbipsum:
+                    self_rootbipsum[rootbip].count += other_rootbipsum[rootbip].count
+                else:
+                    self_rootbipsum[rootbip].count = other_rootbipsum[rootbip].count
 
         self._bipartsummary_processed = False
         self._sorted_biplist = None
@@ -4064,8 +4089,8 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, store_trees=False):
-        TreeSummary.__init__(self)
+    def __init__(self, store_trees=False, trackroot=False):
+        TreeSummary.__init__(self, trackroot)
         self._toposummary = {}
         self._toposummary_processed = False
         self.store_trees = store_trees
