@@ -2068,9 +2068,8 @@ class Tree:
                                           self.sorted_leaf_list, self.leaf2index)
                 if self.interner:
                     bipartition = self.interner.intern(bipartition)
-                # Python note: Branchstruct from original tree is also in bipdict now
-                # can this cause problems when setting attributes on either?
-                bipartition_dict[bipartition] = self.child_dict[parent][child]
+                origbranch = self.child_dict[parent][child]
+                bipartition_dict[bipartition] = origbranch.copy()
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, compare labels)
