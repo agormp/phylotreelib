@@ -4047,37 +4047,8 @@ class TreeSummary():
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
                     contree._remotechildren_dict = None
+
         return contree
-
-    ###############################################################################################
-
-    def max_clade_cred_tree(self, filelist, skiplist=None, labeldigits=3):
-        """Find and return maximum clade credibility tree.
-        Note: this version based on external treefile (and bipartsummary).
-        Skiplist possibly contains number of trees to skip in each file (burnin)"""
-
-        maxlogcred = -math.inf
-        for i,fname in enumerate(filelist):
-            with Treefile(fname) as tf:
-                if skiplist:
-                    for j in range(skiplist[i]):
-                        tf.readtree(returntree=False)
-                for tree in tf:
-                    topology = tree.topology()
-                    logcred = self.log_clade_credibility(topology)
-                    if logcred > maxlogcred:
-                        maxlogcred = logcred
-                        maxlogcredtopo = topology
-
-        maxcredbipdict = {}
-        for bipartition in maxlogcredtopo:
-            branch = self.bipartsummary[bipartition]
-            branch.label = f"{round(branch.freq, labeldigits)}"
-            maxcredbipdict[bipartition] = branch
-
-        # Build tree from bipartitions  in new bipdict
-        maxcredtree = Tree.from_biplist(maxcredbipdict)
-        return maxcredtree, maxlogcred
 
 ###################################################################################################
 ###################################################################################################
