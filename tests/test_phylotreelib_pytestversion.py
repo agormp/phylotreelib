@@ -64,14 +64,11 @@ class Test_copy_Branchstruct:
         b1 = pt.Branchstruct(length=mylength, label=mylabel)
         b1.myatt1 = "howdy"
         b1.myatt2 = 0.34984
-        b1.myatt3 =  {1:1, 2:4, 3:9}
         b2 = b1.copy()
         assert b1.length == b2.length
         assert b1.label == b2.label
         assert b1.myatt1 == b2.myatt1
         assert b1.myatt2 == b2.myatt2
-        assert b1.myatt3 == b2.myatt3
-        assert b1.myatt3 is not b2.myatt3  # Deepcopy
 
 ###################################################################################################
 ###################################################################################################

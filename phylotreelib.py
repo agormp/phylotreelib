@@ -143,12 +143,10 @@ class Branchstruct:
     def copy(self):
         """Returns copy of Branchstruct object, with all attributes included"""
 
-        # Python note: deepcopy may be overkill and possibly costly.
-        # Maybe only copy blen and lab?
-
+        # Python note: maybe only copy length and label?
         obj = Branchstruct()
         for attrname, value in vars(self).items():
-            setattr(obj, attrname, copy.deepcopy(value))
+            setattr(obj, attrname, value)
         return obj
 
 ###################################################################################################
@@ -1073,7 +1071,6 @@ class Tree:
         Caches and any user-added attributes are not copied.
         Similar to effect of copy.deepcopy but customized and much faster"""
 
-        # Python note: reconsider copying attributes besides blen and lab?
         obj = Tree()
         obj.root = self.root
         obj.leaves = self.leaves.copy()
