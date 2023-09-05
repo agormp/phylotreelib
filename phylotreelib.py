@@ -2119,6 +2119,24 @@ class Tree:
 
     ###############################################################################################
 
+    def rootbips(self):
+        """Returns list of bipartition(s) associated with root.
+        If root is at bifurcation: returns list of single Bipartition
+        If root is at multifurcation: returns list of nkids Bipartitions"""
+        rootbip_list = []
+        rootkids = self.children(self.root)
+        if len(rootkids) == 2:
+            rootkids = [next(iter(rootkids))]  # only use one of the kids
+
+        for rootkid in rootkids:
+            bipart1 = self.remote_children(rootkid)
+            rootbip = Bipartition(bipart1, self.frozenset_leaves, self.sorted_leaf_list, self.leaf2index)
+            rootbip_list.append(rootbip)
+
+        return rootbip_list
+
+    ###############################################################################################
+
     def check_bip_compatibility(self, bipart):
         """Checks the compatibility between bipartition and tree.
         Returns tuple of: is_present, is_compatible, insert_tuple
