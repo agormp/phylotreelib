@@ -226,7 +226,8 @@ class Bipartition:
 
     def __str__(self):
         bip1,bip2 = self.get_bipartitions()
-        return f"\n{str(bip1)}\n{str(bip2)}\n"
+        if len(bip1) < len(bip2):
+            return f"\n{str(bip1)}\n"
 
     def __repr__(self):
         return self.__str__()
@@ -1465,6 +1466,10 @@ class Tree:
             msg = "Some nodes in set are not part of tree: %s" % leafstring
             raise TreeError(msg)
 
+        # special case: leaf is its own mrca (will this always work?)
+        if len(leafset) == 1:
+            return next(iter(leafset))
+
         # pick random starting node among leafset, and find its parent node
         random_leaf = next(iter(leafset))
         parent = self.parent(random_leaf)
@@ -1597,6 +1602,23 @@ class Tree:
 
         msg = f"The following is not a monophyletic group in this tree:\n{leafstring}"
         raise TreeError(msg)
+
+    ###############################################################################################
+
+    def find_bipart_nodes(self, bipartition):
+        """Given a Bipartition as input: return the two nodes on the current tree that delimit
+        the branch corresponding to the bipartition (if present in tree)"""
+
+        (bip1, bip2) = bipartition
+        mrca = self.find_mrca(bip1)
+        bip = bip1
+        if mrca == self.root:
+            mrca = self.find_mrca(bip2)
+            bip = bip2
+        if self.remotechildren_dict[mrca] != bip:
+            raise TreeError(f"Bipartition not present in tree: \n{bipartition}")
+
+        return (self.parent(mrca), mrca)
 
     ###############################################################################################
 
@@ -2120,20 +2142,25 @@ class Tree:
     ###############################################################################################
 
     def rootbips(self):
-        """Returns list of bipartition(s) associated with root.
-        If root is at bifurcation: returns list of single Bipartition
-        If root is at multifurcation: returns list of nkids Bipartitions"""
-        rootbip_list = []
-        rootkids = self.children(self.root)
-        if len(rootkids) == 2:
-            rootkids = [next(iter(rootkids))]  # only use one of the kids
+        """For a tree rooted at a bifurcation: returns a tuple giving the following information
+        about the bipartition on which the root is located:
+                (Bipartition, leafset1, blen1, leafset2, blen2)
+        where leafset1 and leafset2 are the two halves of the bipartition, and blen1 and blen2
+        are the lengths of the branches leading from the root to their two basal nodes"""
 
-        for rootkid in rootkids:
-            bipart1 = self.remote_children(rootkid)
-            rootbip = Bipartition(bipart1, self.frozenset_leaves, self.sorted_leaf_list, self.leaf2index)
-            rootbip_list.append(rootbip)
+        rootkids = list(self.children(self.root))
+        if len(rootkids) > 2:
+            msg = ("The rootbip method only works for trees rooted at bifurcations\n" +
+                    "The root of the current tree has {len(rootkids)} kids.")
+            raise TreeError(msg)
 
-        return rootbip_list
+        leafset1 = self.remote_children(rootkids[0])
+        leafset2 = self.remote_children(rootkids[1])
+        blen1 = self.nodedist(self.root, rootkids[0])
+        blen2 = self.nodedist(self.root, rootkids[1])
+        rootbip = Bipartition(leafset1, self.frozenset_leaves, self.sorted_leaf_list, self.leaf2index)
+
+        return rootbip, leafset1, blen1, leafset2, blen2
 
     ###############################################################################################
 
@@ -2233,6 +2260,14 @@ class Tree:
 
         is_present, is_compatible, insert_tuple = self.check_bip_compatibility(bipart)
         return is_compatible
+
+    ###############################################################################################
+
+    def bipart_is_present(self, bipart):
+        """Checks whether a given bipartition is present in tree"""
+
+        is_present, is_compatible, insert_tuple = self.check_bip_compatibility(bipart)
+        return is_present
 
     ###############################################################################################
 
@@ -3597,7 +3632,6 @@ class Tree:
             self.reroot(outbase, inbase, polytomy, outbasedist)
 
     ###############################################################################################
-
     def possible_spr_prune_nodes(self):
         """Utililty function when using spr function: where is it possible to prune"""
 
@@ -3795,6 +3829,44 @@ class TreeSet():
 ###################################################################################################
 ###################################################################################################
 
+class RootBipStruct:
+    def __init__(self, leafset1, blen1, leafset2, blen2):
+        combined_length = blen1 + blen2
+        self.count = 1
+        self.leafset1 = leafset1
+        self.fraction1 = blen1 / combined_length
+        self.leafset2 = leafset2
+        self.fraction2 = blen2 / combined_length
+
+    def add(self, leafset1, blen1, leafset2, blen2):
+        """Adds branch length fractions to the current sum and increments the count."""
+        # Make sure blen1 and blen2 refer to the correct leafsets
+        if leafset1 != self.leafset1:
+            blen2,blen1 = blen1,blen2
+        combined_length = blen1 + blen2
+        self.count += 1
+        self.fraction1 += blen1 / combined_length
+        self.fraction2 += blen2 / combined_length
+
+    def merge(self, other):
+        """Merges this RootBipStruct with another (for same bipartition)"""
+        blen1,blen2 = other.blen1,other.blen2
+        if other.leafset1 != self.leafset1:
+            blen2,blen1 = blen1,blen2
+        self.count += other.count
+        self.blen1 += blen1
+        self.blen2 += blen2
+
+    def avg_frac(self, leafset):
+        if leafset == self.leafset1:
+            return self.fraction1 / self.count
+        else:
+            return self.fraction2 / self.count
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
@@ -3808,6 +3880,7 @@ class TreeSummary():
         self._bipartsummary_processed = False
         self._sorted_biplist = None
         self.trackroot = trackroot
+        self._sorted_rootbips = None
         if trackroot:
             self._rootbip_summary = {}
         else:
@@ -3865,6 +3938,21 @@ class TreeSummary():
             self._sorted_biplist = leafbips + internalbips
 
         return self._sorted_biplist
+
+    ###############################################################################################
+
+    @property
+    def sorted_rootbips(self):
+        """Return list of root-bipartitions (branches where root has been seen), sorted by
+        occurrence (count on tree samples added to TreeSummary)"""
+
+        if self._sorted_rootbips == None:
+            self._sorted_rootbips = []
+            maxcount = 0
+            for bip,rootbipstruct in self._rootbip_summary.items():
+                self._sorted_rootbips.append((rootbipstruct.count, bip, rootbipstruct))
+            self._sorted_rootbips.sort(reverse=True)
+        return self._sorted_rootbips
 
     ###############################################################################################
 
@@ -3938,13 +4026,11 @@ class TreeSummary():
 
         # If requested: keep track of where root is attached
         if self.trackroot:
-            rootbips = curtree.rootbips()
-            for rootbip in rootbips:
-                if rootbip in self._rootbip_summary:
-                    self._rootbip_summary[rootbip].count += 1
-                else:
-                    self._rootbip_summary[rootbip] = Branchstruct()
-                    self._rootbip_summary[rootbip].count = 1
+            bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbips()
+            if bipartition in self._rootbip_summary:
+                self._rootbip_summary[bipartition].add(leafset1, blen1, leafset2, blen2)
+            else:
+                self._rootbip_summary[bipartition] = RootBipStruct(leafset1, blen1, leafset2, blen2)
 
         return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
 
@@ -3995,9 +4081,9 @@ class TreeSummary():
             self_rootbipsum = self._rootbip_summary
             for rootbip in other_rootbipsum:
                 if rootbip in self_rootbipsum:
-                    self_rootbipsum[rootbip].count += other_rootbipsum[rootbip].count
+                    self_rootbipsum[rootbip].merge(other_rootbipsum[rootbip])
                 else:
-                    self_rootbipsum[rootbip].count = other_rootbipsum[rootbip].count
+                    self_rootbipsum[rootbip] = other_rootbipsum[rootbip]
 
         self._bipartsummary_processed = False
         self._sorted_biplist = None
@@ -4015,8 +4101,13 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def contree(self, cutoff=0.5, allcompat=False, labeldigits=3):
-        """Returns a consensus tree built from selected bipartitions"""
+    def contree(self, cutoff=0.5, allcompat=False, labeldigits=3, use_root_info=True):
+        """Returns a consensus tree built from selected bipartitions.
+
+        use_root_info: Use rooting info (frequencies of different rooting locations in input
+        if trackroot is set for TreeSummary.
+        If trackroot=False: ignore value of this parameter.
+        """
 
         if cutoff < 0.5:
             msg = "Consensus tree cutoff has to be at least 0.5"
@@ -4047,6 +4138,20 @@ class TreeSummary():
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
                     contree._remotechildren_dict = None
+
+        if use_root_info and self.trackroot:
+            for count, bip, rootbipstruct in self.sorted_rootbips:
+                if contree.bipart_is_present(bip):
+                    parent,child = contree.find_bipart_nodes(bip)
+                    print(f"parent,child: {parent,child}") #DEBUG
+                    biplen = contree.nodedist(parent,child)
+                    print(f"biplen: {biplen}") #DEBUG
+                    child_remkids = contree.remotechildren_dict[child]
+                    dist_to_child = biplen * rootbipstruct.avg_frac(child_remkids)
+                    contree.reroot(child, parent, node1dist=dist_to_child)
+                    return contree
+            # If we did not return by now, then bipart not in contree
+            raise TreeError(f"Consensus tree not compatible with any observed root locations")
 
         return contree
 
@@ -4122,7 +4227,7 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def max_clade_cred_tree(self, labeldigits=3):
+    def max_clade_cred_tree(self, labeldigits=3, use_root_info=True):
         """Find and return maximum clade credibility tree"""
 
         maxlogcred = -math.inf
@@ -4140,6 +4245,21 @@ class BigTreeSummary(TreeSummary):
 
         # Build tree from bipartitions  in new bipdict
         maxcredtree = Tree.from_biplist(maxcredbipdict)
+
+        if use_root_info and self.trackroot:
+            for count, bip, rootbipstruct in self.sorted_rootbips:
+                if maxcredtree.bipart_is_present(bip):
+                    parent,child = maxcredtree.find_bipart_nodes(bip)
+                    print(f"parent,child: {parent,child}") #DEBUG
+                    biplen = maxcredtree.nodedist(parent,child)
+                    print(f"biplen: {biplen}") #DEBUG
+                    child_remkids = maxcredtree.remotechildren_dict[child]
+                    dist_to_child = biplen * rootbipstruct.avg_frac(child_remkids)
+                    maxcredtree.reroot(child, parent, node1dist=dist_to_child)
+                    return maxcredtree
+            # If we did not return by now, then bipart not in contree
+            raise TreeError(f"Consensus tree not compatible with any observed root locations")
+
         return maxcredtree, maxlogcred
 
 ###################################################################################################
