@@ -142,8 +142,6 @@ class Branchstruct:
 
     def copy(self):
         """Returns copy of Branchstruct object, with all attributes included"""
-
-        # Python note: maybe only copy length and label?
         obj = Branchstruct()
         for attrname, value in vars(self).items():
             setattr(obj, attrname, value)
@@ -2090,16 +2088,12 @@ class Tree:
             # Deal with labels intelligently
             lab1 = self.child_dict[self.root][kid1].label
             lab2 = self.child_dict[self.root][kid2].label
-
-            # If only one label is set use  that.
             if (lab1 is not None) and (lab2 is None):
                 lab = lab1
             elif (lab1 is None) and (lab2 is not None):
                 lab = lab2
-            # If both or none of the labels are set: pick label1 randomly
             else:
                 lab = lab1
-
             bipartition_dict[rootbip].label = lab
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
