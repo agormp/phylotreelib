@@ -1095,10 +1095,6 @@ class dist_tree_construction(TreeTestBase):
             inputtree = pt.Tree.from_string(self.njtreestringlist[i])
             dmat = pt.Distmatrix.from_distdict(self.njdmatlist[i])
             njtree = dmat.nj()
-            print(f"inputtree:\n {inputtree}") #DEBUG
-            print(f"inputtree topology:\n {inputtree.topology()}") #DEBUG
-            print(f"njtree:\n {njtree}") #DEBUG
-            print(f"njtree topology:\n {njtree.topology()}") #DEBUG
             self.assertEqual(njtree, inputtree)
         inputtree = pt.Tree.from_string(self.largephylip_njtree)
         dmat = pt.Distmatrix.from_distdict(self.large_distdict)
