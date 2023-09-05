@@ -132,6 +132,12 @@ class Branchstruct:
         self.length = length
         self.label = label
 
+    def __str__(self):
+        return f"{str(self.length)}\t´{self.label}´\n"
+
+    def __repr__(self):
+        return self.__str__()
+
     ###############################################################################################
 
     def copy(self):
@@ -221,6 +227,13 @@ class Bipartition:
         primary_set = frozenset({self.leaf_list[i] for i in self.indices})
         complement_set = frozenset(self.leaf_set) - primary_set
         return iter((primary_set, complement_set))
+
+    def __str__(self):
+        bip1,bip2 = self.get_bipartitions()
+        return f"\n{str(bip1)}\n{str(bip2)}\n"
+
+    def __repr__(self):
+        return self.__str__()
 
     def get_bipartitions(self):
         # Convert to sets before returning
@@ -2058,6 +2071,8 @@ class Tree:
                                           self.sorted_leaf_list, self.leaf2index)
                 if self.interner:
                     bipartition = self.interner.intern(bipartition)
+                # Python note: Branchstruct from original tree is also in bipdict now
+                # can this cause problems when setting attributes on either?
                 bipartition_dict[bipartition] = self.child_dict[parent][child]
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
@@ -2071,9 +2086,10 @@ class Tree:
             if self.interner:
                 rootbip = self.interner.intern(rootbip)
 
-            # Sum distances from both kids
-            bipartition_dict[rootbip].length = (self.child_dict[self.root][kid1].length +
+            # Create new collapsed branch, sum distances from both kids
+            combined_len = (self.child_dict[self.root][kid1].length +
                                                 self.child_dict[self.root][kid2].length)
+            bipartition_dict[rootbip] = Branchstruct(combined_len)
 
             # Deal with labels intelligently
             lab1 = self.child_dict[self.root][kid1].label
