@@ -4235,7 +4235,7 @@ class BigTreeSummary(TreeSummary):
     ###############################################################################################
 
     def max_clade_cred_tree(self, labeldigits=3, use_root_info=True):
-        """Find and return maximum clade credibility tree"""
+        """Find maximum clade credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
 
         maxlogcred = -math.inf
         for topology in self.toposummary:
