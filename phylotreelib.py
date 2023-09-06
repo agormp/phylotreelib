@@ -2151,7 +2151,7 @@ class Tree:
         rootkids = list(self.children(self.root))
         if len(rootkids) > 2:
             msg = ("The rootbip method only works for trees rooted at bifurcations\n" +
-                    "The root of the current tree has {len(rootkids)} kids.")
+                    f"The root of the current tree has {len(rootkids)} kids.")
             raise TreeError(msg)
 
         leafset1 = self.remote_children(rootkids[0])
