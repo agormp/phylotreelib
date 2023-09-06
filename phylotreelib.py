@@ -4140,20 +4140,27 @@ class TreeSummary():
                     contree._remotechildren_dict = None
 
         if use_root_info and self.trackroot:
-            for count, bip, rootbipstruct in self.sorted_rootbips:
-                if contree.bipart_is_present(bip):
-                    parent,child = contree.find_bipart_nodes(bip)
-                    print(f"parent,child: {parent,child}") #DEBUG
-                    biplen = contree.nodedist(parent,child)
-                    print(f"biplen: {biplen}") #DEBUG
-                    child_remkids = contree.remotechildren_dict[child]
-                    dist_to_child = biplen * rootbipstruct.avg_frac(child_remkids)
-                    contree.reroot(child, parent, node1dist=dist_to_child)
-                    return contree
-            # If we did not return by now, then bipart not in contree
-            raise TreeError(f"Consensus tree not compatible with any observed root locations")
+            contree = self.root_maxfreq(contree)
 
         return contree
+
+    ###############################################################################################
+
+    def root_maxfreq(self, summary_tree):
+        """Uses info about root bipartitions in TreeSummary to place root on summary tree"""
+
+        for count, bip, rootbipstruct in self.sorted_rootbips:
+            if summary_tree.bipart_is_present(bip):
+                parent,child = summary_tree.find_bipart_nodes(bip)
+                biplen = summary_tree.nodedist(parent,child)
+                child_remkids = summary_tree.remotechildren_dict[child]
+                dist_to_child = biplen * rootbipstruct.avg_frac(child_remkids)
+                summary_tree.reroot(child, parent, node1dist=dist_to_child)
+                summary_tree.rootcred = count / self.tree_count
+                return summary_tree
+
+        # If we did not return by now, then bipart not in contree
+        raise TreeError(f"Summary_tree tree not compatible with any observed root locations")
 
 ###################################################################################################
 ###################################################################################################
@@ -4247,25 +4254,13 @@ class BigTreeSummary(TreeSummary):
         maxcredtree = Tree.from_biplist(maxcredbipdict)
 
         if use_root_info and self.trackroot:
-            for count, bip, rootbipstruct in self.sorted_rootbips:
-                if maxcredtree.bipart_is_present(bip):
-                    parent,child = maxcredtree.find_bipart_nodes(bip)
-                    print(f"parent,child: {parent,child}") #DEBUG
-                    biplen = maxcredtree.nodedist(parent,child)
-                    print(f"biplen: {biplen}") #DEBUG
-                    child_remkids = maxcredtree.remotechildren_dict[child]
-                    dist_to_child = biplen * rootbipstruct.avg_frac(child_remkids)
-                    maxcredtree.reroot(child, parent, node1dist=dist_to_child)
-                    return maxcredtree
-            # If we did not return by now, then bipart not in contree
-            raise TreeError(f"Consensus tree not compatible with any observed root locations")
+            maxcredtree = self.root_maxfreq(maxcredtree)
 
         return maxcredtree, maxlogcred
 
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
-
 
 class TreefileBase():
     """Abstract base-class for representing tree file objects."""
