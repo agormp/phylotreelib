@@ -3850,12 +3850,12 @@ class RootBipStruct:
 
     def merge(self, other):
         """Merges this RootBipStruct with another (for same bipartition)"""
-        blen1,blen2 = other.blen1,other.blen2
+        fraction1, fraction2 = other.fraction1, other.fraction2
         if other.leafset1 != self.leafset1:
-            blen2,blen1 = blen1,blen2
+            fraction1, fraction2 = fraction2, fraction1
         self.count += other.count
-        self.blen1 += blen1
-        self.blen2 += blen2
+        self.fraction1 += fraction1
+        self.fraction2 += fraction2
 
     def avg_frac(self, leafset):
         if leafset == self.leafset1:
