@@ -273,7 +273,7 @@ tree = phylotreelib.Tree.from_leaves(leaflist)
 
 #### Constructing Tree object from lists of parent and child nodes corresponding to branches in tree
 
-The constructor Tree.from_branchinfo() constructs a tree from information about all individual branches in the tree. Specifically the input is a list of parent node IDs and a list of child node IDs (of the same length), such that each pairing of parentnode and  childnode corresponds to a branch in the tree. It is possible to add extra lists containing the corresponding branch lengths and branc labels. Using this constructor allows the specific naming of internal nodes (which are otherwise set automatically based on e.g. the order in which a newick string is parsed). **NOTE:** internal node IDs have to be integers, while leaf IDs have to be strings.
+The constructor Tree.from_branchinfo() constructs a tree from information about all individual branches in the tree. Specifically the input is a list of parent node IDs and a list of child node IDs (of the same length), such that each pairing of parentnode and  childnode corresponds to a branch in the tree. It is possible to add extra lists containing the corresponding branch lengths and branch labels. Using this constructor allows the specific naming of internal nodes (which are otherwise set automatically based on e.g. the order in which a newick string is parsed). **NOTE:** internal node IDs have to be integers, while leaf IDs have to be strings.
 
 ```
 parentlist = [100, 100, 101, 101, 102, 102]
