@@ -1422,6 +1422,28 @@ class Tree:
 
     ###############################################################################################
 
+    def rename_intnodes_to_match(self, other):
+        """Takes as input a tree (other) with the same topology as self, but with potentially
+        different internal nodeIDs. Renames the internal nodeIDs in other so they are the
+        same as those in self. Returns copy of other with new nodeIDs"""
+
+        # Create copy of other, and rename all intnodes so there wont be clashes during renaming
+        maxselfid = max(self.intnodes)
+        minnewid = maxselfid + 1
+        newtree = other.copy_treeobject()
+        for origid in list(other.intnodes):
+            newtree.rename_intnode(origid, origid+minnewid)
+
+        # Now rename
+        other2self, unmatched_root1, unmatched_root2 = newtree.match_nodes(self)
+        if unmatched_root1 or unmatched_root2:
+            raise TreeError("The two trees have different topology - can not match intnodes")
+        for intnode in list(newtree.intnodes):
+            newtree.rename_intnode(intnode, other2self[intnode])
+        return newtree
+
+    ###############################################################################################
+
     def nearleafs(self, leaf1, maxdist):
         """Returns set of leaves that are less than maxdist from leaf, measured along branches"""
 
@@ -3115,7 +3137,7 @@ class Tree:
             raise TreeError(msg)
 
         if newnum in self.intnodes:
-            msg = "There is already an internal node with the number {}".format(oldnum)
+            msg = f"There is already an internal node with the number {newnum}"
             raise TreeError(msg)
 
         # Make a note of original's parent and children
