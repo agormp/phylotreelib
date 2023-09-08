@@ -4358,7 +4358,10 @@ class TreeSummary():
     def set_mean_node_depths(self, summary_tree):
         """Set branch lengths on summary tree based on mean node depth for clades corresponding
         to parent and child nodes (blen = depth_parent - depth_child).
-        Note: only uses node depths from monopyletic clades (so some values may be set
+
+        NOTE 1: only meaningful if input trees are based on a clock model.
+        NOTE 2: summary_tree must first be rooted with root_max_freq (otherwise not possible)
+        NOTE 3: only uses node depths from monopyletic clades (so some values may be set
         based on very few trees)"""
 
         all_leaves = summary_tree.frozenset_leaves
