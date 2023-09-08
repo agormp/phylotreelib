@@ -150,6 +150,30 @@ class Branchstruct:
 ###################################################################################################
 ###################################################################################################
 
+class Nodestruct:
+    """Class that emulates a struct. Keeps node-related info"""
+
+    def __init__(self, depth=0.0):
+        self.depth = depth
+
+    def __str__(self):
+        return f"{str(self.depth)}\n"
+
+    def __repr__(self):
+        return self.__str__()
+
+    ###############################################################################################
+
+    def copy(self):
+        """Returns copy of Nodestruct object, with all attributes included"""
+        obj = Nodestruct()
+        for attrname, value in vars(self).items():
+            setattr(obj, attrname, value)
+        return obj
+
+###################################################################################################
+###################################################################################################
+
 class Topostruct:
     """Class that emulates a struct. Keeps topology-related info"""
 
@@ -237,6 +261,59 @@ class Bipartition:
         primary_set = frozenset({self.leaf_list[i] for i in self.indices})
         complement_set = frozenset(self.leaf_set) - primary_set
         return (primary_set, complement_set)
+
+###################################################################################################
+###################################################################################################
+
+class Clade:
+    """Class that represents a clade: the set of leaves descended from an internal node"""
+
+    __slots__ = ["all_leaves_set", "leaf_list", "leaf2index",
+                 'indices', '_hash_value']
+
+    def __init__(self, leafset, all_leaves_set, sorted_leaf_list, leaf2index):
+        """Initialise clade objects.
+
+        leafset: set of leaves descending from an internal node
+        all_leaves_set: set of all leaf names in tree
+        sorted_leaf_list: sorted list of all leaf names in tree
+        leaf2index: dict of {leaf:index in sorted_leaf_list}
+
+        Last 3 params will typically point to attributes in parent Tree object"""
+
+        self.all_leaves_set = all_leaves_set
+        self.leaf_list = sorted_leaf_list
+        self.leaf2index = leaf2index
+        leafset = frozenset(leafset)
+
+        self.indices = sorted([leaf2index[leaf] for leaf in leafset])
+        self._hash_value = hash(leafset)
+
+    def __hash__(self):
+        # Return the precomputed hash value
+        return self._hash_value
+
+    def __eq__(self, other):
+        # Python note: assumes hash collisions will never occur!
+        # Empirically this seems to be the case for realistic data, but is not guaranteed
+        return self._hash_value == other._hash_value
+
+    # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
+    def __iter__(self):
+        # Convert indices to leaf values using set comprehension
+        leaves = frozenset({self.leaf_list[i] for i in self.indices})
+        return iter((leaves))
+
+    def __str__(self):
+        myclade = self.get_clade()
+        return f"\n{str(myclade)}\n"
+
+    def __repr__(self):
+        return self.__str__()
+
+    def get_clade(self):
+        leaves = frozenset({self.leaf_list[i] for i in self.indices})
+        return (leaves)
 
 ###################################################################################################
 ###################################################################################################
@@ -1424,22 +1501,22 @@ class Tree:
 
     def rename_intnodes_to_match(self, other):
         """Takes as input a tree (other) with the same topology as self, but with potentially
-        different internal nodeIDs. Renames the internal nodeIDs in other so they are the
-        same as those in self. Returns copy of other with new nodeIDs"""
+        different internal nodeIDs. Renames the internal nodeIDs in self so they are the
+        same as those in other. Returns copy of self with new nodeIDs"""
 
-        # Create copy of other, and rename all intnodes so there wont be clashes during renaming
+        # Create copy of self, and rename all intnodes so there wont be clashes during renaming
         maxselfid = max(self.intnodes)
         minnewid = maxselfid + 1
-        newtree = other.copy_treeobject()
-        for origid in list(other.intnodes):
+        newtree = self.copy_treeobject()
+        for origid in list(self.intnodes):
             newtree.rename_intnode(origid, origid+minnewid)
 
         # Now rename
-        other2self, unmatched_root1, unmatched_root2 = newtree.match_nodes(self)
+        self2other, unmatched_root1, unmatched_root2 = newtree.match_nodes(other)
         if unmatched_root1 or unmatched_root2:
             raise TreeError("The two trees have different topology - can not match intnodes")
         for intnode in list(newtree.intnodes):
-            newtree.rename_intnode(intnode, other2self[intnode])
+            newtree.rename_intnode(intnode, self2other[intnode])
         return newtree
 
     ###############################################################################################
@@ -2099,14 +2176,12 @@ class Tree:
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
-        # Other part is then found as diff between all leaves and bipart1
         # Note: if root has two kids, then the root bipartition is added twice
         # This will be dealt with below
         for child, child_remkids in self.remotechildren_dict.items():
             if child != self.root:
                 parent = self.parent(child)
-                bipart1 = frozenset(child_remkids)
-                bipartition = Bipartition(bipart1, self.frozenset_leaves,
+                bipartition = Bipartition(child_remkids, self.frozenset_leaves,
                                           self.sorted_leaf_list, self.leaf2index)
                 if self.interner:
                     bipartition = self.interner.intern(bipartition)
@@ -2118,7 +2193,7 @@ class Tree:
         rootkids = self.children(self.root)
         if len(rootkids) == 2:
             kid1, kid2 = rootkids
-            bipart1 = frozenset(self.remotechildren_dict[kid1])
+            bipart1 = self.remotechildren_dict[kid1]
             rootbip = Bipartition(bipart1, self.frozenset_leaves,
                                       self.sorted_leaf_list, self.leaf2index)
             if self.interner:
@@ -2145,6 +2220,31 @@ class Tree:
             self._remotechildren_dict = None
 
         return bipartition_dict
+
+    ###############################################################################################
+
+    def cladedict(self, keep_remchild_dict = False):
+        """Returns tree in the form of a "clade dictionary" """
+
+        # Names of leaves in clade are represented as an immutable set
+        # The entire tree is represented as a dictionary where the keys are clades
+        # The values are Nodestructs
+        clade_dict = {}
+
+        # For each node: find clade representation, add this and Nodestruct to list.
+        for node, node_remkids in self.remotechildren_dict.items():
+            clade = Clade(node_remkids, self.frozenset_leaves,
+                          self.sorted_leaf_list, self.leaf2index)
+            if self.interner:
+                clade = self.interner.intern(clade)
+            nodedepth = self.nodedepth(node)    # python note: make @property + perhaps rational building of dict?
+            clade_dict[clade] = Nodestruct(nodedepth)
+
+        # Python note: to save memory. Maybe this should be dealt with centrally?
+        if not keep_remchild_dict:
+            self._remotechildren_dict = None
+
+        return clade_dict
 
     ###############################################################################################
 
@@ -3887,12 +3987,11 @@ class RootBipStruct:
 
 ###################################################################################################
 ###################################################################################################
-###################################################################################################
 
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
-    def __init__(self, trackroot=False):
+    def __init__(self, trackbips=True, trackclades=False, trackroot=False):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -3900,8 +3999,12 @@ class TreeSummary():
         self.tree_weight_sum = 0.0
         self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
+        self._cladesummary = {}         # Dict: {clade:nodestruct with extra fields}
+        self._cladesummary_processed = False
         self._sorted_biplist = None
         self.trackroot = trackroot
+        self.trackbips = trackbips
+        self.trackclades = trackclades
         self._sorted_rootbips = None
         if trackroot:
             self._rootbip_summary = {}
@@ -3931,6 +4034,25 @@ class TreeSummary():
             self._bipartsummary_processed = True
 
         return self._bipartsummary
+
+    ###############################################################################################
+
+    @property
+    def cladesummary(self):
+        """Property method for lazy evaluation of freq, var, and sem for node depths"""
+        if not self._cladesummary_processed:
+            for node in self._cladesummary.values():
+                node.freq = node.SUMW / self.tree_weight_sum
+                n = node.clade_count
+                if n > 1:
+                    node.var = node.T * n / ((n - 1) * node.SUMW)
+                    node.sem = math.sqrt(node.var)/math.sqrt(n)
+                else:
+                    node.var = "NA"
+                    node.sem = "NA"
+            self._cladesummary_processed = True
+
+        return self._cladesummary
 
     ###############################################################################################
 
@@ -3995,9 +4117,6 @@ class TreeSummary():
     def add_tree(self, curtree, weight=1.0):
         """Add tree object to treesummary, update all relevant bipartition summaries"""
 
-        self._bipartsummary_processed = False
-        self._sorted_biplist = None
-
         # Main interface to TreeSummary.
         # Takes tree object, updates relevant measures
         # First time entered: build set of leaves for consistency checking.
@@ -4012,7 +4131,64 @@ class TreeSummary():
 
         self.tree_count += 1
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
-        bipdict = curtree.bipdict()
+
+        if self.trackroot:
+            self._add_root(curtree)
+
+        if self.trackclades:
+            self._add_clade(curtree, weight)
+
+        if self.trackbips:
+            bipdict = self._add_bip(curtree, weight)
+            return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
+
+    ###############################################################################################
+
+    def _add_root(self, curtree):
+        """Helper method for add_tree: handles roots"""
+
+        bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbips()
+        if bipartition in self._rootbip_summary:
+            self._rootbip_summary[bipartition].add(leafset1, blen1, leafset2, blen2)
+        else:
+            self._rootbip_summary[bipartition] = RootBipStruct(leafset1, blen1, leafset2, blen2)
+
+    ###############################################################################################
+
+    def _add_clade(self, curtree, weight):
+        """Helper method to add_tree: handles clades"""
+
+        self._cladesummary_processed = False
+
+        cladedict = curtree.cladedict()
+        for clade,nodestruct in cladedict.items():
+            depth = nodestruct.depth
+
+            # If clade has been seen before: update existing info
+            if clade in self._cladesummary:
+                Q = depth - self._cladesummary[clade].depth
+                TEMP = self._cladesummary[clade].SUMW + weight
+                R = Q*weight/TEMP
+                self._cladesummary[clade].depth += R
+                self._cladesummary[clade].T += R * self._cladesummary[clade].SUMW * Q
+                self._cladesummary[clade].SUMW = TEMP
+                self._cladesummary[clade].clade_count += 1
+
+            # If bipartition has never been seen before: add to dict and add online attributes
+            else:
+                self._cladesummary[clade]=nodestruct
+                self._cladesummary[clade].clade_count = 1
+                self._cladesummary[clade].SUMW = weight
+                self._cladesummary[clade].depth = depth
+                self._cladesummary[clade].T = 0.0
+
+    ###############################################################################################
+
+    def _add_bip(self, curtree, weight):
+        """Helper method to add_tree: handles bipartitions"""
+
+        self._bipartsummary_processed = False
+        self._sorted_biplist = None
 
         # I am interested in being able to compute weighted frequency of a bipartition as well as
         # the weighted mean and weighted variance of the branch length for that bipartition.
@@ -4025,6 +4201,7 @@ class TreeSummary():
         # and "brlen" which was "X".
         # Note: mean branch length is stored in two attributes: mean and length
         # This is due to other functions that expect the attribute .length to be present
+        bipdict = curtree.bipdict()
         for bipart,branchstruct in bipdict.items():
             brlen = branchstruct.length
 
@@ -4045,14 +4222,6 @@ class TreeSummary():
                 self._bipartsummary[bipart].SUMW = weight
                 self._bipartsummary[bipart].length = brlen
                 self._bipartsummary[bipart].T = 0.0
-
-        # If requested: keep track of where root is attached
-        if self.trackroot:
-            bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbips()
-            if bipartition in self._rootbip_summary:
-                self._rootbip_summary[bipartition].add(leafset1, blen1, leafset2, blen2)
-            else:
-                self._rootbip_summary[bipartition] = RootBipStruct(leafset1, blen1, leafset2, blen2)
 
         return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
 
@@ -4184,7 +4353,31 @@ class TreeSummary():
         # If we did not return by now, then bipart not in contree
         raise TreeError(f"Summary_tree tree not compatible with any observed root locations")
 
-###################################################################################################
+    ###############################################################################################
+
+    def set_mean_node_depths(self, summary_tree):
+        """Set branch lengths on summary tree based on mean node depth for clades corresponding
+        to parent and child nodes (blen = depth_parent - depth_child).
+        Note: only uses node depths from monopyletic clades (so some values may be set
+        based on very few trees)"""
+
+        all_leaves = summary_tree.frozenset_leaves
+        sorted_leafs = summary_tree.sorted_leaf_list
+        leaf2index = summary_tree.leaf2index
+
+        for parent in summary_tree.sorted_intnodes(deepfirst=True):
+            p_remkids = summary_tree.remotechildren_dict[parent]
+            p_clade = Clade(p_remkids, all_leaves, sorted_leafs, leaf2index)
+            p_depth = self.cladesummary[p_clade].depth
+            for child in summary_tree.children(parent):
+                c_remkids = summary_tree.remotechildren_dict[child]
+                c_clade = Clade(c_remkids, all_leaves, sorted_leafs, leaf2index)
+                c_depth = self.cladesummary[c_clade].depth
+                blen = p_depth - c_depth
+                summary_tree.setlength(parent, child, blen)
+
+        return summary_tree
+
 ###################################################################################################
 ###################################################################################################
 
@@ -4194,8 +4387,8 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, store_trees=False, trackroot=False):
-        TreeSummary.__init__(self, trackroot)
+    def __init__(self, store_trees=False, trackbips=True, trackclades=False, trackroot=False):
+        TreeSummary.__init__(self, trackbips, trackclades, trackroot)
         self._toposummary = {}
         self._toposummary_processed = False
         self.store_trees = store_trees
