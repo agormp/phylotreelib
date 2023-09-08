@@ -109,11 +109,19 @@ class Interner():
     # Interner methods returns *pointer* to object
     # Python note: is there a potential issue with hash collisions
     def __init__(self):
-        self.interndict = {}
+        self.leafset_interndict = {}
+        self.clade_interndict = {}
+        self.bip_interndict = {}
         self.unhashable_dict = {}
 
-    def intern(self, intern_object):
-        return self.interndict.setdefault(intern_object, intern_object)
+    def intern_leafset(self, leafset):
+        return self.leafset_interndict.setdefault(leafset, leafset)
+
+    def intern_clade(self, clade):
+        return self.clade_interndict.setdefault(clade, clade)
+
+    def intern_bipart(self, bipart):
+        return self.bip_interndict.setdefault(bipart, bipart)
 
     def store_unhashable(self, name, obj):
         """
@@ -1095,7 +1103,7 @@ class Tree:
     def frozenset_leaves(self):
         if self._frozenset_leaves == None:
             if self.interner:
-                self._frozenset_leaves = self.interner.intern(frozenset(self.leaves))
+                self._frozenset_leaves = self.interner.intern_leafset(frozenset(self.leaves))
             else:
                 self._frozenset_leaves = frozenset(self.leaves)
         return self._frozenset_leaves
@@ -2184,7 +2192,7 @@ class Tree:
                 bipartition = Bipartition(child_remkids, self.frozenset_leaves,
                                           self.sorted_leaf_list, self.leaf2index)
                 if self.interner:
-                    bipartition = self.interner.intern(bipartition)
+                    bipartition = self.interner.intern_bipart(bipartition)
                 origbranch = self.child_dict[parent][child]
                 bipartition_dict[bipartition] = origbranch.copy()
 
@@ -2197,7 +2205,7 @@ class Tree:
             rootbip = Bipartition(bipart1, self.frozenset_leaves,
                                       self.sorted_leaf_list, self.leaf2index)
             if self.interner:
-                rootbip = self.interner.intern(rootbip)
+                rootbip = self.interner.intern_bipart(rootbip)
 
             # Create new collapsed branch, sum distances from both kids
             combined_len = (self.child_dict[self.root][kid1].length +
@@ -2236,7 +2244,7 @@ class Tree:
             clade = Clade(node_remkids, self.frozenset_leaves,
                           self.sorted_leaf_list, self.leaf2index)
             if self.interner:
-                clade = self.interner.intern(clade)
+                clade = self.interner.intern_clade(clade)
             nodedepth = self.nodedepth(node)    # python note: make @property + perhaps rational building of dict?
             clade_dict[clade] = Nodestruct(nodedepth)
 
