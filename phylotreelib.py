@@ -4300,13 +4300,8 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def contree(self, cutoff=0.5, allcompat=False, labeldigits=3, use_root_info=True):
-        """Returns a consensus tree built from selected bipartitions.
-
-        use_root_info: Use rooting info (frequencies of different rooting locations in input
-        if trackroot is set for TreeSummary.
-        If trackroot=False: ignore value of this parameter.
-        """
+    def contree(self, cutoff=0.5, allcompat=False, labeldigits=3):
+        """Returns a consensus tree built from selected bipartitions."""
 
         if cutoff < 0.5:
             msg = "Consensus tree cutoff has to be at least 0.5"
@@ -4337,9 +4332,6 @@ class TreeSummary():
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
                     contree._remotechildren_dict = None
-
-        if use_root_info and self.trackroot:
-            contree = self.root_maxfreq(contree)
 
         return contree
 
@@ -4457,7 +4449,7 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def max_clade_cred_tree(self, labeldigits=3, use_root_info=True):
+    def max_clade_cred_tree(self, labeldigits=3):
         """Find maximum clade credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
 
         maxlogcred = -math.inf
@@ -4475,9 +4467,6 @@ class BigTreeSummary(TreeSummary):
 
         # Build tree from bipartitions  in new bipdict
         maxcredtree = Tree.from_biplist(maxcredbipdict)
-
-        if use_root_info and self.trackroot:
-            maxcredtree = self.root_maxfreq(maxcredtree)
 
         return maxcredtree, maxlogcred
 
@@ -4600,7 +4589,6 @@ class TreefileBase():
         """For explicit closing of Treefile before content exhausted"""
         self.treefile.close()
 
-###################################################################################################
 ###################################################################################################
 ###################################################################################################
 
