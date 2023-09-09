@@ -1194,19 +1194,69 @@ class Tree:
 
     ###############################################################################################
 
-    def clear_caches(self):
-        self._parent_dict = None            # Property with lazy evaluation
-        self._remotechildren_dict = None    # Property with lazy evaluation
-        self._frozenset_leaves = None       # Property with lazy evaluation
-        self._sorted_leaf_list = None       # Property with lazy evaluation
-        self._leaf2index = None             # Property with lazy evaluation
-        self.dist_dict = None
-        self.path_dict = None
-        self._remotechildren_dict = None     # Python note: Change to property?
-        self.interner = None
-        self._sorted_intnodes_deep = None
-        self._sorted_intnodes_shallow = None
-        self.nodedist.cache_clear()
+    @property
+    def rootdist(self):
+        """Property (dictionary) giving the distance from each node in tree to the root"""
+        if self._rootdist is None:
+            self._rootdist = {self.root: 0.0}
+            children = list(self.children(self.root))
+            while children:
+                child = children.pop()
+                parent = self.parent_dict[child]
+                self._rootdist[child] = (self._rootdist[parent] +
+                                         self.child_dict[parent][child].length)
+                if child in self.intnodes:
+                    children.extend(self.children(child))
+        return self._rootdist
+
+    ###############################################################################################
+
+    @property
+    def nodedepthdict(self):
+        if self._nodedepthdict is None:
+            self._nodedepthdict = {}
+            maxdist = 0
+            for leaf in self.leaves:
+                if self.rootdist[leaf] > maxdist:
+                    maxdist = self.rootdist[leaf]
+            rootdepth = self._nodedepthdict[self.root] = maxdist
+            for node in self.nodes - {self.root}:
+                self._nodedepthdict[node] = rootdepth - self.rootdist[node]
+        return self._nodedepthdict
+
+    ###############################################################################################
+
+    @property
+    def topology_bipart(self):
+        """Returns set of Bipartitions representation of topology"""
+
+        # Names of leaves on one side of a branch are represented as an immutable set.
+        # A bipartition is represented as an immutable set of two such (complementary) sets
+        # The entire tree topology is represented as a set of bipartitions
+        # This is essentially a naked version of a bipdict
+
+        if self._topology_bipart == None:
+            bipdict = self.bipdict()
+            self._topology_bipart = frozenset(bipdict.keys())
+
+        return self._topology_bipart
+
+    ###############################################################################################
+
+    @property
+    def topology_clade(self):
+        """Returns set of Clades representation of topology"""
+
+        # Names of leaves on one side of a branch are represented as an immutable set.
+        # A bipartition is represented as an immutable set of two such (complementary) sets
+        # The entire tree topology is represented as a set of bipartitions
+        # This is essentially a naked version of a bipdict
+
+        if self._topology_clade == None:
+            cladedict = self.cladedict()
+            self._topology_clade = frozenset(cladedict.keys())
+
+        return self._topology_clade
 
     ###############################################################################################
 
