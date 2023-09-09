@@ -564,17 +564,41 @@ class Tree:
     # The main constructor "__init__" is therefore mostly empty
 
     def __init__(self):
-        self._parent_dict = None            # Property with lazy evaluation
-        self._remotechildren_dict = None    # Property with lazy evaluation
-        self._frozenset_leaves = None       # Property with lazy evaluation
-        self._sorted_leaf_list = None       # Property with lazy evaluation
-        self._leaf2index = None             # Property with lazy evaluation
+        self._parent_dict = None
+        self._remotechildren_dict = None
+        self._frozenset_leaves = None
+        self._sorted_leaf_list = None
+        self._leaf2index = None
         self.dist_dict = None
         self.path_dict = None
-        self._remotechildren_dict = None     # Python note: Change to property?
+        self._remotechildren_dict = None
         self.interner = None
         self._sorted_intnodes_deep = None
         self._sorted_intnodes_shallow = None
+        self._rootdist = None
+        self._nodedepthdict = None
+        self._topology_bipart = None
+        self._topology_clade = None
+
+    ###############################################################################################
+
+    def clear_caches(self):
+        self._parent_dict = None
+        self._remotechildren_dict = None
+        self._frozenset_leaves = None
+        self._sorted_leaf_list = None
+        self._leaf2index = None
+        self.dist_dict = None
+        self.path_dict = None
+        self._remotechildren_dict = None
+        self.interner = None
+        self._sorted_intnodes_deep = None
+        self._sorted_intnodes_shallow = None
+        self.nodedist.cache_clear()
+        self._rootdist = None
+        self._nodedepthdict = None
+        self._topology_bipart = None
+        self._topology_clade = None
 
     ###############################################################################################
 
@@ -666,12 +690,12 @@ class Tree:
 
                 # Determine which of insertpoints children to move, namely all children
                 # that are either in the active bipartition OR children whose descendants are
-                moveset = []
+                movelist = []
                 for child in obj.children(insertpoint):
                     if child in active_bip:
-                        moveset.append(child)
-                    elif (child not in obj.leaves) and (obj.remotechildren_dict[child] <= active_bip):
-                        moveset.append(child)
+                        movelist.append(child)
+                    elif obj.remotechildren_dict[child] <= active_bip:
+                        movelist.append(child)
 
                 # Construct new internal node (and therefore branch), transfer Branchstruct
                 maxnode += 1
@@ -680,7 +704,7 @@ class Tree:
                 obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
 
                 # Move relevant children to new node, transfer Branchstructs
-                for child in moveset:
+                for child in movelist:
                     obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
                     del obj.child_dict[insertpoint][child]
 
@@ -696,6 +720,7 @@ class Tree:
         return obj
 
     ###############################################################################################
+
     @classmethod
     def from_topology(cls, topology, interner=None):
         """Constructor: Tree object from topology"""
@@ -753,12 +778,12 @@ class Tree:
 
                 # Determine which of insertpoints children to move, namely all children
                 # that are either in the active bipartition OR children whose descendants are
-                moveset = []
+                movelist = []
                 for child in obj.children(insertpoint):
                     if child in active_bip:
-                        moveset.append(child)
-                    elif (child not in obj.leaves) and (obj.remotechildren_dict[child] <= active_bip):
-                        moveset.append(child)
+                        movelist.append(child)
+                    elif obj.remotechildren_dict[child] <= active_bip:
+                        movelist.append(child)
 
                 # Construct new internal node (and therefore branch)
                 maxnode += 1
@@ -767,7 +792,7 @@ class Tree:
                 obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
 
                 # Move relevant children to new node, transfer Branchstructs
-                for child in moveset:
+                for child in movelist:
                     obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
                     del obj.child_dict[insertpoint][child]
 
@@ -785,6 +810,40 @@ class Tree:
         return obj
 
     ###############################################################################################
+
+    @classmethod
+    def from_cladedict(cls, cladedict, interner=None):
+
+        clade = next(iter(cladedict))
+        leaves = clade.all_leaves_set
+        obj = cls.from_leaves(leaves)
+
+        for clade,node in cladedict.items():
+            clade_leaves = clade.get_clade()
+            if len(clade_leaves)>1 and (clade_leaves != leaves):
+                mrca = obj.find_mrca(clade_leaves)
+                movelist = []
+                for child in obj.children(mrca):
+                    if child in clade_leaves:
+                        movelist.append(child)
+                    elif obj.remotechildren_dict[child] <= clade_leaves:
+                        movelist.append(child)
+                obj.insert_node(mrca, movelist, Branchstruct(label=node.label))
+
+                # Reset obj caches which are now obsolete
+                obj.clear_caches()
+
+        obj.nodes = set(obj.leaves | obj.intnodes)
+        obj.interner = interner
+        if obj.interner:
+            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
+            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
+            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
+
+        return obj
+
+    ###############################################################################################
+
     @classmethod
     def from_leaves(cls, leaflist, interner=None):
         """Constructor: star-tree object from list of leaves"""
@@ -798,6 +857,7 @@ class Tree:
         return cls.from_string("".join(treelist), interner)
 
     ###############################################################################################
+
     @classmethod
     def from_branchinfo(cls, parentlist, childlist, lenlist=None, lablist=None, interner=None):
         """Constructor: Tree object from information about all branches in tree
