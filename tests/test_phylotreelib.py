@@ -576,7 +576,6 @@ class Treesummarytests(TreeTestBase):
         self.trprob_trees = trprobfile.readtrees()
         trprobfile.close()
 
-    @pytest.mark.slow
     def test_contree(self):
         ts = pt.TreeSummary()
         tf1 = pt.Nexustreefile(self.t1_fname)
@@ -605,7 +604,6 @@ class Treesummarytests(TreeTestBase):
                 mb_freq = float(mb_branch.label)
                 self.assertAlmostEqual(mb_freq, own_freq)
 
-    @pytest.mark.slow
     def test_treesummary_update(self):
         ts1 = pt.TreeSummary()
         tf1 = pt.Nexustreefile(self.t1_fname)
@@ -638,7 +636,6 @@ class Treesummarytests(TreeTestBase):
                 mb_freq = float(mb_branch.label)
                 self.assertAlmostEqual(mb_freq, own_freq, places=3)
 
-    @pytest.mark.slow
     def test_bigtreesummary(self):
         # Note: I am checking that mrbayes topologies are the same I found.
         # should also check topology frequencies
