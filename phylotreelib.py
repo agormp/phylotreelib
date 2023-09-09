@@ -2354,7 +2354,7 @@ class Tree:
                           self.sorted_leaf_list, self.leaf2index)
             if self.interner:
                 clade = self.interner.intern_clade(clade)
-            nodedepth = self.nodedepth(node)    # python note: make @property + perhaps rational building of dict?
+            nodedepth = self.nodedepthdict[node]
             clade_dict[clade] = Nodestruct(nodedepth)
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
