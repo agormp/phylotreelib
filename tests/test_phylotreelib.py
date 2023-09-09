@@ -648,7 +648,7 @@ class Treesummarytests(TreeTestBase):
             ts.add_tree(t)
         for tree in self.trprob_trees:
             mb_topology = tree.topology()
-            self.assertIn(mb_topology, ts.toposummary)
+            self.assertIn(mb_topology, ts.biptoposummary)
 
 ########################################################################################
 ########################################################################################
