@@ -4740,12 +4740,10 @@ class BigTreeSummary(TreeSummary):
 
         maxcred_bipdict = {}
         for clade in maxlogcred_cladetopo:
-            node = self.cladesummary[clade]
-            node.label = f"{round(node.freq, labeldigits)}"
-            maxcred_bipdict[clade] = node
+            nodestruct = self.cladesummary[clade]
+            nodestruct.label = f"{round(nodestruct.freq, labeldigits)}"
+            maxcred_bipdict[clade] = nodestruct
         maxcredtree = Tree.from_cladedict(maxcred_bipdict)
-
-        maxcredtree = self.set_mean_node_depths(maxcredtree)
 
         return maxcredtree, maxlogcred
 
