@@ -4521,12 +4521,22 @@ class TreeSummary():
         cur_rootbip, _, _, _, _ = summary_tree.rootbip()
         for count, bip, summary_rootbipstruct in self.sorted_rootbips:
             if summary_tree.bipart_is_present(bip):
-                parent,child = summary_tree.find_bipart_nodes(bip)
-                biplen = summary_tree.nodedist(parent,child)
-                child_remkids = summary_tree.remotechildren_dict[child]
-                dist_to_child = biplen * rootbipstruct.avg_frac(child_remkids)
-                summary_tree.reroot(child, parent, node1dist=dist_to_child)
+                # If tree already rooted correctly: do not reroot
+                if (cur_rootbip == None) or (bip != cur_rootbip):
+                    parent,child = summary_tree.find_bipart_nodes(bip)
+                    summary_tree.reroot(child, parent)
                 summary_tree.rootcred = count / self.tree_count
+
+                # Divide branch lengths for two rootkids according to fractions
+                # seen for this rootbip across trees in ._rootbip_summary
+                kid1,kid2 = summary_tree.children(summary_tree.root)
+                biplen = summary_tree.nodedist(kid1, kid2)
+                kid1_remkids = summary_tree.remotechildren_dict[kid1]
+                dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+                dist_to_kid2 = biplen - dist_to_kid1
+                summary_tree.child_dict[summary_tree.root][kid1].length = dist_to_kid1
+                summary_tree.child_dict[summary_tree.root][kid2].length = dist_to_kid2
+
                 return summary_tree
 
         # If we did not return by now, then bipart not in contree
