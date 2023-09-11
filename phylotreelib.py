@@ -2388,10 +2388,11 @@ class Tree:
         are the lengths of the branches leading from the root to their two basal nodes"""
 
         rootkids = list(self.children(self.root))
+
+        # If rooted at multifurcation: return None for all variables
+        # Python note: rethink logic here...
         if len(rootkids) > 2:
-            msg = ("The rootbip method only works for trees rooted at bifurcations\n" +
-                    f"The root of the current tree has {len(rootkids)} kids.")
-            raise TreeError(msg)
+            return None, None, None, None, None
 
         leafset1 = self.remote_children(rootkids[0])
         leafset2 = self.remote_children(rootkids[1])
