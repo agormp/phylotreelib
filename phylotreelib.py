@@ -2380,7 +2380,7 @@ class Tree:
 
     ###############################################################################################
 
-    def rootbips(self):
+    def rootbip(self):
         """For a tree rooted at a bifurcation: returns a tuple giving the following information
         about the bipartition on which the root is located:
                 (Bipartition, leafset1, blen1, leafset2, blen2)
