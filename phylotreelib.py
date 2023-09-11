@@ -4265,7 +4265,7 @@ class TreeSummary():
     def _add_root(self, curtree):
         """Helper method for add_tree: handles roots"""
 
-        bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbips()
+        bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbip()
         if bipartition in self._rootbip_summary:
             self._rootbip_summary[bipartition].add(leafset1, blen1, leafset2, blen2)
         else:
@@ -4512,9 +4512,14 @@ class TreeSummary():
     ###############################################################################################
 
     def root_maxfreq(self, summary_tree):
-        """Uses info about root bipartitions in TreeSummary to place root on summary tree"""
+        """Uses info about root bipartitions in TreeSummary to place root on summary tree.
+        Divides length of root bipartition among two branches in accordance with average
+        fraction of lengths seen for this rootbip across all trees."""
 
-        for count, bip, rootbipstruct in self.sorted_rootbips:
+        # Starting with most frequent root location: find one that is compatible
+        # Python note: should i just try number 1 on sorted list?
+        cur_rootbip, _, _, _, _ = summary_tree.rootbip()
+        for count, bip, summary_rootbipstruct in self.sorted_rootbips:
             if summary_tree.bipart_is_present(bip):
                 parent,child = summary_tree.find_bipart_nodes(bip)
                 biplen = summary_tree.nodedist(parent,child)
