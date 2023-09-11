@@ -4420,7 +4420,7 @@ class TreeSummary():
                 t1 = self_cladesum[clade].T
                 t2 = other_cladesum[clade].T
 
-                self_cladesum[clade].clade_count += other_cladesum[bipart].clade_count
+                self_cladesum[clade].clade_count += other_cladesum[clade].clade_count
                 self_cladesum[clade].depth = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
                 self_cladesum[clade].SUMW += other_cladesum[clade].SUMW
 
