@@ -4570,6 +4570,19 @@ class TreeSummary():
 
         return summary_tree
 
+    ###############################################################################################
+
+    def compute_rootcred(self, tree):
+        """Returns root credibility (frequency of tree's root among observed trees) based
+        on current root of summary_tree and information in self._rootbip_summary"""
+
+        # Python note: mostly relevant for MCC trees. Other tree types will typically
+        # get the .rootcred attribute set when calling .root_max_freq()
+
+        tree_rootbip, _, _, _, _ = tree.rootbip()
+        summary_rootbipstruct = self._rootbip_summary[tree_rootbip]
+        return summary_rootbipstruct.count / self.tree_count
+
 ###################################################################################################
 ###################################################################################################
 
