@@ -1676,15 +1676,17 @@ class Tree:
 
     def find_mrca(self, leaves):
         """Finds Most Recent Common Ancestor for the provided set of leaves.
-        MRCA for a leaf is the parent of leaf"""
-
-        # Python note: maybe a bit weird that MRCA of leaf is parent of leaf?
+        MRCA for a leaf is leaf itself"""
 
         leafset = set(leaves)
         if not leafset <= self.leaves:
             leafstring = ", ".join(map(str, leafset))
             msg = "Some nodes in set are not part of tree: %s" % leafstring
             raise TreeError(msg)
+
+        # special case: mrca for leaf is leaf itself
+        if len(leafset) == 1:
+            return next(iter(leafset))
 
         # pick random starting node among leafset, and find its parent node
         random_leaf = next(iter(leafset))
