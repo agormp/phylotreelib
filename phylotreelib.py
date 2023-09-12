@@ -4524,7 +4524,10 @@ class TreeSummary():
 
         # Starting with most frequent root location: find one that is compatible
         # Python note: should i just try number 1 on sorted list?
-        cur_rootbip, _, _, _, _ = summary_tree.rootbip()
+        if summary_tree.is_bifurcation(summary_tree.root):
+            cur_rootbip, _, _, _, _ = summary_tree.rootbip()
+        else:
+            cur_rootbip = None
         for count, bip, summary_rootbipstruct in self.sorted_rootbips:
             if summary_tree.bipart_is_present(bip):
                 # If tree already rooted correctly: do not reroot
