@@ -4533,8 +4533,11 @@ class TreeSummary():
         for count, bip, summary_rootbipstruct in self.sorted_rootbips:
             if summary_tree.bipart_is_present(bip):
                 # If tree already rooted correctly: do not reroot
-                if (cur_rootbip == None) or (bip != cur_rootbip):
+                if (cur_rootbip is None) or (bip != cur_rootbip):
                     parent,child = summary_tree.find_bipart_nodes(bip)
+                    summary_tree.deroot()  # Python note: necessary?
+                                           # reroot seems to assume not rooted at birfurcation
+                                           # rethink reroot function and others depending on it!
                     summary_tree.reroot(child, parent)
                 summary_tree.rootcred = count / self.tree_count
 
