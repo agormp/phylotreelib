@@ -2389,10 +2389,11 @@ class Tree:
 
         rootkids = list(self.children(self.root))
 
-        # If rooted at multifurcation: return None for all variables
+        # If rooted at multifurcation: raise error
         # Python note: rethink logic here...
         if len(rootkids) > 2:
-            return None, None, None, None, None
+            msg = "Input tree rooted at multifurcation - not possible to assign root to bipartition"
+            raise TreeError(msg)
 
         leafset1 = self.remote_children(rootkids[0])
         leafset2 = self.remote_children(rootkids[1])
