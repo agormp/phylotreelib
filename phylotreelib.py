@@ -1197,6 +1197,7 @@ class Tree:
     @property
     def rootdist(self):
         """Property (dictionary) giving the distance from each node in tree to the root"""
+
         if self._rootdist is None:
             self._rootdist = {self.root: 0.0}
             children = list(self.children(self.root))
@@ -3590,8 +3591,9 @@ class Tree:
             # remove previous root
             del self.child_dict[root]
 
-            # update intnodelist and delete caches, which are now unreliable
+            # update intnode and node attributes and clear caches, which are now unreliable
             self.intnodes = set(self.child_dict.keys())
+            self.nodes = self.intnodes | self.leaves
             self.clear_caches()
 
     ###############################################################################################
