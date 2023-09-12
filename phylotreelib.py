@@ -4253,12 +4253,15 @@ class TreeSummary():
         if self.trackroot:
             self._add_root(curtree)
 
+        cladedict = None
         if self.trackclades:
-            self._add_clade(curtree, weight)
+            cladedict = self._add_clade(curtree, weight)
 
+        bipdict = None
         if self.trackbips:
             bipdict = self._add_bip(curtree, weight)
-            return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
+
+        return bipdict, cladedict
 
     ###############################################################################################
 
@@ -4299,6 +4302,8 @@ class TreeSummary():
                 self._cladesummary[clade].SUMW = weight
                 self._cladesummary[clade].depth = depth
                 self._cladesummary[clade].T = 0.0
+
+        return cladedict
 
     ###############################################################################################
 
@@ -4341,7 +4346,7 @@ class TreeSummary():
                 self._bipartsummary[bipart].length = brlen
                 self._bipartsummary[bipart].T = 0.0
 
-        return bipdict  # Experimental: so bigtreesummary can reuse and avoid topology computation
+        return bipdict
 
     ###############################################################################################
 
@@ -4626,28 +4631,28 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def add_tree(self,curtree, weight=1.0):
+    def add_tree(self, curtree, weight=1.0):
         """Add tree to treesummary, update all summaries"""
 
         self._biptoposummary_processed = False
         self._cladetoposummary_processed = False
 
         # Superclass method takes care of updating n_trees and all bipart/clade-related info
-        TreeSummary.add_tree(self, curtree, weight)
+        # Python note: bipdict or cladedict are None when bip or clade not tracked
+        bipdict, cladedict = TreeSummary.add_tree(self, curtree, weight)
 
         if self.trackbips:
-            self._addbiptopo(curtree, weight)
+            self._addbiptopo(bipdict, curtree, weight)
 
         if self.trackclades:
-            self._addcladetopo(curtree, weight)
+            self._addcladetopo(cladedict, curtree, weight)
 
     ###############################################################################################
 
-    def _addbiptopo(self, curtree, weight):
+    def _addbiptopo(self, bipdict, curtree, weight):
 
         # If biptopology has never been seen before, then add it and initialize count
         # If topology HAS been seen before then update count
-        bipdict = curtree.bipdict()
         topology = frozenset(bipdict.keys())
         if topology in self._biptoposummary:
             self._biptoposummary[topology].weight += weight
@@ -4660,11 +4665,10 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def _addcladetopo(self, curtree, weight):
+    def _addcladetopo(self, cladedict, curtree, weight):
 
         # If biptopology has never been seen before, then add it and initialize count
         # If topology HAS been seen before then update count
-        cladedict = curtree.cladedict()
         topology = frozenset(cladedict.keys())
         if topology in self._biptoposummary:
             self._cladetoposummary[topology].weight += weight
