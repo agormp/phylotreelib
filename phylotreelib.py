@@ -4563,7 +4563,9 @@ class TreeSummary():
         to parent and child nodes (blen = depth_parent - depth_child).
 
         NOTE 1: only meaningful if input trees are based on a clock model.
-        NOTE 2: summary_tree must first be rooted with root_max_freq (otherwise not possible)
+        NOTE 2: only works if all clades in tree have been observed at least once. The option
+                will therefore not work with all rootings, and may also fail for majority rule
+                consensus trees
         NOTE 3: only uses node depths from monopyletic clades (so some values may be set
         based on very few trees)"""
 
@@ -4571,16 +4573,21 @@ class TreeSummary():
         sorted_leafs = summary_tree.sorted_leaf_list
         leaf2index = summary_tree.leaf2index
 
-        for parent in summary_tree.sorted_intnodes(deepfirst=True):
-            p_remkids = summary_tree.remotechildren_dict[parent]
-            p_clade = Clade(p_remkids, all_leaves, sorted_leafs, leaf2index)
-            p_depth = self.cladesummary[p_clade].depth
-            for child in summary_tree.children(parent):
-                c_remkids = summary_tree.remotechildren_dict[child]
-                c_clade = Clade(c_remkids, all_leaves, sorted_leafs, leaf2index)
-                c_depth = self.cladesummary[c_clade].depth
-                blen = p_depth - c_depth
-                summary_tree.setlength(parent, child, blen)
+        try:
+            for parent in summary_tree.sorted_intnodes(deepfirst=True):
+                p_remkids = summary_tree.remotechildren_dict[parent]
+                p_clade = Clade(p_remkids, all_leaves, sorted_leafs, leaf2index)
+                p_depth = self.cladesummary[p_clade].depth
+                for child in summary_tree.children(parent):
+                    c_remkids = summary_tree.remotechildren_dict[child]
+                    c_clade = Clade(c_remkids, all_leaves, sorted_leafs, leaf2index)
+                    c_depth = self.cladesummary[c_clade].depth
+                    blen = p_depth - c_depth
+                    summary_tree.setlength(parent, child, blen)
+        except KeyError as e:
+            raise TreeError("Problem while setting mean node depths: the following clade has not been "
+                            + "observed among input trees: check rooting of tree."
+                            + f"\n{e.args[0]}")
 
         return summary_tree
 
