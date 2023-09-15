@@ -349,7 +349,6 @@ class NewickStringParser:
         treeobj.leaves = set()
         treeobj.intnodes = set()
         treeobj.root = 0
-        treeobj.belowroot = None
         self.tree = treeobj
 
         # Hack to remove whitespace from treestring
@@ -4789,6 +4788,7 @@ class TreefileBase():
 
         self.interner = interner
         self.buffer = ""                # Used for keeping leftovers after reading whole line
+        self.below_root = None
 
     ###############################################################################################
 
@@ -4923,7 +4923,9 @@ class Newicktreefile(TreefileBase):
         else:
             treestring = remove_comments(treestring)
             if returntree:
-                return Tree.from_string(treestring, self.interner)
+                tree = Tree.from_string(treestring, self.interner)
+                tree.below_root = self.below_root
+                return tree
 
 ###################################################################################################
 ###################################################################################################
@@ -5068,7 +5070,9 @@ class Nexustreefile(TreefileBase):
 
         # Return tree object if requested
         if returntree:
-            return Tree.from_string(treestring, self.transdict, self.interner)
+            tree = Tree.from_string(treestring, self.transdict, self.interner)
+            tree.below_root = self.below_root
+            return tree
 
 ###################################################################################################
 ###################################################################################################
