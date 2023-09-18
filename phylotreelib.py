@@ -2169,13 +2169,16 @@ class Tree:
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, print_leaflabels=False,
-                precision=6, labelfield="label", transdict=None):
+                label_delimiters = None, precision=6, labelfield="label", transdict=None):
         """Returns Newick format tree string representation of tree object"""
 
         # Distances and (internal branch) labels are printed unless user explicitly request no printing
         # Transdict is meant for printing Nexus files with translate blocks: In these cases
         # the leaf names should be replaced by the leaf number instead, so transdict is reverse
         # of info in translate block: {name:number} instead of {number:name}
+        # label_delimiters: None: no delimiters, print label as is
+        #                   "brackets": Put brackets around label text: [my label text]
+        #                    "braces": put curly braces around label text: {my label text}
         # NOTE: This could probably be done slightly faster by iteration (instead of recursion)
         # for instance by using a stack, but unlikely that this function will be heavily used...
         # NOTE 2: I am using getattr() on "labelfield" to allow run-time specification of what
@@ -2190,6 +2193,10 @@ class Tree:
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
                 label = getattr(branchstruct, labelfield)
+                if label_delimiters == "brackets":
+                    label = f"[{label}]"
+                elif label_delimiters == "braces":
+                    label = f"{{{label}}}"
 
                 if child in self.leaves:
                     if transdict:
@@ -2197,7 +2204,6 @@ class Tree:
                     else:
                         treelist.append(child)
                     if label != "" and print_leaflabels:
-                        treelist.append(" ")
                         treelist.append("{}".format(label))
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
@@ -2228,7 +2234,7 @@ class Tree:
     ###############################################################################################
 
     def nexus(self, printdist=True, printlabels=True, print_leaflabels=False,
-                precision=6, labelfield="label", translateblock=False):
+                label_delimiters = None, precision=6, labelfield="label", translateblock=False):
         """Returns nexus format tree as a string"""
 
         # Construct header
@@ -2242,9 +2248,11 @@ class Tree:
         # Add newick tree string
         stringlist.append("   tree nexus_tree = ")
         if translateblock:
-            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision, labelfield, transdict))
+            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, label_delimiters,
+                                          precision, labelfield, transdict))
         else:
-            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision, labelfield))
+            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, label_delimiters,
+                                          precision, labelfield))
 
         # Add footer
         stringlist.append("\nend;\n")
