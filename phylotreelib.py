@@ -5,6 +5,7 @@
 import copy
 import functools
 import itertools
+from itertools import (takewhile,repeat)
 import math
 import random
 import re
