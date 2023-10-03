@@ -4198,7 +4198,8 @@ class RootBipStruct:
 class TreeSummary():
     """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
 
-    def __init__(self, trackbips=True, trackclades=False, trackroot=False):
+    def __init__(self, trackbips=True, trackclades=False, trackroot=False,
+                       trackblen=False, trackdepth=False):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -4212,6 +4213,8 @@ class TreeSummary():
         self.trackroot = trackroot
         self.trackbips = trackbips
         self.trackclades = trackclades
+        self.trackblen = trackblen
+        self.trackdepth = trackdepth
         self._sorted_rootbips = None
         if trackroot:
             self._rootbip_summary = {}
@@ -4376,21 +4379,23 @@ class TreeSummary():
 
             # If clade has been seen before: update existing info
             if clade in self._cladesummary:
-                Q = depth - self._cladesummary[clade].depth
                 TEMP = self._cladesummary[clade].SUMW + weight
-                R = Q*weight/TEMP
-                self._cladesummary[clade].depth += R
-                self._cladesummary[clade].T += R * self._cladesummary[clade].SUMW * Q
                 self._cladesummary[clade].SUMW = TEMP
-                self._cladesummary[clade].clade_count += 1
+                if self.trackdepth:
+                    Q = depth - self._cladesummary[clade].depth
+                    R = Q*weight/TEMP
+                    self._cladesummary[clade].depth += R
+                    self._cladesummary[clade].T += R * self._cladesummary[clade].SUMW * Q
+                    self._cladesummary[clade].clade_count += 1
 
             # If bipartition has never been seen before: add to dict and add online attributes
             else:
                 self._cladesummary[clade]=nodestruct
-                self._cladesummary[clade].clade_count = 1
                 self._cladesummary[clade].SUMW = weight
-                self._cladesummary[clade].depth = depth
-                self._cladesummary[clade].T = 0.0
+                if self.trackdepth:
+                    self._cladesummary[clade].clade_count = 1
+                    self._cladesummary[clade].depth = depth
+                    self._cladesummary[clade].T = 0.0
 
         return cladedict
 
@@ -4415,25 +4420,26 @@ class TreeSummary():
         # This is due to other functions that expect the attribute .length to be present
         bipdict = curtree.bipdict()
         for bipart,branchstruct in bipdict.items():
-            brlen = branchstruct.length
 
             # If bipartition has been seen before: update existing info
             if bipart in self._bipartsummary:
-                Q = brlen - self._bipartsummary[bipart].length
                 TEMP = self._bipartsummary[bipart].SUMW + weight
-                R = Q*weight/TEMP
-                self._bipartsummary[bipart].length += R
-                self._bipartsummary[bipart].T += R * self._bipartsummary[bipart].SUMW * Q
                 self._bipartsummary[bipart].SUMW = TEMP
-                self._bipartsummary[bipart].bip_count += 1
+                if self.trackblen:
+                    Q = brlen - self._bipartsummary[bipart].length
+                    R = Q*weight/TEMP
+                    self._bipartsummary[bipart].length += R
+                    self._bipartsummary[bipart].T += R * self._bipartsummary[bipart].SUMW * Q
+                    self._bipartsummary[bipart].bip_count += 1
 
             # If bipartition has never been seen before: add to dict and add online attributes
             else:
                 self._bipartsummary[bipart]=branchstruct
-                self._bipartsummary[bipart].bip_count = 1
                 self._bipartsummary[bipart].SUMW = weight
-                self._bipartsummary[bipart].length = brlen
-                self._bipartsummary[bipart].T = 0.0
+                if self.trackblen:
+                    self._bipartsummary[bipart].bip_count = 1
+                    self._bipartsummary[bipart].length = brlen
+                    self._bipartsummary[bipart].T = 0.0
 
         return bipdict
 
@@ -4699,8 +4705,9 @@ class BigTreeSummary(TreeSummary):
     # Does everything TreeSummary does and also keeps track of topologies
     # (topology list is potentially quite big, which is the reason for not including it in TS)
 
-    def __init__(self, store_trees=False, trackbips=True, trackclades=False, trackroot=False):
-        TreeSummary.__init__(self, trackbips, trackclades, trackroot)
+    def __init__(self, store_trees=False, trackbips=True, trackclades=False, trackroot=False,
+                       trackblen=False, trackdepth=False):
+        TreeSummary.__init__(self, trackbips, trackclades, trackroot, trackblen, trackdepth)
         self._biptoposummary = {}
         self._biptoposummary_processed = False
         self._cladetoposummary = {}
