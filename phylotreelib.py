@@ -4234,13 +4234,14 @@ class TreeSummary():
         if not self._bipartsummary_processed:
             for branch in self._bipartsummary.values():
                 branch.freq = branch.SUMW / self.tree_weight_sum
-                n = branch.bip_count
-                if n > 1:
-                    branch.var = branch.T * n / ((n - 1) * branch.SUMW)
-                    branch.sem = math.sqrt(branch.var)/math.sqrt(n)
-                else:
-                    branch.var = "NA"
-                    branch.sem = "NA"
+                if self.trackblen:
+                    n = branch.bip_count
+                    if n > 1:
+                        branch.var = branch.T * n / ((n - 1) * branch.SUMW)
+                        branch.sem = math.sqrt(branch.var)/math.sqrt(n)
+                    else:
+                        branch.var = "NA"
+                        branch.sem = "NA"
             self._bipartsummary_processed = True
 
         return self._bipartsummary
@@ -4253,13 +4254,14 @@ class TreeSummary():
         if not self._cladesummary_processed:
             for node in self._cladesummary.values():
                 node.freq = node.SUMW / self.tree_weight_sum
-                n = node.clade_count
-                if n > 1:
-                    node.var = node.T * n / ((n - 1) * node.SUMW)
-                    node.sem = math.sqrt(node.var)/math.sqrt(n)
-                else:
-                    node.var = "NA"
-                    node.sem = "NA"
+                if self.trackdepth:
+                    n = node.clade_count
+                    if n > 1:
+                        node.var = node.T * n / ((n - 1) * node.SUMW)
+                        node.sem = math.sqrt(node.var)/math.sqrt(n)
+                    else:
+                        node.var = "NA"
+                        node.sem = "NA"
             self._cladesummary_processed = True
 
         return self._cladesummary
