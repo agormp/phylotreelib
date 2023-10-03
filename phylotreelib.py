@@ -99,6 +99,84 @@ def remove_comments(text):
         processed_text.append(text[prevpos:])
     return "".join(processed_text)
 
+####################################################################################
+
+def fast_treecount(filename, fileformat="nexus"):
+    """Heuristic: count patterns ([;=\n] etc) to infer number of trees"""
+
+    # Empirically: if ); is in file, then this == number of trees
+    n_terminators = count_bytestring(filename, b");")
+    if n_terminators > 0:
+        return n_terminators
+
+    # Count semicolon: if == 1 (possibly after nexus correction): 1 tree
+    n_semicolons = count_bytestring(filename, b";")
+    if n_semicolons == 1:
+        return 1
+    if fileformat == "nexus":
+        n_other_semicolon_patterns  = count_bytestring(filename, b"egin taxa;")
+        n_other_semicolon_patterns += count_bytestring(filename, b"egin trees;")
+        n_other_semicolon_patterns += count_bytestring(filename, b"nd;")
+        n_other_semicolon_patterns += count_bytestring(filename, b"imensions ntax")
+        n_other_semicolon_patterns += count_bytestring(filename, b"axlabels")
+        n_other_semicolon_patterns += count_bytestring(filename, b"ranslate")
+        n_semicolons -= n_other_semicolon_patterns
+    if n_semicolons == 1:
+        return 1
+
+    # If we got this far, and filetype is newick then bail out and use precise counting
+    if fileformat == "newick":
+        return count_trees_by_parsing(filename, fileformat)
+
+    # Final attempt to infer ntrees for nexus files:
+    # count "= (", "=  and "tree "
+    # Add the values that are not 0 to list, choose minimum as count
+    # Should be robust to most variations, but should check at end of sumt...
+    n_eqparen = count_bytestring(filename, b"= (")
+    n_treestr = count_bytestring(filename, b"tree ")
+    countlist = [n_semicolons, n_eqparen, n_treestr]
+    notzero = [val for val in countlist if val>0]
+    return min(countlist)
+
+####################################################################################
+
+def count_bytestring(filename, bytestring):
+    """Fast counting of specific pattern. Bytestring argument must be given
+    with b modifier (e.g., b');')"""
+
+    # Modified from: https://stackoverflow.com/a/27517681/7836730
+    with open(filename, 'rb') as f:
+        bufsize = 1024*1024
+        bufgen = takewhile(lambda x: x, (f.raw.read(bufsize) for _ in repeat(None)))
+
+        prev_buf = b""
+        count = 0
+
+        for buf in bufgen:
+            count += buf.count(bytestring)
+
+            # For multi-byte patterns, consider overlaps between buffers
+            if len(bytestring) > 1 and len(prev_buf) > 0:
+                merged = prev_buf[-len(bytestring)+1:] + buf[:len(bytestring)-1]
+                count += merged.count(bytestring)
+
+            prev_buf = buf
+
+    return count
+
+####################################################################################
+
+def count_trees_by_parsing(filename, args):
+    # Open treefile. Discard (i.e., silently pass by) the requested number of trees
+    if args.informat == "nexus":
+        treefile = pt.Nexustreefile(filename)
+    else:
+        treefile = pt.Newicktreefile(filename)
+    treecount = 0
+    for tree in treefile:
+        treecount += 1
+    return treecount
+
 ###################################################################################################
 ###################################################################################################
 
