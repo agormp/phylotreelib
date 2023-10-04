@@ -577,7 +577,7 @@ class Treesummarytests(TreeTestBase):
         trprobfile.close()
 
     def test_contree(self):
-        ts = pt.TreeSummary()
+        ts = pt.TreeSummary(trackblen=True)
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts.add_tree(t)
@@ -605,12 +605,12 @@ class Treesummarytests(TreeTestBase):
                 self.assertAlmostEqual(mb_freq, own_freq)
 
     def test_treesummary_update(self):
-        ts1 = pt.TreeSummary()
+        ts1 = pt.TreeSummary(trackblen=True)
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts1.add_tree(t)
         tf1.close()
-        ts2 = pt.TreeSummary()
+        ts2 = pt.TreeSummary(trackblen=True)
         tf2 = pt.Nexustreefile(self.t2_fname)
         for t in tf2:
             ts2.add_tree(t)
