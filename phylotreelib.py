@@ -4688,6 +4688,42 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def set_mean_biplen(self, summary_tree):
+        """Sets branch-length, -var, and -sem for each branch in summary_tree,
+        based on values in bipsummary.
+        Should only be called when summary_tree constructed based on clades, but brlens
+        are to be set based on mean bipartition values"""
+
+        for p in summary_tree.sorted_intnodes():
+            if p != summary_tree.root:
+                for c in summary_tree.children(p):
+                    bipart1 = summary_tree.remotechildren_dict[c]
+                    bip = Bipartition(bipart1, summary_tree.frozenset_leaves,
+                                      summary_tree.sorted_leaf_list, summary_tree.leaf2index)
+                    brstruct = self.bipartsummary[bip]
+                    summary_tree.set_branch_attribute(p,c,"length", brstruct.length)
+                    summary_tree.set_branch_attribute(p,c,"var", brstruct.var)
+                    summary_tree.set_branch_attribute(p,c,"sem", brstruct.sem)
+
+        # Handle root bipartition separately
+        # Python note: should perhaps check for root being tracked?
+        kid1,kid2 = summary_tree.children(summary_tree.root)
+        kid1_remkids = summary_tree.remotechildren_dict[kid1]
+        rootbip = Bipartition(kid1_remkids, summary_tree.frozenset_leaves,
+                       summary_tree.sorted_leaf_list, summary_tree.leaf2index)
+        rootbrstruct = self.bipartsummary[rootbip]
+        summary_rootbipstruct = self._rootbip_summary[rootbip]
+
+        rootbiplen = rootbrstruct.length
+        dist_to_kid1 = rootbiplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+        dist_to_kid2 = rootbiplen - dist_to_kid1
+        summary_tree.child_dict[summary_tree.root][kid1].length = dist_to_kid1
+        summary_tree.child_dict[summary_tree.root][kid2].length = dist_to_kid2
+
+        return summary_tree
+
+    ###############################################################################################
+
     def compute_rootcred(self, tree):
         """Returns root credibility (frequency of tree's root among observed trees) based
         on current root of summary_tree and information in self._rootbip_summary"""
