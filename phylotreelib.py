@@ -4701,6 +4701,8 @@ class TreeSummary():
         for node in sum_tree.nodes:
             nodedict[node] = Nodestruct(depth = 0.0)
 
+        # Find mean common ancestor depth for all internal nodes
+        # (I assume input trees are from clock models, so leave-depths are constant)
         wsum = 0.0
         for weight, count, burnin, filename in wt_count_burnin_filename_list:
             ntrees = count - burnin
@@ -4710,15 +4712,20 @@ class TreeSummary():
             for i in range(burnin):
                 treefile.readtree(returntree=False)
             for input_tree in treefile:
-                for node in sum_tree.nodes:
+                for node in sum_tree.intnodes:
                     sumt_remkids = sum_tree.remotechildren_dict[node]
                     input_mrca = input_tree.find_mrca(sumt_remkids)
-                    input_depth = input_tree.nodedepth(input_mrca)
+                    input_depth = input_tree.nodedepthdict[input_mrca]
                     nodedict[node].depth += input_depth * multiplier
 
-        # normalise each value by sum of weights
-        for nodestruct in nodedict.values():
-            nodestruct.depth /= wsum
+        # normalise values for internal nodes by sum of weights
+        for node in sum_tree.intnodes:
+            nodedict[node].depth /= wsum
+
+        # Set values for leaves
+        # Use values on last tree left over from looping above (assume same on all input trees)
+        for node in sum_tree.leaves:
+            nodedict[node].depth = input_tree.nodedepthdict[node]
 
         # use average depths to set branch lengths
         for parent in sum_tree.sorted_intnodes(deepfirst=True):
