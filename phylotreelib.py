@@ -4612,6 +4612,8 @@ class TreeSummary():
 
     def root_maxfreq(self, summary_tree):
         """Uses info about root bipartitions in TreeSummary to place root on summary tree.
+
+        If tree has branch lengths:
         Divides length of root bipartition among two branches in accordance with average
         fraction of lengths seen for this rootbip across all trees."""
 
