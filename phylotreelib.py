@@ -4706,7 +4706,7 @@ class TreeSummary():
             ntrees = count - burnin
             wsum += weight
             multiplier = weight / ntrees
-            treefile = pt.Treefile(filename)
+            treefile = Treefile(filename)
             for i in range(burnin):
                 treefile.readtree(returntree=False)
             for input_tree in treefile:
