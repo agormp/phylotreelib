@@ -1764,11 +1764,11 @@ class Tree:
 
         # pick random starting node among leafset, and find its parent node
         random_leaf = next(iter(leafset))
-        parent = self.parent(random_leaf)
+        parent = self.parent_dict[random_leaf]
 
         # Walk down the tree from the initially picked node, until remkids include all of "leafset"
         while not leafset <= self.remotechildren_dict[parent]:
-            parent = self.parent(parent)
+            parent = self.parent_dict[parent]
 
         return parent
 
