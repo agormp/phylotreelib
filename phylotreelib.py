@@ -4717,7 +4717,7 @@ class TreeSummary():
                     nodedict[node].depth += input_depth * multiplier
 
         # normalise each value by sum of weights
-        for nodestruct in nodedict.items():
+        for nodestruct in nodedict.values():
             nodestruct.depth /= wsum
 
         # use average depths to set branch lengths
