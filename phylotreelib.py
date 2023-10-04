@@ -4485,21 +4485,17 @@ class TreeSummary():
         for bipart in other_bipsum:
             # If bipart already in self.bipartsummary, update fields
             if bipart in self_bipsum:
-
-                sumw1 = self_bipsum[bipart].SUMW
-                sumw2 = other_bipsum[bipart].SUMW
-                mean1 = self_bipsum[bipart].length
-                mean2 = other_bipsum[bipart].length
-                t1 = self_bipsum[bipart].T
-                t2 = other_bipsum[bipart].T
-
-                self_bipsum[bipart].bip_count += other_bipsum[bipart].bip_count
-                self_bipsum[bipart].length = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
+                if self.trackblen:
+                    sumw1 = self_bipsum[bipart].SUMW
+                    sumw2 = other_bipsum[bipart].SUMW
+                    mean1 = self_bipsum[bipart].length
+                    mean2 = other_bipsum[bipart].length
+                    t1 = self_bipsum[bipart].T
+                    t2 = other_bipsum[bipart].T
+                    self_bipsum[bipart].bip_count += other_bipsum[bipart].bip_count
+                    self_bipsum[bipart].length = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
+                    self_bipsum[bipart].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
                 self_bipsum[bipart].SUMW += other_bipsum[bipart].SUMW
-
-                # Note: the following expression was arrived at empirically!
-                # I have not proven this is correct, but it does seem to work...
-                self_bipsum[bipart].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
 
             # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
             else:
@@ -4519,21 +4515,17 @@ class TreeSummary():
         for clade in other_cladesum:
             # If bipart already in self.bipartsummary, update fields
             if clade in self_cladesum:
-
-                sumw1 = self_cladesum[clade].SUMW
-                sumw2 = other_cladesum[clade].SUMW
-                mean1 = self_cladesum[clade].depth
-                mean2 = other_cladesum[clade].depth
-                t1 = self_cladesum[clade].T
-                t2 = other_cladesum[clade].T
-
-                self_cladesum[clade].clade_count += other_cladesum[clade].clade_count
-                self_cladesum[clade].depth = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
+                if self.trackdepth:
+                    sumw1 = self_cladesum[clade].SUMW
+                    sumw2 = other_cladesum[clade].SUMW
+                    mean1 = self_cladesum[clade].depth
+                    mean2 = other_cladesum[clade].depth
+                    t1 = self_cladesum[clade].T
+                    t2 = other_cladesum[clade].T
+                    self_cladesum[clade].clade_count += other_cladesum[clade].clade_count
+                    self_cladesum[clade].depth = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
+                    self_cladesum[clade].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
                 self_cladesum[clade].SUMW += other_cladesum[clade].SUMW
-
-                # Note: the following expression was arrived at empirically!
-                # I have not proven this is correct, but it does seem to work...
-                self_cladesum[clade].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
 
             # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
             else:
@@ -4640,15 +4632,17 @@ class TreeSummary():
                     summary_tree.reroot(child, parent)
                 summary_tree.rootcred = count / self.tree_count
 
+                # If branch lengths or node depths have been tracked:
                 # Divide branch lengths for two rootkids according to fractions
                 # seen for this rootbip across trees in ._rootbip_summary
-                kid1,kid2 = summary_tree.children(summary_tree.root)
-                biplen = summary_tree.nodedist(kid1, kid2)
-                kid1_remkids = summary_tree.remotechildren_dict[kid1]
-                dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
-                dist_to_kid2 = biplen - dist_to_kid1
-                summary_tree.child_dict[summary_tree.root][kid1].length = dist_to_kid1
-                summary_tree.child_dict[summary_tree.root][kid2].length = dist_to_kid2
+                if self.trackblen or self.trackdepth:
+                    kid1,kid2 = summary_tree.children(summary_tree.root)
+                    biplen = summary_tree.nodedist(kid1, kid2)
+                    kid1_remkids = summary_tree.remotechildren_dict[kid1]
+                    dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+                    dist_to_kid2 = biplen - dist_to_kid1
+                    summary_tree.child_dict[summary_tree.root][kid1].length = dist_to_kid1
+                    summary_tree.child_dict[summary_tree.root][kid2].length = dist_to_kid2
 
                 return summary_tree
 
