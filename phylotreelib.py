@@ -4398,6 +4398,8 @@ class TreeSummary():
                     self._cladesummary[clade].clade_count = 1
                     self._cladesummary[clade].depth = depth
                     self._cladesummary[clade].T = 0.0
+                else:
+                    self._cladesummary[clade].depth = 0.0
 
         return cladedict
 
@@ -4442,6 +4444,8 @@ class TreeSummary():
                     self._bipartsummary[bipart].bip_count = 1
                     self._bipartsummary[bipart].length = brlen
                     self._bipartsummary[bipart].T = 0.0
+                else:
+                    self._bipartsummary[bipart].length = 0.0
 
         return bipdict
 
