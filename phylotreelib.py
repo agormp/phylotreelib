@@ -1278,14 +1278,10 @@ class Tree:
 
         if self._rootdist is None:
             self._rootdist = {self.root: 0.0}
-            children = list(self.children(self.root))
-            while children:
-                child = children.pop()
-                parent = self.parent_dict[child]
-                self._rootdist[child] = (self._rootdist[parent] +
-                                         self.child_dict[parent][child].length)
-                if child in self.intnodes:
-                    children.extend(self.children(child))
+            for parent in self.sorted_intnodes(deepfirst=True):
+                for child in self.children(parent):
+                    self._rootdist[child] = (self._rootdist[parent] +
+                                             self.child_dict[parent][child].length)
         return self._rootdist
 
     ###############################################################################################
