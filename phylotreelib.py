@@ -372,8 +372,7 @@ class Clade:
         self.leaf_list = sorted_leaf_list
         self.leaf2index = leaf2index
         leafset = frozenset(leafset)
-
-        self.indices = sorted([leaf2index[leaf] for leaf in leafset])
+        self.indices = {leaf2index[leaf] for leaf in leafset}
         self._hash_value = hash(leafset)
 
     def __hash__(self):
