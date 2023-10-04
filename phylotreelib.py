@@ -4723,7 +4723,7 @@ class TreeSummary():
         # use average depths to set branch lengths
         for parent in sum_tree.sorted_intnodes(deepfirst=True):
             p_depth = nodedict[parent].depth
-            for child in sum_tree.children(p):
+            for child in sum_tree.children(parent):
                 c_depth = nodedict[child].depth
                 blen = p_depth - c_depth
                 sum_tree.setlength(parent, child, blen)
