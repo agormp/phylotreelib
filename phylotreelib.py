@@ -4424,6 +4424,7 @@ class TreeSummary():
         # This is due to other functions that expect the attribute .length to be present
         bipdict = curtree.bipdict()
         for bipart,branchstruct in bipdict.items():
+            brlen = branchstruct.length
 
             # If bipartition has been seen before: update existing info
             if bipart in self._bipartsummary:
