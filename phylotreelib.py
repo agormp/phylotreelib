@@ -2009,40 +2009,36 @@ class Tree:
     def nodepath(self, node1, node2):
         """Returns path between node1 and node2 along tree."""
 
-        # If path_dict exists, use method tuned for that data structure
-        if self.path_dict is not None:
-            return self.nodepath_fromdict(node1, node2)
-
         # Find path from node1 to root
         root = self.root
-        node1path = [node1]
+        path1 = [node1]
         child = node1
         while child != root:
-            parent = self.parent(child)
-            node1path.append(parent)
+            parent = self.parent_dict[child]
+            path1.append(parent)
             child = parent
 
         # Find path from node2 to root (or to first node that is also on node1's path)
-        node2path = [node2]
+        path2 = [node2]
         child = node2
-        while child not in node1path:
-            parent = self.parent(child)
-            node2path.append(parent)
+        while child not in path1:
+            parent = self.parent_dict[child]
+            path2.append(parent)
             child = parent
         intersect = child        # child is now the intersection between the two paths
 
         # Clean up paths
-        node2path = node2path[:-1]                  # Remove intersection from node2path
-        intersect_index = node1path.index(intersect)
-        node1path = node1path[:intersect_index+1]   # Remove all upstream of intersect in node1path
+        path2 = path2[:-1]                  # Remove intersection from path2
+        intersect_index = path1.index(intersect)
+        path1 = path1[:intersect_index+1]   # Remove all upstream of intersect in path1
 
         # Merge paths to form full path
-        while node2path:
-            lastnode = node2path.pop()
-            node1path.append(lastnode)
+        while path2:
+            lastnode = path2.pop()
+            path1.append(lastnode)
 
-        # node1path now contains entire path between nodes and is returned
-        return node1path
+        # path1 now contains entire path between nodes and is returned
+        return path1
 
     ###############################################################################################
 
