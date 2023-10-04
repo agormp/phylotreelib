@@ -4691,11 +4691,44 @@ class TreeSummary():
 
     def set_ca_node_depths(self, sum_tree, wt_count_burnin_filename_list):
         """Set branch lengths on summary tree based on mean node depth for clades corresponding
-        to MRCA of clade's leaves. This means that all input trees are used when computing
+        to MRCA of clade's leaves. (same as "--height ca" in BEAST's treeannotator)
+        This means that all input trees are used when computing
         mean for each node (not just the input trees where that exact monophyletic clade
         is present)"""
 
-        pass
+        # Initialize node dictionary: {nodeid:Nodestruct}. Keeps track of avg depths
+        nodedict = {}
+        for node in sum_tree.nodes:
+            nodedict[node] = Nodestruct(depth = 0.0)
+
+        wsum = 0.0
+        for weight, count, burnin, filename in wt_count_burnin_filename_list:
+            ntrees = count - burnin
+            wsum += weight
+            multiplier = weight / ntrees
+            treefile = pt.Treefile(filename)
+            for i in range(burnin):
+                treefile.readtree(returntree=False)
+            for input_tree in treefile:
+                for node in sum_tree.nodes:
+                    sumt_remkids = sum_tree.remotechildren_dict[node]
+                    input_mrca = input_tree.find_mrca(sumt_remkids)
+                    input_depth = input_tree.nodedepth(input_mrca)
+                    nodedict[node].depth += input_depth * multiplier
+
+        # normalise each value by sum of weights
+        for nodestruct in nodedict.items():
+            nodestruct.depth /= wsum
+
+        # use average depths to set branch lengths
+        for parent in sum_tree.sorted_intnodes(deepfirst=True):
+            p_depth = nodedict[parent].depth
+            for child in sum_tree.children(p):
+                c_depth = nodedict[child].depth
+                blen = p_depth - c_depth
+                sum_tree.setlength(parent, child, blen)
+
+        return sum_tree
 
     ###############################################################################################
 
