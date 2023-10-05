@@ -2011,18 +2011,20 @@ class Tree:
 
         # Find path from node1 to root
         root = self.root
+        parent_dict = self.parent_dict
         path1 = [node1]
         child = node1
         while child != root:
-            parent = self.parent_dict[child]
+            parent = parent_dict[child]
             path1.append(parent)
             child = parent
+        path1set = set(path1)
 
         # Find path from node2 to root (or to first node that is also on node1's path)
         path2 = [node2]
         child = node2
-        while child not in path1:
-            parent = self.parent_dict[child]
+        while child not in path1set:
+            parent = parent_dict[child]
             path2.append(parent)
             child = parent
         intersect = child        # child is now the intersection between the two paths
