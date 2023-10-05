@@ -35,7 +35,13 @@ python3 -m pip install --upgrade phylotreelib
 * Trees can be grafted to each other, or a subtree can be moved using subtree pruning and regrafting (SPR)
 * Method for computing the distance between two trees (Robinson-Foulds, and derived normalised measures; returns information about number of unique and shared bipartitions)
 * The Distmatrix class contains methods for building trees from distance matrices
-* Methods for computing consensus trees from sets of input trees, which also yield information on the frequencies of clades and topologies, and on the distribution of branch lengths for bipartitions
+* Methods for computing summary tree from sets of input trees:
+    * Majority rule consensus tree
+	* Majority rule consensus tree, with all compatible bipartitions added
+	* Maximum Clade Credibility (MCC) tree
+	* Maximum Bipartition Credibility (MBC) tree
+	* Branch lengths can be set based on node depth (common ancestor or mean) and mean bipartition branch lengths.
+    * Methods also yield information on the frequencies of clades and topologies, and on the distribution of branch lengths for bipartitions
 * Library has been optimized for high speed and low memory consumption
 * NOTE: labels are interpreted as belonging to branches (bipartitions), not to internal nodes, and this association is maintained after re-rooting etc.
 
@@ -188,6 +194,30 @@ pd = tree1.treedist_pathdiff(tree2)
 print(f"Robinson-Foulds distance: {rf}")
 print(f"Normalised similarity (based on RF distance): {rfsimnorm:.2f}")
 print(f"Path difference distance: {pd:.2f}")
+```
+
+-----
+
+### Read set of input tree samples from BEAST (discarding burnin), compute maximum clade credibility tree, set branch lengths based on common ancestor heights
+The code below creates a TreeSummary object that will keep track of clades and topologies in the input tree-set, opens a file containing tree samples from a BEAST run, discards the first 500 as burnin, adds the remaining trees to the TreeSummary object, computes a maximum clade credibility (MCC) tree from the tree-summary, sets the branch lengths based on the common ancestor heights (based on original tree file), and writes the result to a nexus file (branch labels will correspond to clade credibility values).
+
+**NOTE**: The command-line program [sumt](https://github.com/agormp/sumt) exposes all phylotreelib's functionality related to consensus trees, and allows the user to create consensus, MCC, and MBC trees with various options for branch lengths and rooting, without having to write scripts.
+
+```python
+import phylotreelib as pt
+treesummary = pt.BigTreeSummary(trackbips=False, trackclades=True, trackroot=True)
+treefile = pt.Nexustreefile("SARS-CoV-2.trees")
+burnin = 500
+for i in range(burnin):
+    treefile.readtree(returntree=False)
+for tree in treefile:
+    treesummary.add_tree(tree)
+mcctree = treesummary.max_clade_cred_tree()
+weight = 1.0
+treecount = 2001
+mcctree = set_ca_node_depths(mcctree, [weight, treecount, burnin, "SARS-CoV-2.trees"])
+with open("SARS-CoV-2.mcc", "w") as outfile:
+    outfile.write(mcctree.nexus())
 ```
 
 ## Using phylotreelib
