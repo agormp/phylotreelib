@@ -1752,23 +1752,21 @@ class Tree:
         """Finds Most Recent Common Ancestor for the provided set of leaves.
         MRCA for a leaf is leaf itself"""
 
-        leafset = set(leaves)
-        if not leafset <= self.leaves:
-            leafstring = ", ".join(map(str, leafset))
-            msg = "Some nodes in set are not part of tree: %s" % leafstring
-            raise TreeError(msg)
-
         # special case: mrca for leaf is leaf itself
-        if len(leafset) == 1:
-            return next(iter(leafset))
+        if len(leaves) == 1:
+            return next(iter(leaves))
+
+        leafset = set(leaves)
+        remotechildren_dict = self.remotechildren_dict
+        parent_dict = self.parent_dict
 
         # pick random starting node among leafset, and find its parent node
         random_leaf = next(iter(leafset))
-        parent = self.parent_dict[random_leaf]
+        parent = parent_dict[random_leaf]
 
         # Walk down the tree from the initially picked node, until remkids include all of "leafset"
-        while not leafset <= self.remotechildren_dict[parent]:
-            parent = self.parent_dict[parent]
+        while not leafset <= remotechildren_dict[parent]:
+            parent = parent_dict[parent]
 
         return parent
 
