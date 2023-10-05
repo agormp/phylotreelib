@@ -2044,6 +2044,32 @@ class Tree:
 
     ###############################################################################################
 
+    def find_path_intersection(self, node1, node2):
+        """Returns intersection between paths from node1 and node2 to root (two-leaf mrca)."""
+
+        # Python note: overlap with nodepath - integrate somehow perhaos?
+
+        # Find nodes on path from node1 to root
+        root = self.root
+        parent_dict = self.parent_dict
+        path1set = set([node1, root])
+        child = node1
+        while child != root:
+            parent = parent_dict[child]
+            path1set.add(parent)
+            child = parent
+
+        # Find path from node2 to root (or to first node that is also on node1's path)
+        child = node2
+        while child not in path1set:
+            parent = parent_dict[child]
+            child = parent
+        intersect = child        # child is now the intersection between the two paths
+
+        return intersect
+
+    ###############################################################################################
+
     def length(self):
         """Returns tree length (sum of all branch lengths)"""
 
