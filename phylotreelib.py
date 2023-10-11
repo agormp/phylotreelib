@@ -1342,7 +1342,6 @@ class Tree:
 
     ###############################################################################################
 
-    @profile
     def pathdist_dict(self, rooted=False):
         """Returns dictionary giving path-distance (number of edges) for all pairs of leaves"""
 
