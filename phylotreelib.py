@@ -1342,47 +1342,54 @@ class Tree:
 
     ###############################################################################################
 
+    @profile
     def pathdist_dict(self, rooted=False):
         """Returns dictionary giving path-distance (number of edges) for all pairs of leaves"""
 
+        if rooted and self._pathdist_dict:
+            return self._pathdist_dict
+        elif not rooted and self._pathdist_dict_unroot:
+            return self._pathdist_dict_unroot
+
+        child_dict = self.child_dict
+        combinations = itertools.combinations
+
+        # Initialize distdict, counting root traversal as 1 or 2 steps
         if rooted:
-            distdict = self._pathdist_dict
-        else:
-            distdict = self._pathdist_dict_unroot
-
-        if distdict is None:
-            if rooted:
-                tree = self
-            else:
-                tree = self.copy_treeobject()
-                tree.deroot()
-
-            # Build path-distance matrix in optimal order
-            # Data structures and algorithm inspired by the Floyd-Warshall algorithm, but modified and
-            # faster than O(n^3) since it is on a tree (unique paths)
-            distdict = self._pathdist_dict = dict.fromkeys(tree.nodes)
+            distdict = self._pathdist_dict = dict.fromkeys(self.nodes)
             for key in distdict:
                 distdict[key] = {}
-            child_dict = tree.child_dict
-            combinations = itertools.combinations
+            intnodes = self.sorted_intnodes()
+        else:
+            distdict = self._pathdist_dict_unroot = dict.fromkeys(self.nodes - {self.root})
+            for key in distdict:
+                distdict[key] = {}
+            rootkids = self.children(self.root)
+            for (child1, child2) in combinations(rootkids, 2):
+                distdict[child1][child2] = 1
+                distdict[child2][child1] = 1
+            intnodes = self.sorted_intnodes()[1:] # Remove root from front of list
 
-            # Traverse tree starting from root, breadth-first (sorted_intnodes)
-            intnodes = tree.sorted_intnodes()
-            for parent in intnodes:
-                children = child_dict[parent].keys()
-                if distdict[parent]:
-                    prev_contacts = distdict[parent].keys()
-                    for child in children:
-                        for prev_contact in prev_contacts:
-                            totlen = distdict[prev_contact][parent] + 1
-                            distdict[prev_contact][child] = totlen
-                            distdict[child][prev_contact] = totlen
-                for (child1, child2) in combinations(children, 2):
-                    distdict[child1][child2] = 2
-                    distdict[child2][child1] = 2
+        # Build path-distance matrix in optimal order
+        # Data structures and algorithm inspired by the Floyd-Warshall algorithm, but modified and
+        # faster than O(n^3) since it is on a tree (unique paths)
+
+        # Traverse tree starting from root, breadth-first (sorted_intnodes)
+        for parent in intnodes:
+            children = child_dict[parent].keys()
+            if distdict[parent]:
+                prev_contacts = distdict[parent].keys()
                 for child in children:
-                    distdict[parent][child] = 1
-                    distdict[child][parent] = 1
+                    for prev_contact in prev_contacts:
+                        totlen = distdict[prev_contact][parent] + 1
+                        distdict[prev_contact][child] = totlen
+                        distdict[child][prev_contact] = totlen
+            for (child1, child2) in combinations(children, 2):
+                distdict[child1][child2] = 2
+                distdict[child2][child1] = 2
+            for child in children:
+                distdict[parent][child] = 1
+                distdict[child][parent] = 1
 
         return distdict
 
