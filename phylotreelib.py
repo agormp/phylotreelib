@@ -1502,46 +1502,6 @@ class Tree:
 
     ###############################################################################################
 
-    def _build_pathdist_dict(self):
-        """Construct dictionary keeping track of all pairwise distances between nodes"""
-
-        # Data structures and algorithm inspired by the Floyd-Warshall algorithm, but modified and
-        # faster than O(n^3) since it is on a tree (unique paths)
-
-        ddict = self.pathdist_dict = dict.fromkeys(self.nodes)
-        for key in dist:
-            dist[key] = {}
-        tree = self.child_dict
-        combinations = itertools.combinations
-
-        # Traverse tree starting from root, breadth-first (sorted_intnodes)
-        # This is required for below algorithm to work
-        intnodes = self.sorted_intnodes()
-        for parent in intnodes:
-            children = tree[parent].keys()
-            if dist[parent]:
-                prev_contacts = dist[parent].keys()
-                for child in children:
-                    childlen = tree[parent][child].length
-                    for prev_contact in prev_contacts:
-                        totlen = dist[prev_contact][parent] + childlen
-                        dist[prev_contact][child] = totlen
-                        dist[child][prev_contact] = totlen
-            for (child1, child2) in combinations(children, 2):
-                totlen = tree[parent][child1].length + tree[parent][child2].length
-                dist[child1][child2] = totlen
-                dist[child2][child1] = totlen
-            for child in children:
-                totlen = tree[parent][child].length
-                dist[parent][child] = totlen
-                dist[child][parent] = totlen
-
-        # Fill in diagonal (zero entries), just in case
-        for node in self.nodes:
-            dist[node][node] = 0
-
-    ###############################################################################################
-
     def sorted_intnodes(self, deepfirst=True):
         """Returns sorted intnode list for breadth-first traversal of tree"""
 
