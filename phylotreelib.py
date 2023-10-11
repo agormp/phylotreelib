@@ -648,7 +648,9 @@ class Tree:
         self._leaf2index = None
         self.dist_dict = None
         self._pathdist_dict = None
+        self._pathdist_dict_unroot = None
         self._pathdist_as_ndarray = None
+        self._pathdist_as_ndarray_unroot = None
         self.path_dict = None
         self._remotechildren_dict = None
         self.interner = None
@@ -669,7 +671,9 @@ class Tree:
         self._leaf2index = None
         self.dist_dict = None
         self._pathdist_dict = None
+        self._pathdist_dict_unroot = None
         self._pathdist_as_ndarray = None
+        self._pathdist_as_ndarray_unroot = None
         self.path_dict = None
         self._remotechildren_dict = None
         self.interner = None
@@ -1338,25 +1342,32 @@ class Tree:
 
     ###############################################################################################
 
-    @property
-    def pathdist_dict(self):
+    def pathdist_dict(self, rooted=False):
         """Returns dictionary giving path-distance (number of edges) for all pairs of leaves"""
 
-        if self._pathdist_dict == None:
-            treecopy = self.copy_treeobject()
-            #treecopy.deroot()
+        if rooted:
+            distdict = self._pathdist_dict
+        else:
+            distdict = self._pathdist_dict_unroot
+
+        if distdict is None:
+            if rooted:
+                tree = self
+            else:
+                tree = self.copy_treeobject()
+                tree.deroot()
 
             # Build path-distance matrix in optimal order
             # Data structures and algorithm inspired by the Floyd-Warshall algorithm, but modified and
             # faster than O(n^3) since it is on a tree (unique paths)
-            distdict = self._pathdist_dict = dict.fromkeys(treecopy.nodes)
+            distdict = self._pathdist_dict = dict.fromkeys(tree.nodes)
             for key in distdict:
                 distdict[key] = {}
-            child_dict = treecopy.child_dict
+            child_dict = tree.child_dict
             combinations = itertools.combinations
 
             # Traverse tree starting from root, breadth-first (sorted_intnodes)
-            intnodes = treecopy.sorted_intnodes()
+            intnodes = tree.sorted_intnodes()
             for parent in intnodes:
                 children = child_dict[parent].keys()
                 if distdict[parent]:
@@ -1373,24 +1384,27 @@ class Tree:
                     distdict[parent][child] = 1
                     distdict[child][parent] = 1
 
-        return self._pathdist_dict
+        return distdict
 
     ###############################################################################################
 
-    @property
-    def pathdist_as_ndarray(self):
+    def pathdist_as_ndarray(self, rooted=False):
         """Return flattened version of pathdist_dict (in alphabetical leaf-pair order)"""
 
-        if self._pathdist_as_ndarray is None:
-            distdict = self.pathdist_dict
+        if rooted:
+            dictarray = self._pathdist_as_ndarray
+        else:
+            dictarray = self._pathdist_as_ndarray_unroot
+        if dictarray is None:
+            distdict = self.pathdist_dict(rooted)
             leafnames = self.sorted_leaf_list
             namepairs = itertools.combinations(leafnames, 2)
             nleaves = len(leafnames)
             npairs = nleaves * (nleaves - 1) // 2
             distiter = (distdict[n1][n2] for n1, n2 in namepairs)
-            self._pathdist_as_ndarray = np.fromiter(distiter, dtype=float, count=npairs)
+            dictarray = np.fromiter(distiter, dtype=float, count=npairs)
 
-        return self._pathdist_as_ndarray
+        return dictarray
 
     ###############################################################################################
 
@@ -3609,8 +3623,8 @@ class Tree:
         rooted=True: count traversal of root as 2 steps (not 1)
         """
 
-        self_distvec = self.pathdist_as_ndarray
-        other_distvec = other.pathdist_as_ndarray
+        self_distvec = self.pathdist_as_ndarray(rooted)
+        other_distvec = other.pathdist_as_ndarray(rooted)
 
         return np.linalg.norm(self_distvec - other_distvec)
 
