@@ -2011,34 +2011,25 @@ class Tree:
         root = self.root
         parent_dict = self.parent_dict
         path1 = [node1]
-        child = node1
-        while child != root:
-            parent = parent_dict[child]
-            path1.append(parent)
-            child = parent
+        curnode = node1
+        while curnode != root:
+            curnode = parent_dict[curnode]
+            path1.append(curnode)
         path1set = set(path1)
 
         # Find path from node2 to root (or to first node that is also on node1's path)
         path2 = [node2]
-        child = node2
-        while child not in path1set:
-            parent = parent_dict[child]
-            path2.append(parent)
-            child = parent
-        intersect = child        # child is now the intersection between the two paths
+        curnode = node2
+        while curnode not in path1set:
+            curnode = parent_dict[curnode]
+            path2.append(curnode)
 
-        # Clean up paths
-        path2 = path2[:-1]                  # Remove intersection from path2
-        intersect_index = path1.index(intersect)
-        path1 = path1[:intersect_index+1]   # Remove all upstream of intersect in path1
+        # merge paths
+        intersect = path1.index(curnode)
+        path2.reverse()
+        fullpath =  path1[:intersect] + path2
 
-        # Merge paths to form full path
-        while path2:
-            lastnode = path2.pop()
-            path1.append(lastnode)
-
-        # path1 now contains entire path between nodes and is returned
-        return path1
+        return fullpath
 
     ###############################################################################################
 
