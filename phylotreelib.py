@@ -2041,21 +2041,18 @@ class Tree:
         # Find nodes on path from node1 to root
         root = self.root
         parent_dict = self.parent_dict
-        path1set = set([node1, root])
-        child = node1
-        while child != root:
-            parent = parent_dict[child]
-            path1set.add(parent)
-            child = parent
+        path1set = set([node1])
+        curnode = node1
+        while curnode != root:
+            curnode = parent_dict[curnode]
+            path1set.add(curnode)
 
         # Find path from node2 to root (or to first node that is also on node1's path)
-        child = node2
-        while child not in path1set:
-            parent = parent_dict[child]
-            child = parent
-        intersect = child        # child is now the intersection between the two paths
+        curnode = node2
+        while curnode not in path1set:
+            curnode = parent_dict[curnode]
 
-        return intersect
+        return curnode
 
     ###############################################################################################
 
@@ -2086,6 +2083,9 @@ class Tree:
     def diameter(self, return_leaves=False):
         """Return diameter: longest leaf-leaf distance along tree.
         If return_leaves is True: Return tuple with (maxdist, Leaf1, Leaf2)"""
+
+        # Python note: check for zero branch lengths somehow
+        # using .length() is a bit expensive. Some sort of try except approach?
 
         # Find the two leaves having the largest pairwise distance. Neat, 2-step algorithm:
         # (1) Pick random leaf, leaf1, find longest path to other leaf, leaf2
