@@ -647,6 +647,8 @@ class Tree:
         self._sorted_leaf_list = None
         self._leaf2index = None
         self.dist_dict = None
+        self._pathdist_dict = None
+        self._pathdist_as_ndarray = None
         self.path_dict = None
         self._remotechildren_dict = None
         self.interner = None
@@ -666,6 +668,8 @@ class Tree:
         self._sorted_leaf_list = None
         self._leaf2index = None
         self.dist_dict = None
+        self._pathdist_dict = None
+        self._pathdist_as_ndarray = None
         self.path_dict = None
         self._remotechildren_dict = None
         self.interner = None
@@ -1334,6 +1338,62 @@ class Tree:
 
     ###############################################################################################
 
+    @property
+    def pathdist_dict(self):
+        """Returns dictionary giving path-distance (number of edges) for all pairs of leaves"""
+
+        if self._pathdist_dict == None:
+            treecopy = self.copy_treeobject()
+            #treecopy.deroot()
+
+            # Build path-distance matrix in optimal order
+            # Data structures and algorithm inspired by the Floyd-Warshall algorithm, but modified and
+            # faster than O(n^3) since it is on a tree (unique paths)
+            distdict = self._pathdist_dict = dict.fromkeys(treecopy.nodes)
+            for key in distdict:
+                distdict[key] = {}
+            child_dict = treecopy.child_dict
+            combinations = itertools.combinations
+
+            # Traverse tree starting from root, breadth-first (sorted_intnodes)
+            intnodes = treecopy.sorted_intnodes()
+            for parent in intnodes:
+                children = child_dict[parent].keys()
+                if distdict[parent]:
+                    prev_contacts = distdict[parent].keys()
+                    for child in children:
+                        for prev_contact in prev_contacts:
+                            totlen = distdict[prev_contact][parent] + 1
+                            distdict[prev_contact][child] = totlen
+                            distdict[child][prev_contact] = totlen
+                for (child1, child2) in combinations(children, 2):
+                    distdict[child1][child2] = 2
+                    distdict[child2][child1] = 2
+                for child in children:
+                    distdict[parent][child] = 1
+                    distdict[child][parent] = 1
+
+        return self._pathdist_dict
+
+    ###############################################################################################
+
+    @property
+    def pathdist_as_ndarray(self):
+        """Return flattened version of pathdist_dict (in alphabetical leaf-pair order)"""
+
+        if self._pathdist_as_ndarray is None:
+            distdict = self.pathdist_dict
+            leafnames = self.sorted_leaf_list
+            namepairs = itertools.combinations(leafnames, 2)
+            nleaves = len(leafnames)
+            npairs = nleaves * (nleaves - 1) // 2
+            distiter = (distdict[n1][n2] for n1, n2 in namepairs)
+            self._pathdist_as_ndarray = np.fromiter(distiter, dtype=float, count=npairs)
+
+        return self._pathdist_as_ndarray
+
+    ###############################################################################################
+
     def copy_treeobject(self, copylengths=True, copylabels=True, interner=None):
         """Returns copy of Tree object. Copies structure and branch lengths.
         Caches and any user-added attributes are not copied.
@@ -1439,6 +1499,46 @@ class Tree:
             for child in children:
                 path[parent][child] = child
                 path[child][parent] = parent
+
+    ###############################################################################################
+
+    def _build_pathdist_dict(self):
+        """Construct dictionary keeping track of all pairwise distances between nodes"""
+
+        # Data structures and algorithm inspired by the Floyd-Warshall algorithm, but modified and
+        # faster than O(n^3) since it is on a tree (unique paths)
+
+        ddict = self.pathdist_dict = dict.fromkeys(self.nodes)
+        for key in dist:
+            dist[key] = {}
+        tree = self.child_dict
+        combinations = itertools.combinations
+
+        # Traverse tree starting from root, breadth-first (sorted_intnodes)
+        # This is required for below algorithm to work
+        intnodes = self.sorted_intnodes()
+        for parent in intnodes:
+            children = tree[parent].keys()
+            if dist[parent]:
+                prev_contacts = dist[parent].keys()
+                for child in children:
+                    childlen = tree[parent][child].length
+                    for prev_contact in prev_contacts:
+                        totlen = dist[prev_contact][parent] + childlen
+                        dist[prev_contact][child] = totlen
+                        dist[child][prev_contact] = totlen
+            for (child1, child2) in combinations(children, 2):
+                totlen = tree[parent][child1].length + tree[parent][child2].length
+                dist[child1][child2] = totlen
+                dist[child2][child1] = totlen
+            for child in children:
+                totlen = tree[parent][child].length
+                dist[parent][child] = totlen
+                dist[child][parent] = totlen
+
+        # Fill in diagonal (zero entries), just in case
+        for node in self.nodes:
+            dist[node][node] = 0
 
     ###############################################################################################
 
@@ -3541,35 +3641,16 @@ class Tree:
 
     ###############################################################################################
 
-    def _pathdist_as_ndarray(self):
-        """Utillity function for treedist_pathdiff: return pathdiff matrix as vector:
-        For each pair of leaves: count number of edges on path between them,
-        return flattened version of pairwise matrix (in alphabetical leaf-pair order)
-        Note: traversing root counts as one edge (so I deroot treecopy before counting)"""
 
-        def dist_iterator(tree, namepairs):
-            for n1, n2 in namepairs:
-                yield len(tree.nodepath(n1,n2)) - 1
-
-        tree = self.copy_treeobject()
-        tree.deroot()
-        leafnames = tree.leaflist()     # Sorted alphabetically
-        namepairs = itertools.combinations(leafnames, 2)
-        nleaves = len(leafnames)
-        npairs = nleaves * (nleaves - 1) // 2
-        distarray = np.fromiter(dist_iterator(tree, namepairs), dtype=float, count=npairs)
-        return distarray
-
-    ###############################################################################################
-
-    def treedist_pathdiff(self, other):
+    def treedist_pathdiff(self, other, rooted=False):
         """Compute path difference tree-distance between self and other:
         Euclidean distance between nodepath-dist matrices considered as vectors.
         Measure described in M.A. Steel, D. Penny, Syst. Biol. 42 (1993) 126–141
+        rooted=True: count traversal of root as 2 steps (not 1)
         """
 
-        self_distvec = self._pathdist_as_ndarray()
-        other_distvec = other._pathdist_as_ndarray()
+        self_distvec = self.pathdist_as_ndarray
+        other_distvec = other.pathdist_as_ndarray
 
         return np.linalg.norm(self_distvec - other_distvec)
 
