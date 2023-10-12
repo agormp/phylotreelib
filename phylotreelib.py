@@ -1355,14 +1355,10 @@ class Tree:
 
         # Initialize distdict, counting root traversal as 1 or 2 steps
         if rooted:
-            distdict = self._pathdist_dict = dict.fromkeys(self.nodes)
-            for key in distdict:
-                distdict[key] = {}
+            distdict = self._pathdist_dict = {n:{} for n in self.nodes}
             intnodes = self.sorted_intnodes()
         else:
-            distdict = self._pathdist_dict_unroot = dict.fromkeys(self.nodes - {self.root})
-            for key in distdict:
-                distdict[key] = {}
+            distdict = self._pathdist_dict_unroot = {n:{} for n in (self.nodes - {self.root})}
             rootkids = self.children(self.root)
             for (child1, child2) in combinations(rootkids, 2):
                 distdict[child1][child2] = 1
