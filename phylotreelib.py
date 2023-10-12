@@ -5369,10 +5369,19 @@ class Treefile:
 
 ###################################################################################################
 ###################################################################################################
-###################################################################################################
-##
-##          Treebuilding section: classes and methods for building trees
-##
+
+class SymmetricMatrix:
+    """Base class for symmetric matrices (especially distance matrices for trees or taxa).
+    Only needs to set upper half, but can be accessed using any order of indices"""
+
+    def __init__(self):
+        self.dmat = None
+        self.namelist = None
+        self.n = None
+        self.name2index = None
+        self.index2name = None
+
+
 ###################################################################################################
 ###################################################################################################
 
