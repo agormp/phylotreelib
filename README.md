@@ -1,6 +1,6 @@
 # phylotreelib
 
-![](https://img.shields.io/badge/version-1.25.1-blue)
+![](https://img.shields.io/badge/version-1.25.2-blue)
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=PyPI%20downloads&service=github)](https://pepy.tech/project/phylotreelib)
 
 
