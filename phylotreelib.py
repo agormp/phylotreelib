@@ -2286,10 +2286,6 @@ class Tree:
         for (oldname, newname) in zip(tmpnames, newnames):
             self.rename_leaf(oldname, newname)
 
-        # Clear lru_caches (which cannot be edited manually)
-        # self.remote_children.cache_clear()
-        self.clear_caches()
-
     ###############################################################################################
 
     def cladegrep(self, pattern, minsize = 2):
@@ -3501,7 +3497,6 @@ class Tree:
             newname = fixedname
 
         parent = self.parent(oldname)
-        self._parent_dict = None
         self.child_dict[parent][newname] = self.child_dict[parent][oldname]
         del self.child_dict[parent][oldname]
 
@@ -3511,12 +3506,11 @@ class Tree:
         self.nodes.add(newname)
         self.nodes.remove(oldname)
 
-        # # Update self.parent_dict if it exists:
-        # if self.parent_dict is not None:
-        #     self.parent_dict[newname] = self.parent_dict[oldname]
-        #     del self.parent_dict[oldname]
+        # Update self.parent_dict
+        self.parent_dict[newname] = self.parent_dict[oldname]
+        del self.parent_dict[oldname]
 
-        self.clear_caches()
+        self.clear_caches(preserve=["_parent_dict"])
 
     ###############################################################################################
 
