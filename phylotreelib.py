@@ -663,27 +663,27 @@ class Tree:
 
     ###############################################################################################
 
-    def clear_caches(self):
-        self._parent_dict = None
-        self._remotechildren_dict = None
-        self._frozenset_leaves = None
-        self._sorted_leaf_list = None
-        self._leaf2index = None
-        self.dist_dict = None
-        self._pathdist_dict = None
-        self._pathdist_dict_unroot = None
-        self._pathdist_as_ndarray = None
-        self._pathdist_as_ndarray_unroot = None
-        self.path_dict = None
-        self._remotechildren_dict = None
-        self.interner = None
-        self._sorted_intnodes_deep = None
-        self._sorted_intnodes_shallow = None
-        self.nodedist.cache_clear()
-        self._rootdist = None
-        self._nodedepthdict = None
-        self._topology_bipart = None
-        self._topology_clade = None
+    def clear_caches(self, preserve=[]):
+        """Clears set of computed attributes. Use when tree structure is changed, and these
+        are no longer reliable. Does not clear attributes listed in preserve"""
+
+        # Python note: using the actual names instead of the public property names
+        # is perhaps too tight couplling. Consider adding dict mapping from public to private
+        # property names, and let caller use public names in preserve
+
+        attributes_to_clear = {
+            "_parent_dict", "_remotechildren_dict", "_frozenset_leaves",
+            "_sorted_leaf_list", "_leaf2index", "dist_dict", "_pathdist_dict",
+            "_pathdist_dict_unroot", "_pathdist_as_ndarray", "_pathdist_as_ndarray_unroot",
+            "path_dict", "interner", "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
+            "_rootdist", "_nodedepthdict", "_topology_bipart", "_topology_clade"
+        }
+
+        attributes_to_clear -= set(preserve)
+        for attr in attributes_to_clear:
+            setattr(self, attr, None)
+        if "nodedist" not in preserve:
+            self.nodedist.cache_clear()
 
     ###############################################################################################
 
