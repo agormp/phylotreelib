@@ -2268,23 +2268,27 @@ class Tree:
         # NOTE: this is mostly useful for statistical (resampling-style) analysis of whether
         # patterns of clustered leaves are significant
 
-        # Construct list of old names
+        # Construct dictionary mapping old to new names (new names = shuffled version of old)
         oldnames = list(self.leaves)
-
-        # Construct list of new names by shuffling old names
         newnames = list(self.leaves)
         random.shuffle(newnames)
+        old2new = dict(zip(oldnames, newnames))
 
-        # Construct temporary list of names, to avoid duplicate names during name-changing process
-        tmpnames = ["t" + str(i) for i in range(len(oldnames))]
+        # Loop through child_dict and replace leafnames where they occur
+        for parent in list(self.child_dict.keys()):
+            if parent in old2new:
+                newparent = old2new[parent]
+                self.child_dict[newparent] = self.child_dict[parent]
+                del self.child_dict[parent]
+                parent = newparent
+            for child in list(self.child_dict[parent].keys()):
+                if child in old2new:
+                    newchild = old2new[child]
+                    self.child_dict[parent][newchild] = self.child_dict[parent][child]
+                    del self.child_dict[parent][child]
 
-        # Change old names to temporary names
-        for (oldname, newname) in zip(oldnames, tmpnames):
-            self.rename_leaf(oldname, newname)
-
-        # Change temporary names to new names
-        for (oldname, newname) in zip(tmpnames, newnames):
-            self.rename_leaf(oldname, newname)
+        # Delete all caches which will now be rendered obsolete
+        self.clear_caches()
 
     ###############################################################################################
 
