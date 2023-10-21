@@ -2273,19 +2273,17 @@ class Tree:
         newnames = list(self.leaves)
         random.shuffle(newnames)
         old2new = dict(zip(oldnames, newnames))
+        print(old2new)  #DEBUG
 
         # Loop through child_dict and replace leafnames where they occur
-        for parent in list(self.child_dict.keys()):
-            if parent in old2new:
-                newparent = old2new[parent]
-                self.child_dict[newparent] = self.child_dict[parent]
-                del self.child_dict[parent]
-                parent = newparent
-            for child in list(self.child_dict[parent].keys()):
-                if child in old2new:
-                    newchild = old2new[child]
-                    self.child_dict[parent][newchild] = self.child_dict[parent][child]
-                    del self.child_dict[parent][child]
+        for parent in self.child_dict:
+            tmp_dict = {}
+            for child, value in self.child_dict[parent].items():
+                if child in self.leaves:
+                    tmp_dict[old2new[child]] = value
+                else:
+                    tmp_dict[child] = value
+            self.child_dict[parent] = tmp_dict
 
         # Delete all caches which will now be rendered obsolete
         self.clear_caches()
