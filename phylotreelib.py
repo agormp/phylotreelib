@@ -1006,6 +1006,7 @@ class Tree:
         return obj
 
     ###############################################################################################
+
     @classmethod
     def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s", interner=None):
         """Constructor: tree with random topology from list of leaf names OR number of tips"""
@@ -3616,7 +3617,6 @@ class Tree:
             return treedist
 
     ###############################################################################################
-
 
     def treedist_pathdiff(self, other, rooted=False):
         """Compute path difference tree-distance between self and other:
