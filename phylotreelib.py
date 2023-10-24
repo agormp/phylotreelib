@@ -244,7 +244,8 @@ class Nodestruct:
         self.depth = depth
 
     def __str__(self):
-        return f"{str(self.depth)}\n"
+        attrs = [f"{k}: {v}" for k, v in vars(self).items()]
+        return ", ".join(attrs) + "\n"
 
     def __repr__(self):
         return self.__str__()
