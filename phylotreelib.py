@@ -989,8 +989,9 @@ class Tree:
             else:
                 obj.child_dict[parent] = { child:Branchstruct(blen, lab) }
             obj.intnodes.add(parent)
-            if isinstance(child, str):
-                obj.leaves.add(child)
+
+        # Leaves are the childnodes that are not in parentlist
+        obj.leaves = set(childlist) - set(parentlist)
 
         # Root node is the parent node that is not also in childlist
         diffset = set(parentlist) - set(childlist)
