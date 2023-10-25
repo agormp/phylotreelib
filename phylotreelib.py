@@ -3068,8 +3068,11 @@ class Tree:
         # Local copies for faster access
         tree = self.child_dict
 
-        # Account for fact that some intnodes may be strings (e.g., transmission trees)
-        newnode = max(x for x in self.intnodes if isinstance(x, int)) + 1
+        # Account for fact that some or all intnodes may be strings (e.g., transmission trees)
+        if all(isinstance(intnode, str) for intnode in self.intnodes):
+            newnode = 0
+        else:
+            newnode = max(x for x in self.intnodes if isinstance(x, int)) + 1
         tree[newnode] = {}
 
         # Add new internal node as child of "parent"
