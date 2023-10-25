@@ -13,6 +13,7 @@ import statistics
 import sys
 from io import StringIO
 from operator import itemgetter
+from collections import Counter
 import numpy as np
 
 ###################################################################################################
@@ -642,6 +643,7 @@ class Tree:
     # The main constructor "__init__" is therefore mostly empty
 
     def __init__(self):
+        self.nodedict = None   # Python note: not sure it should be initsed here?
         self._parent_dict = None
         self._remotechildren_dict = None
         self._frozenset_leaves = None
@@ -4102,6 +4104,86 @@ class Tree:
         # Regraft: Add subtree back onto remaining tree
         # Special treatment when pruning single leaf (to avoid superfluous internal node)
         self.graft(subtree, regraft_node, graft_with_other_root=isleaf)
+
+    ###############################################################################################
+
+    def parsimony_score_hartigan(self, return_labelinfo=False):
+        """Computes parsimony cost ("small parsimony problem") for tree using Hartigan's
+        1973 algorithm (allowing for multifurcations and labelled internal nodes).
+        Note: so far only implemented for one-character states (in the cladistic sense).
+        Assumes tree has .nodedict attribute: {nodeid:Nodestruct}, and that each
+        Nodestruct has a .state attribute, which is either empty (unlabelled nodes)
+        or a string specifying the state (e.g., "mink" or "human" or "A").
+
+        return_labelinfo: If True: return tuple of (totdist, labdist, unlabdist)
+            where labdist is part of total dist that is between two labelled nodes
+            and unlabdist is part of total dist where at least one node is unlabelled
+        """
+
+        # Note: i am using algorithm from:
+        # Live phylogeny with polytomies: Finding the most compact parsimonious trees
+        # D. Papamichaila et al., Computational Biology and Chemistry 69 (2017) 171–177
+
+        if self.nodedict is None:
+            msg = "Tree object has no .nodedict attribute. Can't compute parsimony score"
+            raise TreeError(msg)
+
+        # Set upper set of all labelled nodes (both internal and leafs) = state-value
+        # Set lower set of labelled nodes to be the empty set (necessary for root-tip pass?)
+        for node in self.nodes:
+            state = self.nodedict[node].state
+            if state:
+                self.nodedict[node].primary_set = set([state])
+                self.nodedict[node].secondary_set = set()
+
+        # Tip-to-root pass: compute upper and lower sets for all unlabelled nodes
+        # All leaves are assumed to be labelled (to have a non-empty .state)
+        for p in self.sorted_intnodes(deepfirst=False):
+            if not self.nodedict[p].state:
+                statecount = Counter()
+                for c in self.children(p):
+                    statecount.update(self.nodedict[c].primary_set)
+                statecountlist = statecount.most_common()
+                topcount = statecountlist[0][1]
+                maxlist = [state for state,count in statecountlist if count==topcount]
+                almostmaxlist = [state for state,count in statecountlist if count==(topcount - 1)]
+                self.nodedict[p].primary_set = set(maxlist)
+                self.nodedict[p].secondary_set = set(almostmaxlist)
+
+        # Set final_set of root (should I randomly choose one state? or is set ok?)
+        self.nodedict[self.root].final_set = self.nodedict[self.root].primary_set
+
+        # Root-to-tip pass: compute final sets for each node (labelled or not)
+        for p in self.sorted_intnodes(deepfirst=True):
+            for c in self.children(p):
+                p_final_set = self.nodedict[p].final_set
+                c_primary_set = self.nodedict[c].primary_set
+                if p_final_set <= c_primary_set:
+                    self.nodedict[c].final_set = p_final_set
+                else:
+                    c_secondary_set = self.nodedict[c].secondary_set
+                    self.nodedict[c].final_set = c_primary_set | (p_final_set & c_secondary_set)
+
+        # Compute parsimony cost by comparing final_sets on either end of each branch:
+        # If there is no overlap between parent's and child's final_set: add 1 to dist
+        # Keep track of part of distance from observed branches (where both ends are labelled)
+        labdist = 0
+        unlabdist = 0
+        for p in self.intnodes:
+            plabelled = bool(self.nodedict[p].state)
+            for c in self.children(p):
+                clabelled = bool(self.nodedict[c].state)
+                if not (self.nodedict[p].final_set & self.nodedict[c].final_set):
+                    if plabelled & clabelled:
+                        labdist += 1
+                    else:
+                        unlabdist += 1
+
+        totdist = labdist + unlabdist
+        if return_labelinfo:
+            return (totdist, labdist, unlabdist)
+        else:
+            return totdist
 
 ###################################################################################################
 ###################################################################################################
