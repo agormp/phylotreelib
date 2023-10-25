@@ -1426,22 +1426,48 @@ class Tree:
         obj.intnodes = self.intnodes.copy()
         obj.nodes = self.nodes.copy()
         obj.interner = interner
-        obj.child_dict = {}
-        origtree = self.child_dict
-        newtree = obj.child_dict
-        for parent in origtree:
-            newtree[parent] = {}
-            for child in origtree[parent]:
+        obj.child_dict = self._copy_child_dict(obj, copylengths, copylabels)
+        obj.nodedict = self._copy_nodedict(obj)
+        return obj
+
+    ###############################################################################################
+
+    def _copy_child_dict(self, obj, copylengths=True, copylabels=True):
+        origdict = self.child_dict
+        newdict = {}
+        for parent in origdict:
+            newdict[parent] = {}
+            for child in origdict[parent]:
                 if copylengths:
-                    blen = origtree[parent][child].length
+                    blen = origdict[parent][child].length
                 else:
                     blen = 0.0
                 if copylabels:
-                    lab = origtree[parent][child].label
+                    lab = origdict[parent][child].label
                 else:
                     lab = ""
-                newtree[parent][child] = Branchstruct(blen,lab)
-        return obj
+                newdict[parent][child] = Branchstruct(blen,lab)
+        return newdict
+
+    ###############################################################################################
+
+    def _copy_nodedict(self, obj):
+        if self.nodedict is None:
+            return None
+        else:
+            origdict = self.nodedict
+            newdict = {}
+            for key,orignode in origdict.items():
+                newnode = Nodestruct()
+                for attrname, origvalue in orignode.__dict__.items():
+                    if isinstance(origvalue, set):
+                        newvalue = origvalue.copy()
+                    else:
+                        newvalue = origvalue  # Assume all other attributes are immutable
+                    setattr(newnode, attr_name, newvalue)
+                newdict[key] = newnode
+
+            return newdict
 
     ###############################################################################################
 
