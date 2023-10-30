@@ -14,6 +14,7 @@ import sys
 from io import StringIO
 from operator import itemgetter
 from collections import Counter
+from collections import defaultdict
 import numpy as np
 
 ###################################################################################################
@@ -1464,7 +1465,7 @@ class Tree:
                         newvalue = origvalue.copy()
                     else:
                         newvalue = origvalue  # Assume all other attributes are immutable
-                    setattr(newnode, attr_name, newvalue)
+                    setattr(newnode, attrname, newvalue)
                 newdict[key] = newnode
 
             return newdict
@@ -4136,83 +4137,184 @@ class Tree:
 
     ###############################################################################################
 
-    def parsimony_score_hartigan(self, return_labelinfo=False):
-        """Computes parsimony cost ("small parsimony problem") for tree using Hartigan's
-        1973 algorithm (allowing for multifurcations and labelled internal nodes).
-        Note: so far only implemented for one-character states (in the cladistic sense).
-        Assumes tree has .nodedict attribute: {nodeid:Nodestruct}, and that each
+    def parsimony_possible_states(self):
+        """Performs parsimony analysis on tree object, and returns info about possible states
+        at internal nodes.
+
+        Assumes tree object has .nodedict attribute: {nodeid:Nodestruct}, and that each
         Nodestruct has a .state attribute, which is either empty (unlabelled nodes)
         or a string specifying the state (e.g., "mink" or "human" or "A").
 
-        return_labelinfo: If True: return tuple of (totdist, labdist, unlabdist)
-            where labdist is part of total dist that is between two labelled nodes
-            and unlabdist is part of total dist where at least one node is unlabelled
+        Returns: copy of tree object where nodestructs now also have attributes
+        .primary_set, .secondary_set, and .optimal_set
+        .optimal_set gives the full set of states that a node can have on the MP tree.
+        Note: not all combinations of states will yield maximum parsimony score.
+
+        Based on Hartigan's 1973 parsimony algorithm.
+        This version allows multifurcations, and internal nodes can have observed state.
+
+        Note: so far only implemented for one-character states (in the cladistic sense).
         """
 
         # Note: i am using algorithm from:
         # Live phylogeny with polytomies: Finding the most compact parsimonious trees
         # D. Papamichaila et al., Computational Biology and Chemistry 69 (2017) 171–177
+        # Upper and lower sets are here referred to as primary and secondary set
 
         if self.nodedict is None:
-            msg = "Tree object has no .nodedict attribute. Can't compute parsimony score"
+            msg = "Tree object has no .nodedict attribute. Can't perform parsimony analysis"
             raise TreeError(msg)
 
-        # Set upper set of all labelled nodes (both internal and leafs) = state-value
-        # Set lower set of labelled nodes to be the empty set (necessary for root-tip pass?)
-        for node in self.nodes:
-            state = self.nodedict[node].state
+        treecopy = self.copy_treeobject()
+        treecopy = self._hartigan_tip2root_pass(treecopy)
+        treecopy = self._hartigan_root2tip_pass(treecopy)
+
+        return treecopy
+
+    ###############################################################################################
+
+    def parsimony_assign_fits(self, fitpref=None):
+        """Performs parsimony analysis, and returns copy of tree object where one optimal fit
+        (i.e., one giving the maximum parsimony number of changes) has been assigned to each node.
+        fitpref = None: choose random fits at unlabelled nodes, where possible
+        fitpref = <concrete state-string>: Set ambiguous state at unlabelled nodes to this value
+                 when possible (i.e., when compatible with MP score)
+        """
+        print(f"###### fitpref: {fitpref}")
+        tree = self.parsimony_possible_states()
+        ndict = tree.nodedict
+
+        # Set fit and wasambig for labelled nodes
+        for node in tree.nodes:
+            if ndict[node].state:
+                ndict[node].fit = ndict[node].state
+                ndict[node].wasambig = False
+
+        # Set fit and wasambig for root
+        self._set_fit_and_ambiguity_for_node(tree, tree.root, None, fitpref)
+
+        # Set fit and wasambig for internal, unlabelled nodes
+        for parent in tree.sorted_intnodes(deepfirst=True):
+            for child in tree.children(parent):
+                if not ndict[child].state:
+                    self._set_fit_and_ambiguity_for_node(tree, child, parent, fitpref)
+
+        return tree
+
+    ###############################################################################################
+
+    def parsimony_count_changes(self, fitpref=None):
+        """Performs parsimony analysis on tree object, and returns parsimony score and
+        dictionary giving number of changes in either direction:
+            key = tuple (from,to), value = count in that direction
+            {(state1, state2):count1_to_2,
+             (state2, state1):count2_to_1}
+
+        fitpref = None: choose random fits at unlabelled nodes, where possible
+        fitpref = <concrete state-string>: Set ambiguous state at unlabelled nodes to this value
+                 when possible (i.e., when compatible with MP score)
+        """
+
+        tree = self.parsimony_assign_fits(fitpref)
+        ndict = tree.nodedict
+        countdict = defaultdict(int)
+        pscore = 0
+        for parent in tree.sorted_intnodes(deepfirst=True):
+            pfit = ndict[parent].fit
+            for child in tree.children(parent):
+                cfit = ndict[child].fit
+                if pfit != cfit:
+                    countdict[(pfit,cfit)] += 1
+                    pscore += 1
+
+        return pscore, countdict
+
+    ###############################################################################################
+
+    def _hartigan_tip2root_pass(self, tree):
+        """Perform tip-to-root pass of Hartigan parsimony algorithm.
+        Input: tree object with .nodedict having .state info for each node (some empty)
+        Output: same tree object with added attribute .primary_set for all nodes
+        """
+
+        # Set primary set of all labelled nodes (both internal and leafs) = state-value
+        # Set secondary set of labelled nodes to be the empty set
+        states_present = False
+        for node in tree.nodes:
+            state = tree.nodedict[node].state
             if state:
-                self.nodedict[node].primary_set = set([state])
-                self.nodedict[node].secondary_set = set()
+                states_present = True
+                tree.nodedict[node].primary_set = set([state])
+                tree.nodedict[node].secondary_set = set()
+        if not states_present:
+            raise TreeError("There are no nodes with .state attribute in .nodedict. Can't perform parsimony analysis")
 
         # Tip-to-root pass: compute upper and lower sets for all unlabelled nodes
         # All leaves are assumed to be labelled (to have a non-empty .state)
-        for p in self.sorted_intnodes(deepfirst=False):
-            if not self.nodedict[p].state:
+        for p in tree.sorted_intnodes(deepfirst=False):
+            if not tree.nodedict[p].state:
                 statecount = Counter()
-                for c in self.children(p):
-                    statecount.update(self.nodedict[c].primary_set)
+                for c in tree.children(p):
+                    statecount.update(tree.nodedict[c].primary_set)
                 statecountlist = statecount.most_common()
                 topcount = statecountlist[0][1]
                 maxlist = [state for state,count in statecountlist if count==topcount]
                 almostmaxlist = [state for state,count in statecountlist if count==(topcount - 1)]
-                self.nodedict[p].primary_set = set(maxlist)
-                self.nodedict[p].secondary_set = set(almostmaxlist)
+                tree.nodedict[p].primary_set = set(maxlist)
+                tree.nodedict[p].secondary_set = set(almostmaxlist)
 
-        # Set final_set of root (should I randomly choose one state? or is set ok?)
-        self.nodedict[self.root].final_set = self.nodedict[self.root].primary_set
+        return tree
 
-        # Root-to-tip pass: compute final sets for each node (labelled or not)
-        for p in self.sorted_intnodes(deepfirst=True):
-            for c in self.children(p):
-                p_final_set = self.nodedict[p].final_set
-                c_primary_set = self.nodedict[c].primary_set
-                if p_final_set <= c_primary_set:
-                    self.nodedict[c].final_set = p_final_set
+    ###############################################################################################
+
+    def _hartigan_root2tip_pass(self, tree):
+        """Perform root-to-tip pass of Hartigan parsimony algorithm.
+        Input: tree object with .nodedict now having .primary_set and .secondary_set
+            for each node
+        Output: same tree object with added attribute .optimal_set for all nodes
+                The optimal_set contains all the states a node can have in a tree with MP score
+                (but not all combinations of possible states will give MP score)
+        """
+
+        ndict = tree.nodedict
+
+        # Set optimal_set of root
+        ndict[tree.root].optimal_set = ndict[tree.root].primary_set
+
+        # Root-to-tip pass: compute optimal_set for each node (labelled or not)
+        for p in tree.sorted_intnodes(deepfirst=True):
+            for c in tree.children(p):
+                p_optimal_set = ndict[p].optimal_set
+                c_primary_set = ndict[c].primary_set
+                if p_optimal_set <= c_primary_set:
+                    ndict[c].optimal_set = p_optimal_set
                 else:
-                    c_secondary_set = self.nodedict[c].secondary_set
-                    self.nodedict[c].final_set = c_primary_set | (p_final_set & c_secondary_set)
+                    c_secondary_set = ndict[c].secondary_set
+                    ndict[c].optimal_set = c_primary_set | (p_optimal_set & c_secondary_set)
 
-        # Compute parsimony cost by comparing final_sets on either end of each branch:
-        # If there is no overlap between parent's and child's final_set: add 1 to dist
-        # Keep track of part of distance from observed branches (where both ends are labelled)
-        labdist = 0
-        unlabdist = 0
-        for p in self.intnodes:
-            plabelled = bool(self.nodedict[p].state)
-            for c in self.children(p):
-                clabelled = bool(self.nodedict[c].state)
-                if not (self.nodedict[p].final_set & self.nodedict[c].final_set):
-                    if plabelled & clabelled:
-                        labdist += 1
-                    else:
-                        unlabdist += 1
+        return tree
 
-        totdist = labdist + unlabdist
-        if return_labelinfo:
-            return (totdist, labdist, unlabdist)
+    ###############################################################################################
+
+    def _set_fit_and_ambiguity_for_node(self, tree, node, parent, fitpref):
+        """Set fit and ambiguity attributes for a given node."""
+
+        ndict = tree.nodedict
+
+        if len(ndict[node].optimal_set) == 1:
+            ndict[node].wasambig = False
+            ndict[node].fit = next(iter(ndict[node].optimal_set))
         else:
-            return totdist
+            ndict[node].wasambig = True
+            if parent and ndict[parent].wasambig and ndict[parent].fit in ndict[node].optimal_set:
+                ndict[node].fit = ndict[parent].fit
+            else:
+                if fitpref in ndict[node].optimal_set:
+                    ndict[node].fit = fitpref
+                else:
+                    ndict[node].fit = random.choice(tuple(ndict[node].optimal_set))
+
+        return tree
 
 ###################################################################################################
 ###################################################################################################
