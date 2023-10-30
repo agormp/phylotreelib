@@ -2892,7 +2892,11 @@ class Tree:
                 curlevel = nextlevel
             other.nodes = other.leaves | other.intnodes
 
-        self.clear_caches()
+        # If self.nodedict exists: copy relevant parts from self to other
+        if self.nodedict:
+            other.nodedict = {}
+            for node in other.nodes:
+                other.nodedict[node] = self.nodedict[node]
 
         # Python note: possibly bad idea to have different possible returnvalues.
         # Simplify and deal with it at consumer end
