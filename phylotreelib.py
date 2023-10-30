@@ -3237,6 +3237,9 @@ class Tree:
         childset = self.children(parent)
         root = self.root
 
+        if self.nodedict:
+            orignodes = self.nodes.copy()
+
         # If leaf is part of bifurcation AND is directly attached to root, then
         # the "other child" of the root must become the new root
         if (len(childset) == 2) and (leaf in self.children(root)):
@@ -3257,12 +3260,10 @@ class Tree:
             grandparent = self.parent(parent)
 
             # Add remaining child to grandparent
-            # self.child_dict[grandparent][leaf2] = Branchstruct(self.child_dict[grandparent][parent].length,
-            #                                              self.child_dict[grandparent][parent].label)
             self.child_dict[grandparent][child2] = self.child_dict[grandparent][parent]
             self.child_dict[grandparent][child2].length += child2dist   # Cumulated distance
-            del self.child_dict[parent]                           # Delete parent and leaf
-            del self.child_dict[grandparent][parent]              # Also remove pointer from gp to p
+            del self.child_dict[parent]                      # Delete parent and leaf
+            del self.child_dict[grandparent][parent]         # Also remove pointer from gp to p
             del self._parent_dict[leaf]                      # Remove unused entries in parent_dict
             del self._parent_dict[parent]
             self._parent_dict[child2] = grandparent          # Update parent_dict for leaf2
@@ -3278,7 +3279,13 @@ class Tree:
         self.leaves.remove(leaf)
         self.nodes.remove(leaf)
 
-        self.clear_caches()
+        # Clean up nodedict if present
+        if self.nodedict:
+            remnodes = orignodes - self.nodes
+            for node in remnodes:
+                del self.nodedict[node]
+
+        self.clear_caches(preserve=["_parent_dict"])
 
     ###############################################################################################
 
