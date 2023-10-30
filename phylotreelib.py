@@ -4138,13 +4138,21 @@ class Tree:
 
         # Pruning: Remove subtree
         isleaf = prune_node in self.leaves      # Has to be set before pruning!
-        subtree = self.subtree(prune_node)
-        for leaf in self.remote_children(prune_node):
-            self.remove_leaf(leaf)
+        subtree = self.prune_subtree(prune_node)
 
         # Regraft: Add subtree back onto remaining tree
         # Special treatment when pruning single leaf (to avoid superfluous internal node)
         self.graft(subtree, regraft_node, graft_with_other_root=isleaf)
+
+    ###############################################################################################
+
+    def prune_subtree(self, basenode):
+        """Prune subtree rooted at basenode from self. Returns pruned subtree"""
+
+        subtree = self.subtree(basenode)
+        for leaf in self.remote_children(basenode):
+            self.remove_leaf(leaf)
+        return subtree
 
     ###############################################################################################
 
@@ -4191,7 +4199,7 @@ class Tree:
         fitpref = <concrete state-string>: Set ambiguous state at unlabelled nodes to this value
                  when possible (i.e., when compatible with MP score)
         """
-        print(f"###### fitpref: {fitpref}")
+
         tree = self.parsimony_possible_states()
         ndict = tree.nodedict
 
