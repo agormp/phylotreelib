@@ -4147,12 +4147,56 @@ class Tree:
 
     ###############################################################################################
 
-    def prune_subtree(self, basenode):
-        """Prune subtree rooted at basenode from self. Returns pruned subtree"""
+    def prune_subtree(self, basenode, keep_unary=False):
+        """Prune subtree rooted at basenode from self. Returns pruned subtree.
+        keep_unary: keep left-behind, unary internal nodes in self (node with one descendant).
+                    mostly useful when internal nodes have meaning beyond being hypothetical
+                    ancestors (e.g., they can be observed, as in transmission trees)"""
 
         subtree = self.subtree(basenode)
-        for leaf in self.remote_children(basenode):
-            self.remove_leaf(leaf)
+        nodes_removed = subtree.nodes
+        basenode_parent = self.parent(basenode)
+
+        # Remove link to basenode from child_dict
+        # Remove all links from nodes that are downstream of basenode (including basenode)
+        del self.child_dict[basenode_parent][basenode]
+        curlevel = [basenode]
+        while curlevel:
+            nextlevel = []
+            for parent in curlevel:
+                del self.child_dict[parent]
+                for kid in (subtree.children(parent) & subtree.intnodes):
+                    nextlevel.append(kid)
+            curlevel = nextlevel
+
+        # Unless requested: clean up tree structure around parent of basenode (avoiding unary node)
+        if not keep_unary:
+            basenode_siblings = self.children(basenode_parent)
+            if len(basenode_siblings) == 1:
+                if basenode_parent != self.root:
+                    sibling = basenode_siblings.pop()
+                    basenode_grandparent = self.parent(basenode_parent)
+                    lostlen1 = self.child_dict[basenode_parent][sibling].length
+                    lostlen2 = self.child_dict[basenode_grandparent][basenode_parent].length
+                    del self.child_dict[basenode_grandparent][basenode_parent]
+                    newbranch = Branchstruct(length=lostlen1 + lostlen2)  # Salvage label?
+                    self.child_dict[basenode_grandparent][sibling] = newbranch
+                del self.child_dict[basenode_parent]
+                nodes_removed.add(basenode_parent)
+
+        # Update nodesets
+        self.leaves = self.leaves - nodes_removed
+        self.intnodes = self.intnodes - nodes_removed
+        self.nodes = self.leaves | self.intnodes
+
+        # If self.nodedict exists: remove relevant parts from self
+        if self.nodedict:
+            for node in nodes_removed:
+                del self.nodedict[node]
+
+        # Clean up caches (python note: could perhaps salvage _parent_dict)
+        self.clear_caches()
+
         return subtree
 
     ###############################################################################################
