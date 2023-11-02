@@ -2883,7 +2883,7 @@ class Tree:
                     other.child_dict[parent] = {}
                     kids = self.children(parent)
                     for kid in kids:
-                        other.child_dict[parent][kid] = copy.deepcopy(self.child_dict[parent][kid])
+                        other.child_dict[parent][kid] = self.child_dict[parent][kid].copy()
                     intnode_kids = kids & self.intnodes
                     other.intnodes.update(intnode_kids)
                     nextlevel.extend(intnode_kids)
