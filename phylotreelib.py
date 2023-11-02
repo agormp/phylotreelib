@@ -4280,6 +4280,17 @@ class Tree:
         """
 
         tree = self.parsimony_assign_fits(fitpref)
+        pscore, countdict = self._count_changes_on_fitted_tree(tree)
+        return pscore, countdict
+
+    ###############################################################################################
+
+    def _count_changes_on_fitted_tree(self, tree):
+        """Helper function for parsimony analyses:
+        Input: tree where nodedict already has assigned fits for each node
+        Output: tuple of parsimony-score and countdict. {(from_state, to_state):count, ...}
+        key = tuple of (from_state,to_stat), value = count in that direction"""
+
         ndict = tree.nodedict
         countdict = defaultdict(int)
         pscore = 0
