@@ -3231,7 +3231,8 @@ class Tree:
     ###############################################################################################
 
     def remove_leaf(self, leaf):
-        """Removes named leaf from tree, cleans up so remaining tree structure is sane"""
+        """Removes named leaf from tree, cleans up so remaining tree structure is sane.
+        Note: assumes no unary nodes (leaf has at least one sibling)"""
 
         parent = self.parent(leaf)
         childset = self.children(parent)
@@ -3244,7 +3245,7 @@ class Tree:
         # the "other child" of the root must become the new root
         if (len(childset) == 2) and (leaf in self.children(root)):
             [child2] = childset - {leaf}                    # Remaining item is other child
-            del self.child_dict[root]                             # Remove entry for old root
+            del self.child_dict[root]                       # Remove entry for old root
             self.intnodes.remove(root)
             self.nodes.remove(root)
             self.root = child2                              # child2 is new root
