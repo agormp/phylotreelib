@@ -5282,7 +5282,7 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def max_clade_cred_tree(self, labeldigits=3):
+    def max_clade_cred_tree(self, label_precision=6):
         """Find maximum clade credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
 
         maxlogcred = -math.inf
@@ -5295,7 +5295,7 @@ class BigTreeSummary(TreeSummary):
         maxcred_bipdict = {}
         for clade in maxlogcred_cladetopo:
             nodestruct = self.cladesummary[clade]
-            nodestruct.label = f"{round(nodestruct.freq, labeldigits)}"
+            nodestruct.label = f"{nodestruct.freq:.{label_precision}g}"
             maxcred_bipdict[clade] = nodestruct
         maxcredtree = Tree.from_cladedict(maxcred_bipdict)
 
