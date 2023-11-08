@@ -285,7 +285,7 @@ class Bipartition:
 
     def __init__(self, leafset1, all_leaves_set, sorted_leaf_list, leaf2index):
         """Initialise bipartition objects based on only one half of bipartition.
-        If the complement of leafset1 is smaller, than that will be stored instead.
+        If the complement of leafset1 is smaller, then that will be stored instead.
         If they have same size: store leafset with smaller hash.
 
         leafset1: one half of bipartition (to save time in caller)
@@ -5053,7 +5053,7 @@ class TreeSummary():
             nodedict[node] = Nodestruct(depth = 0.0)
 
         # Find mean common ancestor depth for all internal nodes
-        # (I assume input trees are from clock models, so leave-depths are constant)
+        # (I assume input trees are from clock models, so leaf-depths are constant)
         wsum = 0.0
         for weight, count, burnin, filename in wt_count_burnin_filename_list:
             ntrees = count - burnin
