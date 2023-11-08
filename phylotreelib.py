@@ -5037,7 +5037,6 @@ class TreeSummary():
 
         return sum_tree
 
-
     ###############################################################################################
 
     def set_ca_node_depths(self, sum_tree, wt_count_burnin_filename_list):
