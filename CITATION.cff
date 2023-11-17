@@ -6,5 +6,5 @@ authors:
   - family-names: "Pedersen"
     given-names: "Anders Gorm"
     orcid: "https://orcid.org/0000-0001-9650-8965" 
-repository-code: "https://github.com/agormp/greedysub"
+repository-code: "https://github.com/agormp/phylotreelib"
 doi: "10.5281/zenodo.10148565"
