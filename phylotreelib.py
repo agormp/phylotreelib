@@ -5125,6 +5125,32 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def set_clade_credibility(self, tree, precision=6):
+        """Set clade credibility on provided target tree based on freq of clade in TreeSummary.
+
+        NOTE: only works if all clades in tree have been observed at least once. The option
+                will therefore not work with all rootings"""
+
+        all_leaves = tree.frozenset_leaves
+        sorted_leafs = tree.sorted_leaf_list
+        leaf2index = tree.leaf2index
+
+        try:
+            for child in (tree.intnodes - {tree.root}):
+                remkids = tree.remotechildren_dict[child]
+                child_clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
+                clade_cred = self.cladesummary[child_clade].freq
+                parent = tree.parent(child)
+                tree.setlabel(parent, child, f"{clade_cred:.{precision}g}")
+        except KeyError as e:
+            raise TreeError("Problem while setting clade credibililities: the following clade has not been "
+                            + "observed among input trees: check rooting of tree."
+                            + f"\n{e.args[0]}")
+
+        return tree
+
+    ###############################################################################################
+
     def compute_rootcred(self, tree):
         """Returns root credibility (frequency of tree's root among observed trees) based
         on current root of sum_tree and information in self._rootbip_summary"""
