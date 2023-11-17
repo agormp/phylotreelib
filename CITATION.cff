@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: "phylotreelib: a python library for analyzing and manipulating phylogenetic trees"
+version: 1.27.0
+date-released: 2023-11-17
+authors:
+  - family-names: "Pedersen"
+    given-names: "Anders Gorm"
+    orcid: "https://orcid.org/0000-0001-9650-8965" 
+repository-code: "https://github.com/agormp/greedysub"
+doi: "10.5281/zenodo.10148531"
