@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/version-1.27.0-blue)
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=PyPI%20downloads&service=github)](https://pepy.tech/project/phylotreelib)
-[![DOI](https://zenodo.org/badge/381983445.svg)](https://zenodo.org/doi/10.5281/zenodo.10148531)
+[![DOI](https://zenodo.org/badge/381983445.svg)](https://zenodo.org/doi/10.5281/zenodo.10148565)
 
 Using classes and methods in phylotreelib.py it is possible to read and write treefiles and to analyze and manipulate the trees in various ways.
 
