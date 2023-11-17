@@ -24,6 +24,11 @@ Upgrading to latest version:
 python3 -m pip install --upgrade phylotreelib
 ```
 
+## Citation
+
+To cite phylotreelib: use the link in the right sidebar under About --> Cite this repository.
+
+
 ## Highlights
 
 * Methods for reading and writing Nexus and Newick format tree files
