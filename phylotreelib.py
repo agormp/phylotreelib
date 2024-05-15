@@ -1129,7 +1129,7 @@ class Tree:
         tabstring += "|" + "-" * (totwidth)  + "|" + "\n"
 
         # Add list of leaves to tablestring
-        tabstring += "\n%d Leafs:\n" % len(self.leaves)
+        tabstring += "\n%d Leaves:\n" % len(self.leaves)
         tabstring += "-" * maxwidth[1] + "\n"
         for leaf in sorted(self.leaves):
             tabstring += "%s\n" % leaf
@@ -4396,7 +4396,7 @@ class Tree:
 ###################################################################################################
 
 class TreeSet():
-    """Class for storing and manipulating a number of trees, which all have the same leafs"""
+    """Class for storing and manipulating a number of trees, which all have the same leaves"""
 
     def __init__(self):
         self.treelist = []
