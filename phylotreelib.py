@@ -5107,7 +5107,8 @@ class TreeSummary():
                     sum_tree.set_branch_attribute(p,c,"sem", brstruct.sem)
 
         # Handle root bipartition separately
-        # Python note: should perhaps check for root being tracked?
+        if not self.trackroot:
+            raise TreeError("Not possible to access self._rootbip_summary: self.trackroot is False")
         kid1,kid2 = sum_tree.children(sum_tree.root)
         kid1_remkids = sum_tree.remotechildren_dict[kid1]
         rootbip = Bipartition(kid1_remkids, sum_tree.frozenset_leaves,
