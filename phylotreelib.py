@@ -4556,7 +4556,7 @@ class TreeSummary():
         self.translateblock = None
         self.tree_count = 0
         self.tree_weight_sum = 0.0
-        self._bipartsummary = {}         # Dict: {bipartition:branchstruct with extra fields}
+        self._bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
         self._cladesummary = {}         # Dict: {clade:nodestruct with extra fields}
         self._cladesummary_processed = False
@@ -4829,7 +4829,7 @@ class TreeSummary():
 
     def _updatebip(self, other):
 
-        # Merge "treesummary.bipartsummary" with "self.bipartsummary"
+        # Merge "self.bipartsummary" with "other.bipartsummary"
         other_bipsum = other.bipartsummary
         self_bipsum = self.bipartsummary
 
@@ -5092,8 +5092,8 @@ class TreeSummary():
     def set_mean_biplen(self, sum_tree):
         """Sets branch-length, -var, and -sem for each branch in sum_tree,
         based on values in bipsummary.
-        Should only be called when sum_tree constructed based on clades, but brlens
-        are to be set based on mean bipartition values"""
+        Should only be called when sum_tree constructed based on clades (MCC), 
+        but brlens are to be set based on mean bipartition values"""
 
         for p in sum_tree.sorted_intnodes():
             if p != sum_tree.root:
