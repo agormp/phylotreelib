@@ -5612,7 +5612,10 @@ class Nexustreefile(TreefileBase):
         # Non-greedy mathching *?: find first = and then every non-start parenthesis
         pattern = re.compile("^.*?=[^(]*", re.DOTALL)
         self.buffer = pattern.sub("", self.buffer)
-
+        
+        # Instantiate parser object once: this can be used repeatedly when parsing individual tree strings
+        self.parser_obj = NewickStringParser(self.transdict) 
+        
     ###############################################################################################
 
     def __iter__(self):
@@ -5640,7 +5643,7 @@ class Nexustreefile(TreefileBase):
 
         # Return tree object if requested
         if returntree:
-            tree = Tree.from_string(treestring, self.transdict, self.interner)
+            tree = Tree._from_string_private(self.parser_obj, treestring, self.interner)
             tree.below_root = self.below_root
             return tree
 
