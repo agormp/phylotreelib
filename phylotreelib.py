@@ -492,11 +492,9 @@ class NewickStringParser:
 
     def parse(self):
         dispatch = self.dispatch
-        
-        
         delimset = set(",;:(){}")
         state = "TREE_START"
-        tree_parts_list = re.split(r'(\[&|[(),;:=\]{}])', treestring)
+        tree_parts_list = re.split(r'(\[&|[(),;:=\]{}])', self.treestring)
         tree_parts_list = list(filter(None, tree_parts_list))  # Remove empty strings from split()
         for token_value in tree_parts_list:
             if token_value in delimset or token_value == "[&":
