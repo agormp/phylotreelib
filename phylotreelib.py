@@ -172,9 +172,9 @@ def count_bytestring(filename, bytestring):
 def count_trees_by_parsing(filename, args):
     # Open treefile. Discard (i.e., silently pass by) the requested number of trees
     if args.informat == "nexus":
-        treefile = pt.Nexustreefile(filename)
+        treefile = Nexustreefile(filename)
     else:
-        treefile = pt.Newicktreefile(filename)
+        treefile = Newicktreefile(filename)
     treecount = 0
     for tree in treefile:
         treecount += 1
@@ -416,34 +416,12 @@ class TreeError(Exception):
 class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
-    def __init__(self, treeobj, treestring, transdict=None):
-        # Construct Tree object that will be filled out by parser
-        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
-        # are the internal nodes which are numbered consecutively. Each key has an
-        # associated value that is itself a dictionary listing the children: keys are
-        # child nodes, values are Branchstructs containing "length" and "label" fields.
-        # Leafs are identified by a string instead of a number
-
-        # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
-        # an internal node). The label is attached to the same branch as the branch length
-        treeobj.child_dict = {}
-        treeobj.leaves = set()
-        treeobj.intnodes = set()
-        treeobj.root = 0
-        self.tree = treeobj
-
-        # Hack to remove whitespace from treestring
-        self.treestring = "".join(treestring.split())
-
-        # For keeping track of tree state during parsing (different from parser state)
-        self.node_stack = []
-
-        # For checking if there are duplicated leaf names after parsing
-        self.ntips = 0
+    def __init__(self, transdict=None):
 
         # If transdict was supplied: use corresponding handler when adding leaves
+        # Also store transdict in parser (at class level! this is so staticmethods can access)
         if transdict:
-            self.transdict = transdict
+            NewickStringParser.transdict = transdict
             self._handle_add_leaf = NewickStringParser._handle_add_leaf_with_transdict
         else:
             self._handle_add_leaf = NewickStringParser._handle_add_leaf
@@ -490,36 +468,53 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def parse(self):
+    def parse(self, treeobj, treestring):
+        # Construct Tree object that is filled out while parsing
+        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
+        # are the internal nodes which are numbered consecutively. Each key has an
+        # associated value that is itself a dictionary listing the children: keys are
+        # child nodes, values are Branchstructs containing "length" and "label" fields.
+        # Leafs are identified by a string instead of a number
+
+        # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
+        # an internal node). The label is attached to the same branch as the branch length
+        treeobj.child_dict = {}
+        treeobj.leaves = set()
+        treeobj.intnodes = set()
+        treeobj.root = 0
+        treeobj.node_stack = []
+        treeobj.ntips = 0
+
+        treestring = "".join(treestring.split()) # Hack to remove whitespace from treestring
         dispatch = self.dispatch
-        delimset = set(",;:()")
+        delimset = set(",;:(){}")
         state = "TREE_START"
-        tree_parts_list = re.split(r'([(),;:])', self.treestring)
+        tree_parts_list = re.split(r'(\[&|[(),;:=\]{}])', treestring)
         tree_parts_list = list(filter(None, tree_parts_list))  # Remove empty strings from split()
         for token_value in tree_parts_list:
-            if token_value in delimset:
+            if token_value in delimset or token_value == "[&":
                 token_type = token_value
             else:
                 token_type = "NUM_NAME"
             try:
                 handler = dispatch[state][token_type]
-                state = handler(self, token_value)
+                treeobj, state = handler(treeobj, token_value)
             except KeyError:
-                self._handle_parse_error(state, token_value, token_type, self.treestring)
+                self._handle_parse_error(state, token_value, token_type, treestring)
 
-        self.sanitychecks()
-        self.tree.nodes = self.tree.leaves | self.tree.intnodes
+        self.sanitychecks(treeobj)
+        treeobj.nodes = treeobj.leaves | treeobj.intnodes
 
-        return self.tree
+        return treeobj
 
     ###############################################################################################
 
-    def sanitychecks(self):
-        if self.node_stack:
-            msg = f"Nodes remaining on stack after parsing treestring: {self.node_stack}"
+    def sanitychecks(self, treeobj):
+        if treeobj.node_stack:
+            msg = f"Nodes remaining on stack after parsing treestring: {treeobj.node_stack}"
             raise TreeError(msg)
-        if self.ntips > len(self.tree.leaves):
-            raise TreeError(f"Duplicated leafnames in treestring:\n{self.treestring}")
+        if treeobj.ntips > len(treeobj.leaves):
+            raise TreeError(f"Duplicated leafnames in treestring:\n{treeobj.treestring}")
 
     ###############################################################################################
 
@@ -541,96 +536,96 @@ class NewickStringParser:
     ###############################################################################################
 
     @staticmethod
-    def _handle_add_root_intnode(instance, token_value):
-        instance.nodeno = 0
-        instance.tree.child_dict[instance.nodeno] = {}
-        instance.node_stack.append(instance.nodeno)
-        instance.tree.intnodes.add(instance.nodeno)
-        return "INTNODE_START"
+    def _handle_add_root_intnode(treeobj, token_value):
+        treeobj.nodeno = 0
+        treeobj.child_dict[treeobj.nodeno] = {}
+        treeobj.node_stack.append(treeobj.nodeno)
+        treeobj.intnodes.add(treeobj.nodeno)
+        return treeobj, "INTNODE_START"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_add_intnode(instance, token_value):
-        instance.nodeno += 1
-        instance.tree.child_dict[instance.nodeno] = {}
-        parent = instance.node_stack[-1]
-        instance.tree.child_dict[parent][instance.nodeno] = Branchstruct()
-        instance.node_stack.append(instance.nodeno)
-        instance.tree.intnodes.add(instance.nodeno)
-        return "INTNODE_START"
+    def _handle_add_intnode(treeobj, token_value):
+        treeobj.nodeno += 1
+        treeobj.child_dict[treeobj.nodeno] = {}
+        parent = treeobj.node_stack[-1]
+        treeobj.child_dict[parent][treeobj.nodeno] = Branchstruct()
+        treeobj.node_stack.append(treeobj.nodeno)
+        treeobj.intnodes.add(treeobj.nodeno)
+        return treeobj, "INTNODE_START"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_add_leaf(instance, name):
+    def _handle_add_leaf(treeobj, name):
         child = sys.intern(name)
-        parent = instance.node_stack[-1]
-        instance.tree.child_dict[parent][child] = Branchstruct()
-        instance.node_stack.append(child)
-        instance.tree.leaves.add(child)
-        instance.ntips += 1
-        return "LEAF"
+        parent = treeobj.node_stack[-1]
+        treeobj.child_dict[parent][child] = Branchstruct()
+        treeobj.node_stack.append(child)
+        treeobj.leaves.add(child)
+        treeobj.ntips += 1
+        return treeobj, "LEAF"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_add_leaf_with_transdict(instance, name):
-        child = sys.intern(instance.transdict[name])
-        parent = instance.node_stack[-1]
-        instance.tree.child_dict[parent][child] = Branchstruct()
-        instance.node_stack.append(child)
-        instance.tree.leaves.add(child)
-        return "LEAF"
+    def _handle_add_leaf_with_transdict(treeobj, name):
+        child = sys.intern(NewickStringParser.transdict[name])
+        parent = treeobj.node_stack[-1]
+        treeobj.child_dict[parent][child] = Branchstruct()
+        treeobj.node_stack.append(child)
+        treeobj.leaves.add(child)
+        return treeobj, "LEAF"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_transition_child(instance, token_value):
-        instance.node_stack.pop()
-        return "EXPECTING_CHILD"
+    def _handle_transition_child(treeobj, token_value):
+        treeobj.node_stack.pop()
+        return treeobj, "EXPECTING_CHILD"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_transition_brlen(instance, token_value):
-        return "EXPECTING_BRLEN"
+    def _handle_transition_brlen(treeobj, token_value):
+        return treeobj, "EXPECTING_BRLEN"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_add_brlen(instance, brlen_string):
+    def _handle_add_brlen(treeobj, brlen_string):
         try:
             brlen = float(brlen_string)
-            child = instance.node_stack[-1]
-            parent = instance.node_stack[-2]
-            instance.tree.child_dict[parent][child].length = brlen
-            return "BRLEN"
+            child = treeobj.node_stack[-1]
+            parent = treeobj.node_stack[-2]
+            treeobj.child_dict[parent][child].length = brlen
+            return treeobj, "BRLEN"
         except ValueError:
             raise TreeError(f"Expected branch length: {brlen_string}")
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_intnode_end(instance, token_value):
-        instance.node_stack.pop()
-        return "INTNODE_END"
+    def _handle_intnode_end(treeobj, token_value):
+        treeobj.node_stack.pop()
+        return treeobj, "INTNODE_END"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_label(instance, label):
-        child = instance.node_stack[-1]
-        parent = instance.node_stack[-2]
-        instance.tree.child_dict[parent][child].label = label
-        return "LABEL"
+    def _handle_label(treeobj, label):
+        child = treeobj.node_stack[-1]
+        parent = treeobj.node_stack[-2]
+        treeobj.child_dict[parent][child].label = label
+        return treeobj, "LABEL"
 
     ###############################################################################################
 
     @staticmethod
-    def _handle_transition_tree_end(instance, token_value):
-        instance.node_stack.pop()
-        return "TREE"
+    def _handle_transition_tree_end(treeobj, token_value):
+        treeobj.node_stack.pop()
+        return treeobj, "TREE"
 
 ###################################################################################################
 ###################################################################################################
@@ -692,20 +687,34 @@ class Tree:
     ###############################################################################################
 
     @classmethod
-    def from_string(cls, orig_treestring, transdict=None, interner=None):
-        """Constructor: Tree object from tree-string in Newick format"""
+    def from_string(cls, orig_treestring, transdict=None, interner=None, format="newick"):
+        """Constructor: Tree object from tree-string in specified format"""
 
-        # All action is in NewickStringParser
-        obj = cls()
-        parser = NewickStringParser(obj, orig_treestring, transdict)
-        obj = parser.parse()
-        obj.interner = interner
-        if obj.interner:
-            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
-            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
-            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
-        del parser
-        return obj
+        if format.lower() == "newick":
+            parser_obj = NewickStringParser(transdict)
+        treeobj = cls._from_string_private(parser_obj, orig_treestring, interner)
+        del parser_obj
+        return treeobj
+
+    ###############################################################################################
+
+    @classmethod
+    def _from_string_private(cls, parser_obj, orig_treestring, interner=None):
+        """Constructor: Tree object from tree-string. 
+        This version is meant to be used by e.g. treefile objects that will use same parser
+        for a lot of tree-strings, and can then instantiate parser once and reuse with this method.
+        Instantiated parser object has to have same format as treestring (for instance
+        Newick or Nexus with metacomments)"""
+
+        # All action is in parser_obj
+        treeobj = cls()
+        treeobj = parser_obj.parse(treeobj, orig_treestring)
+        treeobj.interner = interner
+        if treeobj.interner:
+            treeobj.leaves = treeobj.interner.store_unhashable("leaves", treeobj.leaves)
+            treeobj.intnodes = treeobj.interner.store_unhashable("intnodes", treeobj.intnodes)
+            treeobj.nodes = treeobj.interner.store_unhashable("nodes", treeobj.nodes)
+        return treeobj
 
     ###############################################################################################
 
