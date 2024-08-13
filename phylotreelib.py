@@ -6040,10 +6040,14 @@ class Distmatrix(object):
 
 # Placeholder: Insert test code here and run module in standalone mode
 def main():
-    pass
+    tf = Nexustreefile("../sumt/tests/big_mrbayes_file.t")
+    for tree in tf:
+        pass
 
 ###################################################################################################
 
 
 if __name__ == "__main__":
-    main()
+#    main()
+    import cProfile
+    cProfile.run('main()', 'tmp/profile.pstats')
