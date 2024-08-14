@@ -493,6 +493,8 @@ class NewickStringParser:
 
     ###############################################################################################
 
+    # from line_profiler import profile
+    # @profile
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
