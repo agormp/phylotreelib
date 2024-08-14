@@ -18,4 +18,4 @@ tests/contest*
 tests/copy*
 tests/large*
 .hypothesis/
-
+tmp/
