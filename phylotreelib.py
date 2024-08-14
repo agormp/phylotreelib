@@ -533,20 +533,20 @@ class NewickStringParser:
 
         treestring = "".join(treestring.split()) # Hack to remove whitespace from treestring
         dispatch = self.dispatch
-        delimset = {",", ";", ":", "(", ")", "{", "}", "[&"}
+        delimset = self.delimset
         state = "TREE_START"
-        tree_parts_list = re.split(r'([(),;:=\]{}])', treestring)
-        tree_parts_list = list(filter(None, tree_parts_list))  # Remove empty strings from split()
+        tree_parts_list = self.regex.split(treestring)
         for token_value in tree_parts_list:
-            if token_value in delimset:
-                token_type = token_value
-            else:
-                token_type = "NUM_NAME"
-            try:
-                handler = dispatch[state][token_type]
-                state = handler(token_value)
-            except KeyError:
-                self._handle_parse_error(state, token_value, token_type, treestring)
+            if token_value:
+                if token_value in delimset:
+                    token_type = token_value
+                else:
+                    token_type = "NUM_NAME"
+                try:
+                    handler = dispatch[state][token_type]
+                    state = handler(token_value)
+                except KeyError:
+                    self._handle_parse_error(state, token_value, token_type, treestring)
 
         self.sanitychecks(treeobj, treestring)
         treeobj.nodes = treeobj.leaves | treeobj.intnodes
