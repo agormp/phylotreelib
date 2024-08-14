@@ -436,45 +436,29 @@ class NewickStringParser:
             self._handle_add_leaf = self._handle_add_leaf
 
         # Dispatch dictionary: specifies which function to use for any given combination of
-        # state and token-type. Functions use token-value as input an return next state.
+        # state and token-type. Functions use token-value as input and return next state.
         self.dispatch = {
-            "TREE_START": {
-                "(": self._handle_add_root_intnode
-            },
-            "INTNODE_START": {
-                "(": self._handle_add_intnode,
-                "NUM_NAME": self._handle_add_leaf
-            },
-            "LEAF": {
-                ":": self._handle_transition_brlen,
-                ",": self._handle_transition_child,
-                ")": self._handle_intnode_end
-            },
-            "EXPECTING_BRLEN": {
-                "NUM_NAME": self._handle_add_brlen
-            },
-            "BRLEN": {
-                ",": self._handle_transition_child,
-                ")": self._handle_intnode_end
-            },
-            "EXPECTING_CHILD": {
-                "(": self._handle_add_intnode,
-                "NUM_NAME": self._handle_add_leaf
-            },
-            "INTNODE_END": {
-                ")": self._handle_intnode_end,
-                ",": self._handle_transition_child,
-                ":": self._handle_transition_brlen,
-                "NUM_NAME": self._handle_label,
-                ";": self._handle_transition_tree_end
-            },
-            "LABEL": {
-                ")": self._handle_intnode_end,
-                ",": self._handle_transition_child,
-                ":": self._handle_transition_brlen
-            }
+            "TREE_START":       {   "(":        self._handle_add_root_intnode       },
+            "INTNODE_START":    {   "(":        self._handle_add_intnode,
+                                    "NUM_NAME": self._handle_add_leaf               },
+            "LEAF":             {   ":":        self._handle_transition_brlen,
+                                    ",":        self._handle_transition_child,
+                                    ")":        self._handle_intnode_end            },
+            "EXPECTING_BRLEN":  {   "NUM_NAME": self._handle_add_brlen              },
+            "BRLEN":            {   ",":        self._handle_transition_child,
+                                    ")":        self._handle_intnode_end            },
+            "EXPECTING_CHILD":  {   "(":        self._handle_add_intnode,
+                                    "NUM_NAME": self._handle_add_leaf               },
+            "INTNODE_END":      {   ")":        self._handle_intnode_end,
+                                    ",":        self._handle_transition_child,
+                                    ":":        self._handle_transition_brlen,
+                                    "NUM_NAME": self._handle_label,
+                                    ";":        self._handle_transition_tree_end    },
+            "LABEL": {              ")":        self._handle_intnode_end,
+                                    ",":        self._handle_transition_child,
+                                    ":":        self._handle_transition_brlen       }
         }
-        
+
         self.update_dispatch()
 
     ###############################################################################################
