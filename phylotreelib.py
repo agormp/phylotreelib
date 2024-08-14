@@ -478,10 +478,11 @@ class NewickStringParser:
 
         # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
         # an internal node). The label is attached to the same branch as the branch length
-        treeobj.child_dict = {}
-        treeobj.leaves = set()
-        treeobj.intnodes = set()
-        treeobj.root = 0
+        self.treeobj = treeobj
+        self.treeobj.child_dict = {}
+        self.treeobj.leaves = set()
+        self.treeobj.intnodes = set()
+        self.treeobj.root = 0
 
         # These variables only used while parsing, and should not be in treeobj
         # In parser object, but reset each time new treestring is parsed
@@ -502,7 +503,7 @@ class NewickStringParser:
                 token_type = "NUM_NAME"
             try:
                 handler = dispatch[state][token_type]
-                treeobj, state = handler(treeobj, token_value)
+                state = handler(token_value)
             except KeyError:
                 self._handle_parse_error(state, token_value, token_type, treestring)
 
@@ -539,87 +540,87 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_add_root_intnode(self, treeobj, token_value):
+    def _handle_add_root_intnode(self, token_value):
         self.nodeno = 0
-        treeobj.child_dict[self.nodeno] = {}
+        self.treeobj.child_dict[self.nodeno] = {}
         self.node_stack.append(self.nodeno)
-        treeobj.intnodes.add(self.nodeno)
-        return treeobj, "INTNODE_START"
+        self.treeobj.intnodes.add(self.nodeno)
+        return "INTNODE_START"
 
     ###############################################################################################
 
-    def _handle_add_intnode(self, treeobj, token_value):
+    def _handle_add_intnode(self, token_value):
         self.nodeno += 1
-        treeobj.child_dict[self.nodeno] = {}
+        self.treeobj.child_dict[self.nodeno] = {}
         parent = self.node_stack[-1]
-        treeobj.child_dict[parent][self.nodeno] = Branchstruct()
+        self.treeobj.child_dict[parent][self.nodeno] = Branchstruct()
         self.node_stack.append(self.nodeno)
-        treeobj.intnodes.add(self.nodeno)
-        return treeobj, "INTNODE_START"
+        self.treeobj.intnodes.add(self.nodeno)
+        return "INTNODE_START"
 
     ###############################################################################################
 
-    def _handle_add_leaf(self, treeobj, name):
+    def _handle_add_leaf(self, name):
         child = sys.intern(name)
         parent = self.node_stack[-1]
-        treeobj.child_dict[parent][child] = Branchstruct()
+        self.treeobj.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
-        treeobj.leaves.add(child)
+        self.treeobj.leaves.add(child)
         self.ntips += 1
-        return treeobj, "LEAF"
+        return "LEAF"
 
     ###############################################################################################
 
-    def _handle_add_leaf_with_transdict(self, treeobj, name):
+    def _handle_add_leaf_with_transdict(self, name):
         child = sys.intern(self.transdict[name])
         parent = self.node_stack[-1]
-        treeobj.child_dict[parent][child] = Branchstruct()
+        self.treeobj.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
-        treeobj.leaves.add(child)
-        return treeobj, "LEAF"
+        self.treeobj.leaves.add(child)
+        return "LEAF"
 
     ###############################################################################################
 
-    def _handle_transition_child(self, treeobj, token_value):
+    def _handle_transition_child(self, token_value):
         self.node_stack.pop()
-        return treeobj, "EXPECTING_CHILD"
+        return "EXPECTING_CHILD"
 
     ###############################################################################################
 
-    def _handle_transition_brlen(self, treeobj, token_value):
-        return treeobj, "EXPECTING_BRLEN"
+    def _handle_transition_brlen(self, token_value):
+        return "EXPECTING_BRLEN"
 
     ###############################################################################################
 
-    def _handle_add_brlen(self, treeobj, brlen_string):
+    def _handle_add_brlen(self, brlen_string):
         try:
             brlen = float(brlen_string)
             child = self.node_stack[-1]
             parent = self.node_stack[-2]
-            treeobj.child_dict[parent][child].length = brlen
-            return treeobj, "BRLEN"
+            self.treeobj.child_dict[parent][child].length = brlen
+            return "BRLEN"
         except ValueError:
             raise TreeError(f"Expected branch length: {brlen_string}")
 
     ###############################################################################################
 
-    def _handle_intnode_end(self, treeobj, token_value):
+    def _handle_intnode_end(self, token_value):
         self.node_stack.pop()
-        return treeobj, "INTNODE_END"
+        return "INTNODE_END"
 
     ###############################################################################################
 
-    def _handle_label(self, treeobj, label):
+    def _handle_label(self, label):
         child = self.node_stack[-1]
         parent = self.node_stack[-2]
-        treeobj.child_dict[parent][child].label = label
-        return treeobj, "LABEL"
+        self.treeobj.child_dict[parent][child].label = label
+        return "LABEL"
 
     ###############################################################################################
 
-    def _handle_transition_tree_end(self, treeobj, token_value):
+    def _handle_transition_tree_end(self, token_value):
         self.node_stack.pop()
-        return treeobj, "TREE"
+        return "TREE"
 
 ###################################################################################################
 ###################################################################################################
