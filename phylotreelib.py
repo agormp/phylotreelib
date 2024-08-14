@@ -16,8 +16,6 @@ from operator import itemgetter
 from collections import Counter
 from collections import defaultdict
 import numpy as np
-import line_profiler
-
 
 ###################################################################################################
 ###################################################################################################
@@ -470,7 +468,6 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    @line_profiler.profile
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
