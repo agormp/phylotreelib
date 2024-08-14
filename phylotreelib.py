@@ -417,7 +417,16 @@ class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
     def __init__(self, transdict=None):
+        """Initialise parser object. 
+        To create derived class: 
+          (1) Call super __init__ in __init__ of derived class
+          (2) Override set_token_delimiters() (return string of single-char delimiters)
+          (3) Override update_dispatch() to modify self.dispatch dict"""
 
+        self.delimiters = self.set_token_delimiters() 
+        self.delimset = set(self.delimiters)
+        self.regex = self.create_compiled_regex(self.delimiters)
+        
         # If transdict was supplied: use corresponding handler when adding leaves
         # Also store transdict in parser (at class level! this is so staticmethods can access)
         if transdict:
@@ -465,6 +474,38 @@ class NewickStringParser:
                 ":": self._handle_transition_brlen
             }
         }
+        
+        self.update_dispatch()
+
+    ###############################################################################################
+
+    def set_token_delimiters(self):
+        """Override to set modified set of delimiters used when parsing.
+        All delimiters must be single-character (handle multi-char delims in parsing code)
+        Specify single string of delimiters that is returned"""
+
+        return ",:;()"          # Override this line in derived classes
+
+    ###############################################################################################
+
+    def update_dispatch(self):
+        """Override to modify dispatch dictionary (extra edges and nodes in state diagram)"""
+        pass                    # Override this code in derived classes
+
+    ###############################################################################################
+
+    def create_compiled_regex(self, delimiters):
+        """Creates compiled regex for faster parsing"""
+
+        # Final pattern will be of the form "([abcde])": a capturing parenthesis surrounding
+        # a bracketed set of single-char delimiters (here a, b, c, d, e)
+        # Metachars are escaped using re.escape
+        pattern_list = ["(["]
+        for delim in delimiters:
+            pattern_list.append(f"{re.escape(delim)}")
+        pattern_list.append("])")
+        pattern = "".join(pattern_list)
+        return re.compile(pattern)
 
     ###############################################################################################
 
