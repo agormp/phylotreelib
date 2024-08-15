@@ -494,8 +494,8 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    # from line_profiler import profile
-    # @profile
+    from line_profiler import profile
+    @profile
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
@@ -6064,7 +6064,12 @@ class Distmatrix(object):
 # Placeholder: Insert test code here and run module in standalone mode
 def main():
     # pass
+    # many tree samples (100,000) but small tree (41 leaves)
     tf = Nexustreefile("../sumt/tests/big_mrbayes_file.t")
+    for tree in tf:
+        pass
+    # Fewer tree samples (4,000) but large tree (1071 leaves)
+    tf = Nexustreefile("../sumt/tests/traitr_gapr_seq_realign_4.run1.t")
     for tree in tf:
         pass
 
