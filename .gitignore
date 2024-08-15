@@ -19,3 +19,4 @@ tests/copy*
 tests/large*
 .hypothesis/
 tmp/
+profile_*
