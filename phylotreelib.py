@@ -535,10 +535,10 @@ class NewickStringParser:
                 except KeyError:
                     self._handle_parse_error(state, token_value, token_type, treestring)
 
-        self.sanitychecks(treeobj, treestring)
-        treeobj.nodes = treeobj.leaves | treeobj.intnodes
+        self.sanitychecks(self.treeobj, treestring)
+        self.treeobj.nodes = self.treeobj.leaves | self.treeobj.intnodes
 
-        return treeobj
+        return self.treeobj
 
     ###############################################################################################
 
