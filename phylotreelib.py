@@ -464,7 +464,7 @@ class NewickStringParser:
     ###############################################################################################
 
     def set_token_delimiters(self):
-        """Override to set modified set of delimiters used when parsing.
+        """Override to modify the set of delimiters used when parsing.
         All delimiters must be single-character (handle multi-char delims in parsing code)
         Specify single string of delimiters that is returned"""
 
@@ -474,7 +474,8 @@ class NewickStringParser:
 
     def update_dispatch(self):
         """Override to modify dispatch dictionary (extra edges and nodes in state diagram)"""
-        pass                    # Override this code in derived classes
+        pass        # Replace this line with code modifying dispath dict in derived classes
+                    # For instance: self.dispatch["INTNODE_END"]["["] = self._handle_enter_comment
 
     ###############################################################################################
 
@@ -511,8 +512,8 @@ class NewickStringParser:
         self.treeobj.intnodes = set()
         self.treeobj.root = 0
 
-        # These variables only used while parsing, and should not be in treeobj
-        # In parser object, but reset each time new treestring is parsed
+        # These variables are only used while parsing, and should be in parserobj (not treeobj)
+        # Values are reset each time new treestring is parsed
         self.node_stack = []
         self.ntips = 0
         self.nodeno = None
