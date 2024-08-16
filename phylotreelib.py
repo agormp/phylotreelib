@@ -438,25 +438,25 @@ class NewickStringParser:
         # Dispatch dictionary: specifies which function to use for any given combination of
         # state and token-type. Functions use token-value as input and return next state.
         self.dispatch = {
-            "TREE_START":       {   "(":        self._handle_add_root_intnode       },
-            "INTNODE_START":    {   "(":        self._handle_add_intnode,
-                                    "NUM_NAME": self._handle_add_leaf               },
-            "LEAF":             {   ":":        self._handle_transition_brlen,
-                                    ",":        self._handle_transition_child,
-                                    ")":        self._handle_intnode_end            },
-            "EXPECTING_BRLEN":  {   "NUM_NAME": self._handle_add_brlen              },
-            "BRLEN":            {   ",":        self._handle_transition_child,
-                                    ")":        self._handle_intnode_end            },
-            "EXPECTING_CHILD":  {   "(":        self._handle_add_intnode,
-                                    "NUM_NAME": self._handle_add_leaf               },
-            "INTNODE_END":      {   ")":        self._handle_intnode_end,
-                                    ",":        self._handle_transition_child,
-                                    ":":        self._handle_transition_brlen,
-                                    "NUM_NAME": self._handle_label,
-                                    ";":        self._handle_transition_tree_end    },
-            "LABEL": {              ")":        self._handle_intnode_end,
-                                    ",":        self._handle_transition_child,
-                                    ":":        self._handle_transition_brlen       }
+            "TREE_START":       {   "(":        (self._handle_add_root_intnode, "INTNODE_START")       },
+            "INTNODE_START":    {   "(":        (self._handle_add_intnode, "INTNODE_START"),
+                                    "NUM_NAME": (self._handle_add_leaf, "LEAF")                        },
+            "LEAF":             {   ":":        (self._handle_transition_brlen, "EXPECTING_BRLEN"),
+                                    ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
+                                    ")":        (self._handle_intnode_end, "INTNODE_END")              },
+            "EXPECTING_BRLEN":  {   "NUM_NAME": (self._handle_add_brlen, "BRLEN")                      },
+            "BRLEN":            {   ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
+                                    ")":        (self._handle_intnode_end, "INTNODE_END")              },
+            "EXPECTING_CHILD":  {   "(":        (self._handle_add_intnode, "INTNODE_START"),
+                                    "NUM_NAME": (self._handle_add_leaf, "LEAF")                        },
+            "INTNODE_END":      {   ")":        (self._handle_intnode_end, "INTNODE_END"),
+                                    ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
+                                    ":":        (self._handle_transition_brlen, "EXPECTING_BRLEN"),
+                                    "NUM_NAME": (self._handle_label, "LABEL"),
+                                    ";":        (self._handle_transition_tree_end, "TREE_START")       },
+            "LABEL":            {   ")":        (self._handle_intnode_end, "INTNODE_END"),
+                                    ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
+                                    ":":        (self._handle_transition_brlen, "EXPECTING_BRLEN")     }
         }
 
         self.update_dispatch()
@@ -530,8 +530,8 @@ class NewickStringParser:
                 else:
                     token_type = "NUM_NAME"
                 try:
-                    handler = dispatch[state][token_type]
-                    state = handler(token_value)
+                    handler, state = dispatch[state][token_type]
+                    handler(token_value)
                 except KeyError:
                     self._handle_parse_error(state, token_value, token_type, treestring)
 
@@ -573,7 +573,6 @@ class NewickStringParser:
         self.treeobj.child_dict[self.nodeno] = {}
         self.node_stack.append(self.nodeno)
         self.treeobj.intnodes.add(self.nodeno)
-        return "INTNODE_START"
 
     ###############################################################################################
 
@@ -584,7 +583,6 @@ class NewickStringParser:
         self.treeobj.child_dict[parent][self.nodeno] = Branchstruct()
         self.node_stack.append(self.nodeno)
         self.treeobj.intnodes.add(self.nodeno)
-        return "INTNODE_START"
 
     ###############################################################################################
 
@@ -595,7 +593,6 @@ class NewickStringParser:
         self.node_stack.append(child)
         self.treeobj.leaves.add(child)
         self.ntips += 1
-        return "LEAF"
 
     ###############################################################################################
 
@@ -605,18 +602,16 @@ class NewickStringParser:
         self.treeobj.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
         self.treeobj.leaves.add(child)
-        return "LEAF"
 
     ###############################################################################################
 
     def _handle_transition_child(self, token_value):
         self.node_stack.pop()
-        return "EXPECTING_CHILD"
 
     ###############################################################################################
 
     def _handle_transition_brlen(self, token_value):
-        return "EXPECTING_BRLEN"
+        pass
 
     ###############################################################################################
 
@@ -626,7 +621,6 @@ class NewickStringParser:
             child = self.node_stack[-1]
             parent = self.node_stack[-2]
             self.treeobj.child_dict[parent][child].length = brlen
-            return "BRLEN"
         except ValueError:
             raise TreeError(f"Expected branch length: {brlen_string}")
 
@@ -634,7 +628,6 @@ class NewickStringParser:
 
     def _handle_intnode_end(self, token_value):
         self.node_stack.pop()
-        return "INTNODE_END"
 
     ###############################################################################################
 
@@ -642,13 +635,11 @@ class NewickStringParser:
         child = self.node_stack[-1]
         parent = self.node_stack[-2]
         self.treeobj.child_dict[parent][child].label = label
-        return "LABEL"
 
     ###############################################################################################
 
     def _handle_transition_tree_end(self, token_value):
         self.node_stack.pop()
-        return "TREE"
 
 ###################################################################################################
 ###################################################################################################
