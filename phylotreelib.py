@@ -435,28 +435,31 @@ class NewickStringParser:
         else:
             self._handle_add_leaf = self._handle_add_leaf
 
-        # Dispatch dictionary: specifies which function to use for any given combination of
-        # state and token-type. Functions use token-value as input and return next state.
+        # Dispatch dictionary: 
+        # Key = current state and token-type
+        # Value = tuple of
+        # (1) Function that should be run to further build tree data structure (argument=token-value)
+        # (2) New state (the one we move to after this step)
         self.dispatch = {
-            "TREE_START":       {   "(":        (self._handle_add_root_intnode, "INTNODE_START")       },
-            "INTNODE_START":    {   "(":        (self._handle_add_intnode, "INTNODE_START"),
-                                    "NUM_NAME": (self._handle_add_leaf, "LEAF")                        },
-            "LEAF":             {   ":":        (self._handle_transition_brlen, "EXPECTING_BRLEN"),
-                                    ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
-                                    ")":        (self._handle_intnode_end, "INTNODE_END")              },
-            "EXPECTING_BRLEN":  {   "NUM_NAME": (self._handle_add_brlen, "BRLEN")                      },
-            "BRLEN":            {   ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
-                                    ")":        (self._handle_intnode_end, "INTNODE_END")              },
-            "EXPECTING_CHILD":  {   "(":        (self._handle_add_intnode, "INTNODE_START"),
-                                    "NUM_NAME": (self._handle_add_leaf, "LEAF")                        },
-            "INTNODE_END":      {   ")":        (self._handle_intnode_end, "INTNODE_END"),
-                                    ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
-                                    ":":        (self._handle_transition_brlen, "EXPECTING_BRLEN"),
-                                    "NUM_NAME": (self._handle_label, "LABEL"),
-                                    ";":        (self._handle_transition_tree_end, "TREE_START")       },
-            "LABEL":            {   ")":        (self._handle_intnode_end, "INTNODE_END"),
-                                    ",":        (self._handle_transition_child, "EXPECTING_CHILD"),
-                                    ":":        (self._handle_transition_brlen, "EXPECTING_BRLEN")     }
+            "TREE_START":       {   "(":        (self._handle_add_root_intnode,     "INTNODE_START")    },
+            "INTNODE_START":    {   "(":        (self._handle_add_intnode,          "INTNODE_START"),
+                                    "NUM_NAME": (self._handle_add_leaf,             "LEAF")             },
+            "LEAF":             {   ":":        (self._handle_transition_brlen,      "EXPECTING_BRLEN"),
+                                    ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
+                                    ")":        (self._handle_intnode_end,          "INTNODE_END")      },
+            "EXPECTING_BRLEN":  {   "NUM_NAME": (self._handle_add_brlen,            "BRLEN")            },
+            "BRLEN":            {   ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
+                                    ")":        (self._handle_intnode_end,          "INTNODE_END")      },
+            "EXPECTING_CHILD":  {   "(":        (self._handle_add_intnode,          "INTNODE_START"),
+                                    "NUM_NAME": (self._handle_add_leaf,             "LEAF")             },
+            "INTNODE_END":      {   ")":        (self._handle_intnode_end,          "INTNODE_END"),
+                                    ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
+                                    ":":        (self._handle_transition_brlen,     "EXPECTING_BRLEN"),
+                                    "NUM_NAME": (self._handle_label,                "LABEL"),
+                                    ";":        (self._handle_transition_tree_end,  "TREE_START")       },
+            "LABEL":            {   ")":        (self._handle_intnode_end,          "INTNODE_END"),
+                                    ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
+                                    ":":        (self._handle_transition_brlen,     "EXPECTING_BRLEN")  }
         }
 
         self.update_dispatch()
