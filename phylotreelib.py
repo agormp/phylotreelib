@@ -4722,6 +4722,7 @@ class TreeSummary():
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
 
         if self.trackroot:
+            self._sorted_rootbips == None
             self._add_root(curtree)
 
         cladedict = None
