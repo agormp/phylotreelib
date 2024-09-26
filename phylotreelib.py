@@ -5091,16 +5091,20 @@ class TreeSummary():
             c1, c2 = sum_tree.children(p)
             sum_tree.set_branch_attribute(p, c1, "rootcred", f"{rootcred:.{precision}g}")
             sum_tree.set_branch_attribute(p, c2, "rootcred", f"{rootcred:.{precision}g}")
+            cumcred_correction = rootcred # Counted twice if i just sum over branches. Hackish solution...
         else:
             for c in sum_tree.children(p):
                 set_branch_credibility(p, c)
+            cumcred_correction = 0.0
                 
         # Compute cumulated rootcred = sum of rootcred on all tree branches
-        # Note: does not need to be 100% since sum_tree may not contain all seen root bipartitions
+        # Note: can be < 100% since sum_tree may not contain all observed root bipartitions
         cumulated_rootcred = 0.0
         for p in sum_tree.intnodes:
             for c in sum_tree.children(p):
-                cumulated_rootcred += float(sum_tree.get_branch_attribute(p, c, "rootcred"))
+                rootcred = float(sum_tree.get_branch_attribute(p, c, "rootcred"))
+                cumulated_rootcred += rootcred
+        cumulated_rootcred -= cumcred_correction  # If root at bifurcation: counted once too many...
         sum_tree.cumulated_rootcred = cumulated_rootcred
 
         return sum_tree
