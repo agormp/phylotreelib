@@ -2803,7 +2803,18 @@ class Tree:
         branch = self.child_dict[node1][node2]
         setattr(branch, attrname, attrvalue)
 
-        self.clear_caches()    # Python note: only lengthrelated caches actually - refactor
+        self.clear_caches()  
+
+    ###############################################################################################
+
+    def get_branch_attribute(self, node1, node2, attrname):
+        """Get the value of any branch attribute.
+        attrname: Name of attribute (e.g., "length")"""
+
+        branch = self.child_dict[node1][node2]
+        attribute = getattr(branch, attrname)
+
+        return attribute
 
     ###############################################################################################
 
