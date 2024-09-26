@@ -4676,7 +4676,7 @@ class TreeSummary():
 
     @property
     def rootbipsummary(self):
-        """Property method for lazy evaluation of freq (=root_cred) for rootbips"""
+        """Property method for lazy evaluation of freq (=rootcred) for rootbips"""
         if not self._rootbip_summary_processed:
             for rootbipstruct in self._rootbip_summary.values():
                 rootbipstruct.freq = rootbipstruct.count / self.tree_count
@@ -5041,7 +5041,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def set_root_credibility(self, sum_tree, precision=6):
+    def set_rootcredibility(self, sum_tree, precision=6):
         """Returns sum_tree with root credibilities as attributes on each branch
         rootcred = fraction of trees in input set where the root was on this branch (bipartition)
         If root was never on a branch: assign the value 0.0
@@ -5056,10 +5056,10 @@ class TreeSummary():
             bip = Bipartition(leafset1, sum_tree.frozenset_leaves, 
                               sum_tree.sorted_leaf_list, sum_tree.leaf2index)
             if bip in self.rootbipsummary:
-                rootbipstruct = self.rootbipsummary[bip]
-                sum_tree.set_branch_attribute(p, c, "root_cred", rootbipstruct.freq)
+                rootcred = self.rootbipsummary[bip].freq
+                sum_tree.set_branch_attribute(p, c, "rootcred", f"{rootcred:.{precision}g}")
             else:
-                sum_tree.set_branch_attribute(p, c, "root_cred", 0.0)
+                sum_tree.set_branch_attribute(p, c, "rootcred", 0.0)
 
         # Find rootcred for all non-root bipartitions on sum_tree
         for p in sum_tree.sorted_intnodes():
@@ -5071,10 +5071,10 @@ class TreeSummary():
         p = sum_tree.root
         if sum_tree.is_bifurcation(p):
             rootbip, _, _, _, _ = sum_tree.rootbip()
-            root_cred = self.rootbipsummary[rootbip].freq
+            rootcred = self.rootbipsummary[rootbip].freq
             c1, c2 = sum_tree.children(p)
-            sum_tree.set_branch_attribute(p, c1, "rootcred", f"{root_cred:.{precision}g}")
-            sum_tree.set_branch_attribute(p, c2, "rootcred", f"{root_cred:.{precision}g}")
+            sum_tree.set_branch_attribute(p, c1, "rootcred", f"{rootcred:.{precision}g}")
+            sum_tree.set_branch_attribute(p, c2, "rootcred", f"{rootcred:.{precision}g}")
         else:
             for c in sum_tree.children(p):
                 set_branch_credibility(p, c)
