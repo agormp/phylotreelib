@@ -5011,6 +5011,8 @@ class TreeSummary():
 
     def root_maxfreq(self, sum_tree):
         """Uses info about root bipartitions in TreeSummary to place root on summary tree.
+        Also sets tree attribute rootcred: 
+            probability (freq among input trees) of current location of root
 
         If tree has branch lengths:
         Divides length of root bipartition among two branches in accordance with average
@@ -5056,7 +5058,10 @@ class TreeSummary():
         """Returns sum_tree with root credibilities as attributes on each branch
         rootcred = fraction of trees in input set where the root was on this branch (bipartition)
         If root was never on a branch: assign the value 0.0
-        Added as attribute .rootcred to Branchstruct for branches om sum_tree"""
+        Added as attribute .rootcred to Branchstruct for branches om sum_tree
+        Also sets tree-attribute cumrootcred: 
+            sum of rootcredibilities for all branches (bipartitions) included on tree
+        """
 
         if not self.trackroot:
             raise TreeError("Not possible to compute root credibilities: self.trackroot is False")
