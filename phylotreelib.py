@@ -5073,8 +5073,8 @@ class TreeSummary():
             rootbip, _, _, _, _ = sum_tree.rootbip()
             root_cred = self.rootbipsummary[rootbip].freq
             c1, c2 = sum_tree.children(p)
-            sum_tree.set_branch_attribute(p, c1, "root_cred", root_cred)
-            sum_tree.set_branch_attribute(p, c2, "root_cred", root_cred)
+            sum_tree.set_branch_attribute(p, c1, "root_cred", f"{root_cred:.{precision}g}")
+            sum_tree.set_branch_attribute(p, c2, "root_cred", f"{root_cred:.{precision}g}")
         else:
             for c in sum_tree.children(p):
                 set_branch_credibility(p, c)
