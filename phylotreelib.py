@@ -5094,6 +5094,14 @@ class TreeSummary():
         else:
             for c in sum_tree.children(p):
                 set_branch_credibility(p, c)
+                
+        # Compute cumulated rootcred = sum of rootcred on all tree branches
+        # Note: does not need to be 100% since sum_tree may not contain all seen root bipartitions
+        cumulated_rootcred = 0.0
+        for p in sum_tree.intnodes:
+            for c in sum_tree.children(p):
+                cumulated_rootcred += sum_tree.get_branch_attribute(p, c, "rootcred")
+        sumtree.cumulated_rootcred = cumulated_rootcred
 
         return sum_tree
 
