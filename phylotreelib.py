@@ -5100,8 +5100,8 @@ class TreeSummary():
         cumulated_rootcred = 0.0
         for p in sum_tree.intnodes:
             for c in sum_tree.children(p):
-                cumulated_rootcred += sum_tree.get_branch_attribute(p, c, "rootcred")
-        sumtree.cumulated_rootcred = cumulated_rootcred
+                cumulated_rootcred += float(sum_tree.get_branch_attribute(p, c, "rootcred"))
+        sum_tree.cumulated_rootcred = cumulated_rootcred
 
         return sum_tree
 
