@@ -4999,45 +4999,93 @@ class TreeSummary():
     ###############################################################################################
 
     def root_maxfreq(self, sum_tree):
-        """Uses info about root bipartitions in TreeSummary to place root on summary tree.
-
+        """Root sum_tree at the location most often observed in input trees.
+        
         If tree has branch lengths:
         Divides length of root bipartition among two branches in accordance with average
         fraction of lengths seen for this rootbip across all trees."""
 
-        # Starting with most frequent root location: find one that is compatible
-        # Python note: should i just try number 1 on sorted list?
+        # Check if most frequent root location compatible with sum_tree, raise error if not
+        maxcount, maxcount_bip, maxcount_rootbipstruct = self.sorted_rootbips[0]
+        if not sum_tree.bipart_is_present(maxcount_bip):
+            raise TreeError(f"Summary tree not compatible with most frequent root location")
+            
         if sum_tree.is_bifurcation(sum_tree.root):
             cur_rootbip, _, _, _, _ = sum_tree.rootbip()
         else:
             cur_rootbip = None
-        for count, bip, summary_rootbipstruct in self.sorted_rootbips:
-            if sum_tree.bipart_is_present(bip):
-                # If tree already rooted correctly: do not reroot
-                if (cur_rootbip is None) or (bip != cur_rootbip):
-                    parent,child = sum_tree.find_bipart_nodes(bip)
-                    sum_tree.deroot()  # Python note: necessary?
-                                           # reroot seems to assume not rooted at birfurcation
-                                           # rethink reroot function and others depending on it!
-                    sum_tree.reroot(child, parent)
-                sum_tree.rootcred = count / self.tree_count
+                    
+        # Re-root if current root is not already on maxcount_bip
+        if (cur_rootbip is None) or (maxcount_bip != cur_rootbip):
+            parent,child = sum_tree.find_bipart_nodes(maxcount_bip)
+            sum_tree.deroot()  # Python note: necessary?
+                               # reroot seems to assume tree not rooted at birfurcation
+                               # rethink reroot function and others depending on it!
+            sum_tree.reroot(child, parent)
+        sum_tree.rootcred = maxcount / self.tree_count
 
-                # If branch lengths or node depths have been tracked:
-                # Divide branch lengths for two rootkids according to fractions
-                # seen for this rootbip across trees in ._rootbip_summary
-                if self.trackblen or self.trackdepth:
-                    kid1,kid2 = sum_tree.children(sum_tree.root)
-                    biplen = sum_tree.nodedist(kid1, kid2)
-                    kid1_remkids = sum_tree.remotechildren_dict[kid1]
-                    dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
-                    dist_to_kid2 = biplen - dist_to_kid1
-                    sum_tree.child_dict[sum_tree.root][kid1].length = dist_to_kid1
-                    sum_tree.child_dict[sum_tree.root][kid2].length = dist_to_kid2
+        # If branch lengths or node depths have been tracked:
+        # Divide branch lengths for two rootkids according to fractions
+        # seen for this rootbip across trees in ._rootbip_summary
+        if self.trackblen or self.trackdepth:
+            kid1,kid2 = sum_tree.children(sum_tree.root)
+            biplen = sum_tree.nodedist(kid1, kid2)
+            kid1_remkids = sum_tree.remotechildren_dict[kid1]
+            dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+            dist_to_kid2 = biplen - dist_to_kid1
+            sum_tree.child_dict[sum_tree.root][kid1].length = dist_to_kid1
+            sum_tree.child_dict[sum_tree.root][kid2].length = dist_to_kid2
 
-                return sum_tree
+        # Now label remaining branches with the corresponding probability root is there
+        parent_set = self.intnodes - sum_tree.children(sum_tree.root) - {sum_tree.root}
+        for parent in parent_set:
+            for child in sum_tree.children(parent):
+                
+        
 
-        # If we did not return by now, then bipart not in contree
-        raise TreeError(f"sum_tree tree not compatible with any observed root locations")
+        return sum_tree
+
+    ###############################################################################################
+
+    def set_root_credibility(self, sum_tree, precision=6):
+        """Returns sum_tree with root credibilities as attributes on each branch
+        rootcred = fraction of trees in input set where the root was on this branch (bipartition)
+        If root was never on a branch: assign the value 0.0
+        Added as attribute .root_cred to Branchstruct for branches om sum_tree"""
+
+        if not self.trackroot:
+            raise TreeError("Not possible to compute root credibilities: self.trackroot is False")
+
+        def set_branch_credibility(p, c):
+            """Helper function to set root credibility for a branch."""
+            leafset1 = sum_tree.remotechildren_dict[c]
+            bip = Bipartition(leafset1, sum_tree.frozenset_leaves, 
+                              sum_tree.sorted_leaf_list, sum_tree.leaf2index)
+            if bip in self.rootbipsummary:
+                rootbipstruct = self.rootbipsummary[bip]
+                sum_tree.set_branch_attribute(p, c, "root_cred", rootbipstruct.freq)
+            else:
+                sum_tree.set_branch_attribute(p, c, "root_cred", 0.0)
+
+        # Find rootcred for all non-root bipartitions on sum_tree
+        for p in sum_tree.sorted_intnodes():
+            if p != sum_tree.root:
+                for c in sum_tree.children(p):
+                    set_branch_credibility(p, c)
+
+        # Handle root bipartition separately
+        p = sum_tree.root
+        if sum_tree.is_bifurcation(p):
+            rootbip, _, _, _, _ = sum_tree.rootbip()
+            root_cred = self.rootbipsummary[rootbip].freq
+            c1, c2 = sum_tree.children(p)
+            sum_tree.set_branch_attribute(p, c1, "root_cred", root_cred)
+            sum_tree.set_branch_attribute(p, c2, "root_cred", root_cred)
+        else:
+            for c in sum_tree.children(p):
+                set_branch_credibility(p, c)
+
+        return sum_tree
 
     ###############################################################################################
 
