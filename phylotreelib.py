@@ -2421,7 +2421,7 @@ class Tree:
                     else:
                         treelist.append(child)
                     if label != "" and print_leaflabels:
-                        treelist.append("{}".format(label))
+                        treelist.append(f"[&{labelfield}={label}]")
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
                 else:
