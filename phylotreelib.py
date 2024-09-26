@@ -4592,6 +4592,7 @@ class TreeSummary():
         self.trackblen = trackblen
         self.trackdepth = trackdepth
         self._sorted_rootbips = None
+        self._rootbip_summary_processed = False
         if trackroot:
             self._rootbip_summary = {}
         else:
@@ -4670,6 +4671,17 @@ class TreeSummary():
             self._sorted_biplist = leafbips + internalbips
 
         return self._sorted_biplist
+
+    ###############################################################################################
+
+    @property
+    def rootbipsummary(self):
+        """Property method for lazy evaluation of freq (=root_cred) for rootbips"""
+        if not self._rootbip_summary_processed:
+            for rootbipstruct in self._rootbip_summary.values():
+                rootbipstruct.freq = rootbipstruct.count / self.treecount
+            self._rootbip_summary_processed = True
+        return self._rootbip_summary
 
     ###############################################################################################
 
