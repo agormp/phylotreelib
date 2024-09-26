@@ -4999,51 +4999,45 @@ class TreeSummary():
     ###############################################################################################
 
     def root_maxfreq(self, sum_tree):
-        """Root sum_tree at the location most often observed in input trees.
-        
+        """Uses info about root bipartitions in TreeSummary to place root on summary tree.
+
         If tree has branch lengths:
         Divides length of root bipartition among two branches in accordance with average
         fraction of lengths seen for this rootbip across all trees."""
 
-        # Check if most frequent root location compatible with sum_tree, raise error if not
-        maxcount, maxcount_bip, maxcount_rootbipstruct = self.sorted_rootbips[0]
-        if not sum_tree.bipart_is_present(maxcount_bip):
-            raise TreeError(f"Summary tree not compatible with most frequent root location")
-            
+        # Starting with most frequent root location: find one that is compatible
+        # Python note: should i just try number 1 on sorted list?
         if sum_tree.is_bifurcation(sum_tree.root):
             cur_rootbip, _, _, _, _ = sum_tree.rootbip()
         else:
             cur_rootbip = None
-                    
-        # Re-root if current root is not already on maxcount_bip
-        if (cur_rootbip is None) or (maxcount_bip != cur_rootbip):
-            parent,child = sum_tree.find_bipart_nodes(maxcount_bip)
-            sum_tree.deroot()  # Python note: necessary?
-                               # reroot seems to assume tree not rooted at birfurcation
-                               # rethink reroot function and others depending on it!
-            sum_tree.reroot(child, parent)
-        sum_tree.rootcred = maxcount / self.tree_count
+        for count, bip, summary_rootbipstruct in self.sorted_rootbips:
+            if sum_tree.bipart_is_present(bip):
+                # If tree already rooted correctly: do not reroot
+                if (cur_rootbip is None) or (bip != cur_rootbip):
+                    parent,child = sum_tree.find_bipart_nodes(bip)
+                    sum_tree.deroot()  # Python note: necessary?
+                                           # reroot seems to assume not rooted at birfurcation
+                                           # rethink reroot function and others depending on it!
+                    sum_tree.reroot(child, parent)
+                sum_tree.rootcred = count / self.tree_count
 
-        # If branch lengths or node depths have been tracked:
-        # Divide branch lengths for two rootkids according to fractions
-        # seen for this rootbip across trees in ._rootbip_summary
-        if self.trackblen or self.trackdepth:
-            kid1,kid2 = sum_tree.children(sum_tree.root)
-            biplen = sum_tree.nodedist(kid1, kid2)
-            kid1_remkids = sum_tree.remotechildren_dict[kid1]
-            dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
-            dist_to_kid2 = biplen - dist_to_kid1
-            sum_tree.child_dict[sum_tree.root][kid1].length = dist_to_kid1
-            sum_tree.child_dict[sum_tree.root][kid2].length = dist_to_kid2
+                # If branch lengths or node depths have been tracked:
+                # Divide branch lengths for two rootkids according to fractions
+                # seen for this rootbip across trees in ._rootbip_summary
+                if self.trackblen or self.trackdepth:
+                    kid1,kid2 = sum_tree.children(sum_tree.root)
+                    biplen = sum_tree.nodedist(kid1, kid2)
+                    kid1_remkids = sum_tree.remotechildren_dict[kid1]
+                    dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+                    dist_to_kid2 = biplen - dist_to_kid1
+                    sum_tree.child_dict[sum_tree.root][kid1].length = dist_to_kid1
+                    sum_tree.child_dict[sum_tree.root][kid2].length = dist_to_kid2
 
-        # Now label remaining branches with the corresponding probability root is there
-        parent_set = self.intnodes - sum_tree.children(sum_tree.root) - {sum_tree.root}
-        for parent in parent_set:
-            for child in sum_tree.children(parent):
-                
-        
+                return sum_tree
 
-        return sum_tree
+        # If we did not return by now, then bipart not in contree
+        raise TreeError(f"sum_tree tree not compatible with any observed root locations")
 
     ###############################################################################################
 
