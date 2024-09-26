@@ -497,8 +497,6 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    from line_profiler import profile
-    @profile
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
@@ -728,9 +726,9 @@ class Tree:
         treeobj = parser_obj.parse(treeobj, orig_treestring)
         treeobj.interner = interner
         if treeobj.interner:
-            treeobj.leaves = treeobj.interner.store_unhashable("leaves", treeobj.leaves)
+            treeobj.leaves = treeobj.interner.store_unhashable("leaves", treeobj.leaves) 
             treeobj.intnodes = treeobj.interner.store_unhashable("intnodes", treeobj.intnodes)
-            treeobj.nodes = treeobj.interner.store_unhashable("nodes", treeobj.nodes)
+            treeobj.nodes = treeobj.interner.store_unhashable("nodes", treeobj.nodes) 
         return treeobj
 
     ###############################################################################################
@@ -2024,7 +2022,7 @@ class Tree:
             leafstring += ", "
         leafstring = leafstring[:-2]    # Remove trailing comma and blank
 
-        msg = f"The following is not a monophyletic group in this tree:\n{leafstring}"
+        msg = f"The following is not a monophyletic group in this tree:\n{leafstring}" 
         raise TreeError(msg)
 
     ###############################################################################################
@@ -3312,7 +3310,7 @@ class Tree:
             for node in remnodes:
                 del self.nodedict[node]
 
-        self.clear_caches(preserve=["_parent_dict"])
+        self.clear_caches(preserve=["_parent_dict"]) 
 
     ###############################################################################################
 
@@ -4681,7 +4679,6 @@ class TreeSummary():
 
         if self._sorted_rootbips == None:
             self._sorted_rootbips = []
-            maxcount = 0
             for bip,rootbipstruct in self._rootbip_summary.items():
                 self._sorted_rootbips.append((rootbipstruct.count, bip, rootbipstruct))
             self._sorted_rootbips.sort(key=itemgetter(0), reverse=True)
@@ -5039,7 +5036,7 @@ class TreeSummary():
         NOTE 2: only works if all clades in tree have been observed at least once. The option
                 will therefore not work with all rootings, and may also fail for majority rule
                 consensus trees
-        NOTE 3: only uses node depths from monopyletic clades (so some values may be set
+        NOTE 3: only uses node depths from monophyletic clades (so some values may be set
         based on very few trees)"""
 
         all_leaves = sum_tree.frozenset_leaves
@@ -5184,7 +5181,7 @@ class TreeSummary():
         on current root of sum_tree and information in self._rootbip_summary"""
 
         # Python note: mostly relevant for MCC trees. Other tree types will typically
-        # get the .rootcred attribute set when calling .root_max_freq()
+        # get the .rootcred attribute set when calling .root_maxfreq()
 
         tree_rootbip, _, _, _, _ = tree.rootbip()
         summary_rootbipstruct = self._rootbip_summary[tree_rootbip]
