@@ -2028,8 +2028,9 @@ class Tree:
     ###############################################################################################
 
     def find_bipart_nodes(self, bipartition):
-        """Given a Bipartition as input: return the two nodes on the current tree that delimit
-        the branch corresponding to the bipartition (if present in tree)"""
+        """Given a Bipartition as input: 
+             If bipart present:     return (parent,child) nodes for bipartition branch. 
+             If bipart not present: return (None, None)"""
 
         (bip1, bip2) = bipartition
         mrca = self.find_mrca(bip1)
@@ -2037,10 +2038,10 @@ class Tree:
         if mrca == self.root:
             mrca = self.find_mrca(bip2)
             bip = bip2
-        if self.remotechildren_dict[mrca] != bip:
-            raise TreeError(f"Bipartition not present in tree: \n{bipartition}")
-
-        return (self.parent(mrca), mrca)
+        if self.remotechildren_dict[mrca] == bip:
+            return (self.parent(mrca), mrca)
+        else:
+            return None
 
     ###############################################################################################
 
