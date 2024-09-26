@@ -4679,7 +4679,7 @@ class TreeSummary():
         """Property method for lazy evaluation of freq (=root_cred) for rootbips"""
         if not self._rootbip_summary_processed:
             for rootbipstruct in self._rootbip_summary.values():
-                rootbipstruct.freq = rootbipstruct.count / self.treecount
+                rootbipstruct.freq = rootbipstruct.count / self.tree_count
             self._rootbip_summary_processed = True
         return self._rootbip_summary
 
