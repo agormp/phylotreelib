@@ -5045,7 +5045,7 @@ class TreeSummary():
         """Returns sum_tree with root credibilities as attributes on each branch
         rootcred = fraction of trees in input set where the root was on this branch (bipartition)
         If root was never on a branch: assign the value 0.0
-        Added as attribute .root_cred to Branchstruct for branches om sum_tree"""
+        Added as attribute .rootcred to Branchstruct for branches om sum_tree"""
 
         if not self.trackroot:
             raise TreeError("Not possible to compute root credibilities: self.trackroot is False")
@@ -5073,8 +5073,8 @@ class TreeSummary():
             rootbip, _, _, _, _ = sum_tree.rootbip()
             root_cred = self.rootbipsummary[rootbip].freq
             c1, c2 = sum_tree.children(p)
-            sum_tree.set_branch_attribute(p, c1, "root_cred", f"{root_cred:.{precision}g}")
-            sum_tree.set_branch_attribute(p, c2, "root_cred", f"{root_cred:.{precision}g}")
+            sum_tree.set_branch_attribute(p, c1, "rootcred", f"{root_cred:.{precision}g}")
+            sum_tree.set_branch_attribute(p, c2, "rootcred", f"{root_cred:.{precision}g}")
         else:
             for c in sum_tree.children(p):
                 set_branch_credibility(p, c)
