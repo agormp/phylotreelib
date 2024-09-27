@@ -4540,6 +4540,53 @@ class TreeSet():
 
     ###############################################################################################
 
+    def figtree(self, printdist=True, printlabels=True, labelfield="label", print_leaflabels=False, 
+                precision=6, translateblock=True, colorlist=None, color="0000FF", metacomments=True):
+        """Returns nexus format tree as a string"""
+
+        # Construct header
+        stringlist = ["#NEXUS\n\n"]
+
+        # Add taxon header with color info
+        t = self[0]    # Random tree used to extract info about leaves. Python note: add attr to TreeSet instead?
+        header = f"begin taxa\n\tdimensions ntax={len(t.leaves)};\n"
+        header += "\ttaxlabels\n"
+        stringlist.append(header)
+        for leaf in t.leaflist():
+            stringlist.append(f"\t\t{leaf}")
+            if colorlist and (leaf in colorlist):
+                col = color
+            else:
+                col = "000000"   # default color is black
+            stringlist.append(f"[&!color=#{col}]\n")
+        stringlist.append(";\nend;\n")
+        stringlist.append("\nbegin trees;\n")
+
+        # If translateblock is requested: add translateblock to stringlist
+        if translateblock:
+            transdict = self[0].transdict()
+            stringlist.append(self[0].translateblock(transdict))
+            
+        # Add newick tree strings
+        for i, tree in enumerate(self.treelist):
+            stringlist.append("    tree t.{} = ".format(i+1))
+            if translateblock:
+                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
+                                              print_leaflabels=print_leaflabels, precision=precision, metacomments=True,
+                                              transdict=transdict))
+            else:
+                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
+                                              print_leaflabels=print_leaflabels, precision=precision, metacomments=True))
+                                
+            stringlist.append("\n")
+
+        # Add footer
+        stringlist.append("end;\n")
+
+        return "".join(stringlist)
+
+    ###############################################################################################
+
     def newick(self, printdist=True, printlabels=True):
         """Returns newick format tree as a string"""
 
