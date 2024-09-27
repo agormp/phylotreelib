@@ -2386,7 +2386,8 @@ class Tree:
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, print_leaflabels=False,
-                label_delimiters = None, precision=6, labelfield="label", transdict=None):
+                label_delimiters = None, precision=6, labelfield="label", transdict=None,
+                metacomments=False):
         """Returns Newick format tree string representation of tree object"""
 
         # Distances and (internal branch) labels are printed unless user explicitly request no printing
@@ -2396,6 +2397,7 @@ class Tree:
         # label_delimiters: None: no delimiters, print label as is
         #                   "brackets": Put brackets around label text: [my label text]
         #                    "braces": put curly braces around label text: {my label text}
+        # metacomments: print labels using Nexus metacomment format: [&name=value]
         # NOTE: This could probably be done slightly faster by iteration (instead of recursion)
         # for instance by using a stack, but unlikely that this function will be heavily used...
         # NOTE 2: I am using getattr() on "labelfield" to allow run-time specification of what
@@ -2421,7 +2423,10 @@ class Tree:
                     else:
                         treelist.append(child)
                     if label != "" and print_leaflabels:
-                        treelist.append(f"[&{labelfield}={label}]")
+                        if metacomments: # Should this be after the colon since it is branch attribute?
+                            treelist.append(f"[&{labelfield}={label}]")
+                        else:
+                            treelist.append(f" {label}")     # Not sure this will ever work (use metacomments always for this).
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
                 else:
@@ -2430,7 +2435,10 @@ class Tree:
                     treelist.append(")")
 
                     if label != "" and printlabels:
-                        treelist.append("{}".format(label))
+                        if metacomments: # Should this be after the colon since it is branch attribute?
+                            treelist.append(f"[&{labelfield}={label}]")
+                        else:
+                            treelist.append(f"{label}")
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
 
@@ -2479,7 +2487,7 @@ class Tree:
     ###############################################################################################
 
     def figtree(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6,
-                colorlist=None, color="0000FF"):
+                labelfield="label", translateblock=False, colorlist=None, color="0000FF"):
         """Returns figtree format tree as a string"""
 
         # Implementation note: Rudimentary and mostly for coloring.
@@ -2491,7 +2499,7 @@ class Tree:
         stringlist = [header]
         for leaf in self.leaflist():
             stringlist.append("\t{}".format(leaf))
-            if leaf in colorlist:
+            if colorlist and (leaf in colorlist):
                 col = color
             else:
                 col = "000000"   # default color is black
@@ -2500,7 +2508,8 @@ class Tree:
         stringlist.append("\nbegin trees;\n\ttree nexus_tree = ")
 
         # Add newick tree string
-        stringlist.append(self.newick(printdist, printlabels, print_leaflabels, precision))
+        stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
+                                      print_leaflabels=print_leaflabels, precision=precision, metacomments=True))
 
         # Add footer
         stringlist.append("\nend;\n")
