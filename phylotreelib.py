@@ -2412,7 +2412,7 @@ class Tree:
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
                 label = getattr(branchstruct, labelfield)
-                if label_delimiters == "brackets":
+                if label_delimiters == "brackets": # do i ever use this feature? Remove
                     label = f"[{label}]"
                 elif label_delimiters == "braces":
                     label = f"{{{label}}}"
