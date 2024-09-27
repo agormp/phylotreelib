@@ -5072,6 +5072,15 @@ class TreeSummary():
             sum of rootcredibilities for all branches (bipartitions) included on tree
         """
 
+        def format_with_decimal(value, precision):
+            """Helper function to format number with significant digits and ensure decimal point
+            (FigTree crashes if metacomment values are a mix of reals and intergers)"""
+            formatted = f"{value:.{precision}g}"
+            # If formatted value is an integer, add '.0'
+            if '.' not in formatted and 'e' not in formatted:
+                formatted += '.0'
+            return formatted
+
         if not self.trackroot:
             raise TreeError("Not possible to compute root credibilities: self.trackroot is False")
 
@@ -5082,9 +5091,9 @@ class TreeSummary():
                               sum_tree.sorted_leaf_list, sum_tree.leaf2index)
             if bip in self.rootbipsummary:
                 rootcred = self.rootbipsummary[bip].freq
-                sum_tree.set_branch_attribute(p, c, "rootcred", f"{rootcred:.{precision}g}")
+                sum_tree.set_branch_attribute(p, c, "rootcred", format_with_decimal(rootcred, precision))
             else:
-                sum_tree.set_branch_attribute(p, c, "rootcred", 0.0)
+                sum_tree.set_branch_attribute(p, c, "rootcred", format_with_decimal(0.0, precision))
 
         # Find rootcred for all non-root bipartitions on sum_tree
         for p in sum_tree.sorted_intnodes():
@@ -5098,8 +5107,8 @@ class TreeSummary():
             rootbip, _, _, _, _ = sum_tree.rootbip()
             rootcred = self.rootbipsummary[rootbip].freq
             c1, c2 = sum_tree.children(p)
-            sum_tree.set_branch_attribute(p, c1, "rootcred", f"{rootcred:.{precision}g}")
-            sum_tree.set_branch_attribute(p, c2, "rootcred", f"{rootcred:.{precision}g}")
+            sum_tree.set_branch_attribute(p, c1, "rootcred", format_with_decimal(rootcred, precision))
+            sum_tree.set_branch_attribute(p, c2, "rootcred", format_with_decimal(rootcred, precision))
             cumcred_correction = rootcred # Counted twice if i just sum over branches. Hackish solution...
         else:
             for c in sum_tree.children(p):
