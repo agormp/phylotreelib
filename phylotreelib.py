@@ -5082,7 +5082,7 @@ class TreeSummary():
             cur_rootbip = None
         for count, bip, summary_rootbipstruct in self.sorted_rootbips:
             if sum_tree.bipart_is_present(bip):
-                # If tree already rooted correctly: do not reroot
+                # Only reroot if tree not already rooted correctly
                 if (cur_rootbip is None) or (bip != cur_rootbip):
                     parent,child = sum_tree.find_bipart_nodes(bip)
                     sum_tree.deroot()  # Python note: necessary?
