@@ -2385,7 +2385,7 @@ class Tree:
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True, print_leaflabels=False,
+    def newick(self, printdist=True, printlabels=True, 
                 label_delimiters = None, precision=6, labelfield="label", transdict=None,
                 metacomments=False):
         """Returns Newick format tree string representation of tree object"""
@@ -2422,11 +2422,8 @@ class Tree:
                         treelist.append(transdict[child])     # Should transdict errors be caught here?
                     else:
                         treelist.append(child)
-                    if label != "" and print_leaflabels:
-                        if metacomments: # Should this be after the colon since it is branch attribute?
-                            treelist.append(f"[&{labelfield}={label}]")
-                        else:
-                            treelist.append(f" {label}")     # Not sure this will ever work (use metacomments always for this).
+                    if label != "" and metacomments:
+                        treelist.append(f"[&{labelfield}={label}]")
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
                 else:
@@ -2458,7 +2455,7 @@ class Tree:
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, print_leaflabels=False,
+    def nexus(self, printdist=True, printlabels=True, 
                 label_delimiters = None, precision=6, labelfield="label", translateblock=False):
         """Returns nexus format tree as a string"""
 
@@ -2473,10 +2470,10 @@ class Tree:
         # Add newick tree string
         stringlist.append("   tree nexus_tree = ")
         if translateblock:
-            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, label_delimiters,
+            stringlist.append(self.newick(printdist, printlabels, label_delimiters,
                                           precision, labelfield, transdict))
         else:
-            stringlist.append(self.newick(printdist, printlabels, print_leaflabels, label_delimiters,
+            stringlist.append(self.newick(printdist, printlabels, label_delimiters,
                                           precision, labelfield))
 
         # Add footer
@@ -2486,7 +2483,7 @@ class Tree:
 
     ###############################################################################################
 
-    def figtree(self, printdist=True, printlabels=True, print_leaflabels=False, precision=6,
+    def figtree(self, printdist=True, printlabels=True, precision=6,
                 labelfield="label", translateblock=False, colorlist=None, color="0000FF"):
         """Returns figtree format tree as a string"""
 
@@ -2509,7 +2506,7 @@ class Tree:
 
         # Add newick tree string
         stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                      print_leaflabels=print_leaflabels, precision=precision, metacomments=True))
+                                      precision=precision, metacomments=True))
 
         # Add footer
         stringlist.append("\nend;\n")
@@ -4540,7 +4537,7 @@ class TreeSet():
 
     ###############################################################################################
 
-    def figtree(self, printdist=True, printlabels=True, labelfield="label", print_leaflabels=False, 
+    def figtree(self, printdist=True, printlabels=True, labelfield="label", 
                 precision=6, translateblock=True, colorlist=None, color="0000FF", metacomments=True):
         """Returns nexus format tree as a string"""
 
@@ -4572,11 +4569,11 @@ class TreeSet():
             stringlist.append("    tree t.{} = ".format(i+1))
             if translateblock:
                 stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                              print_leaflabels=print_leaflabels, precision=precision, metacomments=True,
+                                              precision=precision, metacomments=True,
                                               transdict=transdict))
             else:
                 stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                              print_leaflabels=print_leaflabels, precision=precision, metacomments=True))
+                                              precision=precision, metacomments=True))
                                 
             stringlist.append("\n")
 

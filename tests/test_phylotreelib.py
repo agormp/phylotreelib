@@ -534,7 +534,7 @@ class TreeOutput(TreeTestBase):
             tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
             treesummary.add_tree(tree)
         contree = treesummary.contree()
-        nexus_string = contree.nexus(print_leaflabels=False)
+        nexus_string = contree.nexus()
         nexusfile = pt.Nexustreefile(filecontent=nexus_string)
         mytree = next(nexusfile)
         self.assertEqual(contree,mytree)
