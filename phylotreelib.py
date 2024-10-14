@@ -4674,7 +4674,7 @@ class TreeSummary():
 
     @property
     def bipartsummary(self):
-        """Property method for lazy evaluation of freq, var, and sem for branches"""
+        """Property method for lazy evaluation of freq, var, sd, and sem for branches"""
         if not self._bipartsummary_processed:
             for branch in self._bipartsummary.values():
                 branch.freq = branch.SUMW / self.tree_weight_sum
@@ -4682,9 +4682,11 @@ class TreeSummary():
                     n = branch.bip_count
                     if n > 1:
                         branch.var = branch.T * n / ((n - 1) * branch.SUMW)
-                        branch.sem = math.sqrt(branch.var)/math.sqrt(n)
+                        branch.sd = math.sqrt(branch.var)
+                        branch.sem = branch.sd / math.sqrt(n)
                     else:
                         branch.var = "NA"
+                        branch.sd = "NA"
                         branch.sem = "NA"
             self._bipartsummary_processed = True
 
@@ -4702,9 +4704,11 @@ class TreeSummary():
                     n = node.clade_count
                     if n > 1:
                         node.var = node.T * n / ((n - 1) * node.SUMW)
-                        node.sem = math.sqrt(node.var)/math.sqrt(n)
+                        node.sd = math.sqrt(node.var)
+                        node.sem = node.sd / math.sqrt(n)
                     else:
                         node.var = "NA"
+                        node.sd = "NA"
                         node.sem = "NA"
             self._cladesummary_processed = True
 
@@ -5266,6 +5270,7 @@ class TreeSummary():
                     brstruct = self.bipartsummary[bip]
                     sum_tree.set_branch_attribute(p,c,"length", brstruct.length)
                     sum_tree.set_branch_attribute(p,c,"var", brstruct.var)
+                    sum_tree.set_branch_attribute(p,c,"sd", brstruct.sd)
                     sum_tree.set_branch_attribute(p,c,"sem", brstruct.sem)
 
         # Handle root bipartition separately
