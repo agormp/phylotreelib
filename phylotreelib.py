@@ -2386,64 +2386,65 @@ class Tree:
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
-               metacomments=False, transdict=None):
-        """Returns Newick format tree string representation of tree object"""
-
-        # Distances and (internal branch) labels are printed unless user explicitly request no printing
-        # Transdict is meant for printing Nexus files with translate blocks: In these cases
-        # the leaf names should be replaced by the leaf number instead, so transdict is reverse
-        # of info in translate block: {name:number} instead of {number:name}
-        # metacomments: print labels using Nexus metacomment format: [&name=value]
-        # NOTE: This could probably be done slightly faster by iteration (instead of recursion)
-        # for instance by using a stack, but unlikely that this function will be heavily used...
-        # NOTE 2: I am using getattr() on "labelfield" to allow run-time specification of what
-        # field in Branchstruct to use as label. Perhaps this is an indication that Branchstruct
-        # should be a dict in the first place (instead of a class, that only contains data)
-
-        def append_children(parentnode, labelfield):
+               transdict=None, metacomment_fields=[]):
+        """Returns Newick format tree string representation of tree object, with optional metacomments"""
+    
+        def append_children(parentnode):
             """Recursive function that has main responsibility for building Newick tree string"""
-
+        
             for child in self.children(parentnode):
 
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
                 label = getattr(branchstruct, labelfield)
+
+                # Collect metacomments for all specified fields
+                meta_comment = []
+                for field in metacomment_fields:
+                    field_value = getattr(branchstruct, field, None)
+                    if field_value is not None:
+                        meta_comment.append(f"{field}={field_value}")
+
                 if child in self.leaves:
                     if transdict:
-                        treelist.append(transdict[child])     # Should transdict errors be caught here?
+                        treelist.append(transdict[child])
                     else:
                         treelist.append(child)
-                    if label != "" and metacomments:
-                        treelist.append(f"[&{labelfield}={label}]")
+                
+                    # Add metacomment string if there are metacomments for leaf
+                    if meta_comment:
+                        treelist.append(f"[&{', '.join(meta_comment)}]")
+
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
                 else:
                     treelist.append("(")
-                    append_children(child, labelfield)
+                    append_children(child)
                     treelist.append(")")
 
+                    # Handle regular label
                     if label != "" and printlabels:
-                        if metacomments: # Should this be after the colon since it is branch attribute?
-                            treelist.append(f"[&{labelfield}={label}]")
-                        else:
-                            treelist.append(f"{label}")
+                        treelist.append(f"{label}")
+
+                    # Add metacomment string if there are metacomments for internal branches
+                    if meta_comment and metacomments:
+                        treelist.append(f"[&{', '.join(meta_comment)}]")
+
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
 
                 treelist.append(",")
 
-            del treelist[-1]            # Remove last comma when no more siblings
+            del treelist[-1]  # Remove last comma when no more siblings
 
         # EXECUTION STARTS HERE!
-        # Newick tree is built left-to-right as list, and finally converted to string
-        # Root requires special treatment, rest of tree managed by recursion
         root = self.root
         treelist = ["("]
-        append_children(root, labelfield)
+        append_children(root)
         treelist.append(");")
         treestring = "".join(treelist)
         return treestring
-
+    
     ###############################################################################################
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
