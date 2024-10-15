@@ -2489,11 +2489,14 @@ class Tree:
         stringlist = [header]
         for leaf in self.leaflist():
             stringlist.append("\t{}".format(leaf))
-            if colorlist and (leaf in colorlist):
-                col = color
+            if colorlist:
+                if leaf in colorlist:
+                    col = color
+                else:
+                    col = "000000"   # default color is black
+                stringlist.append(f"[&!color=#{col}]\n")
             else:
-                col = "000000"   # default color is black
-            stringlist.append("[&!color=#{}]\n".format(col))
+                stringlist.append("\n")                
         stringlist.append(";\nend;\n")
         stringlist.append("\nbegin trees;\n\ttree nexus_tree = ")
 
