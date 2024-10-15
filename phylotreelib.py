@@ -4609,13 +4609,13 @@ class TreeSummary():
                 if self.trackblen:
                     n = branch.bip_count
                     if n > 1:
-                        branch.var = branch.T * n / ((n - 1) * branch.SUMW)
-                        branch.sd = math.sqrt(branch.var)
-                        branch.sem = branch.sd / math.sqrt(n)
+                        branch.length_var = branch.T * n / ((n - 1) * branch.SUMW)
+                        branch.length_sd = math.sqrt(branch.length_var)
+                        branch.length_sem = branch.length_sd / math.sqrt(n)
                     else:
-                        branch.var = "NA"
-                        branch.sd = "NA"
-                        branch.sem = "NA"
+                        branch.length_var = "NA"
+                        branch.length_sd = "NA"
+                        branch.length_sem = "NA"
             self._bipartsummary_processed = True
 
         return self._bipartsummary
@@ -4631,13 +4631,13 @@ class TreeSummary():
                 if self.trackdepth:
                     n = node.clade_count
                     if n > 1:
-                        node.var = node.T * n / ((n - 1) * node.SUMW)
-                        node.sd = math.sqrt(node.var)
-                        node.sem = node.sd / math.sqrt(n)
+                        node.depth_var = node.T * n / ((n - 1) * node.SUMW)
+                        node.depth_sd = math.sqrt(node.depth_var)
+                        node.depth_sem = node.depth_sd / math.sqrt(n)
                     else:
-                        node.var = "NA"
-                        node.sd = "NA"
-                        node.sem = "NA"
+                        node.depth_var = "NA"
+                        node.depth_sd = "NA"
+                        node.depth_sem = "NA"
             self._cladesummary_processed = True
 
         return self._cladesummary
@@ -5198,9 +5198,9 @@ class TreeSummary():
                                       sum_tree.sorted_leaf_list, sum_tree.leaf2index)
                     brstruct = self.bipartsummary[bip]
                     sum_tree.set_branch_attribute(p,c,"length", brstruct.length)
-                    sum_tree.set_branch_attribute(p,c,"var", brstruct.var)
-                    sum_tree.set_branch_attribute(p,c,"sd", brstruct.sd)
-                    sum_tree.set_branch_attribute(p,c,"sem", brstruct.sem)
+                    sum_tree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
+                    sum_tree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
+                    sum_tree.set_branch_attribute(p,c,"length_sem", brstruct.length_sem)
 
         # Handle root bipartition separately
         if not self.trackroot:
