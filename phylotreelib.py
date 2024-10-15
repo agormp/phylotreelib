@@ -2448,68 +2448,38 @@ class Tree:
     ###############################################################################################
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
-              translateblock=False):
+              translateblock=False, colorlist=None, color="0000FF", metacomment_fields=[]):
         """Returns nexus format tree as a string"""
 
         # Construct header
-        stringlist = ["#NEXUS\n\nbegin trees;\n"]
+        if colorlist:
+            header = "#NEXUS\nbegin taxa\n\tdimensions ntax={};\n".format(len(self.leaflist()))
+            header += "\ttaxlabels\n\t"
+            stringlist = [header]
+            for leaf in self.leaflist():
+                stringlist.append("\t{}".format(leaf))
+                col = color if leaf in colorlist else "000000"  # default color is black
+                stringlist.append(f"[&!color=#{col}]\n")
+            stringlist.append(";\nend;\n")
+        else:
+            stringlist = ["#NEXUS\n\nbegin trees;\n"]
 
         # If translateblock is requested: add translateblock to stringlist
         if translateblock:
             transdict = self.transdict()
             stringlist.append(self.translateblock(transdict))
 
-        # Add newick tree string
-        stringlist.append("   tree nexus_tree = ")
-
-        if translateblock:
-            stringlist.append(self.newick(printdist=printdist, printlabels=printlabels,
-                                          labelfield=labelfield, precision=precision, 
-                                          transdict=transdict))
-        else:
-            stringlist.append(self.newick(printdist=printdist, printlabels=printlabels,
-                                          labelfield=labelfield, precision=precision))
+        # Add newick tree string with optional meta-comments for figtree format
+        stringlist.append("\ttree nexus_tree = ")
+        stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield, 
+                                      precision=precision, transdict=transdict if translateblock else None, 
+                                      metacomment_fields=metacomment_fields))
 
         # Add footer
         stringlist.append("\nend;\n")
 
         return "".join(stringlist)
-
-    ###############################################################################################
-
-    def figtree(self, printdist=True, printlabels=True, precision=6,
-                labelfield="label", translateblock=False, colorlist=None, color="0000FF"):
-        """Returns figtree format tree as a string"""
-
-        # Implementation note: Rudimentary and mostly for coloring.
-        # Should I add figtree section at end with various settings?
-
-        # Construct header
-        header = "#NEXUS\nbegin taxa\n\tdimensions ntax={};\n".format(len(self.leaflist()))
-        header += "\ttaxlabels\n\t"
-        stringlist = [header]
-        for leaf in self.leaflist():
-            stringlist.append("\t{}".format(leaf))
-            if colorlist:
-                if leaf in colorlist:
-                    col = color
-                else:
-                    col = "000000"   # default color is black
-                stringlist.append(f"[&!color=#{col}]\n")
-            else:
-                stringlist.append("\n")                
-        stringlist.append(";\nend;\n")
-        stringlist.append("\nbegin trees;\n\ttree nexus_tree = ")
-
-        # Add newick tree string
-        stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                      precision=precision, metacomments=True))
-
-        # Add footer
-        stringlist.append("\nend;\n")
-
-        return "".join(stringlist)
-
+    
     ###############################################################################################
 
     def bipdict(self, keep_remchild_dict = False):
