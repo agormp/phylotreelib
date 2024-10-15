@@ -4605,7 +4605,7 @@ class TreeSummary():
         """Property method for lazy evaluation of freq, var, sd, and sem for branches"""
         if not self._bipartsummary_processed:
             for branch in self._bipartsummary.values():
-                branch.freq = branch.SUMW / self.tree_weight_sum
+                branch.posterior = branch.SUMW / self.tree_weight_sum
                 if self.trackblen:
                     n = branch.bip_count
                     if n > 1:
@@ -4627,7 +4627,7 @@ class TreeSummary():
         """Property method for lazy evaluation of freq, var, and sem for node depths"""
         if not self._cladesummary_processed:
             for node in self._cladesummary.values():
-                node.freq = node.SUMW / self.tree_weight_sum
+                node.posterior = node.SUMW / self.tree_weight_sum
                 if self.trackdepth:
                     n = node.clade_count
                     if n > 1:
@@ -4663,7 +4663,7 @@ class TreeSummary():
                     leafname = next(iter(bip2))
                     leafbips.append((leafname, bip))
                 else:
-                    internalbips.append((branch.freq,bip))
+                    internalbips.append((branch.posterior,bip))
 
             leafbips = sorted(leafbips, key=itemgetter(0))
             internalbips = sorted(internalbips, key=itemgetter(0), reverse=True)
@@ -4678,7 +4678,7 @@ class TreeSummary():
         """Property method for lazy evaluation of freq (=rootcred) for rootbips"""
         if not self._rootbip_summary_processed:
             for rootbipstruct in self._rootbip_summary.values():
-                rootbipstruct.freq = rootbipstruct.count / self.tree_count
+                rootbipstruct.posterior = rootbipstruct.count / self.tree_count
             self._rootbip_summary_processed = True
         return self._rootbip_summary
 
@@ -4945,7 +4945,7 @@ class TreeSummary():
         bipartsummary = self.bipartsummary
         logsum = 0.0
         for bipartition in biptopology:
-            logsum += math.log(bipartsummary[bipartition].freq)
+            logsum += math.log(bipartsummary[bipartition].posterior)
         return logsum
 
     ###############################################################################################
@@ -4956,7 +4956,7 @@ class TreeSummary():
         cladesummary = self.cladesummary
         logsum = 0.0
         for clade in cladetopology:
-            logsum += math.log(cladesummary[clade].freq)
+            logsum += math.log(cladesummary[clade].posterior)
         return logsum
 
     ###############################################################################################
@@ -4974,9 +4974,9 @@ class TreeSummary():
         for _, bip in self.sorted_biplist:
             i += 1
             branch = self.bipartsummary[bip]
-            if branch.freq < cutoff:
+            if branch.posterior < cutoff:
                 break
-            branch.label = f"{branch.freq:.{labeldigits}f}"
+            branch.label = f"{branch.posterior:.{labeldigits}f}"
             conbipdict[bip] = branch
         contree = Tree.from_biplist(conbipdict)
 
@@ -4987,7 +4987,7 @@ class TreeSummary():
                     break
                 _,bip = self.sorted_biplist[j]
                 branch = self.bipartsummary[bip]
-                branch.label= f"{branch.freq:.{labeldigits}f}"
+                branch.label= f"{branch.posterior:.{labeldigits}f}"
                 is_present, is_compatible, insert_tuple = contree.check_bip_compatibility(bip)
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
@@ -5061,7 +5061,7 @@ class TreeSummary():
             bip = Bipartition(leafset1, sum_tree.frozenset_leaves, 
                               sum_tree.sorted_leaf_list, sum_tree.leaf2index)
             if bip in self.rootbipsummary:
-                rootcred = self.rootbipsummary[bip].freq
+                rootcred = self.rootbipsummary[bip].posterior
                 sum_tree.set_branch_attribute(p, c, "rootcred", rootcred)
             else:
                 sum_tree.set_branch_attribute(p, c, "rootcred", 0.0)
@@ -5076,7 +5076,7 @@ class TreeSummary():
         p = sum_tree.root
         if sum_tree.is_bifurcation(p):
             rootbip, _, _, _, _ = sum_tree.rootbip()
-            rootcred = self.rootbipsummary[rootbip].freq
+            rootcred = self.rootbipsummary[rootbip].posterior
             c1, c2 = sum_tree.children(p)
             sum_tree.set_branch_attribute(p, c1, "rootcred", rootcred)
             sum_tree.set_branch_attribute(p, c2, "rootcred", rootcred)
@@ -5236,7 +5236,7 @@ class TreeSummary():
             for child in (tree.intnodes - {tree.root}):
                 remkids = tree.remotechildren_dict[child]
                 child_clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
-                clade_cred = self.cladesummary[child_clade].freq
+                clade_cred = self.cladesummary[child_clade].posterior
                 parent = tree.parent(child)
                 tree.setlabel(parent, child, f"{clade_cred:.{precision}g}")
         except KeyError as e:
@@ -5281,10 +5281,10 @@ class BigTreeSummary(TreeSummary):
 
     @property
     def biptoposummary(self):
-        """Property method for lazy evaluation of topostruct.freq"""
+        """Property method for lazy evaluation of topostruct.posterior"""
         if not self._biptoposummary_processed:
             for topostruct in self._biptoposummary.values():
-                topostruct.freq = topostruct.weight / self.tree_weight_sum
+                topostruct.posterior = topostruct.weight / self.tree_weight_sum
             self._biptoposummary_processed = True
 
         return self._biptoposummary
@@ -5293,10 +5293,10 @@ class BigTreeSummary(TreeSummary):
 
     @property
     def cladetoposummary(self):
-        """Property method for lazy evaluation of topostruct.freq"""
+        """Property method for lazy evaluation of topostruct.posterior"""
         if not self._cladetoposummary_processed:
             for topostruct in self._cladetoposummary.values():
-                topostruct.freq = topostruct.weight / self.tree_weight_sum
+                topostruct.posterior = topostruct.weight / self.tree_weight_sum
             self._cladetoposummary_processed = True
 
         return self._cladetoposummary
@@ -5394,7 +5394,7 @@ class BigTreeSummary(TreeSummary):
         maxcredbipdict = {}
         for bipartition in maxlogcredbiptopo:
             branch = self.bipartsummary[bipartition]
-            branch.label = f"{round(branch.freq, labeldigits)}"
+            branch.label = f"{round(branch.posterior, labeldigits)}"
             maxcredbipdict[bipartition] = branch
 
         # Build tree from bipartitions  in new bipdict
@@ -5417,7 +5417,7 @@ class BigTreeSummary(TreeSummary):
         maxcred_bipdict = {}
         for clade in maxlogcred_cladetopo:
             nodestruct = self.cladesummary[clade]
-            nodestruct.label = f"{nodestruct.freq:.{label_precision}g}"
+            nodestruct.label = f"{nodestruct.posterior:.{label_precision}g}"
             maxcred_bipdict[clade] = nodestruct
         maxcredtree = Tree.from_cladedict(maxcred_bipdict)
 
