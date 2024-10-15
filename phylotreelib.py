@@ -4585,7 +4585,7 @@ class TreeSet():
 
         stringlist = []
         for tree in self.treelist:
-            stringlist.append(tree.newick(printdist, printlabels))
+            stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels))
             stringlist.append("\n")
         return "".join(stringlist)
 
