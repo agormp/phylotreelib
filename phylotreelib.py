@@ -2423,7 +2423,7 @@ class Tree:
                     treelist.append(")")
 
                     # Handle regular label
-                    if label != "" and printlabels:
+                    if printlabels and label != "":
                         treelist.append(f"{label}")
 
                     # Add metacomment string if there are metacomments for internal branches
