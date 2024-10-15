@@ -4552,15 +4552,15 @@ class TreeSet():
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True):
-        """Returns newick format tree as a string"""
-
+    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
+               transdict=None, metacomment_fields=[]):
+        """Returns newick format tree for each tree in the set as a string"""
         stringlist = []
         for tree in self.treelist:
-            stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels))
+            stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
+                                          precision=precision, transdict=transdict, metacomment_fields=metacomment_fields))
             stringlist.append("\n")
         return "".join(stringlist)
-
 
 ###################################################################################################
 ###################################################################################################
