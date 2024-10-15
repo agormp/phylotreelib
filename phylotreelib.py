@@ -4478,71 +4478,34 @@ class TreeSet():
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, translateblock=True):
-        """Returns nexus format tree as a string"""
-
-        # Construct header
-        stringlist = ["#NEXUS\n\nbegin trees;\n"]
-
-        # If translateblock is requested: add translateblock to stringlist
-        if translateblock:
-            transdict = self[0].transdict()
-            stringlist.append(self[0].translateblock(transdict))
-
-        # Add newick tree strings
-        for i, tree in enumerate(self.treelist):
-            stringlist.append("    tree t.{} = ".format(i+1))
-            if translateblock:
-                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, transdict=transdict))
-            else:
-                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels))
-            stringlist.append("\n")
-
-        # Add footer
-        stringlist.append("end;\n")
-
-        return "".join(stringlist)
-
-    ###############################################################################################
-
-    def figtree(self, printdist=True, printlabels=True, labelfield="label", 
-                precision=6, translateblock=True, colorlist=None, color="0000FF", metacomments=True):
-        """Returns nexus format tree as a string"""
-
+    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6,
+                      metacomment_fields=[], translateblock=False,  
+                      colorlist=None, colorfg="#0000FF", colorbg="#000000"):
+        """Returns nexus or format tree for each tree in the set"""
+        
         # Construct header
         stringlist = ["#NEXUS\n\n"]
+        if colorlist:
+            t = self[0]  # Random tree to extract leaf info
+            stringlist.append(f"begin taxa\n\tdimensions ntax={len(t.leaves)};\n\ttaxlabels\n") 
+            for leaf in t.leaflist():
+                stringlist.append(f"\t\t{leaf}")
+                col = colorfg if leaf in colorlist else colorbg  # Use foreground/background colors
+                stringlist.append(f"[&!color={col}]\n")
+            stringlist.append(";\nend;\n\n")
+        stringlist.append("begin trees;\n")
 
-        # Add taxon header with color info
-        t = self[0]    # Random tree used to extract info about leaves. Python note: add attr to TreeSet instead?
-        header = f"begin taxa\n\tdimensions ntax={len(t.leaves)};\n"
-        header += "\ttaxlabels\n"
-        stringlist.append(header)
-        for leaf in t.leaflist():
-            stringlist.append(f"\t\t{leaf}")
-            if colorlist and (leaf in colorlist):
-                col = color
-            else:
-                col = "000000"   # default color is black
-            stringlist.append(f"[&!color=#{col}]\n")
-        stringlist.append(";\nend;\n")
-        stringlist.append("\nbegin trees;\n")
-
-        # If translateblock is requested: add translateblock to stringlist
+        # Add translate block if requested
         if translateblock:
             transdict = self[0].transdict()
             stringlist.append(self[0].translateblock(transdict))
-            
-        # Add newick tree strings
+
+        # Add newick trees with metacomments if needed
         for i, tree in enumerate(self.treelist):
-            stringlist.append("    tree t.{} = ".format(i+1))
-            if translateblock:
-                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                              precision=precision, metacomments=True,
-                                              transdict=transdict))
-            else:
-                stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                              precision=precision, metacomments=True))
-                                
+            stringlist.append(f"    tree t.{i + 1} = ")
+            stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
+                                          precision=precision, transdict=transdict if translateblock else None,
+                                          metacomment_fields=metacomment_fields))
             stringlist.append("\n")
 
         # Add footer
