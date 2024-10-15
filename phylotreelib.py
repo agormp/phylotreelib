@@ -2385,18 +2385,14 @@ class Tree:
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True, 
-                label_delimiters = None, precision=6, labelfield="label", transdict=None,
-                metacomments=False):
+    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
+               metacomments=False, transdict=None):
         """Returns Newick format tree string representation of tree object"""
 
         # Distances and (internal branch) labels are printed unless user explicitly request no printing
         # Transdict is meant for printing Nexus files with translate blocks: In these cases
         # the leaf names should be replaced by the leaf number instead, so transdict is reverse
         # of info in translate block: {name:number} instead of {number:name}
-        # label_delimiters: None: no delimiters, print label as is
-        #                   "brackets": Put brackets around label text: [my label text]
-        #                    "braces": put curly braces around label text: {my label text}
         # metacomments: print labels using Nexus metacomment format: [&name=value]
         # NOTE: This could probably be done slightly faster by iteration (instead of recursion)
         # for instance by using a stack, but unlikely that this function will be heavily used...
@@ -2412,11 +2408,6 @@ class Tree:
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
                 label = getattr(branchstruct, labelfield)
-                if label_delimiters == "brackets": # do i ever use this feature? Remove
-                    label = f"[{label}]"
-                elif label_delimiters == "braces":
-                    label = f"{{{label}}}"
-
                 if child in self.leaves:
                     if transdict:
                         treelist.append(transdict[child])     # Should transdict errors be caught here?
@@ -2455,8 +2446,8 @@ class Tree:
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, 
-                label_delimiters = None, precision=6, labelfield="label", translateblock=False):
+    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
+              translateblock=False):
         """Returns nexus format tree as a string"""
 
         # Construct header
@@ -2469,12 +2460,14 @@ class Tree:
 
         # Add newick tree string
         stringlist.append("   tree nexus_tree = ")
+
         if translateblock:
-            stringlist.append(self.newick(printdist, printlabels, label_delimiters,
-                                          precision, labelfield, transdict))
+            stringlist.append(self.newick(printdist=printdist, printlabels=printlabels,
+                                          labelfield=labelfield, precision=precision, 
+                                          transdict=transdict))
         else:
-            stringlist.append(self.newick(printdist, printlabels, label_delimiters,
-                                          precision, labelfield))
+            stringlist.append(self.newick(printdist=printdist, printlabels=printlabels,
+                                          labelfield=labelfield, precision=precision))
 
         # Add footer
         stringlist.append("\nend;\n")
@@ -4771,7 +4764,8 @@ class TreeSummary():
         """Adds attribute .branchID to all bipartitions in .bipartsummary
         External bipartitions are labeled with the leafname.
         Internal bipartitions are labeled with consecutive numbers by decreasing frequency"""
-
+        
+        # Python note: stop using (use nexus metacomments on a single tree instead)
         # Python note: Start enumeration at 1
         for freqrank, (sortkey,bipart) in enumerate(self.sorted_biplist, 1):
             if type(sortkey) == str:
