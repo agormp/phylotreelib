@@ -2427,7 +2427,7 @@ class Tree:
                         treelist.append(f"{label}")
 
                     # Add metacomment string if there are metacomments for internal branches
-                    if meta_comment and metacomments:
+                    if meta_comment:
                         treelist.append(f"[&{', '.join(meta_comment)}]")
 
                     if printdist:
