@@ -2448,7 +2448,8 @@ class Tree:
     ###############################################################################################
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
-              translateblock=False, colorlist=None, color="0000FF", metacomment_fields=[]):
+              metacomment_fields=[], translateblock=False, 
+              colorlist=None, colorfg="#0000FF", colorbg="#000000"):
         """Returns nexus format tree as a string"""
 
         # Construct header
@@ -2458,8 +2459,8 @@ class Tree:
             stringlist = [header]
             for leaf in self.leaflist():
                 stringlist.append("\t{}".format(leaf))
-                col = color if leaf in colorlist else "000000"  # default color is black
-                stringlist.append(f"[&!color=#{col}]\n")
+                col = colorfg if leaf in colorlist else colorbg  # 
+                stringlist.append(f"[&!color={col}]\n")
             stringlist.append(";\nend;\n")
         else:
             stringlist = ["#NEXUS\n\nbegin trees;\n"]
