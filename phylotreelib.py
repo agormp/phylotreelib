@@ -4890,12 +4890,12 @@ class TreeSummary():
 
     def _updateclade(self, other):
 
-        # Merge "treesummary.bipartsummary" with "self.bipartsummary"
+        # Merge "treesummary.cladesummary" with "self.cladesummary"
         other_cladesum = other.cladesummary
         self_cladesum = self.cladesummary
 
         for clade in other_cladesum:
-            # If bipart already in self.bipartsummary, update fields
+            # If bipart already in self.cladesummary, update fields
             if clade in self_cladesum:
                 if self.trackdepth:
                     sumw1 = self_cladesum[clade].SUMW
@@ -4909,7 +4909,7 @@ class TreeSummary():
                     self_cladesum[clade].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
                 self_cladesum[clade].SUMW += other_cladesum[clade].SUMW
 
-            # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
+            # If clade has never been seen before: transfer Nodestruct from other_cladesum:
             else:
                 self_cladesum[clade] = other_cladesum[clade]
 
