@@ -4707,21 +4707,6 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def add_branchid(self):
-        """Adds attribute .branchID to all bipartitions in .bipartsummary
-        External bipartitions are labeled with the leafname.
-        Internal bipartitions are labeled with consecutive numbers by decreasing frequency"""
-        
-        # Python note: stop using (use nexus metacomments on a single tree instead)
-        # Python note: Start enumeration at 1
-        for freqrank, (sortkey,bipart) in enumerate(self.sorted_biplist, 1):
-            if type(sortkey) == str:
-                self.bipartsummary[bipart].branchID = sortkey
-            else:
-                self.bipartsummary[bipart].branchID = freqrank
-
-    ###############################################################################################
-
     def add_tree(self, curtree, weight=1.0):
         """Add tree object to treesummary, update all relevant bipartition summaries"""
 
