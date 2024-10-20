@@ -267,7 +267,7 @@ class Nodestruct:
 class Topostruct:
     """Class that emulates a struct. Keeps topology-related info"""
 
-    __slots__ = ["weight", "tree", "freq"]
+    __slots__ = ["weight", "tree", "posterior"]
 
     # Python note: perhaps replace with dataclass, available since python 3.7
     pass
