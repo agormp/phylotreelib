@@ -4955,7 +4955,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def contree(self, cutoff=0.5, allcompat=False, labeldigits=3):
+    def contree(self, cutoff=0.5, allcompat=False):
         """Returns a consensus tree built from selected bipartitions."""
 
         if cutoff < 0.5:
@@ -4970,7 +4970,6 @@ class TreeSummary():
             branch = self.bipartsummary[bip]
             if branch.posterior < cutoff:
                 break
-            branch.label = f"{branch.posterior:.{labeldigits}f}"
             conbipdict[bip] = branch
         contree = Tree.from_biplist(conbipdict)
 
@@ -4981,7 +4980,6 @@ class TreeSummary():
                     break
                 _,bip = self.sorted_biplist[j]
                 branch = self.bipartsummary[bip]
-                branch.label= f"{branch.posterior:.{labeldigits}f}"
                 is_present, is_compatible, insert_tuple = contree.check_bip_compatibility(bip)
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
