@@ -2386,7 +2386,7 @@ class Tree:
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
-               transdict=None, metacomment_fields=[]):
+               transdict=None, metacomlist_nodes=[], metacomlist_branches=[]):
         """Returns Newick format tree string representation of tree object, with optional metacomments"""
     
         def append_children(parentnode):
@@ -2400,10 +2400,19 @@ class Tree:
 
                 # Collect metacomments for all specified fields
                 meta_comment = []
-                for field in metacomment_fields:
+                for field in metacomlist_nodes:
                     field_value = getattr(branchstruct, field, None)
                     if field_value is not None:
                         meta_comment.append(f"{field}={field_value}")
+                metacomment_node = f"[&{', '.join(meta_comment)}]"
+                
+                meta_comment = []
+                for field in metacomlist_branches:
+                    field_value = getattr(branchstruct, field, None)
+                    if field_value is not None:
+                        meta_comment.append(f"{field}={field_value}")
+                metacomment_node = f"[&{', '.join(meta_comment)}]"
+                
 
                 if child in self.leaves:
                     if transdict:
