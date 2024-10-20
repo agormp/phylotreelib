@@ -4719,7 +4719,7 @@ class TreeSummary():
             self.transdict = curtree.transdict()
             self.translateblock = curtree.translateblock(self.transdict)
         elif curtree.leaves != self.leaves:
-            msg = f"Leaves on tree number {self.tree_count} are different than previous trees"
+            msg = f"Leaves on tree number {self.tree_count +1} are different than previous trees"
             raise TreeError(msg)
 
         self.tree_count += 1
