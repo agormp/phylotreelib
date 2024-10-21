@@ -216,13 +216,13 @@ class Interner():
 
 class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
-
-    def __init__(self, length=0.0, label=""):
+    
+    def __init__(self, length=0.0):
         self.length = length
-        self.label = label
 
     def __str__(self):
-        return f"{str(self.length)}\t´{self.label}´\n"
+        attrs = [f"{k}: {v}" for k, v in vars(self).items()]
+        return ", ".join(attrs) + "\n"
 
     def __repr__(self):
         return self.__str__()
@@ -231,9 +231,39 @@ class Branchstruct:
 
     def copy(self):
         """Returns copy of Branchstruct object, with all attributes included"""
+        
+        # Python note: only works as deepcopy if all attributes are immutable. Rewrite!
         obj = Branchstruct()
-        for attrname, value in vars(self).items():
+        for attrname, value in self.__dict__.items():
             setattr(obj, attrname, value)
+        return obj
+        
+    ###############################################################################################
+    
+    def merge(self, other, check_compat=False):
+        """Merges two Branchstructs and returns new Branchstruct. 
+        Useful for collapsing root branches.
+        Branch lengths are summed, other attributes are taken from self
+        check_compat: if True, check that non-length attributes in self and other match, 
+                      raise TreeError if not"""
+        
+        obj = Branchstruct()
+
+        # Merge length attributes by summing
+        obj.length = self.length + other.length
+        
+        # Merge non-length attributes by copying from self
+        # If check_compat: raise error if mismatch between self and other 
+        for attrname in self.__dict__.keys() - {("length")}:
+            self_value = getattr(self, attrname)
+            if check_compat:
+                othervalue = getattr(other, attrname)
+                if self_value != othervalue:
+                    msg = (f"Mismatch between {attrname} attributes of two Branchstructs: \n"
+                          + f"self: {self_value}  other: {othervalue}")
+                    raise TreeError(msg)
+            setattr(obj, attrname, value)
+
         return obj
 
 ###################################################################################################
@@ -256,6 +286,8 @@ class Nodestruct:
 
     def copy(self):
         """Returns copy of Nodestruct object, with all attributes included"""
+        
+        # Python note: will cause problems if any values are not immutable
         obj = Nodestruct()
         for attrname, value in vars(self).items():
             setattr(obj, attrname, value)
@@ -711,11 +743,12 @@ class Tree:
     ###############################################################################################
 
     @classmethod
-    def from_string(cls, orig_treestring, transdict=None, interner=None, format="newick"):
+    def from_string(cls, orig_treestring, transdict=None, interner=None, format="newick",
+                    label_attr_name="label", label_type=str):
         """Constructor: Tree object from tree-string in specified format"""
 
         if format.lower() == "newick":
-            parser_obj = NewickStringParser(transdict)
+            parser_obj = NewickStringParser(transdict, label_attr_name, label_type)
         treeobj = cls._from_string_private(parser_obj, orig_treestring, interner)
         del parser_obj
         return treeobj
@@ -1119,55 +1152,110 @@ class Tree:
     ###############################################################################################
 
     def __str__(self):
-        """Prints table of parent-child relationships including branch lengths and labels"""
+        """Prints table of parent-child relationships including branch lengths and other attributes."""
 
-        # Starts by building a table of strings containing all information
-        # Then formats table into a string
+        # Parameters
+        fixed_columns = ["parent", "child", "branchlen"]
+        padding = 2  # Minimum padding spaces before and after each value
+        max_col_width = 20
+        max_total_width = 100  # Maximum width for the entire table
 
-        # Headers
-        table = []
-        table.append(["Node", "Child", "Distance", "Label"])
-
-        # Build table of parent-child relationships
+        # Collect data rows and attribute names
+        data_rows = []
+        attr_set = set()
         for node in self.sorted_intnodes():
             for kid in self.children(node):
                 nodstr = str(node)
                 kidstr = str(kid)
                 dist = "{num:.6g}".format(num=self.child_dict[node][kid].length)
-                label = self.child_dict[node][kid].label
-                table.append([nodstr, kidstr, dist, label])
+                branch = self.child_dict[node][kid]
+                data_rows.append([nodstr, kidstr, dist, branch])
+                # Collect attribute names, excluding 'length'
+                for attr in branch.__dict__.keys():
+                    if attr != 'length':
+                        attr_set.add(attr)
 
-        # Find widest string in each column
-        maxwidth = [0]*4
-        for row in table:
-            for i, word in enumerate(row):
-                if len(word) > maxwidth[i]:
-                    maxwidth[i] = len(word)
+        # Sort and initialize attribute names
+        attr_list = sorted(attr_set)
 
-        totwidth = maxwidth[0]+maxwidth[1]+maxwidth[2]+maxwidth[3] + 19     # Flanking space
+        # Initialize headers and maxwidths for fixed columns
+        headers = fixed_columns.copy()
+        maxwidths = [max(len(col), 6) for col in fixed_columns]
 
-        # Build string from table:
-        # Header line
-        tabstring = "|" + "-" * (totwidth)  + "|" + "\n"
-        for j in range(4):
-            tabstring += "|  "+ table[0][j].center(maxwidth[j]) + "  "
+        # Compute max widths for fixed columns
+        for i, col in enumerate(fixed_columns):
+            maxw = len(col)
+            for data_row in data_rows:
+                value = data_row[i]
+                maxw = min(max(len(value), maxw), max_col_width)
+            maxwidths[i] = maxw
+
+        # Compute max widths for attributes
+        maxwidth_dict = {}
+        for attr in attr_list:
+            maxw = len(attr)
+            for data_row in data_rows:
+                branch = data_row[3]
+                value_str = str(getattr(branch, attr, ""))
+                maxw = min(max(len(value_str), maxw), max_col_width)
+            maxwidth_dict[attr] = maxw
+
+        # Include attributes until max_total_width is reached
+        totwidth = sum(maxwidths) + len(headers) * (padding * 2 + 1) + 1
+        included_attrs = []
+        for attr in attr_list:
+            potential_totwidth = totwidth + maxwidth_dict[attr] + (padding * 2 + 1)
+            if potential_totwidth <= max_total_width:
+                headers.append(attr)
+                maxwidths.append(maxwidth_dict[attr])
+                included_attrs.append(attr)
+                totwidth = potential_totwidth
+            else:
+                break
+
+        # Adjust totwidth for the table border
+        totwidth = sum(maxwidths) + len(maxwidths) * (padding * 2 + 1) + 1
+
+        # Build table rows
+        table = [headers]
+        for data_row in data_rows:
+            nodstr, kidstr, dist, branch = data_row
+            row = [nodstr, kidstr, dist]
+            for attr in included_attrs:
+                value = getattr(branch, attr, "")
+                value_str = str(value)[:max_col_width]
+                row.append(value_str)
+            table.append(row)
+
+        # Build the formatted table string
+        border_line = "+" + "-" * (totwidth - 2) + "+\n"
+        tabstring = border_line
+        # Add header row
+        for i, header in enumerate(headers):
+            col_width = maxwidths[i] + padding * 2
+            tabstring += "|" + (padding * " ") + header.center(col_width - 2*padding) + (padding * " ")
         tabstring += "|\n"
-        tabstring += "|" + "-" * (totwidth)  + "|" + "\n"
+        tabstring += border_line
 
-        # Rest of table
-        for i in range(1, len(table)):
-            for j in range(4):
-                tabstring += "|  "+ table[i][j].rjust(maxwidth[j]) + "  "
+        # Add data rows
+        for row in table[1:]:
+            for i, value in enumerate(row):
+                col_width = maxwidths[i] + padding * 2
+                value_str = value.rjust(maxwidths[i])
+                tabstring += "|" + (padding * " ") + value_str.rjust(col_width - 2*padding) + (padding * " ")
             tabstring += "|\n"
-        tabstring += "|" + "-" * (totwidth)  + "|" + "\n"
+        tabstring += border_line
 
-        # Add list of leaves to tablestring
-        tabstring += "\n%d Leaves:\n" % len(self.leaves)
-        tabstring += "-" * maxwidth[1] + "\n"
+        # Add list of leaves
+        leaf_width = max(len(str(leaf)) for leaf in self.leaves)
+        leaf_width = min(leaf_width, max_total_width)
+        tabstring += f"\n{len(self.leaves)} Leaves:\n"
+        tabstring += "-" * leaf_width + "\n"
         for leaf in sorted(self.leaves):
-            tabstring += "%s\n" % leaf
+            leaf_str = str(leaf)[:leaf_width]
+            tabstring += f"{leaf_str}\n"
 
-        return tabstring
+        return tabstring    
 
     ###############################################################################################
 
@@ -1449,9 +1537,11 @@ class Tree:
 
     ###############################################################################################
 
-    def copy_treeobject(self, copylengths=True, copylabels=True, interner=None):
-        """Returns copy of Tree object. Copies structure and branch lengths.
-        Caches and any user-added attributes are not copied.
+    def copy_treeobject(self, copylengths=True, copyattr=True, interner=None):
+        """Returns copy of Tree object.
+        copylengths: copy lengths (otherwise set to 0.0)
+        copyattr: copy non-length attributes
+        Caches are not copied.
         Similar to effect of copy.deepcopy but customized and much faster"""
 
         obj = Tree()
@@ -1460,27 +1550,30 @@ class Tree:
         obj.intnodes = self.intnodes.copy()
         obj.nodes = self.nodes.copy()
         obj.interner = interner
-        obj.child_dict = self._copy_child_dict(obj, copylengths, copylabels)
+        obj.child_dict = self._copy_child_dict(obj, copylengths, copyattr)
         obj.nodedict = self._copy_nodedict(obj)
         return obj
 
     ###############################################################################################
 
-    def _copy_child_dict(self, obj, copylengths=True, copylabels=True):
+    def _copy_child_dict(self, obj, copylengths=True, copyattr=True):
         origdict = self.child_dict
         newdict = {}
         for parent in origdict:
             newdict[parent] = {}
             for child in origdict[parent]:
+                origbranch = origdict[parent][child]
                 if copylengths:
-                    blen = origdict[parent][child].length
+                    blen = origbranch.length
                 else:
                     blen = 0.0
-                if copylabels:
-                    lab = origdict[parent][child].label
-                else:
-                    lab = ""
-                newdict[parent][child] = Branchstruct(blen,lab)
+                newbranch = Branchstruct(blen)
+                if copyattr:
+                    # Python note: should check for immutability, and use .copy if not
+                    for attrname in origbranch.__dict__.keys() - {("length")}:
+                        origvalue =  origbranch.__dict__[attrname]
+                        setattr(newbranch, attrname, origvalue)   
+                newdict[parent][child] = newbranch
         return newdict
 
     ###############################################################################################
@@ -1794,8 +1887,8 @@ class Tree:
         elif not self.has_same_root(other):
 
             # Point "self" and "other" to copies of objects so originals are unchanged
-            self = self.copy_treeobject(copylengths=False, copylabels=False)
-            other = other.copy_treeobject(copylengths=False, copylabels=False)
+            self = self.copy_treeobject(copylengths=False, copyattr=False)
+            other = other.copy_treeobject(copylengths=False, copyattr=False)
 
             # Keep track of original roots if bifurcations
             if self.is_bifurcation(self.root):
@@ -2405,7 +2498,11 @@ class Tree:
 
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
-                label = getattr(branchstruct, labelfield)
+                if printlabels:
+                    if hasattr(branchstruct, labelfield):
+                        label = getattr(branchstruct, labelfield)
+                    else:
+                        label = ""  # Raise error instead? Maybe not since default is true
 
                 # Collect metacomments for all specified fields
                 # NOTE: should get values from nodedict not branches. but parent or child?
@@ -2538,31 +2635,17 @@ class Tree:
                 bipartition_dict[bipartition] = origbranch.copy()
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
-        # bipartition. Clean up by collapsing two branches (add lengths, compare labels)
+        # bipartition. Clean up by collapsing two branches (add lengths, merge other attributes)
         rootkids = self.children(self.root)
         if len(rootkids) == 2:
-            kid1, kid2 = rootkids
-            bipart1 = self.remotechildren_dict[kid1]
-            rootbip = Bipartition(bipart1, self.frozenset_leaves,
-                                      self.sorted_leaf_list, self.leaf2index)
+            rootbip, leafset1, blen1, leafset2, blen2 = self.rootbip()
             if self.interner:
                 rootbip = self.interner.intern_bipart(rootbip)
-
-            # Create new collapsed branch, sum distances from both kids
-            combined_len = (self.child_dict[self.root][kid1].length +
-                                                self.child_dict[self.root][kid2].length)
-            bipartition_dict[rootbip] = Branchstruct(combined_len)
-
-            # Deal with labels intelligently
-            lab1 = self.child_dict[self.root][kid1].label
-            lab2 = self.child_dict[self.root][kid2].label
-            if (lab1 is not None) and (lab2 is None):
-                lab = lab1
-            elif (lab1 is None) and (lab2 is not None):
-                lab = lab2
-            else:
-                lab = lab1
-            bipartition_dict[rootbip].label = lab
+            kid1, kid2 = rootkids
+            branch1 = self.child_dict[self.root][kid1]
+            branch2 = self.child_dict[self.root][kid2]
+            branch_merged = branch1.merge(branch2, check_compat=True)      # Sums up branch lengths, merges attributes
+            bipartition_dict[rootbip] = branch_merged
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
@@ -3182,8 +3265,10 @@ class Tree:
         # In the special case of a star tree: add two new internal nodes, and move each half of
         # bipartition away from root (branch length will be divided equally between two branches)
         if len(self.intnodes) == 1:
-            branchstruct1 = Branchstruct(length=branchstruct.length/2, label=branchstruct.label)
-            branchstruct2 = Branchstruct(length=branchstruct.length/2, label=branchstruct.label)
+            branchstruct1 = branchstruct.copy()
+            branchstruct1.length = branchstruct.length / 2
+            branchstruct2 = branchstruct.copy()
+            branchstruct2.length = branchstruct.length / 2
             self.insert_node(self.root, part1, branchstruct1)
             self.insert_node(self.root, part2, branchstruct2)
 
@@ -3245,8 +3330,9 @@ class Tree:
         grandchildren = self.children(child)
         addlen = lostlen / len(grandchildren)
         for grandchild in grandchildren :
-            self.child_dict[parent][grandchild] = Branchstruct(self.child_dict[child][grandchild].length + addlen,
-                                                         self.child_dict[child][grandchild].label)
+            newbranch = self.child_dict[child][grandchild].copy()
+            newbranch.length += addlen
+            self.child_dict[parent][grandchild] = newbranch
 
         # Delete "child" node and link from parent to child. Update intnodes and nodes
         del self.child_dict[child]
@@ -3796,28 +3882,14 @@ class Tree:
         rootkids = self.children(root)
         if len(rootkids) == 2:      # If root is at bifurcation
             kid1, kid2 = rootkids
-
-            # Length of new, combined branch is sum of distances
-            distsum = self.child_dict[root][kid1].length + self.child_dict[root][kid2].length
-
-            # Deal with labels semi-intelligently
-            # If only one label set: use that. Otherwise pick lab1
-            lab1 = self.child_dict[root][kid1].label
-            lab2 = self.child_dict[root][kid2].label
-            if lab1 != "" and lab2 == "":
-                lab = lab1
-            elif lab1 == ""  and lab2 != "":
-                lab = lab2
-            else:
-                lab = lab1                  # If agree pick 1, if disagree: pick 1 randomly
-
-            # Python note: should handle situation where Branchstruct has additional attributes
-            # Use introspection to find attributes and combine intelligently?
+            branch1 = self.child_dict[root][kid1]
+            branch2 = self.child_dict[root][kid2]
+            branch_merged = branch1.merge(branch2, check_compat=True)   # Sums up branch lengths, merges attributes
             if kid1 in self.intnodes:
-                self.child_dict[kid1][kid2] = Branchstruct(length = distsum, label = lab)
+                self.child_dict[kid1][kid2] = branch_merged
                 self.root = kid1
             elif kid2 in self.intnodes:
-                self.child_dict[kid2][kid1] = Branchstruct(length = distsum, label = lab)
+                self.child_dict[kid2][kid1] = branch_merged
                 self.root = kid2
             else:
                 raise TreeError("Cannot deroot tree: only leaves are present")
@@ -3867,12 +3939,8 @@ class Tree:
 
             # New branch (from parent to newroot) will inherit all attributes from original branch
             # (from parent to child), except for length, which is split between the two branches
-            # Special case: if child is leaf, then original branch will have no branch support
-            # In this case set label to "1.0" (maybe only do this if rest of labels are branch support??)
             newbranch = self.child_dict[parent][child].copy()
             newbranch.length = parent_to_root_dist
-            if newbranch.label == "":
-                newbranch.label = "1.0"
             newroot = self.insert_node(parent, [child], newbranch)
             self.child_dict[newroot][child].length = root_to_child_dist
 
