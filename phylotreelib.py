@@ -2895,12 +2895,12 @@ class Tree:
 
     ###############################################################################################
 
-    def get_branch_attribute(self, node1, node2, attrname):
+    def get_branch_attribute(self, node1, node2, attrname, default=""):
         """Get the value of any branch attribute.
         attrname: Name of attribute (e.g., "length")"""
 
         branch = self.child_dict[node1][node2]
-        attribute = getattr(branch, attrname)
+        attribute = getattr(branch, attrname, default)
 
         return attribute
 
