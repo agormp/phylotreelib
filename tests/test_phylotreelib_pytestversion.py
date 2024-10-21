@@ -90,7 +90,7 @@ class Test_create_Topostruct:
         # Assertion is done implicitly: if exception is raised here then test fails
         ts.weight = w
         ts.tree = t
-        ts.freq = f
+        ts.posterior = f
         with pytest.raises(AttributeError):
             ts.notanatt = x
 

@@ -600,8 +600,8 @@ class Treesummarytests(TreeTestBase):
             bip1, bip2 = bip
             if len(bip1)!=1 and len(bip2)!=1:
                 mb_branch = mb_bipdict[bip]
-                own_freq = float(own_branch.label)
-                mb_freq = float(mb_branch.label)
+                own_freq = round( float(own_branch.posterior), 3)
+                mb_freq = float(mb_branch.label)      # Python note: change test to use posterior
                 self.assertAlmostEqual(mb_freq, own_freq)
 
     def test_treesummary_update(self):
@@ -632,7 +632,7 @@ class Treesummarytests(TreeTestBase):
             bip1, bip2 = bip
             if len(bip1)!=1 and len(bip2)!=1:
                 mb_branch = mb_bipdict[bip]
-                own_freq = float(own_branch.freq)
+                own_freq = float(own_branch.posterior)
                 mb_freq = float(mb_branch.label)
                 self.assertAlmostEqual(mb_freq, own_freq, places=3)
 
