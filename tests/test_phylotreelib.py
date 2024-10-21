@@ -552,7 +552,7 @@ class Treesummarytests(TreeTestBase):
         mbres_fname = os.path.join(testdir_path, 'bip_mean_var.txt')
         mb_trprobs_fname = os.path.join(testdir_path, 'contest.nexus.trprobs')
         cfile = pt.Nexustreefile(con_fname)
-        self.mb_contree = cfile.readtree()
+        self.mb_contree = cfile.readtree()  # Python note: change parser to use attrname for label
         cfile.close()
         with open(mbres_fname) as mbfile:
             mbresults = mbfile.readlines()

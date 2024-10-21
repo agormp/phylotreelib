@@ -416,8 +416,11 @@ class TreeError(Exception):
 class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 
-    def __init__(self, transdict=None):
+    def __init__(self, transdict=None, label_attr_name="label", label_type=str):
         """Initialise parser object. 
+        label_attr_name: name of label attribute on Branchstructs
+        label_type: type conversion to perform on input label string (e.g. float)
+        
         To create derived class: 
           (1) Call super __init__ in __init__ of derived class
           (2) Override set_token_delimiters() (return string of single-char delimiters)
@@ -432,8 +435,10 @@ class NewickStringParser:
         if transdict:
             self.transdict = transdict
             self._handle_add_leaf = self._handle_add_leaf_with_transdict
-        else:
-            self._handle_add_leaf = self._handle_add_leaf
+        
+        # Control how labels are interpreted and what the Branchstruct attribute will be named
+        self.label_attr_name = label_attr_name
+        self.label_type = label_type
 
         # Dispatch dictionary: 
         # Key = current state and token-type
@@ -499,10 +504,13 @@ class NewickStringParser:
 
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
-        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
-        # are the internal nodes which are numbered consecutively. Each key has an
-        # associated value that is itself a dictionary listing the children: keys are
-        # child nodes, values are Branchstructs containing "length" and "label" fields.
+        # Tree is represented as a dictionary of dictionaries. 
+        # The keys in the top dictionary are the internal nodes which are numbered consecutively. 
+        # Each intnode key has an associated value that is itself a dictionary listing the children: 
+        # Keys are child nodes, values are Branchstructs which contain two attributes:
+        #   (1) "length" (float, parsed from numbers after colons in input newick string)
+        #   (2) label_attr_name (by default "label", but is specified at runtime) from before :
+        #       input string for this attribute is converted using label_type() (e.g. float or str)
         # Leafs are identified by a string instead of a number
 
         # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
@@ -635,7 +643,8 @@ class NewickStringParser:
     def _handle_label(self, label):
         child = self.node_stack[-1]
         parent = self.node_stack[-2]
-        self.treeobj.child_dict[parent][child].label = label
+        branchstruct = self.treeobj.child_dict[parent][child]
+        setattr(branchstruct, self.label_attr_name, self.label_type(label))
 
     ###############################################################################################
 
