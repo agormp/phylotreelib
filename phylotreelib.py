@@ -2408,19 +2408,24 @@ class Tree:
                 label = getattr(branchstruct, labelfield)
 
                 # Collect metacomments for all specified fields
-                meta_comment = []
-                for field in metacomlist_nodes:
-                    field_value = getattr(branchstruct, field, None)
-                    if field_value is not None:
-                        meta_comment.append(f"{field}={field_value}")
-                metacomment_node = f"[&{', '.join(meta_comment)}]"
+                # NOTE: should get values from nodedict not branches. but parent or child?
+                if metacomlist_nodes:
+                    meta_comment = []
+                    metacomment_node = None
+                    for field in metacomlist_nodes:
+                        field_value = getattr(branchstruct, field, None)
+                        if field_value is not None:
+                            meta_comment.append(f"{field}={field_value}")
+                    metacomment_node = f"[&{', '.join(meta_comment)}]"
                 
-                meta_comment = []
-                for field in metacomlist_branches:
-                    field_value = getattr(branchstruct, field, None)
-                    if field_value is not None:
-                        meta_comment.append(f"{field}={field_value}")
-                metacomment_node = f"[&{', '.join(meta_comment)}]"
+                if metacomlist_branches:
+                    meta_comment = []
+                    metacomment_branch = None
+                    for field in metacomlist_branches:
+                        field_value = getattr(branchstruct, field, None)
+                        if field_value is not None:
+                            meta_comment.append(f"{field}={field_value}")
+                    metacomment_branch = f"[&{', '.join(meta_comment)}]"
                 
 
                 if child in self.leaves:
@@ -2429,12 +2434,16 @@ class Tree:
                     else:
                         treelist.append(child)
                 
-                    # Add metacomment string if there are metacomments for leaf
-                    if meta_comment:
-                        treelist.append(f"[&{', '.join(meta_comment)}]")
+                    # Add metacomment string if there are metacomments for leaf node
+                    if metacomlist_nodes:
+                        treelist.append(metacomment_node)
 
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
+
+                    # Add metacomment string if there are metacomments for branch leading to leaf
+                    if metacomlist_branches:
+                        treelist.append(metacomment_branch)
                 else:
                     treelist.append("(")
                     append_children(child)
@@ -2444,12 +2453,16 @@ class Tree:
                     if printlabels and label != "":
                         treelist.append(f"{label}")
 
-                    # Add metacomment string if there are metacomments for internal branches
-                    if meta_comment:
-                        treelist.append(f"[&{', '.join(meta_comment)}]")
+                    # Add metacomment string if there are metacomments for internal node
+                    if metacomlist_nodes:
+                        treelist.append(metacomment_node)
 
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
+
+                    # Add metacomment string if there are metacomments for internal branch
+                    if metacomlist_branches:
+                        treelist.append(metacomment_branch)
 
                 treelist.append(",")
 
