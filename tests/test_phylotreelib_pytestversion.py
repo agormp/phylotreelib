@@ -239,7 +239,7 @@ class Test_from_branchinfo:
                     parentlist.append(parent)
                     childlist.append(child)
                     lenlist.append(origtree.nodedist(parent, child))
-                    lablist.append(origtree.getlabel(parent, child))
+                    lablist.append(origtree.get_branch_attribute(parent, child, "label", default=""))
             newtree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist, lablist)
             assert origtree == newtree
 
