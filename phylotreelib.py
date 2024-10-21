@@ -1014,7 +1014,7 @@ class Tree:
     ###############################################################################################
 
     @classmethod
-    def from_branchinfo(cls, parentlist, childlist, lenlist=None, lablist=None, interner=None):
+    def from_branchinfo(cls, parentlist, childlist, lenlist=None, interner=None):
         """Constructor: Tree object from information about all branches in tree
 
         Information about one branch is conceptually given as:
@@ -1054,9 +1054,9 @@ class Tree:
             blen = lenlist[i]
             lab = lablist[i]
             if parent in obj.child_dict:
-                obj.child_dict[parent][child] = Branchstruct(blen, lab)
+                obj.child_dict[parent][child] = Branchstruct(blen)
             else:
-                obj.child_dict[parent] = { child:Branchstruct(blen, lab) }
+                obj.child_dict[parent] = { child:Branchstruct(blen) }
             obj.intnodes.add(parent)
 
         # Leaves are the childnodes that are not in parentlist
