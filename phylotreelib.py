@@ -2479,7 +2479,7 @@ class Tree:
     ###############################################################################################
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
-              metacomment_fields=[], translateblock=False, 
+              translateblock=False,  metacomlist_nodes=[], metacomlist_branches=[],
               colorlist=None, colorfg="#0000FF", colorbg="#000000"):
         """Returns nexus format tree as a string"""
 
@@ -2505,7 +2505,7 @@ class Tree:
         stringlist.append("\ttree nexus_tree = ")
         stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield, 
                                       precision=precision, transdict=transdict if translateblock else None, 
-                                      metacomment_fields=metacomment_fields))
+                                      metacomlist_nodes=metacomlist_nodes, metacomlist_branches=metacomlist_branches))
 
         # Add footer
         stringlist.append("\nend;\n")
@@ -4510,7 +4510,7 @@ class TreeSet():
     ###############################################################################################
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6,
-                      metacomment_fields=[], translateblock=False,  
+                      translateblock=False, metacomlist_nodes=[], metacomlist_branches=[],
                       colorlist=None, colorfg="#0000FF", colorbg="#000000"):
         """Returns nexus or format tree for each tree in the set"""
         
@@ -4534,9 +4534,9 @@ class TreeSet():
         # Add newick trees with metacomments if needed
         for i, tree in enumerate(self.treelist):
             stringlist.append(f"    tree t.{i + 1} = ")
-            stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                          precision=precision, transdict=transdict if translateblock else None,
-                                          metacomment_fields=metacomment_fields))
+            stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield, 
+                                          precision=precision, transdict=transdict if translateblock else None, 
+                                          metacomlist_nodes=metacomlist_nodes, metacomlist_branches=metacomlist_branches))
             stringlist.append("\n")
 
         # Add footer
@@ -4547,12 +4547,14 @@ class TreeSet():
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
-               transdict=None, metacomment_fields=[]):
+               transdict=None, metacomlist_nodes=[], metacomlist_branches=[]):
         """Returns newick format tree for each tree in the set as a string"""
         stringlist = []
         for tree in self.treelist:
             stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                          precision=precision, transdict=transdict, metacomment_fields=metacomment_fields))
+                                          precision=precision, transdict=transdict, 
+                                          metacomlist_nodes=metacomlist_nodes, 
+                                          metacomlist_branches=metacomlist_branches))
             stringlist.append("\n")
         return "".join(stringlist)
 
