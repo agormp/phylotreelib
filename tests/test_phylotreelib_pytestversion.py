@@ -53,7 +53,8 @@ class Test_init_Branchstruct:
     def test_attribute_assignment(self):
         mylength = 0.1543
         mylabel = "0.95"
-        branch = pt.Branchstruct(length=mylength, label=mylabel)
+        branch = pt.Branchstruct(length=mylength)
+        branch.label=mylabel
         assert branch.length == mylength
         assert branch.label == mylabel
 
@@ -61,7 +62,8 @@ class Test_copy_Branchstruct:
     def test_copy(self):
         mylength = 0.1543
         mylabel = "0.9965"
-        b1 = pt.Branchstruct(length=mylength, label=mylabel)
+        b1 = pt.Branchstruct(length=mylength)
+        b1.label=mylabel
         b1.myatt1 = "howdy"
         b1.myatt2 = 0.34984
         b2 = b1.copy()
