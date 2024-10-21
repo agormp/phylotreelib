@@ -811,7 +811,8 @@ class TreeChanging(TreeTestBase):
         anc = mytree.find_mrca({"HV2BE", "HV2D1"})
         pre_nodes = copy.copy(mytree.nodes)
 
-        branchstruct = pt.Branchstruct(length=0.777, label="New_branch")
+        branchstruct = pt.Branchstruct(length=0.777)
+        branchstruct.label="New_branch"
         newnode = mytree.insert_node(anc, ["HV2BE", "HV2D1"], branchstruct)
         self.assertAlmostEqual(mytree.nodedist(newnode, anc), 0.777)
         self.assertEqual(mytree.getlabel(newnode, anc), "New_branch")
@@ -822,7 +823,8 @@ class TreeChanging(TreeTestBase):
         self.assertTrue(pre_nodes < mytree.nodes)
 
         anc2 = mytree.parent(anc)
-        branchstruct = pt.Branchstruct(length= 0.999, label="Lower_branch")
+        branchstruct = pt.Branchstruct(length= 0.999)
+        branchstruct.label="Lower_branch"
         newnode2 = mytree.insert_node(anc2, [anc], branchstruct)
         self.assertAlmostEqual(mytree.nodedist(newnode2, anc2), 0.999)
         self.assertEqual(mytree.getlabel(newnode2, anc2), "Lower_branch")
@@ -833,7 +835,8 @@ class TreeChanging(TreeTestBase):
         treestring = self.treedata["simplestring"]
         mytree = pt.Tree.from_string(treestring)
         anc = mytree.find_mrca({"s1", "s2"})
-        branchstruct = pt.Branchstruct(length=0.777, label="New_branch")
+        branchstruct = pt.Branchstruct(length=0.777)
+        branchstruct.label="New_branch"
         newnode = mytree.insert_node(anc, ["s1", "s2"], branchstruct)
         self.assertAlmostEqual(mytree.nodedist(newnode, anc), 0.777)
         self.assertEqual(mytree.getlabel(newnode, anc), "New_branch")
@@ -850,7 +853,8 @@ class TreeChanging(TreeTestBase):
                             frozenset(["D", "E"])])
         pre_nodes = copy.copy(mytree.nodes)           # Copy mutable
 
-        branchstruct = pt.Branchstruct(length=0.222, label="First_branch")
+        branchstruct = pt.Branchstruct(length=0.222)
+        branchstruct.label="First_branch"
         mytree.add_branch(bipart1, branchstruct)
         anc1 = mytree.parent("A")
         anc2 = mytree.parent("C")
@@ -866,7 +870,8 @@ class TreeChanging(TreeTestBase):
         self.assertEqual(len(pre_nodes) + 2, len(mytree.nodes))
         self.assertTrue(pre_nodes < mytree.nodes)
 
-        branchstruct = pt.Branchstruct(length=0.333, label="Second_branch")
+        branchstruct = pt.Branchstruct(length=0.333)
+        branchstruct.label="Second_branch"
         mytree.add_branch(bipart2, branchstruct)
         anc3 = mytree.parent("D")
         anc4 = mytree.parent(anc3)
