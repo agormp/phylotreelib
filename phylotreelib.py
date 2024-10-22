@@ -1016,35 +1016,34 @@ class Tree:
     ###############################################################################################
 
     @classmethod
-    def from_branchinfo(cls, parentlist, childlist, lenlist=None, interner=None):
+    def from_branchinfo(cls, parentlist, childlist, lenlist=None, **attrlists):
         """Constructor: Tree object from information about all branches in tree
 
         Information about one branch is conceptually given as:
-            parentnodeID, childnodeID, [length], [label]
+            parentnodeID, childnodeID, [length], [other named attributes...]
 
-        The function takes as input 2 to 4 separate lists containing:
+        The function takes as input 2 or more separate lists containing:
             IDs of parents (internal nodes, so integer values)
             ID of children (internal or leaf nodes, so integer or string)
             Length of branches (optional)
-            Label of branches (optional)
+            Any number of additional attributes given as <keyword=list>
 
-        The four lists are assumed to have same length and be in same order (so index n in
+        The lists are assumed to have same length and be in same order (so index n in
         each list corresponds to same branch).
 
         Note: most IDs appear multiple times in lists
         Note 2: can be used as workaround so user can specify IDs for internal nodes"""
 
         nbranches = len(parentlist)
+        if len(childlist) != nbranches:
+            raise TreeError(f"List 'childlist' does not have same length as parentlist: {len(childlist)} != {len(parentlist)}")
         if lenlist is None:
             lenlist = [0.0]*nbranches
-        if lablist is None:
-            lablist = [""]*nbranches
-        for lst in [childlist, lenlist, lablist]:
-            if len(lst) != nbranches:
-                msg = "All lists provided to from_branchinfo() must have same length:\n"
-                msg += str(lst)
-                raise TreeError(msg)
-
+        elif len(lenlist) != nbranches:
+            raise TreeError(f"List 'childlist' does not have same length as parentlist: {len(lenlist)} != {len(parentlist)}")         
+        for attrname, attrlist in attrlists.items():
+            if len(attrlist) != nbranches:
+                raise TreeError(f"List '{attrname}' does not have same length as parentlist: {len(attrlist)} != {len(parentlist)}")         
         obj = cls()                    # Ensures class will be correct also for subclasses of Tree
         obj.child_dict = {}
         obj.leaves = set()
@@ -1054,11 +1053,15 @@ class Tree:
             parent = parentlist[i]     # Perhaps check types are OK?
             child = childlist[i]
             blen = lenlist[i]
-            lab = lablist[i]
-            if parent in obj.child_dict:
-                obj.child_dict[parent][child] = Branchstruct(blen)
+            if attrlists:
+                attrdict = {name: value[i] for name,value in attrlists.items()}
             else:
-                obj.child_dict[parent] = { child:Branchstruct(blen) }
+                attrdict = dict()
+            branch = Branchstruct(blen, **attrdict)
+            if parent in obj.child_dict:
+                obj.child_dict[parent][child] = branch
+            else:
+                obj.child_dict[parent] = { child:branch }
             obj.intnodes.add(parent)
 
         # Leaves are the childnodes that are not in parentlist
@@ -1069,12 +1072,6 @@ class Tree:
         obj.root = diffset.pop()
 
         obj.nodes = obj.leaves | obj.intnodes
-
-        obj.interner = interner
-        if obj.interner:
-            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
-            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
-            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
 
         return obj
 
