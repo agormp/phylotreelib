@@ -1168,14 +1168,13 @@ class Tree:
             for kid in sorted_kids:
                 parentstr = str(parent)
                 kidstr = str(kid)
-                dist = "{num:.6g}".format(num=self.child_dict[node][kid].length)
-                branch = self.child_dict[node][kid]
-                data_rows.append([nodstr, kidstr, dist, branch])
+                dist = "{num:.6g}".format(num=self.child_dict[parent][kid].length)
+                branch = self.child_dict[parent][kid]
+                data_rows.append([parentstr, kidstr, dist, branch])
                 # Collect attribute names, excluding 'length'
                 for attr in branch.__dict__.keys():
                     if attr != 'length':
                         attr_set.add(attr)
-        data_rows.sort()
 
         # Sort and initialize attribute names
         attr_list = sorted(attr_set)
@@ -1221,8 +1220,8 @@ class Tree:
         # Build table rows
         table = [headers]
         for data_row in data_rows:
-            nodstr, kidstr, dist, branch = data_row
-            row = [nodstr, kidstr, dist]
+            parentstr, kidstr, dist, branch = data_row
+            row = [parentstr, kidstr, dist]
             for attr in included_attrs:
                 value = getattr(branch, attr, "")
                 value_str = str(value)[:max_col_width]
