@@ -217,8 +217,10 @@ class Interner():
 class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
     
-    def __init__(self, length=0.0):
+    def __init__(self, length=0.0, **attributes):
         self.length = length
+        for name, value in attributes.items():
+            setattr(self, name, value)
 
     def __str__(self):
         attrs = [f"{k}: {v}" for k, v in vars(self).items()]
