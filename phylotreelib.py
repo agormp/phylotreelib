@@ -3058,9 +3058,9 @@ class Tree:
         if node2 is None:
             node2 = other.root
 
-        # If node2 is not root of tree2 then re-root on branch below node2.
+        # If node2 is not root of tree2 (or child of root2) then re-root on branch below node2.
         # After this, grafting can happen below root2
-        elif node2 != other.root:
+        elif (node2 != other.root) and (node2 not in other.children(other.root)):
             other.deroot()
             node2parent = other.parent(node2)
             other.reroot(node2parent, node2)
