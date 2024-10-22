@@ -264,7 +264,7 @@ class Branchstruct:
                     msg = (f"Mismatch between {attrname} attributes of two Branchstructs: \n"
                           + f"self: {self_value}  other: {othervalue}")
                     raise TreeError(msg)
-            setattr(obj, attrname, value)
+            setattr(obj, attrname, self_value)
 
         return obj
 
