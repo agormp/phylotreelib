@@ -697,7 +697,7 @@ class Tree:
     # The main constructor "__init__" is therefore mostly empty
 
     def __init__(self):
-        self.nodedict = None   # Python note: not sure it should be initsed here?
+        self.nodedict = None   
         self._parent_dict = None
         self._remotechildren_dict = None
         self._frozenset_leaves = None
@@ -2497,6 +2497,7 @@ class Tree:
         
             for child in self.children(parentnode):
 
+                # Collect branch-related information
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
                 if printlabels:
@@ -2504,61 +2505,44 @@ class Tree:
                         label = getattr(branchstruct, labelfield)
                     else:
                         label = ""  # Raise error instead? Maybe not since default is true
-
-                # Collect metacomments for all specified fields
-                # NOTE: should get values from nodedict not branches. but parent or child?
-                if metacomlist_nodes:
-                    meta_comment = []
-                    metacomment_node = None
-                    for field in metacomlist_nodes:
-                        field_value = getattr(branchstruct, field, None)
-                        if field_value is not None:
-                            meta_comment.append(f"{field}={field_value}")
-                    metacomment_node = f"[&{', '.join(meta_comment)}]"
-                
                 if metacomlist_branches:
-                    meta_comment = []
-                    metacomment_branch = None
-                    for field in metacomlist_branches:
-                        field_value = getattr(branchstruct, field, None)
-                        if field_value is not None:
-                            meta_comment.append(f"{field}={field_value}")
-                    metacomment_branch = f"[&{', '.join(meta_comment)}]"
+                    tmplist = []
+                    for attrname in metacomlist_branches:
+                        value = getattr(branchstruct, attrname)  # Python note: Catch exception?
+                        tmplist.append(f"{attrname}={value}")
+                    metacomment_branch = f"[&{', '.join(tmplist)}]"                
                 
+                # Collect node-related information
+                if metacomlist_nodes:
+                    nodestruct = self.nodedict[child]
+                    tmplist = []
+                    for attrname in metacomlist_nodes:
+                        value = getattr(nodestruct, field)
+                        tmplist.append(f"{attrname}={value}")
+                    metacomment_node = f"[&{', '.join(tmplist)}]"
 
+                # Build tree string
                 if child in self.leaves:
                     if transdict:
                         treelist.append(transdict[child])
                     else:
                         treelist.append(child)
-                
-                    # Add metacomment string if there are metacomments for leaf node
                     if metacomlist_nodes:
                         treelist.append(metacomment_node)
-
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
-
-                    # Add metacomment string if there are metacomments for branch leading to leaf
                     if metacomlist_branches:
                         treelist.append(metacomment_branch)
                 else:
                     treelist.append("(")
                     append_children(child)
                     treelist.append(")")
-
-                    # Handle regular label
                     if printlabels and label != "":
                         treelist.append(f"{label}")
-
-                    # Add metacomment string if there are metacomments for internal node
                     if metacomlist_nodes:
                         treelist.append(metacomment_node)
-
                     if printdist:
                         treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
-
-                    # Add metacomment string if there are metacomments for internal branch
                     if metacomlist_branches:
                         treelist.append(metacomment_branch)
 
