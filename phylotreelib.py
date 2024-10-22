@@ -1162,9 +1162,11 @@ class Tree:
         # Collect data rows and attribute names
         data_rows = []
         attr_set = set()
-        for node in self.sorted_intnodes():
-            for kid in self.children(node):
-                nodstr = str(node)
+        for parent in self.sorted_intnodes():
+            kidset = self.children(parent)
+            sorted_kids = sorted(kidset, key=lambda x: (isinstance(x, str), x))
+            for kid in sorted_kids:
+                parentstr = str(parent)
                 kidstr = str(kid)
                 dist = "{num:.6g}".format(num=self.child_dict[node][kid].length)
                 branch = self.child_dict[node][kid]
