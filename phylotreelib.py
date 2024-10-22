@@ -2957,7 +2957,7 @@ class Tree:
             msg = "There is no branch connecting node %s and %s" % (node1, node2)
             raise TreeError(msg)
 
-        return self.child_dict[parent][child].label
+        return getattr(self.child_dict[parent][child], "label", "")
 
     ###############################################################################################
 
