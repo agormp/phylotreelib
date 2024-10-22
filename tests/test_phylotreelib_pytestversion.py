@@ -361,21 +361,21 @@ class Test_str:
         childlist = ["A", "B", 1, "C", "D"]
         lenlist = [2.0, 2.0, 1.0, 1.0, 1.0]
         lablist = ["", "", "0.95", "", ""]
-        my_tree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist, lablist)
+        my_tree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist, label=lablist)
 
         # Expected representation
-        expected_str_lines =   ["|-----------------------------------------|",
-                                "|  Node  |  Child  |  Distance  |  Label  |",
-                                "|-----------------------------------------|",
-                                "|     0  |      1  |         1  |   0.95  |",
-                                "|     0  |      A  |         2  |         |",
-                                "|     0  |      B  |         2  |         |",
-                                "|     1  |      C  |         1  |         |",
-                                "|     1  |      D  |         1  |         |",
-                                "|-----------------------------------------|",
+        expected_str_lines =   ["+--------------------------------------------+",
+                                "|  parent  |  child  |  branchlen  |  label  |",
+                                "+--------------------------------------------+",
+                                "|       0  |      1  |          1  |   0.95  |",
+                                "|       0  |      A  |          2  |         |",
+                                "|       0  |      B  |          2  |         |",
+                                "|       1  |      C  |          1  |         |",
+                                "|       1  |      D  |          1  |         |",
+                                "+--------------------------------------------+",
                                 "",
                                 "4 Leaves:",
-                                "-----",
+                                "-",
                                 "A",
                                 "B",
                                 "C",
