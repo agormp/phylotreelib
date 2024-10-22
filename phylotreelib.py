@@ -2551,6 +2551,8 @@ class Tree:
             del treelist[-1]  # Remove last comma when no more siblings
 
         # EXECUTION STARTS HERE!
+        if metacomlist_nodes and not self.nodedict:
+            raise TreeError(f"Tree has no nodedict. Can not print node-related attributes: {metacomlist_nodes}")
         root = self.root
         treelist = ["("]
         append_children(root)
