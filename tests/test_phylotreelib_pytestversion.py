@@ -457,10 +457,9 @@ class Test_copy_treeobject:
     """Tests for copy_treeobject function"""
 
     def test_blen_lab(self, treedata):
-        """Test copy_treeobject with copylengths=True, copylabels=True"""
         for treestring in treedata.values():
             t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=True, copylabels=True)
+            t2 = t1.copy_treeobject(copylengths=True, copyattr=True)            
             assert t1 == t2
             assert t1.root == t2.root
             assert t1.has_same_root(t2)
@@ -471,10 +470,9 @@ class Test_copy_treeobject:
                     assert t1lab == t2lab
 
     def test_blen_nolab(self, treedata):
-        """Test copy_treeobject with copylengths=True, copylabels=False"""
         for treestring in treedata.values():
             t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=True, copylabels=False)
+            t2 = t1.copy_treeobject(copylengths=True, copyattr=False)
             assert t1 == t2
             assert t1.root == t2.root
             assert t1.has_same_root(t2)
@@ -484,10 +482,9 @@ class Test_copy_treeobject:
                     assert t2lab == ""
 
     def test_noblen_nolab(self, treedata):
-        """Test copy_treeobject with copylengths=False, copylabels=False"""
         for treestring in treedata.values():
             t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=False, copylabels=False)
+            t2 = t1.copy_treeobject(copylengths=False, copyattr=False)
             assert t1.topology() == t2.topology()
             assert t1.root == t2.root
             assert t1.has_same_root(t2)
