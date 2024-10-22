@@ -1173,6 +1173,7 @@ class Tree:
                 for attr in branch.__dict__.keys():
                     if attr != 'length':
                         attr_set.add(attr)
+        data_rows.sort()
 
         # Sort and initialize attribute names
         attr_list = sorted(attr_set)
