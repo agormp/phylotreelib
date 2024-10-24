@@ -2530,7 +2530,7 @@ class Tree:
                     if metacomlist_nodes:
                         treelist.append(metacomment_node)
                     if printdist:
-                        treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
+                        treelist.append(f":{dist:.{precision}g}")
                     if metacomlist_branches:
                         treelist.append(metacomment_branch)
                 else:
@@ -2542,7 +2542,7 @@ class Tree:
                     if metacomlist_nodes:
                         treelist.append(metacomment_node)
                     if printdist:
-                        treelist.append(":{num:.{prec}g}".format(num=dist, prec=precision))
+                        treelist.append(f":{dist:.{precision}g}")
                     if metacomlist_branches:
                         treelist.append(metacomment_branch)
 
