@@ -5396,10 +5396,10 @@ class BigTreeSummary(TreeSummary):
 
     def _addcladetopo(self, cladedict, curtree, weight):
 
-        # If biptopology has never been seen before, then add it and initialize count
+        # If cladetopology has never been seen before, then add it and initialize count
         # If topology HAS been seen before then update count
         topology = frozenset(cladedict.keys())
-        if topology in self._biptoposummary:
+        if topology in self._cladetoposummary:
             self._cladetoposummary[topology].weight += weight
         else:
             self._cladetoposummary[topology]=Topostruct()
