@@ -4764,7 +4764,7 @@ class TreeSummary():
 
         if self._sorted_rootbips == None:
             self._sorted_rootbips = []
-            for bip,rootbipstruct in self._rootbip_summary.items():
+            for bip,rootbipstruct in self.rootbipsummary.items():
                 self._sorted_rootbips.append((rootbipstruct.count, bip, rootbipstruct))
             self._sorted_rootbips.sort(key=itemgetter(0), reverse=True)
         return self._sorted_rootbips
