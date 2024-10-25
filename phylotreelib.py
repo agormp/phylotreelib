@@ -2514,8 +2514,6 @@ class Tree:
             """Recursive function that has main responsibility for building Newick tree string"""
         
             for child in self.children(parentnode):
-
-                # Collect branch-related information
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
                 metacomment_branch = create_metacomment(branchstruct, metacomlist_branches) if metacomlist_branches else ""
@@ -2546,7 +2544,6 @@ class Tree:
                         treelist.append(metacomment_branch)
 
                 treelist.append(",")
-
             del treelist[-1]  # Remove last comma when no more siblings
 
         # EXECUTION STARTS HERE!
@@ -5117,7 +5114,7 @@ class TreeSummary():
         """Returns sum_tree with root credibilities as attributes on each branch
         rootcred = fraction of trees in input set where the root was on this branch (bipartition)
         If root was never on a branch: assign the value 0.0
-        Added as attribute .rootcred to Branchstruct for branches om sum_tree
+        Added as attribute .rootcred to Branchstruct for branches on sum_tree
         Also sets tree-attribute cumrootcred: 
             sum of rootcredibilities for all branches (bipartitions) included on tree
         """
