@@ -2494,8 +2494,6 @@ class Tree:
     
         def create_metacomment(struct, metacomlist):
             """Helper function to create metacomment strings based on attributes of a structure"""
-            if not metacomlist:
-                return ""
             tmplist = []
             for attrname in metacomlist:
                 try: 
@@ -2516,8 +2514,8 @@ class Tree:
             for child in self.children(parentnode):
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
-                metacomment_branch = create_metacomment(branchstruct, metacomlist_branches) if metacomlist_branches else ""
-                metacomment_node = create_metacomment(self.nodedict[child], metacomlist_nodes) if metacomlist_nodes else ""
+                metacomment_branch = create_metacomment(branchstruct, metacomlist_branches) if metacomlist_branches
+                metacomment_node = create_metacomment(self.nodedict[child], metacomlist_nodes) if metacomlist_nodes
 
                 if child in self.leaves:
                     treelist.append(transdict[child] if transdict else child)
