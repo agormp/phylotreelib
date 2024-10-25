@@ -2520,29 +2520,18 @@ class Tree:
                 metacomment_node = create_metacomment(self.nodedict[child], metacomlist_nodes) if metacomlist_nodes else ""
 
                 if child in self.leaves:
-                    if transdict:
-                        treelist.append(transdict[child])
-                    else:
-                        treelist.append(child)
-                    if metacomlist_nodes:
-                        treelist.append(metacomment_node)
-                    if printdist:
-                        treelist.append(f":{dist:.{precision}g}")
-                    if metacomlist_branches:
-                        treelist.append(metacomment_branch)
+                    treelist.append(transdict[child] if transdict else child)
                 else:
                     treelist.append("(")
                     append_children(child)
                     treelist.append(")")
-                    if printlabels and label != "":
+                    if printlabels:
+                        label = getattr(branchstruct, labelfield, "")
                         treelist.append(f"{label}")
-                    if metacomlist_nodes:
-                        treelist.append(metacomment_node)
-                    if printdist:
-                        treelist.append(f":{dist:.{precision}g}")
-                    if metacomlist_branches:
-                        treelist.append(metacomment_branch)
-
+                        
+                if metacomlist_nodes:       treelist.append(metacomment_node)
+                if printdist:               treelist.append(f":{dist:.{precision}g}")
+                if metacomlist_branches:    treelist.append(metacomment_branch)
                 treelist.append(",")
             del treelist[-1]  # Remove last comma when no more siblings
 
