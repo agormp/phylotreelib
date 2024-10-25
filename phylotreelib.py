@@ -2492,6 +2492,24 @@ class Tree:
                transdict=None, metacomlist_nodes=[], metacomlist_branches=[]):
         """Returns Newick format tree string representation of tree object, with optional metacomments"""
     
+        def create_metacomment(struct, metacomlist):
+            """Helper function to create metacomment strings based on attributes of a structure"""
+            if not metacomlist:
+                return ""
+            tmplist = []
+            for attrname in metacomlist:
+                try: 
+                    value = getattr(struct, attrname)
+                except AttributeError:
+                    msg = (f"'{struct.__class__.__name__}' object has no attribute '{attrname}'.\n"
+                          f"Available attributes: {list(vars(struct).keys())}")
+                    raise TreeError(msg)
+                if isinstance(value, float):
+                    tmplist.append(f"{attrname}={value:.{precision}g}")
+                else:
+                    tmplist.append(f"{attrname}={value}")
+            return f"[&{','.join(tmplist)}]"
+
         def append_children(parentnode):
             """Recursive function that has main responsibility for building Newick tree string"""
         
@@ -2500,28 +2518,9 @@ class Tree:
                 # Collect branch-related information
                 branchstruct = self.child_dict[parentnode][child]
                 dist = branchstruct.length
-                if printlabels:
-                    if hasattr(branchstruct, labelfield):
-                        label = getattr(branchstruct, labelfield)
-                    else:
-                        label = ""  # Raise error instead? Maybe not since default is true
-                if metacomlist_branches:
-                    tmplist = []
-                    for attrname in metacomlist_branches:
-                        value = getattr(branchstruct, attrname)  # Python note: Catch exception?
-                        tmplist.append(f"{attrname}={value}")
-                    metacomment_branch = f"[&{', '.join(tmplist)}]"                
-                
-                # Collect node-related information
-                if metacomlist_nodes:
-                    nodestruct = self.nodedict[child]
-                    tmplist = []
-                    for attrname in metacomlist_nodes:
-                        value = getattr(nodestruct, field)
-                        tmplist.append(f"{attrname}={value}")
-                    metacomment_node = f"[&{', '.join(tmplist)}]"
+                metacomment_branch = create_metacomment(branchstruct, metacomlist_branches) if metacomlist_branches else ""
+                metacomment_node = create_metacomment(self.nodedict[child], metacomlist_nodes) if metacomlist_nodes else ""
 
-                # Build tree string
                 if child in self.leaves:
                     if transdict:
                         treelist.append(transdict[child])
