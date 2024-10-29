@@ -4088,7 +4088,7 @@ class Tree:
         if isinstance(outgroup, str):   # if just a single name is given:
                                         # protect string from iteration to single letters
             outgroup = [outgroup]
-        outgroup = frozenset(outgroup)
+        outgroup = set(outgroup)
         ingroup = self.leaves - outgroup
         outbase = self.findbasenode(outgroup)
         inbase = self.findbasenode(ingroup)
