@@ -4085,7 +4085,7 @@ class Tree:
         self.deroot()
 
         # Find pair of internal nodes corresponding to ingroup:outgroup bipartition
-        if type(outgroup) is str:       # if just a single name is given:
+        if isinstance(outgroup, str):   # if just a single name is given:
                                         # protect string from iteration to single letters
             outgroup = [outgroup]
         outgroup = frozenset(outgroup)
