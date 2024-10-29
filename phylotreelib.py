@@ -5471,12 +5471,12 @@ class BigTreeSummary(TreeSummary):
                 maxlogcred = logcred
                 maxlogcred_cladetopo = clade_topology
 
-        maxcred_bipdict = {}
+        maxcred_cladedict = {}
         for clade in maxlogcred_cladetopo:
             nodestruct = self.cladesummary[clade]
             nodestruct.label = f"{nodestruct.posterior:.{label_precision}g}"
-            maxcred_bipdict[clade] = nodestruct
-        maxcredtree = Tree.from_cladedict(maxcred_bipdict)
+            maxcred_cladedict[clade] = nodestruct
+        maxcredtree = Tree.from_cladedict(maxcred_cladedict)
 
         return maxcredtree, maxlogcred
 
