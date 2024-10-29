@@ -1070,6 +1070,15 @@ class Tree:
         # Root node is the parent node that is not also in childlist
         diffset = set(parentlist) - set(childlist)
         obj.root = diffset.pop()
+        
+        # Sanity check: are there any non-root, internal nodes that have no parent?
+        # This would mean that sub-tree might not be linked to rest
+        nonroot_intnodes = obj.intnodes - set([obj.root])
+        orphans = nonroot_intnodes - set(childlist)        
+        if orphans:
+            msg = (f"Missing branch-information: these (non-root) internal nodes have no parent: "
+                   f"{list(orphans)}")
+            raise TreeError(msg)
 
         obj.nodes = obj.leaves | obj.intnodes
 
