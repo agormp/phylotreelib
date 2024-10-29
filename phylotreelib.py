@@ -1257,12 +1257,13 @@ class Tree:
         tabstring += border_line
 
         # Add list of leaves
-        leaf_width = max(len(str(leaf)) for leaf in self.leaves)
+        sorted_leaflist = sorted([str(leaf) for leaf in self.leaves])
+        leaf_width = max(len(leaf) for leaf in sorted_leaflist)
         leaf_width = min(leaf_width, max_total_width)
         tabstring += f"\n{len(self.leaves)} Leaves:\n"
         tabstring += "-" * leaf_width + "\n"
-        for leaf in sorted(self.leaves):
-            leaf_str = str(leaf)[:leaf_width]
+        for leaf in sorted_leaflist:
+            leaf_str = leaf[:leaf_width]
             tabstring += f"{leaf_str}\n"
 
         return tabstring    
