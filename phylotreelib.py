@@ -2084,76 +2084,13 @@ class Tree:
     def findbasenode(self, leafset):
         """Finds node that is at the base of all leaves in leafset."""
 
-        # Specifically, the provided leafset is assumed to form one part of a bipartition
-        # that is compatible with the tree. That bipartition corresponds to an internal
-        # branch delimited by two internal nodes. This function determines which of these
-        # nodes is nearer to the provided leafset. This could perhaps be described as
-        # the unrooted variety of an MRCA
-
-        # NOTE: this approach does not work when leafset is part of polytomy (i.e., basenode
-        # has other descendants in addition to leafset. Think hard about how to fix this now...
-
-        # Conversion to ensure comparison with sets can be done.
-        # Could I assume set() without conversion?
-        leafset = set(leafset)
-
-        # Take care of special case where leafset equals all leafs in tree
-        if leafset == self.leaves:
+        leaves1 = set(leafset)        
+        if leaves1 == self.leaves:
             return self.root
-
-        # If root is at bifurcation: start by checking whether one of its kids match
-        # If not: remove root from further investigation to avoid trouble
-        rootkids = list(self.children(self.root))
-        if len(rootkids) == 2:
-            if leafset == self.remote_children(rootkids[0]):
-                return rootkids[0]
-            elif leafset == self.remote_children(rootkids[1]):
-                return rootkids[1]
-            else:
-                intnodes = self.intnodes - {self.root}
         else:
-            intnodes = self.intnodes
-
-        # Iterate over remaining possible pairs of internal nodes
-        for node1 in intnodes:
-            for node2 in self.children(node1):
-                bipart2 = self.remote_children(node2)    # returns set(node) if node is a leaf
-                bipart1 = self.leaves - bipart2
-
-                # Return basenode when bipartition has been found
-                if leafset == bipart1:
-                    return node1
-                if leafset==bipart2:
-                    return node2
-
-        # If we fell off for loops, then leafset is incompatible with tree: panic
-        # Construct string listing all entries in leafset (for error message)
-        leafstring = ""
-        for leaf in leafset:
-            leafstring += str(leaf)
-            leafstring += ", "
-        leafstring = leafstring[:-2]    # Remove trailing comma and blank
-
-        msg = f"The following is not a monophyletic group in this tree:\n{leafstring}" 
-        raise TreeError(msg)
-
-    ###############################################################################################
-
-    def find_bipart_nodes(self, bipartition):
-        """Given a Bipartition as input: 
-             If bipart present:     return (parent,child) nodes for bipartition branch. 
-             If bipart not present: return (None, None)"""
-
-        (bip1, bip2) = bipartition
-        mrca = self.find_mrca(bip1)
-        bip = bip1
-        if mrca == self.root:
-            mrca = self.find_mrca(bip2)
-            bip = bip2
-        if self.remotechildren_dict[mrca] == bip:
-            return (self.parent(mrca), mrca)
-        else:
-            return None
+            leaves2 = self.leaves - leaves1
+            base1, base2 = self.find_bipart_nodes(leaves1, leaves2, check_arguments=True)
+            return base1
 
     ###############################################################################################
 
