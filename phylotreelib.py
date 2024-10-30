@@ -4736,11 +4736,11 @@ class TreeSummary():
 
         cladedict = None
         if self.trackclades:
-            cladedict = self._add_clade(curtree, weight)
+            cladedict = self._add_clades(curtree, weight)
 
         bipdict = None
         if self.trackbips:
-            bipdict = self._add_bip(curtree, weight)
+            bipdict = self._add_bips(curtree, weight)
 
         return bipdict, cladedict
 
@@ -4757,7 +4757,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def _add_clade(self, curtree, weight):
+    def _add_clades(self, curtree, weight):
         """Helper method to add_tree: handles clades"""
 
         self._cladesummary_processed = False
@@ -4792,7 +4792,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def _add_bip(self, curtree, weight):
+    def _add_bips(self, curtree, weight):
         """Helper method to add_tree: handles bipartitions"""
 
         self._bipartsummary_processed = False
