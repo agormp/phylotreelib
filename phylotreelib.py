@@ -709,7 +709,6 @@ class Tree:
         self._pathdist_as_ndarray = None
         self._pathdist_as_ndarray_unroot = None
         self.path_dict = None
-        self._remotechildren_dict = None
         self.interner = None
         self._sorted_intnodes_deep = None
         self._sorted_intnodes_shallow = None
