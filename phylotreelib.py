@@ -2094,6 +2094,46 @@ class Tree:
 
     ###############################################################################################
 
+    def find_bipart_nodes(self, leaves1, leaves2, check_arguments=True):
+        """Find two internal nodes corresponding to given bipartition of leaves.
+        
+        Input: leaves1, leaves2: leaves on either side of internal branch (bipartition) 
+        Out: (basenode1, basenode2) nodes on either end of the branch corresponding to the bipartition
+             basenode1 is at the base of leaves1 leaves
+             basenode2 is at the base of leaves2 leaves
+        
+        check_arguments: check that leaves1, leaves2 are valid bipartition of leaves
+        
+        If tree is rooted at bifurcation, and bipartition corresponds to two halves of tree,
+        then the two kids of root will be the basenodes (both basal branches are considered
+        to be part of the same branch)"""
+                
+        if check_arguments:
+            bip1 = set(leaves1)
+            bip2 = set(leaves2)
+            all_leaves = bip1 | bip2          
+            if all_leaves < self.leaves:
+                missing_leaves = self.leaves - all_leaves
+                raise TreeError(f"Not a bipartition: some leaves are not included in either bipartition1 or 2: {missing_leaves}")
+            if self.leaves < all_leaves:
+                superfluous = all_leaves - self.leaves
+                raise TreeError(f"Not a bipartition: these leaves are not on tree: {superfluous}")
+            if not bip1:
+                raise TreeError("Not a bipartition: leaves1 contains no leaves")
+            if not bip2:
+                raise TreeError("Not a bipartition: leaves2 contains no leaves")
+
+        mrca1 = self.find_mrca(leaves1)
+        mrca2 = self.find_mrca(leaves2)
+        if mrca1 != self.root and mrca2 == self.root:
+            return mrca1, self.parent(mrca1)
+        elif mrca1 == self.root and mrca2 != self.root:
+            return self.parent(mrca2), mrca2
+        else:
+            return mrca1, mrca2   # Both are kids of root or mrca1==mrca2 (bip anchored in multifurcation)
+        
+    ###############################################################################################
+
     @functools.lru_cache(maxsize=None)
     def nodedist(self,node1,node2=None):
         """Returns distance between node1 and node2 along tree (patristic distance)"""
