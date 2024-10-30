@@ -409,6 +409,19 @@ class RelationShipMethods(TreeTestBase):
                 remotekids = mytree.remote_children(basalnode)
                 self.assertEqual(basalnode, mytree.find_mrca(remotekids))
                 self.assertEqual(basalnode, mytree.findbasenode(remotekids))
+                if basalnode != mytree.root and basalnode not in mytree.children(mytree.root):
+                    basal_parent = mytree.parent(basalnode)
+                    other_half = mytree.leaves - remotekids
+                    self.assertEqual(basal_parent, mytree.findbasenode(other_half))
+                # Python note: double check that this logic always holds
+                if basalnode in mytree.children(mytree.root):
+                    basal_siblings = mytree.children(mytree.root) - set([basalnode])
+                    other_half = mytree.leaves - remotekids
+                    if len(basal_siblings) == 1:
+                        sib = next(iter(basal_siblings))
+                        self.assertEqual(sib, mytree.findbasenode(other_half)) 
+                    else:
+                        self.assertEqual(mytree.root, mytree.findbasenode(other_half))                                        
             for leaf in mytree.leaves:
                 self.assertEqual({leaf}, mytree.remote_children(leaf))
         treestring = self.treedata["simplestring"]
