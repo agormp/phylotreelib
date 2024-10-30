@@ -5270,7 +5270,8 @@ class BigTreeSummary(TreeSummary):
 
     def __init__(self, store_trees=False, trackbips=True, trackclades=False, trackroot=False,
                        trackblen=False, trackdepth=False):
-        TreeSummary.__init__(self, trackbips, trackclades, trackroot, trackblen, trackdepth)
+        TreeSummary.__init__(self, trackbips=trackbips, trackclades=trackclades, 
+                             trackroot=trackroot, trackblen=trackblen, trackdepth=trackdepth)
         self._biptoposummary = {}
         self._biptoposummary_processed = False
         self._cladetoposummary = {}
