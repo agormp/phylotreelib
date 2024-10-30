@@ -4599,7 +4599,7 @@ class TreeSummary():
         self._cladesummary_processed = False
         self._sorted_biplist = None
         self._rootbip_summary_processed = False
-        self._rootbip_summary = {}
+        self._rootbip_summary = {}      
         self.trackroot = trackroot
         self.trackbips = trackbips
         self.trackclades = trackclades
