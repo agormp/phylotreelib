@@ -1071,7 +1071,7 @@ class Tree:
         obj.root = diffset.pop()
         
         # Sanity check: are there any non-root, internal nodes that have no parent?
-        # This would mean that sub-tree might not be linked to rest
+        # This would mean that sub-tree is not linked to rest of tree structure (missing branches)
         nonroot_intnodes = obj.intnodes - set([obj.root])
         orphans = nonroot_intnodes - set(childlist)        
         if orphans:
