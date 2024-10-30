@@ -4598,17 +4598,14 @@ class TreeSummary():
         self._cladesummary = {}         # Dict: {clade:nodestruct with extra fields}
         self._cladesummary_processed = False
         self._sorted_biplist = None
+        self._rootbip_summary_processed = False
+        self._rootbip_summary = {}
         self.trackroot = trackroot
         self.trackbips = trackbips
         self.trackclades = trackclades
         self.trackblen = trackblen
         self.trackdepth = trackdepth
         self._sorted_rootbips = None
-        self._rootbip_summary_processed = False
-        if trackroot:
-            self._rootbip_summary = {}
-        else:
-            self._rootbip_summary = None
 
     ###############################################################################################
 
