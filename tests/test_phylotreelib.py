@@ -240,6 +240,27 @@ class TreeRead(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
+class OutGroupRooting(TreeTestBase):
+    """Tests for rootout function"""
+
+    def test_ogroot_treestrings(self):
+        for treestring in self.treedata.values():
+            t = pt.Tree.from_string(treestring)
+            for node in t.intnodes - set([t.root]):
+                tc = t.copy_treeobject()
+                ig = tc.remote_children(node)
+                og = tc.leaves - ig
+                tc.rootout(og)
+                rootkid1,rootkid2 = tc.children(tc.root)
+                rootremkids1 = tc.remote_children(rootkid1)
+                rootremkids2 = tc.remote_children(rootkid2)
+                self.assertTrue(ig in [rootremkids1, rootremkids2])
+                self.assertTrue(og in [rootremkids1, rootremkids2])
+                
+########################################################################################
+########################################################################################
+
+
 class Has_same_root(TreeTestBase):
     """Tests for has_same_root function"""
     def test_sameroot_sameintnodenumbers(self):
