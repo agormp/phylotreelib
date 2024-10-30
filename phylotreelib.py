@@ -4086,55 +4086,13 @@ class Tree:
         elif self.length() == 0.0:
             self.reroot(outbase, inbase)
 
-        # Else: compute where on branch to place root
+        # Else: place root in the middle between inbase and outbase
         else:
-
-            # Find longest base-leaf distance in outgroup:
-            distances = set()
-            for leaf in outgroup:
-                leafdist = self.nodedist(leaf, outbase)
-                distances.add(leafdist)
-            max_out_dist = max(distances)
-
-            # Find longest base-leaf distance in ingroup:
-            distances = set()
-            for leaf in ingroup:
-                leafdist = self.nodedist(leaf, inbase)
-                distances.add(leafdist)
-            max_in_dist = max(distances)
-
-            # Find length of branch separating ingroup and outgroup
-            inoutdist = self.nodedist(outbase, inbase)
-
-            # If possible, then put root exactly midway between extremes
-            diameter = max_in_dist + max_out_dist + inoutdist
-            midway = diameter/2
-            really_close = 0.1
-
-            # Case 1: outgroup has only one taxon
-            if len(outgroup) == 1:
-                # if possible place root at midpoint
-                if midway < inoutdist:
-                    outbasedist = midway
-                # If not, place it real close to midpoint
-                else:
-                    outbasedist = (1 - really_close) * inoutdist
-
-            # Case 2: outgroup has more than one taxon
-            # If possible place root at midpoint
-            elif (midway > max_in_dist) and (midway > max_out_dist):
-                outbasedist = midway - max_out_dist     # This is distance from outbase to new root
-            # If not then put root really close to relevant internal node
-            else:
-                if midway < max_out_dist:   # Root should be close to outbase
-                    outbasedist = really_close*self.nodedist(outbase, inbase)
-                else:                       # Root should be close to inbase
-                    outbasedist = (1-really_close)*self.nodedist(outbase, inbase)
-
-            # Root tree at the computed position on the ingroup:outgroup branch
-            self.reroot(outbase, inbase, polytomy, outbasedist)
+            half_dist = self.nodedist(outbase, inbase) / 2
+            self.reroot(outbase, inbase, node1dist=half_dist)
 
     ###############################################################################################
+
     def possible_spr_prune_nodes(self):
         """Utililty function when using spr function: where is it possible to prune"""
 
