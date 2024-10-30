@@ -4593,18 +4593,18 @@ class TreeSummary():
         self.translateblock = None
         self.tree_count = 0
         self.tree_weight_sum = 0.0
-        self._bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
-        self._bipartsummary_processed = False
-        self._cladesummary = {}         # Dict: {clade:nodestruct with extra fields}
-        self._cladesummary_processed = False
-        self._sorted_biplist = None
-        self._rootbip_summary_processed = False
-        self._rootbip_summary = {}      
         self.trackroot = trackroot
         self.trackbips = trackbips
         self.trackclades = trackclades
         self.trackblen = trackblen
         self.trackdepth = trackdepth
+        self._bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
+        self._bipartsummary_processed = False
+        self._cladesummary = {}         # Dict: {clade:nodestruct with extra fields}
+        self._cladesummary_processed = False
+        self._rootbip_summary = {}      
+        self._rootbip_summary_processed = False
+        self._sorted_biplist = None
         self._sorted_rootbips = None
 
     ###############################################################################################
