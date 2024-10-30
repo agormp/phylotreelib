@@ -4071,13 +4071,12 @@ class Tree:
         self.deroot()
 
         # Find pair of internal nodes corresponding to ingroup:outgroup bipartition
-        if isinstance(outgroup, str):   # if just a single name is given:
-                                        # protect string from iteration to single letters
-            outgroup = [outgroup]
-        outgroup = set(outgroup)
+        if isinstance(outgroup, str): 
+            outgroup = set([outgroup])
+        else:
+            outgroup = set(outgroup)
         ingroup = self.leaves - outgroup
-        outbase = self.findbasenode(outgroup)
-        inbase = self.findbasenode(ingroup)
+        inbase, outbase = self.find_bipart_nodes(ingroup, outgroup)
 
         # If outgroup should form basal polytomy with ingroup: root on outbase
         if polytomy:
