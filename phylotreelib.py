@@ -5379,7 +5379,7 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def max_bipart_cred_tree(self, labeldigits=3):
+    def max_bipart_cred_tree(self):
         """Find maximum bipartition credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
 
         maxlogcred = -math.inf
@@ -5392,7 +5392,6 @@ class BigTreeSummary(TreeSummary):
         maxcredbipdict = {}
         for bipartition in maxlogcredbiptopo:
             branch = self.bipartsummary[bipartition]
-            branch.label = f"{round(branch.posterior, labeldigits)}"
             maxcredbipdict[bipartition] = branch
 
         # Build tree from bipartitions  in new bipdict
@@ -5402,7 +5401,7 @@ class BigTreeSummary(TreeSummary):
 
     ###############################################################################################
 
-    def max_clade_cred_tree(self, label_precision=6):
+    def max_clade_cred_tree(self):
         """Find maximum clade credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
 
         maxlogcred = -math.inf
@@ -5415,7 +5414,6 @@ class BigTreeSummary(TreeSummary):
         maxcred_cladedict = {}
         for clade in maxlogcred_cladetopo:
             nodestruct = self.cladesummary[clade]
-            nodestruct.label = f"{nodestruct.posterior:.{label_precision}g}"
             maxcred_cladedict[clade] = nodestruct
         maxcredtree = Tree.from_cladedict(maxcred_cladedict)
 
