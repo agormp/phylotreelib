@@ -550,9 +550,6 @@ class NewickStringParser:
         # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
         # an internal node). The label is attached to the same branch as the branch length
         self.treeobj = treeobj
-        self.treeobj.child_dict = {}
-        self.treeobj.leaves = set()
-        self.treeobj.intnodes = set()
         self.treeobj.root = 0
 
         # These variables are only used while parsing, and should be in parserobj (not treeobj)
@@ -697,7 +694,10 @@ class Tree:
     # The main constructor "__init__" is therefore mostly empty
 
     def __init__(self):
-        self.nodedict = None   
+        self.child_dict = {}
+        self.nodedict = {}
+        self.leaves = set()
+        self.intnodes = set()   
         self._parent_dict = None
         self._remotechildren_dict = None
         self._frozenset_leaves = None
@@ -800,7 +800,6 @@ class Tree:
         # Leafs are identified by a string instead of a number
 
         # Construct tree dictionary (main data structure, essentially a child list)
-        obj.child_dict = {}
         obj.child_dict[0]={}
         maxnode = 0
 
@@ -902,7 +901,6 @@ class Tree:
         # Leafs are identified by a string instead of a number
 
         # Construct tree dictionary (main data structure, essentially a child list)
-        obj.child_dict = {}
         obj.child_dict[0]={}
         maxnode = 0
 
@@ -1044,9 +1042,6 @@ class Tree:
             if len(attrlist) != nbranches:
                 raise TreeError(f"List '{attrname}' does not have same length as parentlist: {len(attrlist)} != {len(parentlist)}")         
         obj = cls()                    # Ensures class will be correct also for subclasses of Tree
-        obj.child_dict = {}
-        obj.leaves = set()
-        obj.intnodes = set()
 
         for i in range(nbranches):
             parent = parentlist[i]     # Perhaps check types are OK?
@@ -2955,9 +2950,7 @@ class Tree:
         else:
             # Create empty Tree object. Transfer relevant subset of self's data structure to other
             other = Tree()
-            other.child_dict = {}
             other.intnodes = {basenode}
-            other.leaves = set()
             other.root = basenode
             curlevel = [basenode]
             while curlevel:
@@ -2977,7 +2970,6 @@ class Tree:
 
         # If self.nodedict exists: copy relevant parts from self to other
         if self.nodedict:
-            other.nodedict = {}
             for node in other.nodes:
                 other.nodedict[node] = self.nodedict[node]
 
