@@ -974,7 +974,7 @@ class Tree:
         leaves = clade.all_leaves_set
         obj = cls.from_leaves(leaves)
 
-        for clade,node in cladedict.items():
+        for clade,nodestruct in cladedict.items():
             clade_leaves = clade.get_clade()
             if len(clade_leaves)>1 and (clade_leaves != leaves):
                 mrca = obj.find_mrca(clade_leaves)
