@@ -2804,8 +2804,8 @@ class Tree:
         # Find nodes with > 2 children, add to list of nodes needing to be resolved
         unresolved_nodes = []
         for node in self.intnodes:
-            numkids = len(self.child_dict[node])   # Note: not safe to use .children() method while
-                                             # changing tree (cache will break)
+            # Note: not safe to use .children() method while changing tree (cache will break)
+            numkids = len(self.child_dict[node])   
             if numkids > 2:
                 unresolved_nodes.append(node)
 
