@@ -974,7 +974,12 @@ class Tree:
 
         for clade, nodestruct in cladedict.items():
             clade_leaves = clade.get_clade()
-            if len(clade_leaves)>1 and (clade_leaves != leaves):
+            if len(clade_leaves) == 1:
+                leaf = next(iter(clade_leaves))
+                obj.nodedict[leaf] = nodestruct
+            elif clade_leaves == leaves:
+                obj.nodedict[obj.root] = nodestruct
+            else:
                 mrca = obj.find_mrca(clade_leaves)
                 movelist = []
                 for child in obj.children(mrca):
@@ -982,8 +987,9 @@ class Tree:
                         movelist.append(child)
                     elif obj.remotechildren_dict[child] <= clade_leaves:
                         movelist.append(child)
-                obj.insert_node(mrca, movelist, Branchstruct(label=node.label))
-
+                newnode = obj.insert_node(mrca, movelist, Branchstruct())
+                obj.nodedict[newnode] = nodestruct
+                
                 # Reset obj caches which are now obsolete
                 obj.clear_caches()
 
@@ -3033,7 +3039,7 @@ class Tree:
         self.child_dict.update(other.child_dict)
         # Link subtree to graftpoint in self.child_dict
         self.child_dict[graftpoint][other.root] = Branchstruct(length=blen2)
-
+ 
         # Update look-up lists and caches
         self.nodes.update( other.nodes )
         self.intnodes.update( other.intnodes )
