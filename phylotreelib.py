@@ -983,9 +983,7 @@ class Tree:
                 mrca = obj.find_mrca(clade_leaves)
                 movelist = []
                 for child in obj.children(mrca):
-                    if child in clade_leaves:
-                        movelist.append(child)
-                    elif obj.remotechildren_dict[child] <= clade_leaves:
+                    if (child in clade_leaves) or (obj.remotechildren_dict[child] <= clade_leaves):
                         movelist.append(child)
                 newnode = obj.insert_node(mrca, movelist, Branchstruct())
                 obj.nodedict[newnode] = nodestruct
