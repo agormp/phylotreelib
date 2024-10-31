@@ -2828,14 +2828,12 @@ class Tree:
             #   if more than 2 members: also add intnode2 to list of unresolved nodes
             # After this, intnode1 is resolved (two branches emanating from it)
             if subset1_size > 1:
-                branchstruct = Branchstruct()
-                intnode2 = self.insert_node(intnode1, subset1, branchstruct)
+                intnode2 = self.insert_node(intnode1, subset1, Branchstruct())
                 if subset1_size > 2:
                     unresolved_nodes.append(intnode2)
 
             if subset2_size > 1:
-                branchstruct = Branchstruct()
-                intnode2 = self.insert_node(intnode1, subset2, branchstruct)
+                intnode2 = self.insert_node(intnode1, subset2, Branchstruct())
                 if subset2_size > 2:
                     unresolved_nodes.append(intnode2)
 
