@@ -3870,7 +3870,7 @@ class Tree:
         # the branch, and finally insert new node. Bail out if the nodes are not neighbors
         else:
             if node2 is None:
-                msg = "Need to specify node2 to reroot() method when rooting at bifurcation"
+                msg = "Need to specify node2 to reroot() method when not rooting at polytomy"
                 raise TreeError(msg)
             if node1dist > self.nodedist(node1,node2):
                 msg = ("Parameter node1dist too large:\n"
