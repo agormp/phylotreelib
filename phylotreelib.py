@@ -2872,6 +2872,26 @@ class Tree:
         return attribute
 
     ###############################################################################################
+    # Python note: more pythonic to just set attributes without setter?
+    
+    def set_node_attributes(self, node, **attributes):
+        """Set one or more attributes for the specified node.
+        Attributes can be given as name1=value1, name2=value2, ... pairs"""
+        
+        if node not in self.nodedict:
+            self.nodedict[node] = Nodestruct()
+        for name, val in attributes.items():
+            setattr(self.nodedict[node], name, val)
+
+    ###############################################################################################
+
+    def get_node_attribute(self, node, attrname, default=""):
+        """Get specified attribute for the specified node"""
+        
+        nodestruct = self.nodedict[node]
+        return getattr(nodestruct, attrname, default)
+
+    ###############################################################################################
 
     def setlength(self, node1, node2, length):
         """Sets length of branch connecting node1 and node2"""
