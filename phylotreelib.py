@@ -1163,7 +1163,7 @@ class Tree:
         # Parameters
         fixed_columns = ["parent", "child", "branchlen"]
         padding = 2  # Minimum padding spaces before and after each value
-        max_col_width = 20
+        max_col_width = 200
         max_total_width = 120  # Maximum width for the entire table
 
         # Collect data rows and attribute names
