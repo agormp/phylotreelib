@@ -695,7 +695,7 @@ class Tree:
 
     def __init__(self):
         self.child_dict = {}
-        self.nodedict = {}
+        self._nodedict = None
         self.leaves = set()
         self.intnodes = set()   
         self._parent_dict = None
@@ -1331,6 +1331,17 @@ class Tree:
     ###############################################################################################
 
     @property
+    def nodedict(self):
+        """Lazy creation of _nodedict when needed"""
+        if self._nodedict is None:
+            self._nodedict = {}
+            for node in self.nodes:
+                self._nodedict[node] = Nodestruct()
+        return self._nodedict
+
+    ###############################################################################################
+
+    @property
     def parent_dict(self):
         """Lazy evaluation of _parent_dict when needed"""
         if self._parent_dict == None:
@@ -1560,7 +1571,7 @@ class Tree:
         obj.nodes = self.nodes.copy()
         obj.interner = interner
         obj.child_dict = self._copy_child_dict(obj, copylengths, copyattr)
-        obj.nodedict = self._copy_nodedict(obj)
+        obj._nodedict = self._copy_nodedict(obj)
         return obj
 
     ###############################################################################################
