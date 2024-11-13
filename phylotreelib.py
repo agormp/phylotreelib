@@ -1024,8 +1024,8 @@ class Tree:
             parentnodeID, childnodeID, [length], [other named attributes...]
 
         The function takes as input 2 or more separate lists containing:
-            IDs of parents (internal nodes, so integer values)
-            ID of children (internal or leaf nodes, so integer or string)
+            IDs of parents (internal nodes, integer or string)
+            IDs of children (internal or leaf nodes, integer or string)
             Length of branches (optional)
             Any number of additional attributes given as <keyword=list>
 
