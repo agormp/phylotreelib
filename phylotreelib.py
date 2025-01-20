@@ -2538,7 +2538,11 @@ class Tree:
         root = self.root
         treelist = ["("]
         append_children(root)
-        treelist.append(");")
+        if node_attributes:     
+            metacomment_node = create_metacomment(self.nodedict[root], node_attributes)
+            treelist.append(f"){metacomment_node};")
+        else:
+            treelist.append(");")
         treestring = "".join(treelist)
         return treestring
     
