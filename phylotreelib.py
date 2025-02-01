@@ -3523,9 +3523,10 @@ class Tree:
     def prune_maxlen(self, nkeep, return_leaves=False):
         """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length"""
 
-        possible_branches = set()     # Possible basal branches for starting next path to leaf
-                                      # (node1 is on path, and node2 is not)
-        used_branches = set()         # Branches that are on the path
+        possible_branches = set()     # Set of branches, i.e. (parent, child) tuples, that are 
+                                      # possible basal branches for starting next path to a leaf
+                                      # (parent is on existing path, and child is not)
+        used_branches = set()         # Branches that are entirely on the path
         keep_leaves = set()           # Leaves to keep in tree
 
         # Midpoint root to make initialisation simpler
