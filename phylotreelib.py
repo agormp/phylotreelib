@@ -3551,6 +3551,19 @@ class Tree:
         remote_children = self.remote_children
         children = self.children
 
+        # If keeplist provided: init using branches included in subtree spread out by keeplist
+        if keeplist:
+            remlist = self.leaves - set(keeplist)
+            tree_copy = self.copy_treeobject()
+            tree_copy.remove_leaves(remlist)
+            used_branches = tree_copy.branch_set()
+        # Else: find longest path across tree; initialize using branches in that path
+        else:
+            maxdist,node1,node2 = self.diameter(return_leaves=True)
+            maxpath = nodepath(node1, node2)
+            used_branches = { (maxpath[i], maxpath[i+1] ) for i in range(len(maxpath)-1) }
+
+
         # Midpoint root to make initialisation simpler
         # (costly - should rewrite algorithm to start anywhere.
         # On the other hand I would need diameter anyway...)
