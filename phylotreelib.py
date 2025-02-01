@@ -1858,6 +1858,17 @@ class Tree:
 
     ###############################################################################################
 
+    def branch_set(self):
+        """Returns set of (parent, child) tuples for all branches in tree"""
+        
+        branch_set = set()
+        for p in self.intnodes:
+            for c in self.children(p):
+                mys.add((p,c))
+        return branch_set
+
+    ###############################################################################################
+
     def get_branchstruct(self, node1, node2):
         """Returns Branchstruct object from branch between node1 and node2"""
 
