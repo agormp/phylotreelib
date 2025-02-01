@@ -3573,23 +3573,13 @@ class Tree:
             tree_copy.remove_leaves(remlist)
             used_branches = tree_copy.branch_set()
         # Else: find longest path across tree; initialize using branches in that path
+        # Note: this is the optimal length for 2 leaves
         else:
             maxdist,node1,node2 = self.diameter(return_leaves=True)
             maxpath = nodepath(node1, node2)
-            used_branches = { (maxpath[i], maxpath[i+1] ) for i in range(len(maxpath)-1) }
+            used_branches = self.nodepath_to_branchset(maxpath)
+        
 
-
-        # Midpoint root to make initialisation simpler
-        # (costly - should rewrite algorithm to start anywhere.
-        # On the other hand I would need diameter anyway...)
-        self.rootmid()
-
-        # Initialise: add two branches emanating from root to list of possible starting branches
-        # Note: this only works due to midpoint rooting
-        # (which ensures root will be on the first, longest path between two leafs)
-        rootkids = self.children( self.root )
-        for child in rootkids:
-            possible_branches.add( (self.root, child) )
 
         # Until we have added nkeep leaves to path:
         # find longest newpath from existing path to leaf, add to path
