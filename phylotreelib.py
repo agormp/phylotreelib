@@ -3520,7 +3520,7 @@ class Tree:
 
     ###############################################################################################
 
-    def prune_maxlen(self, nkeep, return_leaves=False):
+    def prune_maxlen(self, nkeep, keeplist=[], return_leaves=False):
         """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length"""
 
         if nkeep > len(self.leaves):
