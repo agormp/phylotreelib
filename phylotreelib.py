@@ -3581,6 +3581,11 @@ class Tree:
             maxpath = nodepath(node1, node2)
             used_branches = self.nodepath_to_branchset(maxpath)
         
+        # Find new branches sprouting off used_branches and include in possible_basal_branches
+        for (p,c1) in used_branches:
+            for c2 in children(p) - {c1}:
+                if (p,c2) not in used_branches:    # Python note: faster to just set subtract at end?
+                    possible_basal_branches.add((p,c2))
 
 
         # Until we have added nkeep leaves to path:
