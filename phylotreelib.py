@@ -3532,6 +3532,21 @@ class Tree:
 
     ###############################################################################################
 
+    def nodepath_to_branchset(self, nodepath):
+        """Input: nodepath (list of (node1, node2) tuples from .nodepath method)
+        Output: set of branches (set of (parent, child) tuples)"""
+        
+        branchset = set()
+        for i in range( len(nodepath) - 1 ):
+            n1, n2 = nodepath[i], nodepath[i+1]
+            if n2 in n1.children():
+                branchset.add((n1,n2))
+            else:
+                branchset.add((n2,n1))
+        return branchset
+
+    ###############################################################################################
+
     def prune_maxlen(self, nkeep, keeplist=[], return_leaves=False):
         """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length"""
 
