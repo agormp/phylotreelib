@@ -3568,14 +3568,14 @@ class Tree:
         remote_children = self.remote_children
         children = self.children
 
-        # If keeplist provided: init using branches included in subtree spread out by keeplist
+        # If keeplist provided: Include all branches in corresponding subtree in used_branches
         if keeplist:
             remlist = self.leaves - set(keeplist)
             tree_copy = self.copy_treeobject()
             tree_copy.remove_leaves(remlist)
             used_branches = tree_copy.branch_set()
-        # Else: find longest path across tree; initialize using branches in that path
-        # Note: this is the optimal length for 2 leaves
+        # Else: find longest path across tree; put all branches in that path in used_branches
+        # Note: longest path is the optimal pruned tree for 2 leaves
         else:
             maxdist,node1,node2 = self.diameter(return_leaves=True)
             maxpath = nodepath(node1, node2)
