@@ -3323,6 +3323,7 @@ class Tree:
 
     def remove_leaf(self, leaf):
         """Removes named leaf from tree, cleans up so remaining tree structure is sane.
+        Internal nodes may be removed, but will not change their IDs
         Note: assumes no unary nodes (leaf has at least one sibling)"""
 
         parent = self.parent(leaf)
