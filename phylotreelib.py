@@ -3523,22 +3523,22 @@ class Tree:
     def prune_maxlen(self, nkeep, return_leaves=False):
         """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length"""
 
-        possible_branches = set()     # Set of branches, i.e. (parent, child) tuples, that are 
-                                      # possible basal branches for starting next path to a leaf
-                                      # (parent is on existing path, and child is not)
-        used_branches = set()         # Branches that are entirely on the path
-        keep_leaves = set()           # Leaves to keep in tree
-
-        # Midpoint root to make initialisation simpler
-        # (costly - should rewrite algorithm to start anywhere.
-        # On the other hand I would need diameter anyway...)
-        self.rootmid()
+        possible_basal_branches = set()   # Set of branches, i.e. (parent, child) tuples, that are 
+                                          # possible basal branches for starting next path to a leaf
+                                          # (parent is on existing path, and child is not)
+        used_branches = set()             # Branches that are entirely on the path
+        keep_leaves = set()               # Leaves to keep in tree
 
         # Place central data structures and functions in local namespace for faster lookup
         nodedist = self.nodedist
         nodepath = self.nodepath
         remote_children = self.remote_children
         children = self.children
+
+        # Midpoint root to make initialisation simpler
+        # (costly - should rewrite algorithm to start anywhere.
+        # On the other hand I would need diameter anyway...)
+        self.rootmid()
 
         # Initialise: add two branches emanating from root to list of possible starting branches
         # Note: this only works due to midpoint rooting
@@ -3554,7 +3554,7 @@ class Tree:
             # Among possible starting branches:
             # find the one having the max possible distance to a remote child
             maxdist = 0.0
-            for (parent, child) in possible_branches:
+            for (parent, child) in possible_basal_branches:
                 for leaf in remote_children(child):
                     dist = nodedist(parent,leaf)
                     if dist > maxdist:
@@ -3564,7 +3564,7 @@ class Tree:
             # Add the found leaf to list of leaves.
             # Remove the basal branch that was used from possible starting branches
             keep_leaves.add( keepleaf )
-            possible_branches = possible_branches - { (node1, node2) }
+            possible_basal_branches = possible_basal_branches - { (node1, node2) }
 
             # Update possible_branches and used branches based on newly added path
             newpath = nodepath( node1, keepleaf )
@@ -3574,7 +3574,7 @@ class Tree:
                 otherkids = children(parent) - {child1}
                 for child2 in otherkids:
                     if (parent, child2) not in used_branches:
-                        possible_branches.add( (parent, child2) )
+                        possible_basal_branches.add( (parent, child2) )
 
         self.clear_caches()
 
