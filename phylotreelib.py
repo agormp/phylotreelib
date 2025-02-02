@@ -3556,7 +3556,7 @@ class Tree:
         branchset = set()
         for i in range( len(nodepath) - 1 ):
             n1, n2 = nodepath[i], nodepath[i+1]
-            if n2 in self.children(n1):
+            if self.is_parent_child_pair(n1, n2):
                 branchset.add((n1,n2))
             else:
                 branchset.add((n2,n1))
