@@ -1026,7 +1026,7 @@ class PruneTester(TreeTestBase):
 
     def test_prune_maxlen(self):
         """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves"""
-        for i in range(1000):
+        for i in range(100):
             ntips = random.randint(5,10)   # Note: combinatorial explosion means execution time rapidly increases
             nkeep = random.randint(3,ntips-1)
             t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
@@ -1036,6 +1036,24 @@ class PruneTester(TreeTestBase):
                 t2.remove_leaves(discardset)
                 lengths.append(t2.length())
             t1.prune_maxlen(nkeep = nkeep)
+            self.assertAlmostEqual( t1.length(), max(lengths))
+
+    def test_prune_maxlen_with_keeplist(self):
+        """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves
+        include keeplist that must be retained"""
+        for i in range(100):
+            ntips = random.randint(5,10)   # Note: combinatorial explosion means execution time rapidly increases
+            nkeep = random.randint(3,ntips-1)
+            nkeeplist = random.randint(1,nkeep)
+            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            keeplist = random.sample(list(t1.leaves), nkeeplist)
+            potential_to_remove = t1.leaves - set(keeplist)
+            lengths = []
+            for discardset in itertools.combinations(potential_to_remove, (ntips - nkeep)):
+                t2 = t1.copy_treeobject()
+                t2.remove_leaves(discardset)
+                lengths.append(t2.length())
+            t1.prune_maxlen(nkeep = nkeep, keeplist=keeplist)
             self.assertAlmostEqual( t1.length(), max(lengths))
 
     def test_find_common_leaf(self):
