@@ -1024,20 +1024,19 @@ class RootTester(TreeTestBase):
 class PruneTester(TreeTestBase):
     """Tests for pruning related methods in Tree object"""
 
-
-
     def test_prune_maxlen(self):
         """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves"""
-        ntips = 14    # Note: combinatorial explosion means execution time rapidly increases
-        nkeep = 7
-        t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
-        lengths = []
-        for discardset in itertools.combinations(t1.leaves, (ntips - nkeep)):
-            t2 = copy.deepcopy(t1)
-            t2.remove_leaves(discardset)
-            lengths.append(t2.length())
-        t1.prune_maxlen(nkeep = nkeep)
-        self.assertAlmostEqual( t1.length(), max(lengths))
+        for i in range(1000):
+            ntips = random.randint(5,10)   # Note: combinatorial explosion means execution time rapidly increases
+            nkeep = random.randint(3,ntips-1)
+            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            lengths = []
+            for discardset in itertools.combinations(t1.leaves, (ntips - nkeep)):
+                t2 = t1.copy_treeobject()
+                t2.remove_leaves(discardset)
+                lengths.append(t2.length())
+            t1.prune_maxlen(nkeep = nkeep)
+            self.assertAlmostEqual( t1.length(), max(lengths))
 
     def test_find_common_leaf(self):
         """Test that find_common_leaf() function returns the typical leaf from clade"""
