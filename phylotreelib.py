@@ -3569,9 +3569,12 @@ class Tree:
         keeplist: optional list of leaves that must be included. 
         Note: Best solution including keeplist may be less good than optimal solution"""
 
-        if (nkeep + len(keeplist)) > len(self.leaves):
-            msg = f"nkeep + len(keeplist) > number of leaves: {nkeep + len(keeplist)} > {len(self.leaves)}"
-            raise TreeError(msg)
+        if nkeep > len(self.leaves):
+            raise TreeError(f"nkeep > number of leaves: {nkeep} > {len(self.leaves)}")
+        if len(keeplist) > len(self.leaves):
+            raise TreeError(f"len(keeplist) > number of leaves: {len(keeplist)} > {len(self.leaves)}")
+        if len(keeplist) > nkeep:
+            raise TreeError( f"len(keeplist) > nkeep: {len(keeplist)} > {nkeep}")
 
         possible_basal_branches = set()   # Set of branches, i.e. (parent, child) tuples, that are 
                                           # possible basal branches for starting next path to a leaf
