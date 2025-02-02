@@ -3579,11 +3579,16 @@ class Tree:
         used_branches = set()             # Branches that are entirely on the path
         keep_leaves = set()               # Leaves to keep in tree
 
-        # Place central data structures and functions in local namespace for faster lookup
-        nodedist = self.nodedist
-        nodepath = self.nodepath
-        remote_children = self.remote_children
-        children = self.children
+        # # Place central data structures and functions in local namespace for faster lookup
+        # nodedist = self.nodedist
+        # nodepath = self.nodepath
+        # remote_children = self.remote_children
+        # children = self.children
+        
+        # Midpoint root to ensure longest path goes through root
+        # Python note: to ensure all subsequent possible paths are children not parents of exising
+        #              rethink algorithm to allow for this to avoid rooting!
+        self.rootmid()
 
         # If keeplist provided: Include all branches in corresponding subtree in used_branches
         if keeplist:
@@ -3591,19 +3596,20 @@ class Tree:
             tree_copy = self.copy_treeobject()
             tree_copy.remove_leaves(remlist)
             used_branches = tree_copy.branch_set()
+            keep_leaves = set(keeplist)
         # Else: find longest path across tree; put all branches in that path in used_branches
         # Note: longest path is the optimal pruned tree for 2 leaves
         else:
             maxdist,node1,node2 = self.diameter(return_leaves=True)
-            maxpath = nodepath(node1, node2)
+            maxpath = self.nodepath(node1, node2)
             used_branches = self.nodepath_to_branchset(maxpath)
+            keep_leaves = set([node1, node2])
         
         # Find new branches sprouting off used_branches and include in possible_basal_branches
         for (p,c1) in used_branches:
-            for c2 in children(p) - {c1}:
+            for c2 in self.children(p) - {c1}:
                 if (p,c2) not in used_branches:    # Python note: faster to just set subtract at end?
                     possible_basal_branches.add((p,c2))
-
 
         # Until we have added nkeep leaves to path:
         # find longest newpath from existing path to leaf, add to path
@@ -3613,8 +3619,8 @@ class Tree:
             # find the one having the max possible distance to a remote child
             maxdist = 0.0
             for (parent, child) in possible_basal_branches:
-                for leaf in remote_children(child):
-                    dist = nodedist(parent,leaf)
+                for leaf in self.remote_children(child):
+                    dist = self.nodedist(parent,leaf)
                     if dist > maxdist:
                         maxdist = dist
                         node1, node2, keepleaf = parent, child, leaf
@@ -3625,11 +3631,11 @@ class Tree:
             possible_basal_branches = possible_basal_branches - { (node1, node2) }
 
             # Update possible_branches and used branches based on newly added path
-            newpath = nodepath( node1, keepleaf )
+            newpath = self.nodepath( node1, keepleaf )
             for i in range( len(newpath) - 1 ):
                 parent, child1 = newpath[i], newpath[i+1]
                 used_branches.add( ( parent, child1 ) )
-                otherkids = children(parent) - {child1}
+                otherkids = self.children(parent) - {child1}
                 for child2 in otherkids:
                     if (parent, child2) not in used_branches:
                         possible_basal_branches.add( (parent, child2) )
