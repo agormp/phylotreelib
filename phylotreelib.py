@@ -1858,6 +1858,23 @@ class Tree:
 
     ###############################################################################################
 
+    def is_parent_child_pair(self, pnode, cnode):
+        """Returns True if cnode is child of pnode. False otherwise (also if order reversed)"""
+        
+        # Python note: hack. There must be a better solution (or naming, or call sequence) to this. 
+        # Or maybe I should never have to ask...
+        
+        try:
+            if pnode == self.parent(cnode):
+                return True
+            else:
+                return False
+        except TreeError:
+            return False
+
+
+    ###############################################################################################
+
     def branch_set(self):
         """Returns set of (parent, child) tuples for all branches in tree"""
         
