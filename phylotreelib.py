@@ -1881,7 +1881,7 @@ class Tree:
         branch_set = set()
         for p in self.intnodes:
             for c in self.children(p):
-                mys.add((p,c))
+                branch_set.add((p,c))
         return branch_set
 
     ###############################################################################################
