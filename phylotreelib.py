@@ -3582,17 +3582,6 @@ class Tree:
         used_branches = set()             # Branches that are entirely on the path
         keep_leaves = set()               # Leaves to keep in tree
 
-        # # Place central data structures and functions in local namespace for faster lookup
-        # nodedist = self.nodedist
-        # nodepath = self.nodepath
-        # remote_children = self.remote_children
-        # children = self.children
-        
-        # Midpoint root to ensure longest path goes through root
-        # Python note: to ensure all subsequent possible paths are children not parents of exising
-        #              rethink algorithm to allow for this to avoid rooting!
-        self.rootmid()
-
         # If keeplist provided: Include all branches in corresponding subtree in used_branches
         if keeplist:
             remlist = self.leaves - set(keeplist)
