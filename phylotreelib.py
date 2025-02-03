@@ -3564,6 +3564,110 @@ class Tree:
 
     ###############################################################################################
 
+    def _init_with_keeplist(self, keeplist):
+        """Helper function for prune_maxlen. Initilalizes used_branches, keep_leaves when 
+        keeplist provided"""
+        used_branches = set()
+        
+        # Special case: only 1 leaf in keeplist
+        # find most distant second leaf and add to keeplist. Then algorithm works as usual
+        if len(keeplist) == 1:
+            leaf1 = keeplist[0]
+            leaf2 = self.find_most_distant(leaf1, self.leaves - {leaf1})[0]
+            keeplist.append(leaf2)
+            
+        # Find mrca and add all branches on spread out subtree to used_branches
+        keeplist_mrca = self.find_mrca(keeplist)
+        for leaf in keeplist:
+            path = self.nodepath(leaf, keeplist_mrca)
+            path_branches = self.nodepath_to_branchset(path)
+            used_branches |= path_branches
+        keep_leaves = set(keeplist)
+        return used_branches, keep_leaves
+    
+    ###############################################################################################
+    
+    def _init_with_longestbranch(self):
+        """Helper function for prune_maxlen: Initializes used_branches, keep_leaves based on
+        finding longest path. Note: longest path is the optimal pruned tree for 2 leaves"""
+        
+        maxdist,node1,node2 = self.diameter(return_leaves=True)
+        maxpath = self.nodepath(node1, node2)
+        used_branches = self.nodepath_to_branchset(maxpath)
+        keep_leaves = set([node1, node2])
+        return used_branches, keep_leaves
+
+    ###############################################################################################
+
+    def _init_possible(self, used_branches, keep_leaves_mrca):
+        """Helper function for prune_maxlen: initialize possible_basal_branches based on 
+        used_branches and keep_leaves.
+        Possible basal branches includes branches sprouting off used_branches.
+        If root is not already in used_branches, then possible_basal_branches also includes
+        branches on path to root and sprouting from that path"""
+        
+        possible_basal_branches = set()
+        for (p,c1) in used_branches:
+            for c2 in (self.children(p) - {c1}):
+                if (p,c2) not in used_branches:    # Python note: faster to just set subtract at end?
+                    possible_basal_branches.add((p,c2))
+        
+        # If root not in used_branches: add path to root, and branches sprouting from this path
+        if keep_leaves_mrca != self.root:
+            rootpath = self.nodepath(self.root, keep_leaves_mrca)
+            rootpath_branches = self.nodepath_to_branchset(rootpath)
+            possible_basal_branches.update(rootpath_branches)
+            for (p,c1) in rootpath_branches:
+                for c2 in (self.children(p) - {c1}):
+                    if (p,c2) not in used_branches:   
+                        possible_basal_branches.add((p,c2))
+        
+        return possible_basal_branches    
+        
+    ###############################################################################################
+
+    def _find_side_branches(self, branchset):
+        """Helper function for prune_maxlen. Finds all side branches to provided set of branches"""
+        side_branches = set()
+        for p,c1 in branchset:
+            for c2 in (self.children(p) - {c1}):
+                side_branches.add((p,c2))
+        return side_branches - branchset
+        
+    ###############################################################################################
+    
+    def _find_best_uppath(self, possible_basal_branches):
+        """Helper function for prune_maxlen. Finds longest new path starting on one of 
+        possible_basal_branches.
+        Returns keep_parent, keep_leaf, maxdist"""
+        maxdist = 0.0
+        for parent,child in possible_basal_branches:
+            for leaf in self.remote_children(child):
+                dist = self.nodedist(parent, leaf)
+                if dist > maxdist:
+                    keep_parent, keep_leaf, maxdist = parent, leaf, dist
+        return keep_parent, keep_leaf, maxdist
+        
+    ###############################################################################################
+    
+    def _find_best_downpath(self, keep_leaves_mrca):
+        """Helper function for prune_maxlen. Finds best new path that starts on one of the
+        nodes ancestral to keep_leaves_mrca. Returns best parent, leaf, dist"""
+        
+        root_path = self.nodepath(keep_leaves_mrca, self.root)
+        root_path_branches = self.nodepath_to_branchset(root_path)
+        side_branches = self._find_side_branches(root_path_branches)
+        maxdist = 0.0
+        for parent,child in side_branches:
+            for leaf in self.remote_children(child):
+                dist = self.nodedist(parent, leaf) + self.nodedist(parent, keep_leaves_mrca)                
+                if dist > maxdist:
+                    keep_parent, keep_leaf, maxdist = keep_leaves_mrca, leaf, dist
+                    
+        return keep_parent, keep_leaf, maxdist
+        
+    ###############################################################################################
+        
     def prune_maxlen(self, nkeep, keeplist=[], return_leaves=False):
         """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length
         keeplist: optional list of leaves that must be included. 
@@ -3576,62 +3680,36 @@ class Tree:
         if len(keeplist) > nkeep:
             raise TreeError( f"len(keeplist) > nkeep: {len(keeplist)} > {nkeep}")
 
-        possible_basal_branches = set()   # Set of branches, i.e. (parent, child) tuples, that are 
-                                          # possible basal branches for starting next path to a leaf
-                                          # (parent is on existing path, and child is not)
-        used_branches = set()             # Branches that are entirely on the path
-        keep_leaves = set()               # Leaves to keep in tree
-
-        # If keeplist provided: Include all branches in corresponding subtree in used_branches
+        # Initialize used_branches and keep_leaves based on keeplist or longest path
         if keeplist:
-            remlist = self.leaves - set(keeplist)
-            tree_copy = self.copy_treeobject()
-            tree_copy.remove_leaves(remlist)
-            used_branches = tree_copy.branch_set()
-            keep_leaves = set(keeplist)
-        # Else: find longest path across tree; put all branches in that path in used_branches
-        # Note: longest path is the optimal pruned tree for 2 leaves
+            used_branches, keep_leaves = self._init_with_keeplist(keeplist)
         else:
-            maxdist,node1,node2 = self.diameter(return_leaves=True)
-            maxpath = self.nodepath(node1, node2)
-            used_branches = self.nodepath_to_branchset(maxpath)
-            keep_leaves = set([node1, node2])
-        
-        # Find new branches sprouting off used_branches and include in possible_basal_branches
-        for (p,c1) in used_branches:
-            for c2 in self.children(p) - {c1}:
-                if (p,c2) not in used_branches:    # Python note: faster to just set subtract at end?
-                    possible_basal_branches.add((p,c2))
-
+            used_branches, keep_leaves = self._init_with_longestbranch()
+        keep_leaves_mrca = self.find_mrca(keep_leaves)
+            
+        # Initialize possible_basal_branches based on used_branches
+        possible_basal_branches = self._find_side_branches(used_branches)        
+            
         # Until we have added nkeep leaves to path:
-        # find longest newpath from existing path to leaf, add to path
+        # find longest newpath from existing path to leaf, add to path, update vars
         while len(keep_leaves) < nkeep:
-
-            # Among possible starting branches:
-            # find the one having the max possible distance to a remote child
-            maxdist = 0.0
-            for (parent, child) in possible_basal_branches:
-                for leaf in self.remote_children(child):
-                    dist = self.nodedist(parent,leaf)
-                    if dist > maxdist:
-                        maxdist = dist
-                        node1, node2, keepleaf = parent, child, leaf
-
-            # Add the found leaf to list of leaves.
-            # Remove the basal branch that was used from possible starting branches
-            keep_leaves.add( keepleaf )
-            possible_basal_branches = possible_basal_branches - { (node1, node2) }
-
-            # Update possible_branches and used branches based on newly added path
-            newpath = self.nodepath( node1, keepleaf )
-            for i in range( len(newpath) - 1 ):
-                parent, child1 = newpath[i], newpath[i+1]
-                used_branches.add( ( parent, child1 ) )
-                otherkids = self.children(parent) - {child1}
-                for child2 in otherkids:
-                    if (parent, child2) not in used_branches:
-                        possible_basal_branches.add( (parent, child2) )
-
+            update_mrca = False
+            keep_parent, keep_leaf, maxdist = self._find_best_uppath(possible_basal_branches)
+            if keep_leaves_mrca != self.root:
+                parent, leaf, dist = self._find_best_downpath(keep_leaves_mrca)
+                if dist > maxdist:
+                    keep_parent, keep_leaf, maxdist = parent, leaf, dist
+                    update_mrca = True
+            keep_leaves.add( keep_leaf )
+            if update_mrca:
+                keep_leaves_mrca = self.find_mrca(keep_leaves)
+            newpath = self.nodepath(keep_parent, keep_leaf)
+            newpath_branches = self.nodepath_to_branchset(newpath)
+            used_branches |= newpath_branches
+            newpath_sidebranches = self._find_side_branches(newpath_branches) - used_branches
+            possible_basal_branches |= newpath_sidebranches
+            possible_basal_branches -= used_branches
+            
         self.clear_caches()
 
         # If requested: return selected leaves without pruning tree
