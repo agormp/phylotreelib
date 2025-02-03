@@ -1027,7 +1027,7 @@ class PruneTester(TreeTestBase):
     def test_prune_maxlen(self):
         """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves"""
         for i in range(100):
-            ntips = random.randint(5,10)   # Note: combinatorial explosion means execution time rapidly increases
+            ntips = random.randint(5,11)   # Note: combinatorial explosion means execution time rapidly increases
             nkeep = random.randint(3,ntips-1)
             t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
             lengths = []
@@ -1042,7 +1042,7 @@ class PruneTester(TreeTestBase):
         """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves
         include keeplist that must be retained"""
         for i in range(100):
-            ntips = random.randint(5,10)   # Note: combinatorial explosion means execution time rapidly increases
+            ntips = random.randint(5,11)   # Note: combinatorial explosion means execution time rapidly increases
             nkeep = random.randint(3,ntips-1)
             nkeeplist = random.randint(1,nkeep)
             t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)

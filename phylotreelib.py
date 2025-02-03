@@ -3636,43 +3636,20 @@ class Tree:
         
     ###############################################################################################
     
-    def _find_best_uppath(self, possible_basal_branches):
-        """Helper function for prune_maxlen. Finds longest new path starting on one of 
-        possible_basal_branches.
-        Returns keep_parent, keep_leaf, maxdist"""
-        maxdist = 0.0
-        for parent,child in possible_basal_branches:
-            for leaf in self.remote_children(child):
-                dist = self.nodedist(parent, leaf)
-                if dist > maxdist:
-                    keep_parent, keep_leaf, maxdist = parent, leaf, dist
-        return keep_parent, keep_leaf, maxdist
+    def _find_possible_down(self, keep_leaves_mrca):
+        """Helper function for prune_maxlen. Initializes possible_up_basal and possible_down_basal"""
         
+        root_path = self.nodepath(self.root, keep_leaves_mrca)
+        root_path_branches = self.nodepath_to_branchset(root_path)
+        possible_down_basal = self._find_side_branches(root_path_branches)
+
+        return possible_down_basal
+                
     ###############################################################################################
     
-    def _find_best_downpath(self, keep_leaves_mrca):
-        """Helper function for prune_maxlen. Finds best new path that starts on one of the
-        nodes ancestral to keep_leaves_mrca. Returns best parent, leaf, dist"""
+    def _check_prune_maxlen_arguments(self, nkeep, keeplist):
+        """Helper function for prune_maxlen. Checks sanity of arguments, raises error if issue"""
         
-        root_path = self.nodepath(keep_leaves_mrca, self.root)
-        root_path_branches = self.nodepath_to_branchset(root_path)
-        side_branches = self._find_side_branches(root_path_branches)
-        maxdist = 0.0
-        for parent,child in side_branches:
-            for leaf in self.remote_children(child):
-                dist = self.nodedist(parent, leaf) + self.nodedist(parent, keep_leaves_mrca)                
-                if dist > maxdist:
-                    keep_parent, keep_leaf, maxdist = keep_leaves_mrca, leaf, dist
-                    
-        return keep_parent, keep_leaf, maxdist
-        
-    ###############################################################################################
-        
-    def prune_maxlen(self, nkeep, keeplist=[], return_leaves=False):
-        """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length
-        keeplist: optional list of leaves that must be included. 
-        Note: Best solution including keeplist may be less good than optimal solution"""
-
         if nkeep > len(self.leaves):
             raise TreeError(f"nkeep > number of leaves: {nkeep} > {len(self.leaves)}")
         if len(keeplist) > len(self.leaves):
@@ -3680,35 +3657,53 @@ class Tree:
         if len(keeplist) > nkeep:
             raise TreeError( f"len(keeplist) > nkeep: {len(keeplist)} > {nkeep}")
 
-        # Initialize used_branches and keep_leaves based on keeplist or longest path
+    ###############################################################################################
+        
+    def prune_maxlen(self, nkeep, keeplist=[], return_leaves=False):
+        """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length
+        keeplist: optional list of leaves that must be included. 
+        Note: Best solution including keeplist may be less good than optimal solution"""
+
+        self._check_prune_maxlen_arguments(nkeep, keeplist)
+
+        # Initialize
         if keeplist:
-            used_branches, keep_leaves = self._init_with_keeplist(keeplist)
+            used_branches, keepleaves = self._init_with_keeplist(keeplist)
         else:
-            used_branches, keep_leaves = self._init_with_longestbranch()
-        keep_leaves_mrca = self.find_mrca(keep_leaves)
-            
-        # Initialize possible_basal_branches based on used_branches
-        possible_basal_branches = self._find_side_branches(used_branches)        
+            used_branches, keepleaves = self._init_with_longestbranch()
+        keepleaves_mrca = self.find_mrca(keepleaves)
+        possible_up_basal = self._find_side_branches(used_branches) 
+        possible_down_basal = self._find_possible_down(keepleaves_mrca)
             
         # Until we have added nkeep leaves to path:
         # find longest newpath from existing path to leaf, add to path, update vars
-        while len(keep_leaves) < nkeep:
-            update_mrca = False
-            keep_parent, keep_leaf, maxdist = self._find_best_uppath(possible_basal_branches)
-            if keep_leaves_mrca != self.root:
-                parent, leaf, dist = self._find_best_downpath(keep_leaves_mrca)
-                if dist > maxdist:
-                    keep_parent, keep_leaf, maxdist = parent, leaf, dist
-                    update_mrca = True
-            keep_leaves.add( keep_leaf )
-            if update_mrca:
-                keep_leaves_mrca = self.find_mrca(keep_leaves)
+        while len(keepleaves) < nkeep:
+            keepleaves_mrca_changed = False
+            maxdist = 0.0
+            for parent,child in possible_up_basal:
+                for leaf in self.remote_children(child):
+                    dist = self.nodedist(parent, leaf)
+                    if dist > maxdist:
+                        keep_parent, keep_leaf, maxdist = parent, leaf, dist
+            for parent,child in possible_down_basal:
+                downdist = self.nodedist(parent, keepleaves_mrca)
+                for leaf in self.remote_children(child):
+                    dist = self.nodedist(parent, leaf) + downdist                
+                    if dist > maxdist:
+                        keep_parent, keep_leaf, maxdist = keepleaves_mrca, leaf, dist
+                        keepleaves_mrca_changed = True
+            keepleaves.add( keep_leaf )
+            
+            # Update relevant variables
+            if keepleaves_mrca_changed:
+                keepleaves_mrca = self.find_mrca(keepleaves)
+                possible_down_basal = self._find_possible_down(keepleaves_mrca)
             newpath = self.nodepath(keep_parent, keep_leaf)
             newpath_branches = self.nodepath_to_branchset(newpath)
             used_branches |= newpath_branches
             newpath_sidebranches = self._find_side_branches(newpath_branches) - used_branches
-            possible_basal_branches |= newpath_sidebranches
-            possible_basal_branches -= used_branches
+            possible_up_basal |= newpath_sidebranches
+            possible_up_basal -= used_branches
             
         self.clear_caches()
 
@@ -3717,8 +3712,8 @@ class Tree:
         if return_leaves:
             return keep_leaves
         else:
-            discard_leaves = self.leaves - keep_leaves
-            self.remove_leaves(discard_leaves)
+            discardleaves = self.leaves - keepleaves
+            self.remove_leaves(discardleaves)
 
     ###############################################################################################
 
