@@ -695,7 +695,7 @@ class Tree:
 
     def __init__(self):
         self.child_dict = {}
-        self.nodedict = {}
+        self._nodedict = None
         self.leaves = set()
         self.intnodes = set()   
         self._parent_dict = None
@@ -1024,8 +1024,8 @@ class Tree:
             parentnodeID, childnodeID, [length], [other named attributes...]
 
         The function takes as input 2 or more separate lists containing:
-            IDs of parents (internal nodes, so integer values)
-            ID of children (internal or leaf nodes, so integer or string)
+            IDs of parents (internal nodes, integer or string)
+            IDs of children (internal or leaf nodes, integer or string)
             Length of branches (optional)
             Any number of additional attributes given as <keyword=list>
 
@@ -1163,7 +1163,7 @@ class Tree:
         # Parameters
         fixed_columns = ["parent", "child", "branchlen"]
         padding = 2  # Minimum padding spaces before and after each value
-        max_col_width = 20
+        max_col_width = 200
         max_total_width = 120  # Maximum width for the entire table
 
         # Collect data rows and attribute names
@@ -1327,6 +1327,17 @@ class Tree:
             # Avoid properties, methods, and special attributes (those that start with '__')
             if not attr.startswith("__") and not self.is_property(Tree, attr) and not callable(getattr(self, attr)) :
                 setattr(self, attr, None)
+
+    ###############################################################################################
+
+    @property
+    def nodedict(self):
+        """Lazy creation of _nodedict when needed"""
+        if self._nodedict is None:
+            self._nodedict = {}
+            for node in self.nodes:
+                self._nodedict[node] = Nodestruct()
+        return self._nodedict
 
     ###############################################################################################
 
@@ -1560,7 +1571,7 @@ class Tree:
         obj.nodes = self.nodes.copy()
         obj.interner = interner
         obj.child_dict = self._copy_child_dict(obj, copylengths, copyattr)
-        obj.nodedict = self._copy_nodedict(obj)
+        obj._nodedict = self._copy_nodedict(obj)
         return obj
 
     ###############################################################################################
@@ -2555,7 +2566,11 @@ class Tree:
         root = self.root
         treelist = ["("]
         append_children(root)
-        treelist.append(");")
+        if node_attributes:     
+            metacomment_node = create_metacomment(self.nodedict[root], node_attributes)
+            treelist.append(f"){metacomment_node};")
+        else:
+            treelist.append(");")
         treestring = "".join(treelist)
         return treestring
     
@@ -2887,6 +2902,26 @@ class Tree:
         attribute = getattr(branch, attrname, default)
 
         return attribute
+
+    ###############################################################################################
+    # Python note: more pythonic to just set attributes without setter?
+    
+    def set_node_attributes(self, node, **attributes):
+        """Set one or more attributes for the specified node.
+        Attributes can be given as name1=value1, name2=value2, ... pairs"""
+        
+        if node not in self.nodedict:
+            self.nodedict[node] = Nodestruct()
+        for name, val in attributes.items():
+            setattr(self.nodedict[node], name, val)
+
+    ###############################################################################################
+
+    def get_node_attribute(self, node, attrname, default=""):
+        """Get specified attribute for the specified node"""
+        
+        nodestruct = self.nodedict[node]
+        return getattr(nodestruct, attrname, default)
 
     ###############################################################################################
 
