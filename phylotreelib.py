@@ -2578,8 +2578,11 @@ class Tree:
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
               translateblock=False,  node_attributes=None, branch_attributes=None,
-              colorlist=None, colorfg="#0000FF", colorbg="#000000"):
-        """Returns nexus format tree as a string"""
+              leafgroups=None, leafgroup_colors="#0000FF", colorbg="#000000"):
+        """Returns nexus format tree as a string
+           leafgroups: list of leafnames, or list of lists of leafnames. 
+                       Each group to be colored differently
+           leafgroup_colors: color or list of colors, one for each group in leafgroups"""
 
         # Construct header
         if colorlist:
