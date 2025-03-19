@@ -4278,7 +4278,7 @@ class Tree:
         subtree = treecopy.subtree(prune_node)
         for leaf in subtree.leaves:
             treecopy.remove_leaf(leaf)
-        possible_regraft_nodes = treecopy.leaves - {treecopy.root}
+        possible_regraft_nodes = treecopy.nodes - {treecopy.root}
         return possible_regraft_nodes
 
     ###############################################################################################
