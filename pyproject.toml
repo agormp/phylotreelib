@@ -1,6 +1,18 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
-]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "phylotreelib"
+version = "1.29.3"
+description = "Analyze and manipulate phylogenetic trees"
+readme = "README.md"
+requires-python = ">=3.6"
+dependencies = ["numpy"]
+authors = [{name = "Anders Gorm Pedersen", email = "agpe@dtu.dk"}]
+
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
