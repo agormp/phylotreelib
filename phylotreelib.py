@@ -5260,9 +5260,8 @@ class TreeSummary():
         is present)"""
 
         # Initialize node dictionary: {nodeid:Nodestruct}. Keeps track of avg depths
-        nodedict = {}
         for node in sum_tree.nodes:
-            nodedict[node] = Nodestruct(depth = 0.0)
+            sum_tree.nodedict[node] = Nodestruct(depth = 0.0)
 
         # Find mean common ancestor depth for all internal nodes
         # (I assume input trees are from clock models, so leaf-depths are constant)
@@ -5279,22 +5278,22 @@ class TreeSummary():
                     sumt_remkids = sum_tree.remotechildren_dict[node]
                     input_mrca = input_tree.find_mrca(sumt_remkids)
                     input_depth = input_tree.nodedepthdict[input_mrca]
-                    nodedict[node].depth += input_depth * multiplier
+                    sum_tree.nodedict[node].depth += input_depth * multiplier
 
         # normalise values for internal nodes by sum of weights
         for node in sum_tree.intnodes:
-            nodedict[node].depth /= wsum
+            sum_tree.nodedict[node].depth /= wsum
 
         # Set values for leaves
         # Use values on last tree left over from looping above (assume same on all input trees)
         for node in sum_tree.leaves:
-            nodedict[node].depth = input_tree.nodedepthdict[node]
+            sum_tree.nodedict[node].depth = input_tree.nodedepthdict[node]
 
         # use average depths to set branch lengths
         for parent in sum_tree.sorted_intnodes(deepfirst=True):
-            p_depth = nodedict[parent].depth
+            p_depth = sum_tree.nodedict[parent].depth
             for child in sum_tree.children(parent):
-                c_depth = nodedict[child].depth
+                c_depth = sum_tree.nodedict[child].depth
                 blen = p_depth - c_depth
                 sum_tree.setlength(parent, child, blen)
 
