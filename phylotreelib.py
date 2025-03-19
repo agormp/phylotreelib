@@ -1333,11 +1333,17 @@ class Tree:
     @property
     def nodedict(self):
         """Lazy creation of _nodedict when needed"""
-        if self._nodedict is None:
+        if not self._has_nodedict():
             self._nodedict = {}
             for node in self.nodes:
                 self._nodedict[node] = Nodestruct()
         return self._nodedict
+
+    ###############################################################################################
+
+    def _has_nodedict(self):
+        """Check if nodedict exists (cant use property to test, since it triggers creation)"""
+        return self._nodedict is not None
 
     ###############################################################################################
 
@@ -1599,7 +1605,7 @@ class Tree:
     ###############################################################################################
 
     def _copy_nodedict(self, obj):
-        if self.nodedict is None:
+        if not self._has_nodedict():
             return None
         else:
             origdict = self.nodedict
@@ -2561,7 +2567,7 @@ class Tree:
             del treelist[-1]  # Remove last comma when no more siblings
 
         # EXECUTION STARTS HERE!
-        if node_attributes and not self.nodedict:
+        if node_attributes and not self._has_nodedict():
             raise TreeError(f"Tree has no nodedict. Can not print node-related attributes: {node_attributes}")
         root = self.root
         treelist = ["("]
@@ -3034,7 +3040,7 @@ class Tree:
             other.nodes = other.leaves | other.intnodes
 
         # If self.nodedict exists: copy relevant parts from self to other
-        if self.nodedict:
+        if self._has_nodedict():
             for node in other.nodes:
                 other.nodedict[node] = self.nodedict[node]
 
@@ -3382,7 +3388,7 @@ class Tree:
         childset = self.children(parent)
         root = self.root
 
-        if self.nodedict:
+        if self._has_nodedict():
             orignodes = self.nodes.copy()
 
         # If leaf is part of bifurcation AND is directly attached to root, then
@@ -3425,7 +3431,7 @@ class Tree:
         self.nodes.remove(leaf)
 
         # Clean up nodedict if present
-        if self.nodedict:
+        if self._has_nodedict():
             remnodes = orignodes - self.nodes
             for node in remnodes:
                 del self.nodedict[node]
@@ -4365,7 +4371,7 @@ class Tree:
         # D. Papamichaila et al., Computational Biology and Chemistry 69 (2017) 171–177
         # Upper and lower sets are here referred to as primary and secondary set
 
-        if self.nodedict is None:
+        if not self._has_nodedict():
             msg = "Tree object has no .nodedict attribute. Can't perform parsimony analysis"
             raise TreeError(msg)
 
