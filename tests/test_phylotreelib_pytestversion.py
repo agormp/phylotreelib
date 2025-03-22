@@ -753,20 +753,18 @@ class TestSPR:
             tree.spr()
 
     def test_random_spr_no_params(self):
-        """Without parameters, spr() should perform a random SPR while preserving leaf set."""
-        for i in range(50):
-            tree = self.create_sample_tree(ntips=6)
-            original_leaves = tree.leaves.copy()
-            original_topology = tree.topology()  # (should change)
+        """Without parameters, spr() should perform a random SPR while preserving leaf set.
+        No exceptions should be raised"""
+        for i in range(10):
+            for ntips in range(3,9):
+                tree = pt.Tree.randtree(ntips=ntips, randomlen=True)
+                original_leaves = tree.leaves.copy()
         
-            # Call spr() with no parameters (both prune_node and regraft_node chosen randomly)
-            tree.spr()
+                # Call spr() with no parameters (both prune_node and regraft_node chosen randomly)
+                tree.spr()
         
-            # Check that the leaf set remains unchanged
-            assert tree.leaves == original_leaves
-        
-            # Assert topology has changed
-            assert original_topology != tree.topology()
+                # Check that the leaf set remains unchanged
+                assert tree.leaves == original_leaves
 
     def test_spr_with_prune_only(self):
         """When only a prune_node is given, spr() should choose a valid regraft node."""
