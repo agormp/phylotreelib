@@ -4319,7 +4319,7 @@ class Tree:
             if prune_node not in possible_prune_nodes:
                 raise TreeError(f"Can not prune below {prune_node}")
 
-        # Choose random regraft_node or check the one provided
+        # Select random regraft_node or check the one provided
         possible_regraft_nodes = self.possible_spr_regraft_nodes(prune_node)
         if regraft_node is None:
             regraft_node = random.choice(list(possible_regraft_nodes))
