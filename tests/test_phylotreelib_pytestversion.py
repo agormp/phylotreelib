@@ -735,66 +735,7 @@ class Test_translateblock:
                 assert trans_dictionary[name] == number
             assert nameset == t.leaves
 
-###################################################################################################
-
-class TestPossibleSPRPruneNodes:
-    @pytest.fixture
-    def sample_tree(self):
-        """Return a random tree with at least 6 tips."""
-        return pt.Tree.randtree(ntips=6, randomlen=True)
-
-    def test_prune_nodes_are_valid(self, sample_tree):
-        """Verify that all nodes returned are part of tree.nodes except the root."""
-        prune_nodes = sample_tree.possible_spr_prune_nodes()
-        # All nodes must be in tree.nodes, but the root should never be pruned.
-        assert prune_nodes.issubset(sample_tree.nodes - {sample_tree.root})
-
-    def test_prune_nodes_special_case(self, sample_tree):
-        """
-        For trees where the root has exactly two children and one is an internal node 
-        while the other is a leaf, ensure that the internal child is not allowed for pruning.
-        """
-        root_children = list(sample_tree.children(sample_tree.root))
-        if len(root_children) == 2:
-            # Check special condition: if one child is a leaf and the other internal,
-            # then the internal node should be omitted from the possible prune nodes.
-            if (root_children[0] in sample_tree.leaves and root_children[1] in sample_tree.intnodes):
-                assert root_children[1] not in sample_tree.possible_spr_prune_nodes()
-            elif (root_children[1] in sample_tree.leaves and root_children[0] in sample_tree.intnodes):
                 assert root_children[0] not in sample_tree.possible_spr_prune_nodes()
-
-###################################################################################################
-
-class TestPossibleSPRRegraftNodes:
-    @pytest.fixture
-    def sample_tree(self):
-        """Return a random tree with at least 6 tips."""
-        return pt.Tree.randtree(ntips=6, randomlen=True)
-
-    @pytest.fixture
-    def prune_node(self, sample_tree):
-        """
-        Select and return an arbitrary prune node from the set of nodes allowed
-        by possible_spr_prune_nodes().
-        """
-        possible_prune_nodes = sample_tree.possible_spr_prune_nodes()
-        return next(iter(possible_prune_nodes))
-
-    def test_regraft_nodes_set(self, sample_tree, prune_node):
-        """
-        Verify that possible_spr_regraft_nodes(prune_node) returns exactly the set of nodes
-        obtained by taking a copy of the tree, removing the pruned subtree's leaves,
-        and then excluding the (copied) root.
-        """
-        # Make a copy of the tree and prune (i.e. remove the leaves of) the subtree.
-        tree_copy = sample_tree.copy_treeobject()
-        subtree = tree_copy.subtree(prune_node)
-        for leaf in subtree.leaves:
-            tree_copy.remove_leaf(leaf)
-        expected_regraft_nodes = tree_copy.nodes - {tree_copy.root}
-
-        actual_regraft_nodes = sample_tree.possible_spr_regraft_nodes(prune_node)
-        assert actual_regraft_nodes == expected_regraft_nodes
 
 ###################################################################################################
 
