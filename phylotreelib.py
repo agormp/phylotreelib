@@ -4315,21 +4315,17 @@ class Tree:
         possible_prune_nodes = self.possible_spr_prune_nodes()
         if prune_node == None:
             prune_node = random.choice(list(possible_prune_nodes))
-        elif prune_node not in possible_prune_nodes:
-            raise TreeError(f"Can not prune below {prune_node}")
-            
-        # Get the set of possible regraft nodes
-        possible_regraft = self.possible_spr_regraft_nodes(prune_node)
+        else:
+            if prune_node not in possible_prune_nodes:
+                raise TreeError(f"Can not prune below {prune_node}")
 
         # Choose random regraft_node or check the one provided
+        possible_regraft_nodes = self.possible_spr_regraft_nodes(prune_node)
         if regraft_node is None:
-            if not possible_topochange:
-                raise TreeError("No valid regraft nodes available that would change the topology")
-            regraft_node = random.choice(list(possible_topochange))
-        elif regraft_node == original_parent:
-            raise TreeError(f"Specified regraft_node {regraft_node} is parent of prune node - it would recreate original topology")
-        elif regraft_node not in possible_regraft:
-            raise TreeError(f"Specified regraft_node {regraft_node} is not compatible with prune node.")
+            regraft_node = random.choice(list(possible_regraft_nodes))
+        elif regraft_node not in possible_regraft_nodes:
+            msg = f"Specified regraft_node {regraft_node} is not compatible with prune_node"
+            raise TreeError(msg)
 
         # Pruning: Remove subtree
         isleaf = prune_node in self.leaves      # Has to be set before pruning!
