@@ -1,4 +1,5 @@
 import phylotreelib as pt
+import copy
 import math
 import pytest
 import random
@@ -736,7 +737,139 @@ class Test_translateblock:
 
 ###################################################################################################
 
-# Missing methods to be tested
+class TestPossibleSPRPruneNodes:
+    @pytest.fixture
+    def sample_tree(self):
+        """Return a random tree with at least 6 tips."""
+        return pt.Tree.randtree(ntips=6, randomlen=True)
+
+    def test_prune_nodes_are_valid(self, sample_tree):
+        """Verify that all nodes returned are part of tree.nodes except the root."""
+        prune_nodes = sample_tree.possible_spr_prune_nodes()
+        # All nodes must be in tree.nodes, but the root should never be pruned.
+        assert prune_nodes.issubset(sample_tree.nodes - {sample_tree.root})
+
+    def test_prune_nodes_special_case(self, sample_tree):
+        """
+        For trees where the root has exactly two children and one is an internal node 
+        while the other is a leaf, ensure that the internal child is not allowed for pruning.
+        """
+        root_children = list(sample_tree.children(sample_tree.root))
+        if len(root_children) == 2:
+            # Check special condition: if one child is a leaf and the other internal,
+            # then the internal node should be omitted from the possible prune nodes.
+            if (root_children[0] in sample_tree.leaves and root_children[1] in sample_tree.intnodes):
+                assert root_children[1] not in sample_tree.possible_spr_prune_nodes()
+            elif (root_children[1] in sample_tree.leaves and root_children[0] in sample_tree.intnodes):
+                assert root_children[0] not in sample_tree.possible_spr_prune_nodes()
+
+###################################################################################################
+
+class TestPossibleSPRRegraftNodes:
+    @pytest.fixture
+    def sample_tree(self):
+        """Return a random tree with at least 6 tips."""
+        return pt.Tree.randtree(ntips=6, randomlen=True)
+
+    @pytest.fixture
+    def prune_node(self, sample_tree):
+        """
+        Select and return an arbitrary prune node from the set of nodes allowed
+        by possible_spr_prune_nodes().
+        """
+        possible_prune_nodes = sample_tree.possible_spr_prune_nodes()
+        return next(iter(possible_prune_nodes))
+
+    def test_regraft_nodes_set(self, sample_tree, prune_node):
+        """
+        Verify that possible_spr_regraft_nodes(prune_node) returns exactly the set of nodes
+        obtained by taking a copy of the tree, removing the pruned subtree's leaves,
+        and then excluding the (copied) root.
+        """
+        # Make a copy of the tree and prune (i.e. remove the leaves of) the subtree.
+        tree_copy = sample_tree.copy_treeobject()
+        subtree = tree_copy.subtree(prune_node)
+        for leaf in subtree.leaves:
+            tree_copy.remove_leaf(leaf)
+        expected_regraft_nodes = tree_copy.nodes - {tree_copy.root}
+
+        actual_regraft_nodes = sample_tree.possible_spr_regraft_nodes(prune_node)
+        assert actual_regraft_nodes == expected_regraft_nodes
+
+###################################################################################################
+
+class TestSPR:
+    def create_sample_tree(self, ntips=6):
+        """Helper to create a random tree with at least 6 leaves."""
+        # Here we create a random tree with 6 tips and random branch lengths.
+        tree = pt.Tree.randtree(ntips=ntips, randomlen=True)
+        return tree
+
+    def test_spr_raises_on_two_leaf_tree(self):
+        """SPR should not work on a tree with only 2 leaves."""
+        tree = pt.Tree.from_leaves(["A", "B"])
+        with pytest.raises(pt.TreeError):
+            tree.spr()
+
+    def test_random_spr_no_params(self):
+        """Without parameters, spr() should perform a random SPR while preserving leaf set."""
+        for i in range(50):
+            tree = self.create_sample_tree(ntips=6)
+            original_leaves = tree.leaves.copy()
+            original_topology = tree.topology()  # (should change)
+        
+            # Call spr() with no parameters (both prune_node and regraft_node chosen randomly)
+            tree.spr()
+        
+            # Check that the leaf set remains unchanged
+            assert tree.leaves == original_leaves
+        
+            # Assert topology has changed
+            assert original_topology != tree.topology()
+
+    def test_spr_with_prune_only(self):
+        """When only a prune_node is given, spr() should choose a valid regraft node."""
+        tree = self.create_sample_tree()
+        possible_prune_nodes = tree.possible_spr_prune_nodes()
+        # Pick one prune node from the possible set
+        prune_node = next(iter(possible_prune_nodes))
+        original_leaves = tree.leaves.copy()
+        
+        # Call spr() specifying only prune_node.
+        tree.spr(prune_node=prune_node)
+        
+        # Leaves must remain unchanged
+        assert tree.leaves == original_leaves
+
+    def test_spr_with_invalid_regraft_node(self):
+        """Supplying a regraft_node that is not allowed should raise an error."""
+        tree = self.create_sample_tree()
+        possible_prune_nodes = tree.possible_spr_prune_nodes()
+        prune_node = next(iter(possible_prune_nodes))
+        # Choose an invalid regraft node. For example, a number unlikely to be a valid node.
+        invalid_regraft_node = -999  
+        with pytest.raises(pt.TreeError):
+            tree.spr(prune_node=prune_node, regraft_node=invalid_regraft_node)
+
+    def test_spr_with_valid_nodes(self):
+        """Supplying both a valid prune_node and regraft_node results in a tree with the same leaf set."""
+        tree = self.create_sample_tree()
+        possible_prune_nodes = tree.possible_spr_prune_nodes()
+        prune_node = next(iter(possible_prune_nodes))
+        possible_regraft_nodes = tree.possible_spr_regraft_nodes(prune_node)
+        regraft_node = next(iter(possible_regraft_nodes))
+        original_leaves = tree.leaves.copy()
+        
+        # (Optionally, take a deepcopy before modification for further comparisons.)
+        tree_before = copy.deepcopy(tree)
+        tree.spr(prune_node=prune_node, regraft_node=regraft_node)
+        
+        # Check that the set of leaves remains unchanged.
+        assert tree.leaves == original_leaves
+        
+        # Optionally, you might want to compare topologies.
+        # Here we simply ensure that the tree still has the expected number of nodes.
+        assert len(tree.nodes) == len(tree_before.nodes)
 
 ###################################################################################################
 
