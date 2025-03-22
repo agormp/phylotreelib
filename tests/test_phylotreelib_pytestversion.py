@@ -735,8 +735,6 @@ class Test_translateblock:
                 assert trans_dictionary[name] == number
             assert nameset == t.leaves
 
-                assert root_children[0] not in sample_tree.possible_spr_prune_nodes()
-
 ###################################################################################################
 
 class TestSPR:
