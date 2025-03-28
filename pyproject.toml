@@ -21,4 +21,3 @@ Repository = "https://github.com/agormp/phylotreelib"
 
 [tool.setuptools]
 py-modules = ["phylotreelib"]
-license-files = []
