@@ -3751,7 +3751,7 @@ class Tree:
         # If requested: return selected leaves without pruning tree
         # Otherwise: prune tree so only leaves in keepset are retained
         if return_leaves:
-            return keep_leaves
+            return keepleaves
         else:
             discardleaves = self.leaves - keepleaves
             self.remove_leaves(discardleaves)
