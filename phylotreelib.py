@@ -5537,7 +5537,6 @@ class BigTreeSummary(TreeSummary):
             nodestruct = self.cladesummary[clade]
             maxcred_cladedict[clade] = nodestruct
         maxcredtree = Tree.from_cladedict(maxcred_cladedict)
-
         return maxcredtree, maxlogcred
 
 ###################################################################################################
