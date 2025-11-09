@@ -2522,7 +2522,7 @@ class Tree:
                transdict=None, node_attributes=None, branch_attributes=None):
         """Returns Newick format tree string representation of tree object, with optional metacomments"""
     
-        def create_metacomment(struct, attributes):
+        def create_metacomment(struct, attributes): 
             """Helper function to create metacomment strings based on attributes of a structure"""
             tmplist = []
             for attrname in attributes:
@@ -2554,9 +2554,9 @@ class Tree:
                         label = getattr(branchstruct, labelfield, "")
                         treelist.append(f"{label}")
                         
-                if node_attributes:     
+                if node_attributes:    
                     metacomment_node = create_metacomment(self.nodedict[child], node_attributes)
-                    treelist.append(metacomment_node)
+                    treelist.append(metacomment_node) 
                 if printdist:
                     treelist.append(f":{dist:.{precision}g}")
                 if branch_attributes:
@@ -3702,7 +3702,8 @@ class Tree:
         
     def prune_maxlen(self, nkeep, keeplist=[], return_leaves=False):
         """Prune tree so remaining nkeep leaves spread out maximal percentage of branch length
-        keeplist: optional list of leaves that must be included. 
+        keeplist: optional list of leaves that must be included.
+        return_leaves: return selected leaves without pruning tree        
         Note: Best solution including keeplist may be less good than optimal solution"""
 
         self._check_prune_maxlen_arguments(nkeep, keeplist)
