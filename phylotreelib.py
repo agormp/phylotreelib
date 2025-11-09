@@ -2552,8 +2552,10 @@ class Tree:
                     treelist.append(")")
                     if printlabels:
                         label = getattr(branchstruct, labelfield, "")
-                        treelist.append(f"{label}")
-                        
+                        if isinstance(label, float):
+                            treelist.append(f"{label:.{precision}g}")
+                        else:
+                            treelist.append(f"{label}")
                 if node_attributes:    
                     metacomment_node = create_metacomment(self.nodedict[child], node_attributes)
                     treelist.append(metacomment_node) 
