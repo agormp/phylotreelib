@@ -5117,7 +5117,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def root_maxfreq(self, sum_tree):
+    def root_maxfreq(self, sumtree):
         """Uses info about root bipartitions in TreeSummary to place root on summary tree.
         Also sets tree attribute rootcred: 
             probability (freq among input trees) of current location of root
@@ -5128,45 +5128,45 @@ class TreeSummary():
 
         # Starting with most frequent root location: find one that is compatible
         # Python note: should i just try number 1 on sorted list?
-        if sum_tree.is_bifurcation(sum_tree.root):
-            cur_rootbip, _, _, _, _ = sum_tree.rootbip()
+        if sumtree.is_bifurcation(sumtree.root):
+            cur_rootbip, _, _, _, _ = sumtree.rootbip()
         else:
             cur_rootbip = None
         for count, bip, summary_rootbipstruct in self.sorted_rootbips:
-            if sum_tree.bipart_is_present(bip):
+            if sumtree.bipart_is_present(bip):
                 # Only reroot if tree not already rooted correctly
                 if (cur_rootbip is None) or (bip != cur_rootbip):
-                    parent,child = sum_tree.find_bipart_nodes(bip)
-                    sum_tree.deroot()  # Python note: necessary?
+                    parent,child = sumtree.find_bipart_nodes(bip)
+                    sumtree.deroot()  # Python note: necessary?
                                            # reroot seems to assume not rooted at birfurcation
                                            # rethink reroot function and others depending on it!
-                    sum_tree.reroot(child, parent)
-                sum_tree.rootcred = count / self.tree_count
+                    sumtree.reroot(child, parent)
+                sumtree.rootcred = count / self.tree_count
 
                 # If branch lengths or node depths have been tracked:
                 # Divide branch lengths for two rootkids according to fractions
                 # seen for this rootbip across trees in ._rootbip_summary
                 if self.trackblen or self.trackdepth:
-                    kid1,kid2 = sum_tree.children(sum_tree.root)
-                    biplen = sum_tree.nodedist(kid1, kid2)
-                    kid1_remkids = sum_tree.remotechildren_dict[kid1]
+                    kid1,kid2 = sumtree.children(sumtree.root)
+                    biplen = sumtree.nodedist(kid1, kid2)
+                    kid1_remkids = sumtree.remotechildren_dict[kid1]
                     dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
                     dist_to_kid2 = biplen - dist_to_kid1
-                    sum_tree.child_dict[sum_tree.root][kid1].length = dist_to_kid1
-                    sum_tree.child_dict[sum_tree.root][kid2].length = dist_to_kid2
+                    sumtree.child_dict[sumtree.root][kid1].length = dist_to_kid1
+                    sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
 
-                return sum_tree
+                return sumtree
 
         # If we did not return by now, then bipart not in contree
-        raise TreeError(f"sum_tree tree not compatible with any observed root locations")
+        raise TreeError(f"sumtree tree not compatible with any observed root locations")
 
     ###############################################################################################
 
-    def set_rootcredibility(self, sum_tree, precision=6):
-        """Returns sum_tree with root credibilities as attributes on each branch
+    def set_rootcredibility(self, sumtree, precision=6):
+        """Returns sumtree with root credibilities as attributes on each branch
         rootcred = fraction of trees in input set where the root was on this branch (bipartition)
         If root was never on a branch: assign the value 0.0
-        Added as attribute .rootcred to Branchstruct for branches on sum_tree
+        Added as attribute .rootcred to Branchstruct for branches on sumtree
         Also sets tree-attribute cumrootcred: 
             sum of rootcredibilities for all branches (bipartitions) included on tree
         """
@@ -5176,49 +5176,49 @@ class TreeSummary():
 
         def set_branch_credibility(p, c):
             """Helper function to set root credibility for a branch."""
-            leafset1 = sum_tree.remotechildren_dict[c]
-            bip = Bipartition(leafset1, sum_tree.frozenset_leaves, 
-                              sum_tree.sorted_leaf_list, sum_tree.leaf2index)
+            leafset1 = sumtree.remotechildren_dict[c]
+            bip = Bipartition(leafset1, sumtree.frozenset_leaves, 
+                              sumtree.sorted_leaf_list, sumtree.leaf2index)
             if bip in self.rootbipsummary:
                 rootcred = self.rootbipsummary[bip].posterior
-                sum_tree.set_branch_attribute(p, c, "rootcred", rootcred)
+                sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
             else:
-                sum_tree.set_branch_attribute(p, c, "rootcred", 0.0)
+                sumtree.set_branch_attribute(p, c, "rootcred", 0.0)
 
-        # Find rootcred for all non-root bipartitions on sum_tree
-        for p in sum_tree.sorted_intnodes():
-            if p != sum_tree.root:
-                for c in sum_tree.children(p):
+        # Find rootcred for all non-root bipartitions on sumtree
+        for p in sumtree.sorted_intnodes():
+            if p != sumtree.root:
+                for c in sumtree.children(p):
                     set_branch_credibility(p, c)
 
         # Handle root bipartition separately
-        p = sum_tree.root
-        if sum_tree.is_bifurcation(p):
-            rootbip, _, _, _, _ = sum_tree.rootbip()
+        p = sumtree.root
+        if sumtree.is_bifurcation(p):
+            rootbip, _, _, _, _ = sumtree.rootbip()
             rootcred = self.rootbipsummary[rootbip].posterior
-            c1, c2 = sum_tree.children(p)
-            sum_tree.set_branch_attribute(p, c1, "rootcred", rootcred)
-            sum_tree.set_branch_attribute(p, c2, "rootcred", rootcred)
+            c1, c2 = sumtree.children(p)
+            sumtree.set_branch_attribute(p, c1, "rootcred", rootcred)
+            sumtree.set_branch_attribute(p, c2, "rootcred", rootcred)
             cumcred_correction = rootcred # Counted twice if i just sum over branches. Hackish solution...
         else:
-            for c in sum_tree.children(p):
+            for c in sumtree.children(p):
                 set_branch_credibility(p, c)
             cumcred_correction = 0.0
                 
         # Compute cumulated rootcred = sum of rootcred on all tree branches
-        # Note: can be < 100% since sum_tree may not contain all observed root bipartitions
+        # Note: can be < 100% since sumtree may not contain all observed root bipartitions
         cumulated_rootcred = 0.0
-        for p in sum_tree.intnodes:
-            for c in sum_tree.children(p):
-                cumulated_rootcred += sum_tree.get_branch_attribute(p, c, "rootcred")
+        for p in sumtree.intnodes:
+            for c in sumtree.children(p):
+                cumulated_rootcred += sumtree.get_branch_attribute(p, c, "rootcred")
         cumulated_rootcred -= cumcred_correction  # If root at bifurcation: counted once too many...
-        sum_tree.cumulated_rootcred = cumulated_rootcred
+        sumtree.cumulated_rootcred = cumulated_rootcred
 
-        return sum_tree
+        return sumtree
 
     ###############################################################################################
 
-    def set_mean_node_depths(self, sum_tree):
+    def set_mean_node_depths(self, sumtree):
         """Set branch lengths on summary tree based on mean node depth for clades corresponding
         to parent and child nodes (blen = depth_parent - depth_child).
 
@@ -5229,31 +5229,31 @@ class TreeSummary():
         NOTE 3: only uses node depths from monophyletic clades (so some values may be set
         based on very few trees)"""
 
-        all_leaves = sum_tree.frozenset_leaves
-        sorted_leafs = sum_tree.sorted_leaf_list
-        leaf2index = sum_tree.leaf2index
+        all_leaves = sumtree.frozenset_leaves
+        sorted_leafs = sumtree.sorted_leaf_list
+        leaf2index = sumtree.leaf2index
 
         try:
-            for parent in sum_tree.sorted_intnodes(deepfirst=True):
-                p_remkids = sum_tree.remotechildren_dict[parent]
+            for parent in sumtree.sorted_intnodes(deepfirst=True):
+                p_remkids = sumtree.remotechildren_dict[parent]
                 p_clade = Clade(p_remkids, all_leaves, sorted_leafs, leaf2index)
                 p_depth = self.cladesummary[p_clade].depth
-                for child in sum_tree.children(parent):
-                    c_remkids = sum_tree.remotechildren_dict[child]
+                for child in sumtree.children(parent):
+                    c_remkids = sumtree.remotechildren_dict[child]
                     c_clade = Clade(c_remkids, all_leaves, sorted_leafs, leaf2index)
                     c_depth = self.cladesummary[c_clade].depth
                     blen = p_depth - c_depth
-                    sum_tree.setlength(parent, child, blen)
+                    sumtree.setlength(parent, child, blen)
         except KeyError as e:
             raise TreeError("Problem while setting mean node depths: the following clade has not been "
                             + "observed among input trees: check rooting of tree."
                             + f"\n{e.args[0]}")
 
-        return sum_tree
+        return sumtree
 
     ###############################################################################################
 
-    def set_ca_node_depths(self, sum_tree, wt_count_burnin_filename_list):
+    def set_ca_node_depths(self, sumtree, wt_count_burnin_filename_list):
         """Set branch lengths on summary tree based on mean node depth for clades corresponding
         to MRCA of clade's leaves. (same as "--height ca" in BEAST's treeannotator)
         This means that all input trees are used when computing
@@ -5275,68 +5275,68 @@ class TreeSummary():
             for i in range(burnin):
                 treefile.readtree(returntree=False)
             for input_tree in treefile:
-                for node in sum_tree.intnodes:
-                    sumt_remkids = sum_tree.remotechildren_dict[node]
+                for node in sumtree.intnodes:
+                    sumt_remkids = sumtree.remotechildren_dict[node]
                     input_mrca = input_tree.find_mrca(sumt_remkids)
                     input_depth = input_tree.nodedepthdict[input_mrca]
-                    sum_tree.nodedict[node].depth += input_depth * multiplier
+                    sumtree.nodedict[node].depth += input_depth * multiplier
 
         # normalise values for internal nodes by sum of weights
-        for node in sum_tree.intnodes:
-            sum_tree.nodedict[node].depth /= wsum
+        for node in sumtree.intnodes:
+            sumtree.nodedict[node].depth /= wsum
 
         # Set values for leaves
         # Use values on last tree left over from looping above (assume same on all input trees)
-        for node in sum_tree.leaves:
-            sum_tree.nodedict[node].depth = input_tree.nodedepthdict[node]
+        for node in sumtree.leaves:
+            sumtree.nodedict[node].depth = input_tree.nodedepthdict[node]
 
         # use average depths to set branch lengths
-        for parent in sum_tree.sorted_intnodes(deepfirst=True):
-            p_depth = sum_tree.nodedict[parent].depth
-            for child in sum_tree.children(parent):
-                c_depth = sum_tree.nodedict[child].depth
+        for parent in sumtree.sorted_intnodes(deepfirst=True):
+            p_depth = sumtree.nodedict[parent].depth
+            for child in sumtree.children(parent):
+                c_depth = sumtree.nodedict[child].depth
                 blen = p_depth - c_depth
-                sum_tree.setlength(parent, child, blen)
+                sumtree.setlength(parent, child, blen)
 
-        return sum_tree
+        return sumtree
 
     ###############################################################################################
 
-    def set_mean_biplen(self, sum_tree):
-        """Sets branch-length, -var, and -sem for each branch in sum_tree,
+    def set_mean_biplen(self, sumtree):
+        """Sets branch-length, -var, and -sem for each branch in sumtree,
         based on values in bipsummary.
-        Should only be called when sum_tree constructed based on clades (MCC), 
+        Should only be called when sumtree constructed based on clades (MCC), 
         but brlens are to be set based on mean bipartition values"""
 
-        for p in sum_tree.sorted_intnodes():
-            if p != sum_tree.root:
-                for c in sum_tree.children(p):
-                    bipart1 = sum_tree.remotechildren_dict[c]
-                    bip = Bipartition(bipart1, sum_tree.frozenset_leaves,
-                                      sum_tree.sorted_leaf_list, sum_tree.leaf2index)
+        for p in sumtree.sorted_intnodes():
+            if p != sumtree.root:
+                for c in sumtree.children(p):
+                    bipart1 = sumtree.remotechildren_dict[c]
+                    bip = Bipartition(bipart1, sumtree.frozenset_leaves,
+                                      sumtree.sorted_leaf_list, sumtree.leaf2index)
                     brstruct = self.bipartsummary[bip]
-                    sum_tree.set_branch_attribute(p,c,"length", brstruct.length)
-                    sum_tree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
-                    sum_tree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
-                    sum_tree.set_branch_attribute(p,c,"length_sem", brstruct.length_sem)
+                    sumtree.set_branch_attribute(p,c,"length", brstruct.length)
+                    sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
+                    sumtree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
+                    sumtree.set_branch_attribute(p,c,"length_sem", brstruct.length_sem)
 
         # Handle root bipartition separately
         if not self.trackroot:
             raise TreeError("Not possible to access self._rootbip_summary: self.trackroot is False")
-        kid1,kid2 = sum_tree.children(sum_tree.root)
-        kid1_remkids = sum_tree.remotechildren_dict[kid1]
-        rootbip = Bipartition(kid1_remkids, sum_tree.frozenset_leaves,
-                       sum_tree.sorted_leaf_list, sum_tree.leaf2index)
+        kid1,kid2 = sumtree.children(sumtree.root)
+        kid1_remkids = sumtree.remotechildren_dict[kid1]
+        rootbip = Bipartition(kid1_remkids, sumtree.frozenset_leaves,
+                       sumtree.sorted_leaf_list, sumtree.leaf2index)
         rootbrstruct = self.bipartsummary[rootbip]
         summary_rootbipstruct = self._rootbip_summary[rootbip]
 
         rootbiplen = rootbrstruct.length
         dist_to_kid1 = rootbiplen * summary_rootbipstruct.avg_frac(kid1_remkids)
         dist_to_kid2 = rootbiplen - dist_to_kid1
-        sum_tree.child_dict[sum_tree.root][kid1].length = dist_to_kid1
-        sum_tree.child_dict[sum_tree.root][kid2].length = dist_to_kid2
+        sumtree.child_dict[sumtree.root][kid1].length = dist_to_kid1
+        sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
 
-        return sum_tree
+        return sumtree
 
     ###############################################################################################
 
@@ -5368,7 +5368,7 @@ class TreeSummary():
 
     def compute_rootcred(self, tree):
         """Returns root credibility (frequency of tree's root among observed trees) based
-        on current root of sum_tree and information in self._rootbip_summary"""
+        on current root of sumtree and information in self._rootbip_summary"""
 
         # Python note: mostly relevant for MCC trees. Other tree types will typically
         # get the .rootcred attribute set when calling .root_maxfreq()
