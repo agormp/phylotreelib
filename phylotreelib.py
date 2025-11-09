@@ -5260,12 +5260,8 @@ class TreeSummary():
         mean for each node (not just the input trees where that exact monophyletic clade
         is present)"""
 
-        # Initialize node dictionary: {nodeid:Nodestruct}. Keeps track of avg depths
-        for node in sum_tree.nodes:
-            sum_tree.nodedict[node] = Nodestruct(depth = 0.0)
-
         # Find mean common ancestor depth for all internal nodes
-        # (I assume input trees are from clock models, so leaf-depths are constant)
+        # (I assume input trees are from clock models, so leaf-depths are constant across trees)
         wsum = 0.0
         for weight, count, burnin, filename in wt_count_burnin_filename_list:
             ntrees = count - burnin
