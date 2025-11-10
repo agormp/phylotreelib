@@ -738,6 +738,7 @@ class Tree:
         attributes_to_clear -= set(preserve)
         for attr in attributes_to_clear:
             setattr(self, attr, None)
+        # Special treatment for function nodedist() which is using an lru_cache
         if "nodedist" not in preserve:
             self.nodedist.cache_clear()
 
