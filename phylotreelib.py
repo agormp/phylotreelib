@@ -724,7 +724,7 @@ class Tree:
         are no longer reliable. Does not clear attributes listed in preserve"""
 
         # Python note: using the actual names instead of the public property names
-        # is perhaps too tight couplling. Consider adding dict mapping from public to private
+        # is perhaps too tight coupling. Consider adding dict mapping from public to private
         # property names, and let caller use public names in preserve
 
         attributes_to_clear = {
@@ -4762,7 +4762,7 @@ class TreeSummary():
 
     @property
     def cladesummary(self):
-        """Property method for lazy evaluation of freq, var, and sem for node depths"""
+        """Property method for lazy evaluation of freq, var, sd, and sem for node depths"""
         if not self._cladesummary_processed:
             for node in self._cladesummary.values():
                 node.posterior = node.SUMW / self.tree_weight_sum
