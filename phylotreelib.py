@@ -2216,8 +2216,7 @@ class Tree:
             child2 = parent2
 
         # Compute combined distance
-        nodedist = cumdist2 + node1_ancdist[child2]
-        return nodedist
+        return cumdist2 + node1_ancdist[child2]
 
     ###############################################################################################
 
