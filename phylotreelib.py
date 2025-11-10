@@ -5112,7 +5112,6 @@ class TreeSummary():
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
-                    contree._remotechildren_dict = None
 
         return contree
 
