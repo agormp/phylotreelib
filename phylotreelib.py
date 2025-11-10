@@ -4889,14 +4889,13 @@ class TreeSummary():
 
         cladedict = curtree.cladedict()
         for clade,nodestruct in cladedict.items():
-            depth = nodestruct.depth
 
             # If clade has been seen before: update existing info
             if clade in self._cladesummary:
                 TEMP = self._cladesummary[clade].SUMW + weight
                 self._cladesummary[clade].SUMW = TEMP
                 if self.trackdepth:
-                    Q = depth - self._cladesummary[clade].depth
+                    Q = nodestruct.depth - self._cladesummary[clade].depth
                     R = Q*weight/TEMP
                     self._cladesummary[clade].depth += R
                     self._cladesummary[clade].T += R * self._cladesummary[clade].SUMW * Q
@@ -4908,7 +4907,7 @@ class TreeSummary():
                 self._cladesummary[clade].SUMW = weight
                 if self.trackdepth:
                     self._cladesummary[clade].clade_count = 1
-                    self._cladesummary[clade].depth = depth
+                    self._cladesummary[clade].depth = nodestruct.depth
                     self._cladesummary[clade].T = 0.0
                 else:
                     self._cladesummary[clade].depth = 0.0
@@ -4936,14 +4935,13 @@ class TreeSummary():
         # This is due to other functions that expect the attribute .length to be present
         bipdict = curtree.bipdict()
         for bipart,branchstruct in bipdict.items():
-            brlen = branchstruct.length
 
             # If bipartition has been seen before: update existing info
             if bipart in self._bipartsummary:
                 TEMP = self._bipartsummary[bipart].SUMW + weight
                 self._bipartsummary[bipart].SUMW = TEMP
                 if self.trackblen:
-                    Q = brlen - self._bipartsummary[bipart].length
+                    Q = branchstruct.length - self._bipartsummary[bipart].length
                     R = Q*weight/TEMP
                     self._bipartsummary[bipart].length += R
                     self._bipartsummary[bipart].T += R * self._bipartsummary[bipart].SUMW * Q
@@ -4955,7 +4953,7 @@ class TreeSummary():
                 self._bipartsummary[bipart].SUMW = weight
                 if self.trackblen:
                     self._bipartsummary[bipart].bip_count = 1
-                    self._bipartsummary[bipart].length = brlen
+                    self._bipartsummary[bipart].length = branchstruct.length
                     self._bipartsummary[bipart].T = 0.0
                 else:
                     self._bipartsummary[bipart].length = 0.0
