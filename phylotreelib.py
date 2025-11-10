@@ -4816,6 +4816,7 @@ class TreeSummary():
         """Property method for lazy evaluation of freq (=rootcred) for rootbips"""
         if not self._rootbip_summary_processed:
             for rootbipstruct in self._rootbip_summary.values():
+                # Python note: should i divide by tree_weight_sum, not tree_count?
                 rootbipstruct.posterior = rootbipstruct.count / self.tree_count
             self._rootbip_summary_processed = True
         return self._rootbip_summary
