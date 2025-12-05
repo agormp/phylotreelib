@@ -5138,8 +5138,8 @@ class TreeSummary():
                 if (cur_rootbip is None) or (bip != cur_rootbip):
                     parent,child = sumtree.find_bipart_nodes(bip)
                     sumtree.deroot()  # Python note: necessary?
-                                           # reroot seems to assume not rooted at birfurcation
-                                           # rethink reroot function and others depending on it!
+                                      # reroot seems to assume not rooted at birfurcation
+                                      # rethink reroot function and others depending on it!
                     sumtree.reroot(child, parent)
                 sumtree.rootcred = count / self.tree_count
 
@@ -5172,7 +5172,8 @@ class TreeSummary():
         """
 
         if not self.trackroot:
-            raise TreeError("Not possible to compute root credibilities: self.trackroot is False")
+            msg = "Not possible to compute root credibilities: TreeSummary.trackroot is False"
+            raise TreeError(msg)
 
         def set_branch_credibility(p, c):
             """Helper function to set root credibility for a branch."""
@@ -5223,11 +5224,11 @@ class TreeSummary():
         to parent and child nodes (blen = depth_parent - depth_child).
 
         NOTE 1: only meaningful if input trees are based on a clock model.
-        NOTE 2: only works if all clades in tree have been observed at least once. The option
+        NOTE 2: only works if all clades in sumtree have been observed at least once. The option
                 will therefore not work with all rootings, and may also fail for majority rule
                 consensus trees
         NOTE 3: only uses node depths from monophyletic clades (so some values may be set
-        based on very few trees)"""
+                based on very few input trees)"""
 
         all_leaves = sumtree.frozenset_leaves
         sorted_leafs = sumtree.sorted_leaf_list
@@ -5255,7 +5256,7 @@ class TreeSummary():
 
     def set_ca_node_depths(self, sumtree, wt_count_burnin_filename_list):
         """Set branch lengths on summary tree based on mean node depth for clades corresponding
-        to MRCA of clade's leaves. (same as "--height ca" in BEAST's treeannotator)
+        to MRCA of sumtree-clade's leaves. (same as "--height ca" in BEAST's treeannotator)
         This means that all input trees are used when computing
         mean for each node (not just the input trees where that exact monophyletic clade
         is present)"""
@@ -5267,7 +5268,7 @@ class TreeSummary():
             ntrees = count - burnin
             wsum += weight
             multiplier = weight / ntrees
-            treefile = Treefile(filename)
+            treefile = Treefile(filename) #Python note: use "with Treefile(filename)"?
             for i in range(burnin):
                 treefile.readtree(returntree=False)
             for input_tree in treefile:
@@ -5299,7 +5300,7 @@ class TreeSummary():
     ###############################################################################################
 
     def set_mean_biplen(self, sumtree):
-        """Sets branch-length, -var, and -sem for each branch in sumtree,
+        """Sets branch-length, -var, -sd, and -sem for each branch in sumtree,
         based on values in bipsummary.
         Should only be called when sumtree constructed based on clades (MCC), 
         but brlens are to be set based on mean bipartition values"""
@@ -5425,7 +5426,7 @@ class BigTreeSummary(TreeSummary):
         self._cladetoposummary_processed = False
 
         # Superclass method takes care of updating n_trees and all bipart/clade-related info
-        # Python note: bipdict or cladedict are None when bip or clade not tracked
+        # bipdict or cladedict are None when bip or clade not tracked
         bipdict, cladedict = TreeSummary.add_tree(self, curtree, weight)
 
         if self.trackbips:
