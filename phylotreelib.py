@@ -2521,7 +2521,7 @@ class Tree:
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6, 
                transdict=None, node_attributes=None, branch_attributes=None):
         """Returns Newick format tree string representation of tree object, with optional metacomments"""
-    
+        
         def create_metacomment(struct, attributes): 
             """Helper function to create metacomment strings based on attributes of a structure"""
             tmplist = []
@@ -4856,7 +4856,7 @@ class TreeSummary():
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
 
         if self.trackroot:
-            self._sorted_rootbips == None
+            self._sorted_rootbips = None
             self._add_root(curtree)
 
         cladedict = None
