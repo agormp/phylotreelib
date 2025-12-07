@@ -884,28 +884,13 @@ class Tree:
         # A bipartition is represented as an immutable set of two such (complementary) sets
         # Huge overlap with from_biplist: difference is this doesnt have Branchstructs to begin with
         # Think about mergin code, with flag for branchstruct presence
-        obj = cls()
 
         # Extract set of leaves
         part1, part2 = next(iter(topology)) # First item=set of two leaf name sets
-        obj.leaves = part1 | part2          # Concatenate them to get all leafnames
-        obj.intnodes = {0}                  # Will be built as we go along
-        obj.root = 0                        # Root is node zero at start
-                                            # This may change after re-rooting etc
-
-        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
-        # are the internal nodes, which are numbered consecutively. Each key has an associated
-        # value that is itself a dictionary listing the children: keys are child nodes, values are
-        # Branchstructs containing "length" (float) and "label" (str) fields.
-        # Leafs are identified by a string instead of a number
-
-        # Construct tree dictionary (main data structure, essentially a child list)
-        obj.child_dict[0]={}
-        maxnode = 0
+        leaves = part1 | part2          # Concatenate them to get all leafnames
 
         # Start by building star-tree, this is resolved branch-by-branch later on
-        for leaf in obj.leaves:
-            obj.child_dict[0][leaf]= Branchstruct()
+        obj = Tree.from_leaves(leaves, interner=interner)
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for bip1, bip2 in topology:
