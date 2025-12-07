@@ -814,7 +814,6 @@ class Tree:
 
         # Start by building star-tree, this is resolved branch-by-branch later on
         obj = Tree.from_leaves(leaves, interner=interner)
-        maxnode = 0                 # Only internal node so far is root = 0
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for (bip1, bip2), branchstruct in biplist.items():
@@ -860,19 +859,9 @@ class Tree:
                     elif obj.remotechildren_dict[child] <= active_bip:
                         movelist.append(child)
 
-                # Construct new internal node (and therefore branch), transfer Branchstruct
-                maxnode += 1
-                obj.child_dict[maxnode] = {}
-                obj.child_dict[insertpoint][maxnode] = branchstruct
-                obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
-
-                # Move relevant children to new node, transfer Branchstructs
-                for child in movelist:
-                    obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
-                    del obj.child_dict[insertpoint][child]
-
-                # reset obj caches which are now obsolete
-                obj.clear_caches()
+                # Add new internal node and move relevant children to this.
+                # Attach Branchstruct to newly created branch
+                obj.insert_node(insertpoint, movelist, branchstruct)
 
         obj.nodes = set(obj.leaves | obj.intnodes)
         obj.interner = interner
