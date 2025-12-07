@@ -925,19 +925,9 @@ class Tree:
                     elif obj.remotechildren_dict[child] <= active_bip:
                         movelist.append(child)
 
-                # Construct new internal node (and therefore branch)
-                maxnode += 1
-                obj.child_dict[maxnode] = {}
-                obj.child_dict[insertpoint][maxnode] = Branchstruct()
-                obj.intnodes.add(maxnode)       # Add new node to list of internal nodes
-
-                # Move relevant children to new node, transfer Branchstructs
-                for child in movelist:
-                    obj.child_dict[maxnode][child] = obj.child_dict[insertpoint][child]
-                    del obj.child_dict[insertpoint][child]
-
-            # Reset obj caches which are now obsolete
-            obj.clear_caches()
+                # Add new internal node and move relevant children to this.
+                # Attach empty Branchstruct to newly created branch (no blen info in topology)
+                obj.insert_node(insertpoint, movelist, Branchstruct())
 
         obj.nodes = set(obj.leaves | obj.intnodes)
 
