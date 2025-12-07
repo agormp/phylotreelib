@@ -690,6 +690,12 @@ class NewickStringParser:
 class Tree:
     """Class representing basic phylogenetic tree object."""
 
+    # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
+    # are the internal nodes, which are numbered consecutively. Each key has an associated
+    # value that is itself a dictionary listing the children: keys are child nodes, values are
+    # Branchstructs containing "length" (float) and "label" (str) fields.
+    # Leafs are identified by a string instead of a number
+
     # Implementation note: Tree objects can be constructed from several different kinds of things:
     # including Newick tree strings, Bipartition lists, and a list of leaves.
     # The Tree class therefore has several alternate constructors implemented as classmethods
@@ -806,12 +812,6 @@ class Tree:
         part1, part2 = next(iter(biplist))  # First key=set of two leaf name sets
         leaves = part1 | part2          # Concatenate them to get all leafnames
 
-        # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
-        # are the internal nodes, which are numbered consecutively. Each key has an associated
-        # value that is itself a dictionary listing the children: keys are child nodes, values are
-        # Branchstructs containing "length" (float) and "label" (str) fields.
-        # Leafs are identified by a string instead of a number
-
         # Start by building star-tree, this is resolved branch-by-branch later on
         obj = Tree.from_leaves(leaves, interner=interner)
         maxnode = 0                 # Only internal node so far is root = 0
@@ -851,7 +851,7 @@ class Tree:
                     insertpoint = mrca2
                     active_bip = bip2
 
-                # Determine which of insertpoints children to move, namely all children
+                # Determine which of insertpoint's children to move, namely all children
                 # that are either in the active bipartition OR children whose descendants are
                 movelist = []
                 for child in obj.children(insertpoint):
