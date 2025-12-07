@@ -780,6 +780,20 @@ class Tree:
     ###############################################################################################
 
     @classmethod
+    def from_leaves(cls, leaflist, interner=None):
+        """Constructor: star-tree object from list of leaves"""
+
+        treelist = ["("]
+        for name in leaflist:
+            treelist.append(name)
+            treelist.append(",")
+        del treelist[-1]
+        treelist.append(");")
+        return cls.from_string("".join(treelist), interner)
+
+    ###############################################################################################
+
+    @classmethod
     def from_biplist(cls, biplist, interner=None):
         """Constructor: Tree object from bipartition list"""
 
