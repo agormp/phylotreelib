@@ -375,7 +375,9 @@ class Bipartition:
     def __str__(self):
         bip1,bip2 = self.get_bipartitions()
         if len(bip1) < len(bip2):
-            return f"\n{str(bip1)}\n"
+            return f"\nleaf set 1:\n{str(bip1)}\n\nleaf set 2:\n{str(bip2)}\n"
+        else:
+            return f"\nleaf set 1:\n{str(bip2)}\n\nleaf set 2:\n{str(bip1)}\n"
 
     def __repr__(self):
         return self.__str__()
