@@ -897,11 +897,13 @@ class Tree:
 
             # If bipartition represents internal branch: add branch to tree
             if len(bip1) > 1 and len(bip2) > 1:
+                
+                # Make the smaller side bip1 for MRCA efficiency
                 if len(bip1) > len(bip2):
                     bip1,bip2 = bip2,bip1
 
                 # Determine which group of leaves to move
-                # Note: one part of bipartition will necessarily have root as its MRCA
+                # One part of bipartition will necessarily have root as its MRCA
                 # since the members are present on both sides of root. It is the other part of
                 # the bipartition (where all members are on same side of root) that should be moved
                 # For a star-tree the resolution will be random (both have root as their MRCA)
@@ -914,7 +916,7 @@ class Tree:
                     insertpoint = mrca2
                     active_bip = bip2
 
-                # Determine which of insertpoints children to move, namely all children
+                # Determine which of insertpoint's children to move, namely all children
                 # that are either in the active bipartition OR children whose descendants are
                 movelist = []
                 for child in obj.children(insertpoint):
