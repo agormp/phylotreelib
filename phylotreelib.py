@@ -844,7 +844,7 @@ class Tree:
                 # the bipartition (where all members are on same side of root) that should be moved
                 # For a star-tree the resolution will be random (both have root as their MRCA)
                 mrca1 = obj.find_mrca(bip1)
-                if mrca1 != 0:
+                if mrca1 != obj.root:
                     insertpoint = mrca1
                     active_bip = bip1
                 else:
