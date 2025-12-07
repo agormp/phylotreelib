@@ -801,14 +801,10 @@ class Tree:
         # Names of leaves on one side of a branch are represented as an immutable set of leaves
         # A bipartition is represented as an immutable set of two such (complementary) sets
         # The entire tree is represented as a dictionary of bipartition:Branchstruct pairs
-        obj = cls()
 
         # Extract set of leaves
         part1, part2 = next(iter(biplist))  # First key=set of two leaf name sets
-        obj.leaves = part1 | part2          # Concatenate them to get all leafnames
-        obj.intnodes = {0}                  # Will be built as we go along
-        obj.root = 0                        # Root is node zero at start
-                                            # This may change after re-rooting etc
+        leaves = part1 | part2          # Concatenate them to get all leafnames
 
         # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
         # are the internal nodes, which are numbered consecutively. Each key has an associated
@@ -816,14 +812,9 @@ class Tree:
         # Branchstructs containing "length" (float) and "label" (str) fields.
         # Leafs are identified by a string instead of a number
 
-        # Construct tree dictionary (main data structure, essentially a child list)
-        obj.child_dict[0]={}
-        maxnode = 0
-
         # Start by building star-tree, this is resolved branch-by-branch later on
-        # Python note: use startree constructor?
-        for leaf in obj.leaves:
-            obj.child_dict[0][leaf]= None
+        obj = Tree.from_leaves(leaves, interner=interner)
+        maxnode = 0                 # Only internal node so far is root = 0
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for (bip1, bip2), branchstruct in biplist.items():
