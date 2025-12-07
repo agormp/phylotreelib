@@ -5372,7 +5372,13 @@ class TreeSummary():
         not observed among input trees"""
 
         tree_rootbip, _, _, _, _ = tree.rootbip()
-        summary_rootbipstruct = self._rootbip_summary[tree_rootbip]
+        try:
+            summary_rootbipstruct = self._rootbip_summary[tree_rootbip]
+        except KeyError as e:
+            raise TreeError("Problem while setting root credibilility: the current rooting "
+                            + "has not been observed among input trees."
+                            + f"\n\nCurrent root bipartition: {e.args[0]}")
+            
         return summary_rootbipstruct.count / self.tree_count
 
 ###################################################################################################
