@@ -831,8 +831,10 @@ class Tree:
                         childdict[leaf] = branchstruct
                         break
 
-            # If bipartition represents internal branch: add branch to tree, transfer Branchstruct
+            # If bipartition represents internal branch: 
+            # insert new node and attach branchstruct there
             else:
+                # Make bip1 the smaller part (for MRCA efficiency)
                 if len(bip1) > len(bip2):
                     bip1,bip2 = bip2,bip1
 
