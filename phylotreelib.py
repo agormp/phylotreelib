@@ -5376,7 +5376,8 @@ class TreeSummary():
             summary_rootbipstruct = self._rootbip_summary[tree_rootbip]
         except KeyError as e:
             raise TreeError("Problem while setting root credibilility: the current rooting "
-                            + "has not been observed among input trees."
+                            + "has not been observed among input trees. Make sure that input "
+                            + "trees are rooted (e.g., by using a clock model)."
                             + f"\n\nCurrent root bipartition: {e.args[0]}")
             
         return summary_rootbipstruct.count / self.tree_count
