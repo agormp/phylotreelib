@@ -5193,7 +5193,12 @@ class TreeSummary():
                 will therefore not work with all rootings, and may also fail for majority rule
                 consensus trees
         NOTE 3: only uses node depths from monophyletic clades (so some values may be set
-                based on very few input trees)"""
+                based on very few input trees)
+        
+        Node-depths of leaves will be the mean value observed across input trees. 
+        This only matters for leaves whose depth is being estimated (all other nodes
+        will have constant depth across input trees).
+        """
 
         all_leaves = sumtree.frozenset_leaves
         sorted_leafs = sumtree.sorted_leaf_list
@@ -5224,10 +5229,25 @@ class TreeSummary():
         to MRCA of sumtree-clade's leaves. (same as "--height ca" in BEAST's treeannotator)
         This means that all input trees are used when computing
         mean for each node (not just the input trees where that exact monophyletic clade
-        is present)"""
+        is present)
+        
+        Node-depths of leaves will be the mean value observed across input trees. 
+        This only matters for leaves whose depth is being estimated (all other nodes
+        will have constant depth across input trees).
+        """
+        
+        sumtree.clear_caches()   # Python note: ever necessary? Mostly worried about nodedepthdict
+        
+        # If trackdepth: 
+        # nodedict[node].depth already has mean node depth which is not what we want for internal nodes
+        if self.trackdepth:
+            for node in sumtree.intnodes:
+                sumtree.nodedict[node].depth = 0.0
 
         # Find mean common ancestor depth for all internal nodes
-        # (I assume input trees are from clock models, so leaf-depths are constant across trees)
+        # Find mean node depth for leaves (for a leaf mean depth = CA depth)
+        # (most leaves will have constant depth across input trees, but if some 
+        # leaf dates are being estimated, then these will vary)
         wsum = 0.0
         for weight, count, burnin, filename in wt_count_burnin_filename_list:
             ntrees = count - burnin
@@ -5242,16 +5262,19 @@ class TreeSummary():
                     input_mrca = input_tree.find_mrca(sumt_remkids)
                     input_depth = input_tree.nodedepthdict[input_mrca]
                     sumtree.nodedict[node].depth += input_depth * multiplier
+                # If trackdepth: nodedict already has mean leaf depth, so dont compute again
+                if not self.trackdepth:
+                    for node in sumtree.leaves:
+                        input_depth = input_tree.nodedepthdict[node]
+                        sumtree.nodedict[node].depth += input_depth * multiplier
 
-        # normalise values for internal nodes by sum of weights
+        # normalise depth values by sum of weights
         for node in sumtree.intnodes:
             sumtree.nodedict[node].depth /= wsum
-
-        # Set values for leaves
-        # Use values on last tree left over from looping above (assume same on all input trees)
-        for node in sumtree.leaves:
-            sumtree.nodedict[node].depth = input_tree.nodedepthdict[node]
-
+        if not self.trackdepth:
+            for node in sumtree.leaves:
+                sumtree.nodedict[node].depth /= wsum
+                
         # use average depths to set branch lengths
         for parent in sumtree.sorted_intnodes(deepfirst=True):
             p_depth = sumtree.nodedict[parent].depth
