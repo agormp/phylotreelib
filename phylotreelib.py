@@ -435,6 +435,9 @@ class Clade:
 
     def __repr__(self):
         return self.__str__()
+        
+    def __len__(self):
+        return(len(self.indices))
 
     def get_clade(self):
         leaves = frozenset({self.leaf_list[i] for i in self.indices})
