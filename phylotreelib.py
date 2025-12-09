@@ -1417,8 +1417,9 @@ class Tree:
             self._nodedepthdict = {}
             maxdist = 0
             for leaf in self.leaves:
-                if self.rootdist[leaf] > maxdist:
-                    maxdist = self.rootdist[leaf]
+                dist_root_leaf = self.rootdist[leaf]
+                if dist_root_leaf > maxdist:
+                    maxdist = dist_root_leaf
             rootdepth = self._nodedepthdict[self.root] = maxdist
             for node in self.nodes - {self.root}:
                 self._nodedepthdict[node] = rootdepth - self.rootdist[node]
