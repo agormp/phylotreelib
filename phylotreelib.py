@@ -4673,26 +4673,36 @@ class RootBipStruct:
 ###################################################################################################
 
 class TreeSummary():
-    """Class summarizing bipartitions and branch lengths (but not topologies) from many trees"""
+    """Class summarizing requested attributes (bipartitions, clades, root location, branch lengths,
+       node depths, topologies) from many trees"""
 
-    def __init__(self, trackbips=True, trackclades=False, trackroot=False,
-                       trackblen=False, trackdepth=False):
+    def __init__(self, trackbips=True, trackclades=False, trackroot=False, trackblen=False, 
+                       trackdepth=False, tracktopo=False, store_trees=False):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
         self.tree_count = 0
         self.tree_weight_sum = 0.0
+        
         self.trackroot = trackroot
         self.trackbips = trackbips
         self.trackclades = trackclades
         self.trackblen = trackblen
         self.trackdepth = trackdepth
+        self.tracktopo = tracktopo
+        self.store_trees = store_trees
+        
         self._bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
         self._bipartsummary_processed = False
         self._cladesummary = {}         # Dict: {clade:nodestruct with extra fields}
         self._cladesummary_processed = False
         self._rootbip_summary = {}      
         self._rootbip_summary_processed = False
+        self._biptoposummary = {}
+        self._biptoposummary_processed = False
+        self._cladetoposummary = {}
+        self._cladetoposummary_processed = False
+        
         self._sorted_biplist = None
         self._sorted_rootbips = None
 
@@ -4802,8 +4812,32 @@ class TreeSummary():
 
     ###############################################################################################
 
+    @property
+    def biptoposummary(self):
+        """Property method for lazy evaluation of topostruct.posterior"""
+        if not self._biptoposummary_processed:
+            for topostruct in self._biptoposummary.values():
+                topostruct.posterior = topostruct.weight / self.tree_weight_sum
+            self._biptoposummary_processed = True
+
+        return self._biptoposummary
+
+    ###############################################################################################
+
+    @property
+    def cladetoposummary(self):
+        """Property method for lazy evaluation of topostruct.posterior"""
+        if not self._cladetoposummary_processed:
+            for topostruct in self._cladetoposummary.values():
+                topostruct.posterior = topostruct.weight / self.tree_weight_sum
+            self._cladetoposummary_processed = True
+
+        return self._cladetoposummary
+
+    ###############################################################################################
+
     def add_tree(self, curtree, weight=1.0):
-        """Add tree object to treesummary, update all relevant bipartition summaries"""
+        """Add tree object to treesummary, update all relevant summaries"""
 
         # Main interface to TreeSummary.
         # Takes tree object, updates relevant measures
@@ -4831,13 +4865,19 @@ class TreeSummary():
         bipdict = None
         if self.trackbips:
             bipdict = self._add_bips(curtree, weight)
+          
+        if self.tracktopo and self.trackbips:
+            self._addbiptopo(bipdict, curtree, weight)
 
-        return bipdict, cladedict
-
+        if self.tracktopo and self.trackclades:
+            self._addcladetopo(cladedict, curtree, weight)
+        
     ###############################################################################################
 
     def _add_root(self, curtree):
         """Helper method for add_tree: handles roots"""
+        
+        self._rootbip_summary_processed = False
 
         bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbip()
         if bipartition in self._rootbip_summary:
@@ -4851,7 +4891,6 @@ class TreeSummary():
         """Helper method to add_tree: handles clades"""
 
         self._cladesummary_processed = False
-
         cladedict = curtree.cladedict()
         for clade,nodestruct in cladedict.items():
 
@@ -4927,6 +4966,42 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def _addbiptopo(self, bipdict, curtree, weight):
+
+        self._biptoposummary_processed = False
+        
+        # If biptopology has never been seen before, then add it and initialize count
+        # If topology HAS been seen before then update count        
+        topology = frozenset(bipdict.keys())
+        if topology in self._biptoposummary:
+            self._biptoposummary[topology].weight += weight
+        else:
+            self._biptoposummary[topology]=Topostruct()
+            self._biptoposummary[topology].weight = weight
+            if self.store_trees:
+                curtree.clear_caches()
+                self._biptoposummary[topology].tree = curtree
+
+    ###############################################################################################
+
+    def _addcladetopo(self, cladedict, curtree, weight):
+        
+        self._cladetoposummary_processed = False
+        
+        # If cladetopology has never been seen before, then add it and initialize count
+        # If topology HAS been seen before then update count
+        topology = frozenset(cladedict.keys())
+        if topology in self._cladetoposummary:
+            self._cladetoposummary[topology].weight += weight
+        else:
+            self._cladetoposummary[topology]=Topostruct()
+            self._cladetoposummary[topology].weight = weight
+            if self.store_trees:
+                curtree.clear_caches()
+                self._cladetoposummary[topology].tree = curtree
+
+    ###############################################################################################
+
     def update(self, other):
         """Merge this object with external treesummary"""
 
@@ -4947,7 +5022,9 @@ class TreeSummary():
 
         if self.trackroot:
             self._updateroot(other)
-
+            
+        if self.tracktopo:
+            self._updatetopo(other)
 
     ###############################################################################################
 
@@ -5025,6 +5102,30 @@ class TreeSummary():
                 self_rootbipsum[rootbip] = other_rootbipsum[rootbip]
 
     ###############################################################################################
+    
+    def _updatetopo(self, other):
+        """Helper for update(). Handles biptopologies and cladetopologies"""
+
+        self._biptoposummary_processed = False
+        self._cladetoposummary_processed = False
+
+        for biptopology in other._biptoposummary:
+            # If topology already in self.toposummary, update count
+            if biptopology in self._biptoposummary:
+                self._biptoposummary[biptopology].weight += other._biptoposummary[biptopology].weight
+            # If topology has never been seen before, simply transfer entry
+            else:
+                self._biptoposummary[biptopology]=other._biptoposummary[biptopology]
+
+        for cladetopology in other._cladetoposummary:
+            # If topology already in self.toposummary, update count
+            if cladetopology in self._cladetoposummary:
+                self._cladetoposummary[cladetopology].weight += other._cladetoposummary[cladetopology].weight
+            # If topology has never been seen before, simply transfer entry
+            else:
+                self._cladetoposummary[cladetopology]=other._cladetoposummary[cladetopology]
+
+    ###############################################################################################
 
     def log_bipart_credibility(self, biptopology):
         """Compute log bipartition credibility for topology (sum of log(freq) for all branches)"""
@@ -5079,6 +5180,47 @@ class TreeSummary():
                     contree.insert_node(parentnode, childnodes, branch)
 
         return contree
+
+    ###############################################################################################
+
+    def max_bipart_cred_tree(self):
+        """Find maximum bipartition credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
+
+        maxlogcred = -math.inf
+        for biptopology in self.biptoposummary:
+            logcred = self.log_bipart_credibility(biptopology)
+            if logcred > maxlogcred:
+                maxlogcred = logcred
+                maxlogcredbiptopo = biptopology
+
+        maxcredbipdict = {}
+        for bipartition in maxlogcredbiptopo:
+            branch = self.bipartsummary[bipartition]
+            maxcredbipdict[bipartition] = branch
+
+        # Build tree from bipartitions  in new bipdict
+        maxcredtree = Tree.from_biplist(maxcredbipdict)
+
+        return maxcredtree, maxlogcred
+
+    ###############################################################################################
+
+    def max_clade_cred_tree(self):
+        """Find maximum clade credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
+
+        maxlogcred = -math.inf
+        for clade_topology in self.cladetoposummary:
+            logcred = self.log_clade_credibility(clade_topology)
+            if logcred > maxlogcred:
+                maxlogcred = logcred
+                maxlogcred_cladetopo = clade_topology
+
+        maxcred_cladedict = {}
+        for clade in maxlogcred_cladetopo:
+            nodestruct = self.cladesummary[clade]
+            maxcred_cladedict[clade] = nodestruct
+        maxcredtree = Tree.from_cladedict(maxcred_cladedict)
+        return maxcredtree, maxlogcred
 
     ###############################################################################################
 
@@ -5367,168 +5509,6 @@ class TreeSummary():
                             + f"\n\nCurrent root bipartition: {e.args[0]}")
             
         return summary_rootbipstruct.count / self.tree_count
-
-###################################################################################################
-###################################################################################################
-
-class BigTreeSummary(TreeSummary):
-    """Class summarizing bipartitions, branch lengths, and topologies from many trees"""
-
-    # Does everything TreeSummary does and also keeps track of topologies
-    # (topology list is potentially quite big, which is the reason for not including it in TS)
-
-    def __init__(self, store_trees=False, trackbips=True, trackclades=False, trackroot=False,
-                       trackblen=False, trackdepth=False):
-        TreeSummary.__init__(self, trackbips=trackbips, trackclades=trackclades, 
-                             trackroot=trackroot, trackblen=trackblen, trackdepth=trackdepth)
-        self._biptoposummary = {}
-        self._biptoposummary_processed = False
-        self._cladetoposummary = {}
-        self._cladetoposummary_processed = False
-        self.store_trees = store_trees
-
-    ###############################################################################################
-
-    @property
-    def biptoposummary(self):
-        """Property method for lazy evaluation of topostruct.posterior"""
-        if not self._biptoposummary_processed:
-            for topostruct in self._biptoposummary.values():
-                topostruct.posterior = topostruct.weight / self.tree_weight_sum
-            self._biptoposummary_processed = True
-
-        return self._biptoposummary
-
-    ###############################################################################################
-
-    @property
-    def cladetoposummary(self):
-        """Property method for lazy evaluation of topostruct.posterior"""
-        if not self._cladetoposummary_processed:
-            for topostruct in self._cladetoposummary.values():
-                topostruct.posterior = topostruct.weight / self.tree_weight_sum
-            self._cladetoposummary_processed = True
-
-        return self._cladetoposummary
-
-    ###############################################################################################
-
-    def add_tree(self, curtree, weight=1.0):
-        """Add tree to treesummary, update all summaries"""
-
-        self._biptoposummary_processed = False
-        self._cladetoposummary_processed = False
-
-        # Superclass method takes care of updating n_trees and all bipart/clade-related info
-        # bipdict or cladedict are None when bip or clade not tracked
-        bipdict, cladedict = TreeSummary.add_tree(self, curtree, weight)
-
-        if self.trackbips:
-            self._addbiptopo(bipdict, curtree, weight)
-
-        if self.trackclades:
-            self._addcladetopo(cladedict, curtree, weight)
-
-    ###############################################################################################
-
-    def _addbiptopo(self, bipdict, curtree, weight):
-
-        # If biptopology has never been seen before, then add it and initialize count
-        # If topology HAS been seen before then update count
-        topology = frozenset(bipdict.keys())
-        if topology in self._biptoposummary:
-            self._biptoposummary[topology].weight += weight
-        else:
-            self._biptoposummary[topology]=Topostruct()
-            self._biptoposummary[topology].weight = weight
-            if self.store_trees:
-                curtree.clear_caches()
-                self._biptoposummary[topology].tree = curtree
-
-    ###############################################################################################
-
-    def _addcladetopo(self, cladedict, curtree, weight):
-
-        # If cladetopology has never been seen before, then add it and initialize count
-        # If topology HAS been seen before then update count
-        topology = frozenset(cladedict.keys())
-        if topology in self._cladetoposummary:
-            self._cladetoposummary[topology].weight += weight
-        else:
-            self._cladetoposummary[topology]=Topostruct()
-            self._cladetoposummary[topology].weight = weight
-            if self.store_trees:
-                curtree.clear_caches()
-                self._cladetoposummary[topology].tree = curtree
-
-    ###############################################################################################
-
-    def update(self, other):
-        """Merge this object with other treesummary"""
-
-        self._biptoposummary_processed = False
-        self._cladetoposummary_processed = False
-
-        # Superclass method takes care of updating:
-        # tree_count, tree_weight_sum, and bipart/clade-summary
-        TreeSummary.update(self, other)
-
-        for biptopology in other._biptoposummary:
-            # If topology already in self.toposummary, update count
-            if biptopology in self._biptoposummary:
-                self._biptoposummary[biptopology].weight += other._biptoposummary[biptopology].weight
-            # If topology has never been seen before, simply transfer entry
-            else:
-                self._biptoposummary[biptopology]=other._biptoposummary[biptopology]
-
-        for cladetopology in other._cladetoposummary:
-            # If topology already in self.toposummary, update count
-            if cladetopology in self._cladetoposummary:
-                self._cladetoposummary[cladetopology].weight += other._cladetoposummary[cladetopology].weight
-            # If topology has never been seen before, simply transfer entry
-            else:
-                self._cladetoposummary[cladetopology]=other._cladetoposummary[cladetopology]
-
-    ###############################################################################################
-
-    def max_bipart_cred_tree(self):
-        """Find maximum bipartition credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
-
-        maxlogcred = -math.inf
-        for biptopology in self.biptoposummary:
-            logcred = self.log_bipart_credibility(biptopology)
-            if logcred > maxlogcred:
-                maxlogcred = logcred
-                maxlogcredbiptopo = biptopology
-
-        maxcredbipdict = {}
-        for bipartition in maxlogcredbiptopo:
-            branch = self.bipartsummary[bipartition]
-            maxcredbipdict[bipartition] = branch
-
-        # Build tree from bipartitions  in new bipdict
-        maxcredtree = Tree.from_biplist(maxcredbipdict)
-
-        return maxcredtree, maxlogcred
-
-    ###############################################################################################
-
-    def max_clade_cred_tree(self):
-        """Find maximum clade credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
-
-        maxlogcred = -math.inf
-        for clade_topology in self.cladetoposummary:
-            logcred = self.log_clade_credibility(clade_topology)
-            if logcred > maxlogcred:
-                maxlogcred = logcred
-                maxlogcred_cladetopo = clade_topology
-
-        maxcred_cladedict = {}
-        for clade in maxlogcred_cladetopo:
-            nodestruct = self.cladesummary[clade]
-            maxcred_cladedict[clade] = nodestruct
-        maxcredtree = Tree.from_cladedict(maxcred_cladedict)
-        return maxcredtree, maxlogcred
 
 ###################################################################################################
 ###################################################################################################
