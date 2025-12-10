@@ -670,10 +670,10 @@ class Treesummarytests(TreeTestBase):
                 mb_freq = float(mb_branch.label)
                 self.assertAlmostEqual(mb_freq, own_freq, places=3)
 
-    def test_bigtreesummary(self):
+    def test_treesummary_with_topologies(self):
         # Note: I am checking that mrbayes topologies are the same I found.
         # should also check topology frequencies
-        ts = pt.BigTreeSummary()
+        ts = pt.TreeSummary(trackbips=True, tracktopo=True)
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts.add_tree(t)
