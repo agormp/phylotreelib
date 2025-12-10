@@ -5150,7 +5150,7 @@ class TreeSummary():
     ###############################################################################################
 
     def contree(self, cutoff=0.5, allcompat=False):
-        """Returns a consensus tree built from selected bipartitions."""
+        """Find consensus tree built from selected bipartitions. Annotate tree with logcred"""
 
         if cutoff < 0.5:
             msg = "Consensus tree cutoff has to be at least 0.5"
@@ -5178,13 +5178,17 @@ class TreeSummary():
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
+                    
+        logcred = self.log_bipart_credibility(contree.topology())
+        contree.logcred = logcred
+        contree.cred_type = "bipartition"        
 
         return contree
 
     ###############################################################################################
 
     def max_bipart_cred_tree(self):
-        """Find maximum bipartition credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
+        """Find maximum bipartition credibility tree. Annotate tree with logcred/cred_type"""
 
         maxlogcred = -math.inf
         for biptopology in self.biptoposummary:
@@ -5198,15 +5202,17 @@ class TreeSummary():
             branch = self.bipartsummary[bipartition]
             maxcredbipdict[bipartition] = branch
 
-        # Build tree from bipartitions  in new bipdict
+        # Build tree from bipartitions in new bipdict, annotate with logcred and type
         maxcredtree = Tree.from_biplist(maxcredbipdict)
+        maxcredtree.logcred = maxlogcred
+        maxcredtree.cred_type = "clade"
 
-        return maxcredtree, maxlogcred
+        return maxcredtree
 
     ###############################################################################################
 
     def max_clade_cred_tree(self):
-        """Find maximum clade credibility tree. Return tuple of (maxcredtree, maxlogcred)"""
+        """Find maximum clade credibility tree. Annotate tree with logcred/cred_type"""
 
         maxlogcred = -math.inf
         for clade_topology in self.cladetoposummary:
@@ -5220,7 +5226,10 @@ class TreeSummary():
             nodestruct = self.cladesummary[clade]
             maxcred_cladedict[clade] = nodestruct
         maxcredtree = Tree.from_cladedict(maxcred_cladedict)
-        return maxcredtree, maxlogcred
+        maxcredtree.logcred = maxlogcred
+        maxcredtree.cred_type = "bipartition"
+
+        return maxcredtree
 
     ###############################################################################################
 
