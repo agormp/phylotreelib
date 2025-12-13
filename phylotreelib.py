@@ -2897,8 +2897,7 @@ class Tree:
             raise TreeError(msg)
 
         self.child_dict[parent][child].length = length
-
-        self.clear_caches()    # Python note: only lengthrelated caches actually - refactor
+        self.clear_length_caches()
 
     ###############################################################################################
 
