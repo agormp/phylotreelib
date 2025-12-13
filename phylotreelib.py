@@ -2870,10 +2870,7 @@ class Tree:
         attrname: Name of attribute (e.g., "depth")
         attrvalue: Value of attribute (e.g. 0.153)"""
         
-        if node not in self.nodedict:
-            self.nodedict[node] = Nodestruct()
-        for name, val in attributes.items():
-            setattr(self.nodedict[node], name, val)
+        setattr(self.nodedict[node], attrname, attrvalue)
 
     ###############################################################################################
 
