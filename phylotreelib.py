@@ -256,7 +256,7 @@ class Branchstruct:
         
         # Merge non-length attributes by copying from self
         # If check_compat: raise error if mismatch between self and other 
-        for attrname in self.__dict__.keys() - {("length")}:
+        for attrname in self.__dict__.keys() - {"length"}:
             self_value = getattr(self, attrname)
             if check_compat:
                 othervalue = getattr(other, attrname)
