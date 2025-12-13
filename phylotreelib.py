@@ -5454,8 +5454,9 @@ class TreeSummary():
     ###############################################################################################
 
     def set_mean_node_depths(self, sumtree):
-        """Set branch lengths on summary tree based on mean node depth for clades corresponding
-        to parent and child nodes (blen = depth_parent - depth_child).
+        """Set node depths on summary tree based on mean node depths for clades. 
+        Also set info about depth variation (sd and sem).
+        All information obtained from TreeSummary.cladesummary
 
         NOTE 1: only meaningful if input trees are based on a clock model.
         NOTE 2: only works if all clades in sumtree have been observed at least once. The option
