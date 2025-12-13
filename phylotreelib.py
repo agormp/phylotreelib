@@ -2014,7 +2014,11 @@ class Tree:
         if len(leaves) == 1:
             return next(iter(leaves))
 
-        leafset = set(leaves)
+        # python note: is if test always faster than set conversion?
+        if isinstance(leaves, set):
+            leafset = leaves
+        else:
+            leafset = set(leaves)        
         remotechildren_dict = self.remotechildren_dict
         parent_dict = self.parent_dict
 
