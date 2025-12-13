@@ -4885,11 +4885,9 @@ class TreeSummary():
             self._sorted_rootbips = None
             self._add_root(curtree)
 
-        cladedict = None
         if self.trackclades:
             cladedict = self._add_clades(curtree, weight)
 
-        bipdict = None
         if self.trackbips:
             bipdict = self._add_bips(curtree, weight)
           
