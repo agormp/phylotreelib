@@ -2852,9 +2852,7 @@ class Tree:
         attrname: Name of attribute (e.g., "length")
         attrvalue: Value of attribute (e.g. 0.153)"""
 
-        branch = self.child_dict[node1][node2]
-        setattr(branch, attrname, attrvalue)
-
+        setattr(self.child_dict[node1][node2], attrname, attrvalue)
         self.clear_caches()  
 
     ###############################################################################################
@@ -2863,13 +2861,9 @@ class Tree:
         """Get the value of any branch attribute.
         attrname: Name of attribute (e.g., "length")"""
 
-        branch = self.child_dict[node1][node2]
-        attribute = getattr(branch, attrname, default)
-
-        return attribute
+        return getattr(self.child_dict[node1][node2], attrname, default)
 
     ###############################################################################################
-    # Python note: more pythonic to just set attributes without setter?
     
     def set_node_attributes(self, node, **attributes):
         """Set one or more attributes for the specified node.
