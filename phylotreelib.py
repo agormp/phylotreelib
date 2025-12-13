@@ -1305,9 +1305,7 @@ class Tree:
     def nodedict(self):
         """Lazy creation of _nodedict when needed"""
         if not self._has_nodedict():
-            self._nodedict = {}
-            for node in self.nodes:
-                self._nodedict[node] = Nodestruct()
+            self._nodedict = {node: Nodestruct() for node in self.nodes}
         return self._nodedict
 
     ###############################################################################################
