@@ -4717,6 +4717,45 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def online_weighted_update_mean_var(self, struct, x, w):
+        """
+        Weighted online update of mean + M2 (sum of weighted squared deviations).
+            x: value whose mean and variance will be computed (e.g. branch length or node depth)
+            w: weight
+
+        Assumes struct has attributes: SUMW, mean, M2, n
+        """
+
+        # I am interested in being able to compute weighted mean and variance of various 
+        # node and branch attributes, and to do this "online" in a single pass.
+        # In order to do this I follow the robust (= no underflow/overflow problems), one-pass
+        # approach described in D.H.D. West, "Updating Mean and Variance Estimates: An Improved
+        # Method", Communications of the ACM, 22(9), 1979.
+
+        struct.n += 1
+        delta = x - struct.mean
+        struct.mean += (w / struct.SUMW) * delta
+        struct.M2 += w * delta * (x - struct.mean)
+    
+    ###############################################################################################
+
+    def finalize_online_weighted(self, struct):
+        """Helper for online_weighted_update_mean_var() method: 
+        compute final mean, var, and sd when all values have been collected"""
+        
+        if struct.n == 0:
+            msg = f"Can't compute mean and sd for item with 0 observations: {struct}"
+            raise TreeError(msg)
+        elif struct.n == 1:
+            return (struct.mean, "NA", "NA")
+        else:
+            # Could compute variance without bias correction n/n-1 but I think mrbayes etc uses it
+            var = (struct.M2 / struct.SUMW) * (struct.n / (struct.n - 1))
+            sd = math.sqrt(var)
+            return (struct.mean, var, sd)
+    
+    ###############################################################################################   
+        
     @property
     def bipartsummary(self):
         """Property method for lazy evaluation of freq, var, sd, and sem for branches"""
