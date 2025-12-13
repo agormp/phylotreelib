@@ -4758,44 +4758,28 @@ class TreeSummary():
         
     @property
     def bipartsummary(self):
-        """Property method for lazy evaluation of freq, var, sd, and sem for branches"""
+        """Property method for lazy evaluation of freq, var, and sd for branchstructs"""
         if not self._bipartsummary_processed:
-            for branch in self._bipartsummary.values():
-                branch.posterior = branch.SUMW / self.tree_weight_sum
+            for branchstruct in self._bipartsummary.values():
+                br = branchstruct
+                br.bipartition_cred = br.posterior = br.SUMW / self.tree_weight_sum
                 if self.trackblen:
-                    n = branch.bip_count
-                    if n > 1:
-                        branch.length_var = branch.T * n / ((n - 1) * branch.SUMW)
-                        branch.length_sd = math.sqrt(branch.length_var)
-                        branch.length_sem = branch.length_sd / math.sqrt(n)
-                    else:
-                        branch.length_var = "NA"
-                        branch.length_sd = "NA"
-                        branch.length_sem = "NA"
+                    br.length, br.length_var, br.length_sd = self.finalize_online_weighted(br)
             self._bipartsummary_processed = True
-
         return self._bipartsummary
 
     ###############################################################################################
 
     @property
     def cladesummary(self):
-        """Property method for lazy evaluation of freq, var, sd, and sem for node depths"""
+        """Property method for lazy evaluation of freq, var, and sd for nodestructs"""
         if not self._cladesummary_processed:
-            for node in self._cladesummary.values():
-                node.posterior = node.SUMW / self.tree_weight_sum
+            for nodestruct in self._cladesummary.values():
+                nd = nodestruct
+                nd.clade_cred = nd.posterior = nd.SUMW / self.tree_weight_sum
                 if self.trackdepth:
-                    n = node.clade_count
-                    if n > 1:
-                        node.depth_var = node.T * n / ((n - 1) * node.SUMW)
-                        node.depth_sd = math.sqrt(node.depth_var)
-                        node.depth_sem = node.depth_sd / math.sqrt(n)
-                    else:
-                        node.depth_var = "NA"
-                        node.depth_sd = "NA"
-                        node.depth_sem = "NA"
+                    nd.depth, nd.depth_var, nd.depth_sd = self.finalize_online_weighted(nd)
             self._cladesummary_processed = True
-
         return self._cladesummary
 
     ###############################################################################################
