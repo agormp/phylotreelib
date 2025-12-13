@@ -2945,6 +2945,28 @@ class Tree:
 
     ###############################################################################################
 
+    def set_blens_from_depths(self):
+        """Set all branch lengths based on node depths: blen = depth_parent - depth_child"""
+        
+        # Ensure presence of nodedict and that depth attribute exists for all nodes
+        if not self._has_nodedict():
+            raise TreeError("Tree does not have nodedict, so depth information not available")
+        missing = [n for n in self.nodes if not hasattr(self.nodedict[n], "depth")]
+        if missing:
+            msg = (f"No information about node depths on this tree "
+                   f"(missing 'depth' attribute for {len(missing)} nodes; e.g. {missing[:5]})")
+            raise TreeError(msg)
+        
+        # Set lengths from the stored depths
+        for parent in self.sorted_intnodes(deepfirst=True):
+            p_depth = self.nodedict[parent].depth
+            for child in self.children(parent):
+                c_depth = self.nodedict[child].depth
+                self.child_dict[parent][child].length = (p_depth - c_depth)
+        self.clear_length_caches()
+        
+    ###############################################################################################
+
     def subtree(self, basenode, return_basalbranch=False):
         """Returns subtree rooted at basenode as Tree object"""
 
