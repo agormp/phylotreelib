@@ -2560,6 +2560,7 @@ class Tree:
             stringlist = ["#NEXUS\n\nbegin trees;\n"]
 
         # If translateblock is requested: add translateblock to stringlist
+        transdict = None
         if translateblock:
             transdict = self.transdict()
             stringlist.append(self.translateblock(transdict))
@@ -2567,7 +2568,7 @@ class Tree:
         # Add newick tree string with optional meta-comments for figtree format
         stringlist.append("\ttree nexus_tree = ")
         stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield, 
-                                      precision=precision, transdict=transdict if translateblock else None, 
+                                      precision=precision, transdict=transdict, 
                                       node_attributes=node_attributes, branch_attributes=branch_attributes))
 
         # Add footer
