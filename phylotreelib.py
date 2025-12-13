@@ -734,25 +734,31 @@ class Tree:
         """Clears set of computed attributes. Use when tree structure is changed, and these
         are no longer reliable. Does not clear attributes listed in preserve"""
 
-        # Python note: using the actual names instead of the public property names
-        # is perhaps too tight coupling. Consider adding dict mapping from public to private
-        # property names, and let caller use public names in preserve
-
-        attributes_to_clear = {
-            "_parent_dict", "_remotechildren_dict", "_frozenset_leaves",
-            "_sorted_leaf_list", "_leaf2index", "dist_dict", "_pathdist_dict",
-            "_pathdist_dict_unroot", "_pathdist_as_ndarray", "_pathdist_as_ndarray_unroot",
-            "path_dict", "interner", "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
-            "_rootdist", "_nodedepthdict", "_topology_bipart", "_topology_clade"
-        }
-
-        attributes_to_clear -= set(preserve)
-        for attr in attributes_to_clear:
+        # structure/topology derived
+        for attr in {
+            "_parent_dict", "_remotechildren_dict",
+            "_frozenset_leaves", "_sorted_leaf_list", "_leaf2index",
+            "path_dict",
+            "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
+            "_topology_bipart", "_topology_clade",
+        }:
             setattr(self, attr, None)
-        # Special treatment for function nodedist() which is using an lru_cache
-        if "nodedist" not in preserve:
-            self.nodedist.cache_clear()
 
+        # and also clear length-derived
+        self.clear_length_caches()
+
+    ###############################################################################################
+
+    def clear_length_caches(self):
+        """Clear only length-related caches - leave topology related caches alone"""
+        
+        for attr in {
+            "dist_dict", "_rootdist", "_nodedepthdict", "_pathdist_dict", 
+            "_pathdist_dict_unroot", "_pathdist_as_ndarray", "_pathdist_as_ndarray_unroot",
+        }:
+            setattr(self, attr, None)
+        self.nodedist.cache_clear()
+    
     ###############################################################################################
 
     @classmethod
