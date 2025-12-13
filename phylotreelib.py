@@ -5475,20 +5475,16 @@ class TreeSummary():
         leaf2index = sumtree.leaf2index
 
         try:
-            for parent in sumtree.sorted_intnodes(deepfirst=True):
-                p_remkids = sumtree.remotechildren_dict[parent]
-                p_clade = Clade(p_remkids, all_leaves, sorted_leafs, leaf2index)
-                p_depth = self.cladesummary[p_clade].depth
-                for child in sumtree.children(parent):
-                    c_remkids = sumtree.remotechildren_dict[child]
-                    c_clade = Clade(c_remkids, all_leaves, sorted_leafs, leaf2index)
-                    c_depth = self.cladesummary[c_clade].depth
-                    blen = p_depth - c_depth
-                    sumtree.setlength(parent, child, blen)
+            for node in sumtree.nodes:
+                remkids = sumtree.remotechildren_dict[node]
+                clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
+                sumtree.set_node_attribute(node, "depth", self.cladesummary[clade].depth)
+                sumtree.set_node_attribute(node, "depth_sd", self.cladesummary[clade].depth_sd)
         except KeyError as e:
-            raise TreeError("Problem while setting mean node depths: the following clade has not been "
-                            + "observed among input trees: check rooting of tree."
-                            + f"\n{e.args[0]}")
+            raise TreeError("Problem while setting mean node depths on summary tree:\n"
+                            + "the following clade has not been observed among input trees.\n"
+                            + "Check rooting of tree:\n"
+                            + f"{e.args[0]}")
 
         return sumtree
 
