@@ -5093,7 +5093,6 @@ class TreeSummary():
         self._cladesummary_processed = False
         self._sorted_biplist = None
 
-
     ###############################################################################################
 
     def _updateroot(self, other):
@@ -5132,6 +5131,118 @@ class TreeSummary():
             else:
                 self._cladetoposummary[cladetopology]=other._cladetoposummary[cladetopology]
 
+    ###############################################################################################
+
+    def compute_sumtree(self, treetype="con", rooting="minvar", blen="biplen", 
+                        og=None, wt_count_burnin_filename_list=None):
+        """Compute and annotate summary tree: find topology, set root, set branch lengths,
+           annotate branches and nodes with relevant available information (eg, sd for blen)
+        
+           Possible values (should be provided as strings):
+           treetype: con (consensus tree)
+                     all (consensus tree with all compatible bipartitions)
+                     mcc (maximum clade credibility tree)
+                     mbc (maximum bipartition credibility tree)
+        
+           rooting: mid (midpoint rooting)
+                    minvar (minimum variance rooting)
+                    og (outgroup as string or list of strings, provide value in parameter og)
+                    input (use the root on the chosen input tree - only valid for mcc and mbc trees)
+        
+           blen: biplen (mean branch length for bipartitions corresponding to branches)
+                 meandepth (set node depths to mean for monophyl clade, derive blens from depths)
+                 cadepth (set node depths to mean common ancestor depths, derive blens from depths)
+                 input (use the depths on chosen input tree, derive blens. Only valid for mcc and mbc)
+                 none (all branch lengths set to 0.0)
+        
+           og: if rooting=og: name of outgroup taxon or list of names
+        """
+        
+        # Check that all required parameters are given and consistent
+        if (rooting == "og") and (not og):
+            raise TreeError(f"Outgroup rooting requested, but no og parameter provided")
+        if (blen == "cadepth") and (not wt_count_burnin_filename_list):
+            raise TreeError("Requested cadepth but no wt_count_burnin_filename_list provided")
+        
+        # Choose summary tree topology
+        if treetype == "mcc":
+            sumtree = self.max_clade_cred_tree()
+        elif treetype == "mbc":
+            sumtree = self.max_bipart_cred_tree()
+        elif treetype in ("con", "all"):
+            sumtree = self.contree(allcompat=(treetype == "all"))
+        else:
+            raise TreeError(f"Unknown summary tree type: {treetype}")
+            
+        # Root summary tree
+        if rooting == "mid":
+            sumtree.rootmid()
+        elif rooting == "minvar":
+            sumtree.rootminvar()
+        elif rooting == "og":
+            sumtree.rootout(og)
+        elif rooting == "input":
+            pass
+        else:
+            raise TreeError(f"Unknown rooting method: {rooting}")
+            
+        # Set branch lengths (or depths and then branch lengths)
+        if blen == "none":
+            # either leave as-is or force zero
+            for p in sumtree.intnodes:
+                for c in sumtree.children(p):
+                    sumtree.set_branch_attribute(p, c, "length", 0.0)
+        elif blen == "input":
+            pass  # keep whatever is already on the chosen tree
+        elif blen == "meandepth":
+            sumtree = self.set_mean_node_depths(sumtree)
+            sumtree.set_blens_from_depths()
+        elif blen == "cadepth":
+            sumtree = self.set_ca_node_depths(sumtree, wt_count_burnin_filename_list)
+            sumtree.set_blens_from_depths()
+        elif blen == "biplen":
+            sumtree = self.set_mean_biplen(sumtree)        
+        else:
+            raise TreeError(f"Unknown branch-length method: {blen}")
+            
+        # Annotate tree with relevant, available attributes
+        sumtree = self.annotate_sumtree(sumtree)
+        
+        # Decide what meta-comments to print
+        node_attrs = set()
+        branch_attrs = set()
+
+        if self.trackclades:
+            node_attrs.add("clade_cred")
+        if self.trackbips:
+            branch_attrs.add("bipartition_cred")
+
+        if blen in ("meandepth", "cadepth"):
+            node_attrs.update({"depth", "depth_sd", "depth_var"})
+
+        if blen == "biplen":
+            branch_attrs.add("length")
+            if self.trackblen:
+                branch_attrs.update({"length_sd", "length_var"})
+
+        elif blen in ("meandepth", "cadepth"):
+            branch_attrs.add("length")
+
+        elif blen == "none":
+            branch_attrs.add("length") 
+
+        elif blen == "input":
+            branch_attrs.add("length")
+
+        if self.trackroot:
+            branch_attrs.add("rootcred")
+
+        # attach for printing
+        sumtree._print_node_attributes = tuple(sorted(node_attrs))
+        sumtree._print_branch_attributes = tuple(sorted(branch_attrs))
+        
+        return sumtree
+            
     ###############################################################################################
 
     def log_bipart_credibility(self, biptopology):
