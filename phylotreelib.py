@@ -4917,29 +4917,26 @@ class TreeSummary():
 
         self._cladesummary_processed = False
         cladedict = curtree.cladedict()
-        for clade,nodestruct in cladedict.items():
-
-            # If clade has been seen before: update existing info
+        
+        # Local binding for faster access to function
+        online_weighted_update_mean_var = self.online_weighted_update_mean_var
+        
+        for clade, nodestruct in cladedict.items():
+            depth = nodestruct.depth
+            
             if clade in self._cladesummary:
-                TEMP = self._cladesummary[clade].SUMW + weight
-                self._cladesummary[clade].SUMW = TEMP
+                s =  self._cladesummary[clade]
+                s.SUMW += weight
                 if self.trackdepth:
-                    Q = nodestruct.depth - self._cladesummary[clade].depth
-                    R = Q*weight/TEMP
-                    self._cladesummary[clade].depth += R
-                    self._cladesummary[clade].T += R * self._cladesummary[clade].SUMW * Q
-                    self._cladesummary[clade].clade_count += 1
-
-            # If bipartition has never been seen before: add to dict and add online attributes
+                    online_weighted_update_mean_var(s, depth, weight)
             else:
-                self._cladesummary[clade]=nodestruct
-                self._cladesummary[clade].SUMW = weight
+                s = nodestruct
+                s.SUMW = weight
                 if self.trackdepth:
-                    self._cladesummary[clade].clade_count = 1
-                    self._cladesummary[clade].depth = nodestruct.depth
-                    self._cladesummary[clade].T = 0.0
-                else:
-                    self._cladesummary[clade].depth = 0.0
+                    s.n = 1
+                    s.mean = depth
+                    s.M2 = 0.0
+                self._cladesummary[clade] = s
 
         return cladedict
 
@@ -4951,41 +4948,26 @@ class TreeSummary():
         self._bipartsummary_processed = False
         self._sorted_biplist = None
 
-        # I am interested in being able to compute weighted frequency of a bipartition as well as
-        # the weighted mean and weighted variance of the branch length for that bipartition.
-        # In order to do this I follow the robust (= no underflow/overflow problems), one-pass
-        # approach described in D.H.D. West, "Updating Mean and Variance Estimates: An Improved
-        # Method", Communications of the ACM, 22(9), 1979.
-        # A number of variables are used, some of which are stored in the summary dictionary.
-        # These variables have mostly been named according to the original paper.
-        # Exceptions are "bip_count" which was "N", "weight" which was "W", "mean" which was "M",
-        # and "brlen" which was "X".
-        # Note: mean branch length is stored in two attributes: mean and length
-        # This is due to other functions that expect the attribute .length to be present
+        # Local binding for faster access to function
+        online_weighted_update_mean_var = self.online_weighted_update_mean_var
+        
         bipdict = curtree.bipdict()
-        for bipart,branchstruct in bipdict.items():
-
-            # If bipartition has been seen before: update existing info
+        for bipart, branchstruct in bipdict.items():
+            length = branchstruct.length
+            
             if bipart in self._bipartsummary:
-                TEMP = self._bipartsummary[bipart].SUMW + weight
-                self._bipartsummary[bipart].SUMW = TEMP
+                s = self._bipartsummary[bipart]
+                s.SUMW += weight
                 if self.trackblen:
-                    Q = branchstruct.length - self._bipartsummary[bipart].length
-                    R = Q*weight/TEMP
-                    self._bipartsummary[bipart].length += R
-                    self._bipartsummary[bipart].T += R * self._bipartsummary[bipart].SUMW * Q
-                    self._bipartsummary[bipart].bip_count += 1
-
-            # If bipartition has never been seen before: add to dict and add online attributes
+                    online_weighted_update_mean_var(s, length, weight)
             else:
-                self._bipartsummary[bipart]=branchstruct
-                self._bipartsummary[bipart].SUMW = weight
+                s = branchstruct
+                s.SUMW = weight
                 if self.trackblen:
-                    self._bipartsummary[bipart].bip_count = 1
-                    self._bipartsummary[bipart].length = branchstruct.length
-                    self._bipartsummary[bipart].T = 0.0
-                else:
-                    self._bipartsummary[bipart].length = 0.0
+                    s.n = 1
+                    s.mean = length
+                    s.M2 = 0.0
+                self._bipartsummary[bipart] = s
 
         return bipdict
 
