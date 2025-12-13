@@ -5047,13 +5047,13 @@ class TreeSummary():
                 if self.trackblen:
                     sumw1 = self_bipsum[bipart].SUMW
                     sumw2 = other_bipsum[bipart].SUMW
-                    mean1 = self_bipsum[bipart].length
-                    mean2 = other_bipsum[bipart].length
-                    t1 = self_bipsum[bipart].T
-                    t2 = other_bipsum[bipart].T
-                    self_bipsum[bipart].bip_count += other_bipsum[bipart].bip_count
-                    self_bipsum[bipart].length = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
-                    self_bipsum[bipart].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
+                    mean1 = self_bipsum[bipart].mean
+                    mean2 = other_bipsum[bipart].mean
+                    M21 = self_bipsum[bipart].M2
+                    M22 = other_bipsum[bipart].M2
+                    self_bipsum[bipart].n += other_bipsum[bipart].n
+                    self_bipsum[bipart].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
+                    self_bipsum[bipart].M2 = M21+M22+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
                 self_bipsum[bipart].SUMW += other_bipsum[bipart].SUMW
 
             # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
@@ -5077,13 +5077,13 @@ class TreeSummary():
                 if self.trackdepth:
                     sumw1 = self_cladesum[clade].SUMW
                     sumw2 = other_cladesum[clade].SUMW
-                    mean1 = self_cladesum[clade].depth
-                    mean2 = other_cladesum[clade].depth
-                    t1 = self_cladesum[clade].T
-                    t2 = other_cladesum[clade].T
-                    self_cladesum[clade].clade_count += other_cladesum[clade].clade_count
-                    self_cladesum[clade].depth = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
-                    self_cladesum[clade].T = t1+t2+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
+                    mean1 = self_cladesum[clade].mean
+                    mean2 = other_cladesum[clade].mean
+                    M21 = self_cladesum[clade].M2
+                    M22 = other_cladesum[clade].M2
+                    self_cladesum[clade].n += other_cladesum[clade].n
+                    self_cladesum[clade].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
+                    self_cladesum[clade].M2 = M21+M22+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
                 self_cladesum[clade].SUMW += other_cladesum[clade].SUMW
 
             # If clade has never been seen before: transfer Nodestruct from other_cladesum:
