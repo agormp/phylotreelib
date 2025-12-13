@@ -5491,64 +5491,79 @@ class TreeSummary():
     ###############################################################################################
 
     def set_ca_node_depths(self, sumtree, wt_count_burnin_filename_list):
-        """Set branch lengths on summary tree based on mean node depth for clades corresponding
-        to MRCA of sumtree-clade's leaves. (same as "--height ca" in BEAST's treeannotator)
-        This means that all input trees are used when computing
-        mean for each node (not just the input trees where that exact monophyletic clade
-        is present)
+        """Set node depths on summary tree based on mean node depth of clade's MRCAs on set 
+        of input trees (same as "--height ca" in BEAST's treeannotator).
+        This means that all input trees are used when computing mean depth for each node 
+        (not just the input trees where that exact monophyletic clade is present).
+        Proper interpretation of node depth is then "depth of MRCA of descendant leaves".
         
-        Node-depths of leaves will be the mean value observed across input trees. 
+        Node-depths of _leaves_ will be the mean value observed across input trees. 
         This only matters for leaves whose depth is being estimated (all other nodes
         will have constant depth across input trees).
         """
         
         sumtree.clear_caches()   # Python note: ever necessary? Mostly worried about nodedepthdict
         
-        # If trackdepth: 
-        # nodedict[node].depth already has mean node depth which is not what we want for internal nodes
-        if self.trackdepth:
-            for node in sumtree.intnodes:
-                sumtree.nodedict[node].depth = 0.0
-
         # Find mean common ancestor depth for all internal nodes
-        # Find mean node depth for leaves (for a leaf mean depth = CA depth)
+        # Find mean node depth for leaves (for a leaf: mean depth == CA depth)
         # (most leaves will have constant depth across input trees, but if some 
         # leaf dates are being estimated, then these will vary)
-        wsum = 0.0
-        for weight, count, burnin, filename in wt_count_burnin_filename_list:
+        
+        # Create local bindings and precomputed list for variables used in tight loops
+        online_weighted_update_mean_var = self.online_weighted_update_mean_var
+        sumtree_remkid_dict = sumtree.remotechildren_dict 
+        sumtree_intnodes = sumtree.intnodes
+        sumtree_leaves = sumtree.leaves
+        intnode_remkids = [(node, sumtree_remkid_dict[node]) for node in sumtree_intnodes]
+        
+        # Make online accumulators for node stats
+        acc = {}
+        for node in sumtree.nodes:
+            s = Nodestruct()
+            s.SUMW = 0.0
+            s.n = 0
+            s.mean = 0.0
+            s.M2 = 0.0
+            acc[node] = s
+        
+        # Stream trees and update stats online
+        for file_weight, count, burnin, filename in wt_count_burnin_filename_list:
             ntrees = count - burnin
-            wsum += weight
-            multiplier = weight / ntrees
-            treefile = Treefile(filename) #Python note: use "with Treefile(filename)"?
-            for i in range(burnin):
+            w_tree = file_weight / ntrees
+
+            treefile = Treefile(filename)
+            for _ in range(burnin):
                 treefile.readtree(returntree=False)
+
             for input_tree in treefile:
-                for node in sumtree.intnodes:
-                    sumt_remkids = sumtree.remotechildren_dict[node]
-                    input_mrca = input_tree.find_mrca(sumt_remkids)
-                    input_depth = input_tree.nodedepthdict[input_mrca]
-                    sumtree.nodedict[node].depth += input_depth * multiplier
-                # If trackdepth: nodedict already has mean leaf depth, so dont compute again
-                if not self.trackdepth:
-                    for node in sumtree.leaves:
-                        input_depth = input_tree.nodedepthdict[node]
-                        sumtree.nodedict[node].depth += input_depth * multiplier
-
-        # normalise depth values by sum of weights
-        for node in sumtree.intnodes:
-            sumtree.nodedict[node].depth /= wsum
-        if not self.trackdepth:
-            for node in sumtree.leaves:
-                sumtree.nodedict[node].depth /= wsum
                 
-        # use average depths to set branch lengths
-        for parent in sumtree.sorted_intnodes(deepfirst=True):
-            p_depth = sumtree.nodedict[parent].depth
-            for child in sumtree.children(parent):
-                c_depth = sumtree.nodedict[child].depth
-                blen = p_depth - c_depth
-                sumtree.setlength(parent, child, blen)
+                # local bindings for speed
+                find_mrca = input_tree.find_mrca 
+                nodedepthdict = input_tree.nodedepthdict
 
+                # internal nodes: MRCA depths
+                for node, sumtree_remkids in intnode_remkids:
+                    s = acc[node]
+                    s.SUMW += w_tree
+                    input_mrca = find_mrca(sumtree_remkids)
+                    depth = nodedepthdict[input_mrca]
+                    online_weighted_update_mean_var(s, depth, w_tree)
+
+                # leaves: mean depths (CA depth for singleton)
+                for node in sumtree_leaves:
+                    s = acc[node]
+                    s.SUMW += w_tree
+                    depth = nodedepthdict[node]
+                    online_weighted_update_mean_var(s, depth, w_tree)
+        
+        # Write results onto sumtree with domain names
+        for node in sumtree.nodes:
+            s = acc[node]
+            mean, var, sd = self.finalize_online_weighted(s)
+            sumtree.set_node_attribute(node, "depth", mean)
+            sumtree.set_node_attribute(node, "depth_var", var)
+            sumtree.set_node_attribute(node, "depth_sd", sd)
+        
         return sumtree
 
     ###############################################################################################
