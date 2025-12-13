@@ -2877,8 +2877,7 @@ class Tree:
     def get_node_attribute(self, node, attrname, default=""):
         """Get specified attribute for the specified node"""
         
-        nodestruct = self.nodedict[node]
-        return getattr(nodestruct, attrname, default)
+        return getattr(self.nodedict[node], attrname, default)
 
     ###############################################################################################
 
