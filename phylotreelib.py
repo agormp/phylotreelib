@@ -2865,9 +2865,10 @@ class Tree:
 
     ###############################################################################################
     
-    def set_node_attributes(self, node, **attributes):
-        """Set one or more attributes for the specified node.
-        Attributes can be given as name1=value1, name2=value2, ... pairs"""
+    def set_node_attribute(self, node, attrname, attrvalue):
+        """Set attribute for the specified node.
+        attrname: Name of attribute (e.g., "depth")
+        attrvalue: Value of attribute (e.g. 0.153)"""
         
         if node not in self.nodedict:
             self.nodedict[node] = Nodestruct()
