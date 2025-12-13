@@ -2207,23 +2207,7 @@ class Tree:
     def nodedepth(self,node):
         """Returns depth of node: distance from furthest leaf-level to node"""
 
-        # The depth of node N can be found from the depth of the root as:
-        # depth_N = depth_root - dist(root, N)
-        # First: Find rootdepth. Use cached value if present
-        try:
-            rootdepth = self.rootdepth
-        except AttributeError:
-            maxdist = 0.0
-            for leaf in self.leaflist():
-                rootdist = self.nodedist(leaf)
-                if rootdist > maxdist:
-                    maxdist = rootdist
-            rootdepth = maxdist
-            self.rootdepth = rootdepth
-
-        # Second: Find root-dist of specified node, and compute and return depth of node
-        depth = rootdepth - self.nodedist(node)
-        return depth
+        return self.nodedepthdict[node]
 
     ###############################################################################################
 
