@@ -5323,7 +5323,7 @@ class TreeSummary():
         # Build tree from bipartitions in new bipdict, annotate with logcred and type
         maxcredtree = Tree.from_biplist(maxcredbipdict)
         maxcredtree.logcred = maxlogcred
-        maxcredtree.cred_type = "clade"
+        maxcredtree.cred_type = "bipartition"
 
         return maxcredtree
 
@@ -5345,7 +5345,7 @@ class TreeSummary():
             maxcred_cladedict[clade] = nodestruct
         maxcredtree = Tree.from_cladedict(maxcred_cladedict)
         maxcredtree.logcred = maxlogcred
-        maxcredtree.cred_type = "bipartition"
+        maxcredtree.cred_type = "clade"
 
         return maxcredtree
 
