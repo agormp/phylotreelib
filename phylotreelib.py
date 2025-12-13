@@ -5606,6 +5606,84 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def annotate_sumtree(self, sumtree):
+        """
+        Annotate sumtree nodes/branches with whatever TreeSummary tracked.
+        """
+        # Keep track of which attributes can be printed
+        node_attrs = set()
+        branch_attrs = set()
+        
+        # Node annotations from cladesummary
+        if self.trackclades:
+            all_leaves = sumtree.frozenset_leaves
+            sorted_leafs = sumtree.sorted_leaf_list
+            leaf2index = sumtree.leaf2index
+
+            for node in sumtree.nodes:
+                clade = Clade(sumtree.remotechildren_dict[node], all_leaves, sorted_leafs, leaf2index)
+                nd = self.cladesummary.get(clade)
+                if nd is None:
+                    raise TreeError("Problem while annotating summary tree:\n"
+                                    + "the following clade has not been observed among input trees.\n"
+                                    + "Check rooting of tree:\n"
+                                    + f"{clade}")
+                else:
+                    # consensus clade WAS observed
+                    sumtree.set_node_attribute(node, "clade_cred", getattr(nd, "clade_cred", nd.posterior))
+                    node_attrs.add("clade_cred")
+                    if self.trackdepth:
+                        sumtree.set_node_attribute(node, "depth", nd.depth)
+                        sumtree.set_node_attribute(node, "depth_sd", nd.depth_sd)
+                        sumtree.set_node_attribute(node, "depth_var", nd.depth_var)
+                        node_attrs.update({"depth", "depth_sd", "depth_var"})
+
+        # Branch annotations from bipartsummary
+        if self.trackbips:
+            for parent in sumtree.sorted_intnodes():
+                for child in sumtree.children(parent):
+                    leafset1 = sumtree.remotechildren_dict[child]
+                    bip = Bipartition(leafset1, sumtree.frozenset_leaves, sumtree.sorted_leaf_list, sumtree.leaf2index)
+                    br = self.bipartsummary[bip]
+                    sumtree.set_branch_attribute(parent, child, "bipartition_cred",
+                                                 getattr(br, "bipartition_cred", br.posterior))
+                    branch_attrs.add("bipartition_cred")
+
+                    if self.trackblen:
+                        sumtree.set_branch_attribute(parent, child, "length", br.length)
+                        sumtree.set_branch_attribute(parent, child, "length_sd", br.length_sd)
+                        sumtree.set_branch_attribute(parent, child, "length_var", br.length_var)
+                        branch_attrs.update({"length", "length_sd", "length_var"})
+                        
+        # Set Newick internal node labels (numbers after ')') 
+        # For each internal node (except root), set the label on its incoming branch.
+        for parent in sumtree.sorted_intnodes():
+            for child in sumtree.children(parent):
+                if child in sumtree.leaves:
+                    continue  # no label needed for tips
+
+                br = sumtree.child_dict[parent][child]
+                nd = sumtree.nodedict.get(child)
+
+                # Prefer clade support if available on the node
+                if nd is not None and hasattr(nd, "clade_cred"):
+                    br.label = nd.clade_cred
+                # Otherwise use bipartition support if available on the branch
+                elif hasattr(br, "bipartition_cred"):
+                    br.label = br.bipartition_cred
+                else:
+                    # Optional: set empty label (or leave unchanged)
+                    br.label = ""
+                        
+        # Root annotations
+        if self.trackroot:
+            self.set_rootcredibility(sumtree)
+            branch_attrs.add("rootcred")
+
+        return sumtree
+    
+    ###############################################################################################
+    
     def set_clade_credibility(self, tree, precision=6):
         """Set clade credibility on provided target tree based on freq of clade in TreeSummary.
 
