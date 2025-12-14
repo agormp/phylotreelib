@@ -5201,9 +5201,7 @@ class TreeSummary():
             sumtree = self.set_ca_node_depths(sumtree, wt_count_burnin_filename_list)
             sumtree.set_blens_from_depths()
         elif (blen == "biplen"):
-            if treetype in {"con", "all"}: 
-                pass    # blen=biplen already set during construction, and root not tracked
-            else:
+            if treetype == "mcc": 
                 sumtree = self.set_mean_biplen(sumtree)     
         else:
             raise TreeError(f"Unknown branch-length method: {blen}")
