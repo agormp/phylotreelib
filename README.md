@@ -1,6 +1,6 @@
 # phylotreelib
 
-[![](https://img.shields.io/badge/version-1.30.1-blue)](#installation)
+[![](https://img.shields.io/badge/version-1.30.2-blue)](#installation)
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=PyPI%20downloads&service=github)](https://pepy.tech/project/phylotreelib)
 [![](https://img.shields.io/badge/DOI-10.5281/zenodo.10148531-blue)](https://zenodo.org/doi/10.5281/zenodo.10148531)
 
