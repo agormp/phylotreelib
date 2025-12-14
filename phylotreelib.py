@@ -5479,8 +5479,9 @@ class TreeSummary():
             for node in sumtree.nodes:
                 remkids = sumtree.remotechildren_dict[node]
                 clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
-                sumtree.set_node_attribute(node, "depth", self.cladesummary[clade].depth)
-                sumtree.set_node_attribute(node, "depth_sd", self.cladesummary[clade].depth_sd)
+                nodestruct = self.cladesummary[clade]
+                sumtree.set_node_attribute(node, "depth", nodestruct.depth)
+                sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
         except KeyError as e:
             raise TreeError("Problem while setting mean node depths on summary tree:\n"
                             + "the following clade has not been observed among input trees.\n"
