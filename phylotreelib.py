@@ -4744,7 +4744,7 @@ class TreeSummary():
         compute final mean, var, and sd when all values have been collected"""
         
         if struct.n == 0:
-            msg = f"Can't compute mean and sd for item with 0 observations: {struct}"
+            msg = f"Can't compute mean and sd for item with 0 observations:\n{struct}"
             raise TreeError(msg)
         elif struct.n == 1:
             return (struct.mean, "NA", "NA")
@@ -5200,8 +5200,11 @@ class TreeSummary():
         elif blen == "cadepth":
             sumtree = self.set_ca_node_depths(sumtree, wt_count_burnin_filename_list)
             sumtree.set_blens_from_depths()
-        elif blen == "biplen":
-            sumtree = self.set_mean_biplen(sumtree)        
+        elif (blen == "biplen"):
+            if treetype in {"con", "all"}: 
+                pass    # blen=biplen already set during construction, and root not tracked
+            else:
+                sumtree = self.set_mean_biplen(sumtree)     
         else:
             raise TreeError(f"Unknown branch-length method: {blen}")
             
@@ -5569,10 +5572,11 @@ class TreeSummary():
     ###############################################################################################
 
     def set_mean_biplen(self, sumtree):
-        """Sets branch-length, -var, -sd, and -sem for each branch in sumtree,
-        based on values in bipsummary.
-        Should only be called when sumtree constructed based on clades (MCC), 
-        but brlens are to be set based on mean bipartition values"""
+        """Only to be used when goal is to set bipartition-based branch-length stats
+        on sumtree, and those were not already set during construction. This happens for instance
+        when treetype in {MCC, MBC} (but not when treetype in {con, all}).
+        NOTE: requires rooting to be tracked in order to properly split branch length on 
+        root bipartition"""
 
         for p in sumtree.sorted_intnodes():
             if p != sumtree.root:
@@ -5587,8 +5591,6 @@ class TreeSummary():
                     sumtree.set_branch_attribute(p,c,"length_sem", brstruct.length_sem)
 
         # Handle root bipartition separately
-        if not self.trackroot:
-            raise TreeError("Not possible to access self._rootbip_summary: self.trackroot is False")
         kid1,kid2 = sumtree.children(sumtree.root)
         kid1_remkids = sumtree.remotechildren_dict[kid1]
         rootbip = Bipartition(kid1_remkids, sumtree.frozenset_leaves,
