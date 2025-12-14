@@ -5483,10 +5483,11 @@ class TreeSummary():
                 sumtree.set_node_attribute(node, "depth", nodestruct.depth)
                 sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
         except KeyError as e:
-            raise TreeError("Problem while setting mean node depths on summary tree:\n"
-                            + "the following clade has not been observed among input trees.\n"
-                            + "Check rooting of tree:\n"
-                            + f"{e.args[0]}")
+            raise TreeError("Problem while setting mean node depths on summary tree: "
+                            + "the following clade has not been observed among input trees. "
+                            + "Summary tree is probably rooted differently from input trees - "
+                            + "consider changing rooting option.\n"
+                            + f"Unobserved clade:\n{e.args[0]}")
 
         return sumtree
 
