@@ -4885,17 +4885,15 @@ class TreeSummary():
             self._sorted_rootbips = None
             self._add_root(curtree)
 
-        if self.trackclades:
-            cladedict = self._add_clades(curtree, weight)
-
         if self.trackbips:
             bipdict = self._add_bips(curtree, weight)
-          
-        if self.tracktopo and self.trackbips:
-            self._addbiptopo(bipdict, curtree, weight)
+            if self.tracktopo:
+                self._addbiptopo(bipdict, curtree, weight)
 
-        if self.tracktopo and self.trackclades:
-            self._addcladetopo(cladedict, curtree, weight)
+        if self.trackclades:
+            cladedict = self._add_clades(curtree, weight)
+            if self.tracktopo:
+                self._addcladetopo(cladedict, curtree, weight)
         
     ###############################################################################################
 
