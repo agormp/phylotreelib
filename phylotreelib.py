@@ -4611,7 +4611,7 @@ class TreeSet():
         # Add newick trees with metacomments if needed
         for i, tree in enumerate(self.treelist):
             stringlist.append(f"    tree t.{i + 1} = ")
-            stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield, 
+            stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield, 
                                           precision=precision, transdict=transdict if translateblock else None, 
                                           node_attributes=node_attributes, branch_attributes=branch_attributes))
             stringlist.append("\n")
