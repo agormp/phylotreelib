@@ -241,29 +241,14 @@ class Branchstruct:
     ###############################################################################################
     
     def merge(self, other, check_compat=False):
-        """Merges two Branchstructs and returns new Branchstruct. 
-        Useful for collapsing root branches.
-        Branch lengths are summed, other attributes are taken from self
-        check_compat: if True, check that non-length attributes in self and other match, 
-                      raise TreeError if not"""
+        """Merges two Branchstructs and returns new Branchstruct, e.g. for collapsing root branches.
+        lengths are summed, all other attributes are ignored (no easy way to combine)"""
         
-        obj = Branchstruct()
-
-        # Merge length attributes by summing
-        obj.length = self.length + other.length
-        
-        # Merge non-length attributes by copying from self
-        # If check_compat: raise error if mismatch between self and other 
-        for attrname in self.__dict__.keys() - {"length"}:
-            self_value = getattr(self, attrname)
-            if check_compat:
-                othervalue = getattr(other, attrname)
-                if self_value != othervalue:
-                    msg = (f"Mismatch between {attrname} attributes of two Branchstructs: \n"
-                          + f"self: {self_value}  other: {othervalue}")
-                    raise TreeError(msg)
-            setattr(obj, attrname, self_value)
-
+        # Python note: non-length attributes difficult to manage, since they may differ on two
+        # branches, and there is no way of combining them (e.g. clade cred-derived support values)
+        # Consider whether this will ever impact callers
+                        
+        obj = Branchstruct(length = self.length + other.length)        
         return obj
 
 ###################################################################################################
