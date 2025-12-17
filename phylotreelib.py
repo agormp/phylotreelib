@@ -4791,7 +4791,7 @@ class TreeSummary():
         if not self._cladesummary_processed:
             for nodestruct in self._cladesummary.values():
                 nd = nodestruct
-                nd.clade_cred = nd.posterior = nd.SUMW / self.tree_weight_sum
+                nd.clade_cred = nd.posterior = nd.freq = nd.SUMW / self.tree_weight_sum
                 if self.trackdepth:
                     nd.depth, nd.depth_var, nd.depth_sd = self.finalize_online_weighted(nd)
             self._cladesummary_processed = True
