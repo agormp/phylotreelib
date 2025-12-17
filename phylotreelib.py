@@ -5825,6 +5825,12 @@ class TreefileBase():
 
     # Classes for specific formats inherit from this class and add extra stuff as needed.
     # NOTE: i am opening files in "read text" with encoding UTF-8. Will this work across platforms?
+    # Python note: interner is used to store leaves and intnodes during reading multiple trees
+    # from one treefile. If any tree is changed during reading (e.g. read and then reroot)
+    # then the interned value is changed, and the next read tree will no longer match the 
+    # interned version (there is one more internal node for instance). This can lead to subtle
+    # crashes. I think only defense is to not use interning when planning to change trees online
+    
 
     def __init__(self, filename, filecontent, interner):
 
