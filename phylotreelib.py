@@ -4693,8 +4693,9 @@ class TreeSummary():
     """Class summarizing requested attributes (bipartitions, clades, root location, branch lengths,
        node depths, topologies) from many trees"""
 
-    def __init__(self, trackbips=True, trackclades=False, trackroot=False, trackblen=False, 
-                       trackdepth=False, tracktopo=False, store_trees=False):
+    def __init__(self, trackbips=False, trackclades=False, trackroot=False, trackblen=False, 
+                       trackdepth=False, tracktopo=False, track_subcladepairs= False,
+                       store_trees=False):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -4707,6 +4708,7 @@ class TreeSummary():
         self.trackblen = trackblen
         self.trackdepth = trackdepth
         self.tracktopo = tracktopo
+        self.track_subcladepairs = track_subcladepairs
         self.store_trees = store_trees
         
         self._bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
