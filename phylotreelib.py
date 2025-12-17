@@ -4777,7 +4777,7 @@ class TreeSummary():
         if not self._bipartsummary_processed:
             for branchstruct in self._bipartsummary.values():
                 br = branchstruct
-                br.bipartition_cred = br.posterior = br.SUMW / self.tree_weight_sum
+                br.bipartition_cred = br.posterior = br.freq = br.SUMW / self.tree_weight_sum
                 if self.trackblen:
                     br.length, br.length_var, br.length_sd = self.finalize_online_weighted(br)
             self._bipartsummary_processed = True
