@@ -6140,7 +6140,7 @@ class Nexustreefile(TreefileBase):
 class Treefile:
     """Factory for making Newick or Nexus treefile objects. Autodetects fileformat"""
 
-    def __new__(klass, filename):
+    def __new__(klass, filename, interner=None):
 
         def read_until_non_comment(filename):
             with open(filename, 'r') as file:
@@ -6169,9 +6169,9 @@ class Treefile:
 
         headertext = read_until_non_comment(filename)
         if "#nexus" in headertext.lower():
-            return Nexustreefile(filename)
+            return Nexustreefile(filename, interner=interner)
         else:
-            return Newicktreefile(filename)
+            return Newicktreefile(filename, interner=interner)
 
 ###################################################################################################
 ###################################################################################################
