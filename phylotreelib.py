@@ -219,8 +219,7 @@ class Branchstruct:
     
     def __init__(self, length=0.0, **attributes):
         self.length = length
-        for name, value in attributes.items():
-            setattr(self, name, value)
+        self.__dict__.update(attributes)
 
     def __str__(self):
         attrs = [f"{k}: {v}" for k, v in vars(self).items()]
@@ -236,8 +235,7 @@ class Branchstruct:
         
         # Python note: only works as deepcopy if all attributes are immutable. Rewrite!
         obj = Branchstruct()
-        for attrname, value in self.__dict__.items():
-            setattr(obj, attrname, value)
+        obj.__dict__.update(self.__dict__)
         return obj
         
     ###############################################################################################
