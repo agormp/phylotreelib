@@ -731,7 +731,7 @@ class Tree:
             "path_dict",
             "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
             "_topology_bipart", "_topology_clade",
-        }:
+        } - set(preserve):
             setattr(self, attr, None)
 
         # and also clear length-derived
