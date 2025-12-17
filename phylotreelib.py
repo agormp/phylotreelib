@@ -2612,27 +2612,50 @@ class Tree:
 
     ###############################################################################################
 
-    def cladedict(self, keep_remchild_dict = False):
-        """Returns tree in the form of a "clade dictionary" """
+    def cladedict(self, keep_remchild_dict=False, track_subcladepairs=False):
+        """Returns tree in the form of a "clade dictionary": {clade: nodestruct}
+        Nodestructs get the .depth attribute set during construction.
+        If requested: Nodestructs also sets .subcladepairs attribute (set)"""
 
-        # Names of leaves in clade are represented as an immutable set
-        # The entire tree is represented as a dictionary where the keys are clades
-        # The values are Nodestructs
-        clade_dict = {}
-
-        # For each node: find clade representation, add this and Nodestruct to list.
+        cladedict = {}
+        node2clade = {}     
+        
+        # For each node: find clade representation, add this and Nodestruct to dict
         for node, node_remkids in self.remotechildren_dict.items():
             clade = Clade(node_remkids, self.frozenset_leaves,
                           self.sorted_leaf_list, self.leaf2index)
             if self.interner:
                 clade = self.interner.intern_clade(clade)
-            clade_dict[clade] = Nodestruct(self.nodedepth(node))
-
+            nodestruct = Nodestruct(self.nodedepth(node), len(node_remkids))
+            cladedict[clade] = nodestruct
+            
+            # If tracking subcladepairs: remember clade for each node to avoid superfluous Clade
+            # construction for the two sub-clades in each iteration (already built as parent clade)
+            if track_subcladepairs:
+                node2clade[node] = clade
+            
+        if track_subcladepairs:
+            for node in self.intnodes:
+                try:
+                    kid1, kid2 = self.child_dict[node].keys()   # Instead of .children() for speed
+                except ValueError:
+                    msg = (
+                            f"Error while tracking subclade_pairs - clade has more than 2 children: "
+                            f"parent-node: {node}    children: {self.children(node)}"
+                            f"Are you sure input trees are rooted, e.g. using a clock-model?"
+                    )
+                    raise TreeError(msg)
+                clade = node2clade[node]
+                nodestruct = cladedict[clade]
+                subclade1 = node2clade[kid1]
+                subclade2 = node2clade[kid2]        
+                nodestruct.add_subcladepair(subclade1, subclade2)
+                
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
             self._remotechildren_dict = None
 
-        return clade_dict
+        return cladedict
 
     ###############################################################################################
 
