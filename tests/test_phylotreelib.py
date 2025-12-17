@@ -563,7 +563,7 @@ class TreeOutput(TreeTestBase):
 
         # Generate a random tree, create 10 variants using random spr, compute consensus tree
         # This function only checks that nexus string can be parsed, not that contree is correct
-        treesummary = pt.TreeSummary()
+        treesummary = pt.TreeSummary(trackbips = True, trackblen = True)
         for i in range(10):
             tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
             treesummary.add_tree(tree)
@@ -611,7 +611,7 @@ class Treesummarytests(TreeTestBase):
         trprobfile.close()
 
     def test_contree(self):
-        ts = pt.TreeSummary(trackblen=True)
+        ts = pt.TreeSummary(trackbips=True, trackblen=True)
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts.add_tree(t)
@@ -639,12 +639,12 @@ class Treesummarytests(TreeTestBase):
                 self.assertAlmostEqual(mb_freq, own_freq)
 
     def test_treesummary_update(self):
-        ts1 = pt.TreeSummary(trackblen=True)
+        ts1 = pt.TreeSummary(trackbips=True, trackblen=True)
         tf1 = pt.Nexustreefile(self.t1_fname)
         for t in tf1:
             ts1.add_tree(t)
         tf1.close()
-        ts2 = pt.TreeSummary(trackblen=True)
+        ts2 = pt.TreeSummary(trackbips=True, trackblen=True)
         tf2 = pt.Nexustreefile(self.t2_fname)
         for t in tf2:
             ts2.add_tree(t)
