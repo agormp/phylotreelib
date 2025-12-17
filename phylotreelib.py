@@ -5161,6 +5161,7 @@ class TreeSummary():
                      all (consensus tree with all compatible bipartitions)
                      mcc (maximum clade credibility tree)
                      mbc (maximum bipartition credibility tree)
+                     hip (HIPSTR summary tree)
         
            rooting: mid (midpoint rooting)
                     minvar (minimum variance rooting)
@@ -5189,6 +5190,8 @@ class TreeSummary():
             sumtree = self.max_bipart_cred_tree()
         elif treetype in ("con", "all"):
             sumtree = self.contree(allcompat=(treetype == "all"))
+        elif treetype == "hip":
+            sumtree = self.hipstr_tree()
         else:
             raise TreeError(f"Unknown summary tree type: {treetype}")
             
