@@ -4856,7 +4856,8 @@ class TreeSummary():
 
     @property
     def biptoposummary(self):
-        """Property method for lazy evaluation of topostruct.posterior"""
+        """Property method for lazy evaluation of topostruct.posterior
+        biptoposummary: dict of {biptopology: Topostruct}"""
         if not self._biptoposummary_processed:
             for topostruct in self._biptoposummary.values():
                 topostruct.posterior = topostruct.weight / self.tree_weight_sum
@@ -4868,7 +4869,8 @@ class TreeSummary():
 
     @property
     def cladetoposummary(self):
-        """Property method for lazy evaluation of topostruct.posterior"""
+        """Property method for lazy evaluation of topostruct.posterior
+           cladetoposummary: dict of {cladetopology: Topostruct}"""
         if not self._cladetoposummary_processed:
             for topostruct in self._cladetoposummary.values():
                 topostruct.posterior = topostruct.weight / self.tree_weight_sum
