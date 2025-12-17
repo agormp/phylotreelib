@@ -4931,7 +4931,7 @@ class TreeSummary():
         """Helper method to add_tree: handles clades"""
 
         self._cladesummary_processed = False
-        cladedict = curtree.cladedict()
+        cladedict = curtree.cladedict(track_subcladepairs=self.track_subcladepairs)
         
         # Local binding for faster access to function
         online_weighted_update_mean_var = self.online_weighted_update_mean_var
@@ -4944,6 +4944,9 @@ class TreeSummary():
                 s.SUMW += weight
                 if self.trackdepth:
                     online_weighted_update_mean_var(s, depth, weight)
+                if self.track_subcladepairs and (nodestruct.nleaves > 2):
+                    subclade1, subclade2 = next(iter(nodestruct.subcladepairs))
+                    s.add_subcladepair(subclade1, subclade2)
             else:
                 s = nodestruct
                 s.SUMW = weight
