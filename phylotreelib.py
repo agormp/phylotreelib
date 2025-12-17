@@ -2575,7 +2575,7 @@ class Tree:
         # A bipartition is represented as an immutable set of two such (complementary) sets
         # The entire tree is represented as a dictionary where the keys are bipartitions
         # The values are Branchstructs
-        bipartition_dict = {}
+        bipdict = {}
 
         # For each branch: find bipartition representation, add this and Branchstruct to list.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
@@ -2589,7 +2589,7 @@ class Tree:
                 if self.interner:
                     bipartition = self.interner.intern_bipart(bipartition)
                 origbranch = self.child_dict[parent][child]
-                bipartition_dict[bipartition] = origbranch.copy()
+                bipdict[bipartition] = origbranch.copy()
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, merge other attributes)
@@ -2602,13 +2602,13 @@ class Tree:
             branch1 = self.child_dict[self.root][kid1]
             branch2 = self.child_dict[self.root][kid2]
             branch_merged = branch1.merge(branch2, check_compat=True)      # Sums up branch lengths, merges attributes
-            bipartition_dict[rootbip] = branch_merged
+            bipdict[rootbip] = branch_merged
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
             self._remotechildren_dict = None
 
-        return bipartition_dict
+        return bipdict
 
     ###############################################################################################
 
