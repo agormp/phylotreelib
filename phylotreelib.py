@@ -257,8 +257,10 @@ class Branchstruct:
 class Nodestruct:
     """Class that emulates a struct. Keeps node-related info"""
 
-    def __init__(self, depth=0.0):
+    def __init__(self, depth=0.0, nleaves=None):
         self.depth = depth
+        self.nleaves = nleaves
+        self.subcladepairs = set()
 
     def __str__(self):
         attrs = [f"{k}: {v}" for k, v in vars(self).items()]
@@ -266,6 +268,11 @@ class Nodestruct:
 
     def __repr__(self):
         return self.__str__()
+
+    ###############################################################################################
+
+    def add_subcladepair(self, subclade1, subclade2):
+        self.subcladepairs.add(frozenset([subclade1, subclade2]))
 
     ###############################################################################################
 
