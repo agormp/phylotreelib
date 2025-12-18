@@ -1229,17 +1229,39 @@ class Tree:
 
     ###############################################################################################
 
-    def __eq__(self, other, blenprecision=0.005):
-        """Implements equality testing for Tree objects"""
+    def __eq__(self, other):
+        """Implements unrooted equality testing for Tree objects"""
+        
+        return self.equals(other, rooted=False)
 
-        # Two trees are identical if they have the same leaves, the same topology
-        # and the same branchlengths. Branch labels are ignored. Rooting is ignored
-        # NB: floating point comparison of relative difference.
-        # Precision chosen based on empirical comparison between own and PHYLIP tree (...)
+    ###############################################################################################
+
+    def equals(self, other, rooted=False, blenprecision=0.005):
+        """General method to test rooted or unrooted equality of Tree objects.
+        Two trees are identical if they have the same leaves, the same topology
+        and the same branchlengths (within requested relative precision). 
+        Branch labels are ignored. 
+        
+        rooted=False: ignore rooting, compare .topology_bipart
+        rooting=True: take rooting into account, compare .topology_clade
+        blenprecision: floating point comparison of relative difference. 
+                       blens are identical if abs(len1 - len2) / len1) < blenprecision
+                       Default precision 0.005 chosen based on empirical comparison 
+                       between own and PHYLIP trees (...)
+        """
+
         if self.leaves != other.leaves:
             return False
-        if self.topology() != other.topology():
+            
+        if rooted:
+            topo_self = self.topology_clade
+            topo_other = other.topology_clade
+        else:
+            topo_self = self.topology_bipart
+            topo_other = other.topology_bipart
+        if topo_self != topo_other:
             return False
+            
         bipself = self.bipdict()
         bipother = other.bipdict()
         for bipart in bipself:
@@ -1248,7 +1270,7 @@ class Tree:
             if len1 != 0 and len2 != 0:
                 if (abs(len1 - len2) / len1) > blenprecision:   # Floating point comparison of relative diff
                     return False
-            if (len1 == 0 and len2 > 0) or (len1 > 0 and len2 == 0):
+            if (len1 == 0 and len2 > 0) or (len1 > 0 and len2 == 0): # Will this ever happen?
                 return False
 
         # If we made it this far without returning, then Tree objects must be identical
