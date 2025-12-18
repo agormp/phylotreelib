@@ -2684,7 +2684,8 @@ class Tree:
         # If rooted at multifurcation: raise error
         # Python note: rethink logic here...
         if len(rootkids) > 2:
-            msg = "Input tree rooted at multifurcation - not possible to assign root to bipartition"
+            msg = ("Tree rooted at multifurcation - not possible to assign a unique root-bipartition"
+                   f"\nRoot's child-nodes: {rootkids}")
             raise TreeError(msg)
 
         leafset1 = self.remote_children(rootkids[0])
