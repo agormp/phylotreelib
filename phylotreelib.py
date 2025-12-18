@@ -5659,15 +5659,16 @@ class TreeSummary():
             raise TreeError("Root was not tracked - impossible to use biplen on this summary tree\n"
                             "(needed in order to properly split branch length on root bipartition)")
 
-        for p in sumtree.sorted_intnodes() - {sumtree.root}:
-            for c in sumtree.children(p):
-                bipart1 = sumtree.remotechildren_dict[c]
-                bip = Bipartition(bipart1, sumtree.frozenset_leaves,
-                                  sumtree.sorted_leaf_list, sumtree.leaf2index)
-                brstruct = self.bipartsummary[bip]
-                sumtree.set_branch_attribute(p,c,"length", brstruct.length)
-                sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
-                sumtree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
+        for p in sumtree.sorted_intnodes():
+            if p != sumtree.root:
+                for c in sumtree.children(p):
+                    bipart1 = sumtree.remotechildren_dict[c]
+                    bip = Bipartition(bipart1, sumtree.frozenset_leaves,
+                                      sumtree.sorted_leaf_list, sumtree.leaf2index)
+                    brstruct = self.bipartsummary[bip]
+                    sumtree.set_branch_attribute(p,c,"length", brstruct.length)
+                    sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
+                    sumtree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
 
         # Handle root bipartition separately
         kid1,kid2 = sumtree.children(sumtree.root)
