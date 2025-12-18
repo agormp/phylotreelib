@@ -5444,7 +5444,7 @@ class TreeSummary():
                         hipstr_cladedict[subclade] = ndstruct
                         clades_to_add.append(ndstruct)
         hipstr_tree = Tree.from_cladedict(hipstr_cladedict)
-        hipstr_tree.logcred = root_ndstruct.hipcc #? or compute logcred?
+        hipstr_tree.logcred = root_ndstruct.hipcc 
         hipstr_tree.cred_type = "hipstr"
 
         return hipstr_tree
