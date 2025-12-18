@@ -5162,7 +5162,8 @@ class TreeSummary():
                      all (consensus tree with all compatible bipartitions)
                      mcc (maximum clade credibility tree)
                      mbc (maximum bipartition credibility tree)
-                     hip (HIPSTR summary tree)
+                     hipstr (HIPSTR summary tree)
+                     mrhipstr (majority rule HIPSTR summary tree)
         
            rooting: mid (midpoint rooting)
                     minvar (minimum variance rooting)
