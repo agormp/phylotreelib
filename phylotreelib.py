@@ -5398,7 +5398,7 @@ class TreeSummary():
     ###############################################################################################
 
     def hipstr_tree(self, majrule=False):
-        """Construct HIPSTR summary tree, or MrHIPSTR tree (majrule=True)
+        """Construct HIPSTR summary tree, or mrHIPSTR tree (majrule=True)
         HIPSTR: highest independent posterior subtree reconstruction in TreeAnnotator X
         Baele et al., Bioinformatics, 2025, 41(10), https://doi.org/10.1093/bioinformatics/btaf488"""
         
