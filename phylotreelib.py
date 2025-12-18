@@ -5192,8 +5192,8 @@ class TreeSummary():
             sumtree = self.max_bipart_cred_tree()
         elif treetype in ("con", "all"):
             sumtree = self.contree(allcompat=(treetype == "all"))
-        elif treetype == "hip":
-            sumtree = self.hipstr_tree()
+        elif treetype in ("hipstr", "mrhipstr"):
+            sumtree = self.hipstr_tree(majrule=(treetype == "mrhipstr"))
         else:
             raise TreeError(f"Unknown summary tree type: {treetype}")
             
