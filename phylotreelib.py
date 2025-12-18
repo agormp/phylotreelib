@@ -139,7 +139,7 @@ def fast_treecount(filename, fileformat="nexus"):
     n_treestr = count_bytestring(filename, b"tree ")
     countlist = [n_semicolons, n_eqparen, n_treestr]
     notzero = [val for val in countlist if val>0]
-    return min(countlist)
+    return min(notzero)
 
 ####################################################################################
 
@@ -2619,7 +2619,7 @@ class Tree:
 
         cladedict = {}
         node2clade = {}     
-        
+
         # For each node: find clade representation, add this and Nodestruct to dict
         for node, node_remkids in self.remotechildren_dict.items():
             clade = Clade(node_remkids, self.frozenset_leaves,
