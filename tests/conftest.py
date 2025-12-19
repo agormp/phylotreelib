@@ -1,6 +1,14 @@
 import phylotreelib as pt
 import pytest
+from pathlib import Path
 
+############################################################################################
+
+@pytest.fixture
+def data_dir():
+    """Returns path to data dir, constructed relative to this test file"""
+    return Path(__file__).parent / "data"
+    
 ############################################################################################
 
 @pytest.fixture()
