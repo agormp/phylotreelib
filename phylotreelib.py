@@ -5174,7 +5174,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def compute_sumtree(self, treetype="con", rooting="minvar", blen="biplen", 
+    def compute_sumtree(self, treetype="con", blen="biplen", rooting=None, 
                         og=None, wt_count_burnin_filename_list=None):
         """Compute and annotate summary tree: find topology, set root, set branch lengths,
            annotate branches and nodes with relevant available information (eg, sd for blen)
@@ -5184,19 +5184,20 @@ class TreeSummary():
                      all (consensus tree with all compatible bipartitions)
                      mcc (maximum clade credibility tree)
                      mbc (maximum bipartition credibility tree)
-                     hipstr (HIPSTR summary tree)
-                     mrhipstr (majority rule HIPSTR summary tree)
-        
-           rooting: mid (midpoint rooting)
-                    minvar (minimum variance rooting)
-                    og (outgroup as string or list of strings, provide value in parameter og)
-                    input (use the root on the chosen input tree - only valid for mcc and mbc trees)
+                     hip (HIPSTR summary tree)
+                     mrhip (majority rule HIPSTR summary tree)
         
            blen: biplen (mean branch length for bipartitions corresponding to branches)
                  meandepth (set node depths to mean for monophyl clade, derive blens from depths)
                  cadepth (set node depths to mean common ancestor depths, derive blens from depths)
                  input (use the depths on chosen input tree, derive blens. Only valid for mcc and mbc)
                  none (all branch lengths set to 0.0)
+
+           rooting: mid (midpoint rooting)
+                    minvar (minimum variance rooting)
+                    og (outgroup as string or list of strings, provide value in parameter og)
+                    input (use the root on the chosen input tree - only valid for mcc and mbc trees)
+        
         
            og: if rooting=og: name of outgroup taxon or list of names
         """
@@ -5214,8 +5215,8 @@ class TreeSummary():
             sumtree = self.max_bipart_cred_tree()
         elif treetype in ("con", "all"):
             sumtree = self.contree(allcompat=(treetype == "all"))
-        elif treetype in ("hipstr", "mrhipstr"):
-            sumtree = self.hipstr_tree(majrule=(treetype == "mrhipstr"))
+        elif treetype in ("hip", "mrhip"):
+            sumtree = self.hipstr_tree(majrule=(treetype == "mrhip"))
         else:
             raise TreeError(f"Unknown summary tree type: {treetype}")
             
@@ -5226,7 +5227,7 @@ class TreeSummary():
             sumtree.rootminvar()
         elif rooting == "og":
             sumtree.rootout(og)
-        elif rooting == "input":
+        elif rooting is None:
             pass
         else:
             raise TreeError(f"Unknown rooting method: {rooting}")
