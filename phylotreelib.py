@@ -5402,50 +5402,73 @@ class TreeSummary():
         """Construct HIPSTR summary tree, or mrHIPSTR tree (majrule=True)
         HIPSTR: highest independent posterior subtree reconstruction in TreeAnnotator X
         Baele et al., Bioinformatics, 2025, 41(10), https://doi.org/10.1093/bioinformatics/btaf488"""
-        
-        # Create list of [(nleaves, clade, nodestruct), ...], sorted by nleaves
-        sorted_cladesummary = [(nd.nleaves, clade, nd) for clade,nd in self.cladesummary.items()]
-        sorted_cladesummary = sorted(sorted_cladesummary,key=itemgetter(0))
-        
-        # For each clade: find hipstr clade credbility and optimal pair of subclades
+                
+        # For each clade, starting with the smallest: 
+        #     find hipstr clade_score and optimal pair of subclades
         # For clade of size 1 or 2: 
-        #     hipstr_cc = log(freq)
+        #     clade_score = log(freq)
         # For larger clades: 
-        #     hipstr_cc = max[ logcc(subclade1) + logcc(subclade2) ] + log(cladefreq) 
+        #     clade_score = max[ clade_score(c1) + clade_score(c2) ] 
+        #                       + log(cladefreq) + majrule_reward (if freq>0.5)
         #     for all observed pairs of subclades
         cladesum = self.cladesummary
-        for nleaves, clade, ndstruct in sorted_cladesummary:
-            log_cladefreq = math.log(ndstruct.freq)
-            if nleaves <= 2:
-                ndstruct.hipcc = log_cladefreq
-                ndstruct.max_subcladepair = None
+        majrule_reward = 1E10
+        clades_by_size = [(nd.nleaves, clade, nd) for clade,nd in self.cladesummary.items()]
+        clades_by_size = sorted(clades_by_size, key=itemgetter(0))
+        
+        for nleaves, clade, nd in clades_by_size:    
+            cladefreq = nd.freq
+            log_cladefreq = math.log(cladefreq)
+            
+            if majrule and (cladefreq > 0.5):
+                reward = majrule_reward
             else:
-                max_hipcc = -math.inf
-                for subcladepair in ndstruct.subcladepairs:
-                    subclade1,subclade2 = subcladepair
-                    hipcc = cladesum[subclade1].hipcc + cladesum[subclade2].hipcc + log_cladefreq
-                    if hipcc > max_hipcc:
-                        max_hipcc = hipcc
-                        max_subcladepair = subcladepair
-                ndstruct.hipcc = max_hipcc
-                ndstruct.max_subcladepair = max_subcladepair
+                reward = 0.0
+                    
+            if nleaves == 1:
+                nd.clade_score = log_cladefreq # Always log(1.0) = 0.0
+                nd.best_pair = None       
+            elif nleaves == 2:
+                nd.clade_score = log_cladefreq + reward
+                nd.best_pair = None
+            else:
+                best_score = -math.inf
+                best_pairs = []
+                for c1,c2 in nd.subcladepairs:
+                    freqsum = cladesum[c1].freq + cladesum[c2].freq
+                    clade_score = (cladesum[c1].clade_score +
+                                   cladesum[c2].clade_score +
+                                   log_cladefreq + 
+                                   reward)
+                    if clade_score > best_score:
+                        best_score = clade_score
+                        best_pairs = [(freqsum, c1, c2)]
+                    elif clade_score == best_score:
+                        best_pairs.append((freqsum, c1, c2))
+                        
+                if len(best_pairs) > 1:
+                    best_pairs.sort(key = itemgetter(0), reverse=True)
+                
+                freqsum, best_sub1, best_sub2 = best_pairs[0]
+                nd.clade_score = best_score
+                nd.best_pair = (best_sub1, best_sub2)
                 
         # Starting from root clade (all leaves): add the clades in max_subcladepair, and then their
         # max_subcladepair, etc until tree fully resolved (no deeper max_subcladepairs)
-        nleaves, root_clade, root_ndstruct = sorted_cladesummary[-1]
-        hipstr_cladedict = {root_clade:root_ndstruct}
-        clades_to_add = [root_ndstruct]
-        while clades_to_add:
-            ndstruct = clades_to_add.pop()
-            if ndstruct.max_subcladepair:
+        nleaves, root_clade, root_nd = clades_by_size[-1]
+        hip_clades = {root_clade:root_nd}
+        stack = [root_nd]
+        while stack:
+            nd = stack.pop()
+            if nd.best_pair:
                 # Iterate over the two subclades
-                for subclade in ndstruct.max_subcladepair:
-                    ndstruct = cladesum[subclade]
-                    if (not majrule) or (ndstruct.freq >= 0.5):
-                        hipstr_cladedict[subclade] = ndstruct
-                        clades_to_add.append(ndstruct)
-        hipstr_tree = Tree.from_cladedict(hipstr_cladedict)
-        hipstr_tree.logcred = root_ndstruct.hipcc 
+                for subclade in nd.best_pair:
+                    nd = cladesum[subclade]
+                    hip_clades[subclade] = nd
+                    stack.append(nd)
+        hipstr_tree = Tree.from_cladedict(hip_clades)
+        hipstr_tree.clade_score = root_nd.clade_score 
+        hipstr_tree.logcred = hipstr_tree.clade_score # Placeholder for later real without awards
         hipstr_tree.cred_type = "hipstr"
 
         return hipstr_tree
