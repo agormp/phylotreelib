@@ -5472,7 +5472,7 @@ class TreeSummary():
                     stack.append(nd)
         hipstr_tree = Tree.from_cladedict(hip_clades)
         hipstr_tree.clade_score = root_nd.clade_score 
-        hipstr_tree.logcred = hipstr_tree.clade_score # Placeholder for later real without awards
+        hipstr_tree.logcred = self.log_clade_credibility(hipstr_tree.topology_clade)
         hipstr_tree.cred_type = "hipstr"
 
         return hipstr_tree
