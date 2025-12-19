@@ -5439,7 +5439,7 @@ class TreeSummary():
                 best_score = -math.inf
                 best_pairs = []
                 for c1,c2 in nd.subcladepairs:
-                    freqsum = cladesum[c1].freq + cladesum[c2].freq
+                    freqsum = cladesum[c1].freq + cladesum[c2].freq # Used to break tied scores (see treeannotator)
                     clade_score = (cladesum[c1].clade_score +
                                    cladesum[c2].clade_score +
                                    log_cladefreq + 
