@@ -792,6 +792,8 @@ class Test_compute_sumtree:
     """Compare pre-computed summary trees (treeannotator) to own computations. 
     Check various combinations of summary tree type, blen-setting, and rooting"""
     
+    # Python note: surely this can be done with fewer lines of code, but how then
+    # to get individual test PASSED messages?
     
     def test_hipstr_meandepth(self, data_dir):
         """HIPSTR tree with mean node depths and rooting at best HIPSTR resolution of root clade"""
@@ -847,7 +849,26 @@ class Test_compute_sumtree:
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
-    
+
+    def test_mcc_cadepth(self, data_dir):
+        """MCC tree with CA node depths and rooting at best tree's original root"""
+        
+        # Own computation
+        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
+        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True, 
+                              track_subcladepairs=True)
+        for t in tf:
+            tsum.add_tree(t)
+        town = tsum.compute_sumtree(treetype="mcc", blen="cadepth",
+                                    wt_count_burnin_filename_list=[(1, 1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
+        
+        # Gold standard computed by treeannotator
+        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_ca")
+        tgold = tf.readtree()
+        
+        # Comparisons
+        assert town.topology_clade == tgold.topology_clade # To get separate error message
+        assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
     
 ###################################################################################################
     
