@@ -2669,9 +2669,9 @@ class Tree:
                     raise TreeError(msg)
                 clade = node2clade[node]
                 nodestruct = cladedict[clade]
-                subclade1 = node2clade[kid1]
-                subclade2 = node2clade[kid2]        
-                nodestruct.add_subcladepair(subclade1, subclade2)
+                c1 = node2clade[kid1]
+                c2 = node2clade[kid2]        
+                nodestruct.add_subcladepair(c1, c2)
                 
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
@@ -4968,8 +4968,8 @@ class TreeSummary():
                 if self.trackdepth:
                     online_weighted_update_mean_var(s, depth, weight)
                 if self.track_subcladepairs and (nodestruct.nleaves > 2):
-                    subclade1, subclade2 = next(iter(nodestruct.subcladepairs))
-                    s.add_subcladepair(subclade1, subclade2)
+                    c1, c2 = next(iter(nodestruct.subcladepairs))
+                    s.add_subcladepair(c1, c2)
             else:
                 s = nodestruct
                 s.SUMW = weight
