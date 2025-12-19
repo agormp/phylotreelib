@@ -364,10 +364,14 @@ class Bipartition:
 
     def __str__(self):
         bip1,bip2 = self.get_bipartitions()
+        # if len(bip1) < len(bip2):
+        #     return f"\nleaf set 1:\n{str(bip1)}\n\nleaf set 2:\n{str(bip2)}\n"
+        # else:
+        #     return f"\nleaf set 1:\n{str(bip2)}\n\nleaf set 2:\n{str(bip1)}\n"
         if len(bip1) < len(bip2):
-            return f"\nleaf set 1:\n{str(bip1)}\n\nleaf set 2:\n{str(bip2)}\n"
+            return f"\nleaf set 1 (smaller half):\n{str(bip1)}"
         else:
-            return f"\nleaf set 1:\n{str(bip2)}\n\nleaf set 2:\n{str(bip1)}\n"
+            return f"\nleaf set 1 (smaller half):\n{str(bip2)}"
 
     def __repr__(self):
         return self.__str__()
@@ -5447,7 +5451,7 @@ class TreeSummary():
                         best_pairs.append((freqsum, c1, c2))
                         
                 if len(best_pairs) > 1:
-                    best_pairs.sort(key = itemgetter(0), reverse=True)
+                    best_pairs.sort(key = itemgetter(0), reverse=True)                            
                 
                 freqsum, best_sub1, best_sub2 = best_pairs[0]
                 nd.clade_score = best_score
