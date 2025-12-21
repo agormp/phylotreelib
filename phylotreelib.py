@@ -416,16 +416,16 @@ class Clade:
         cls._cache = {}
 
     @classmethod
-    def from_leafset(cls, leafset, tree=None):
+    def from_leafset(cls, leafset, tree):
         """Constructor: takes leaf names, maps to indices, interns"""
         if cls._leaf2index is None:
             cls._setup_clade(tree)
-        idx = cls._leaf2index
-        indices_froz = frozenset(idx[leaf] for leaf in leafset)
-        obj = cls._cache.get(indices_froz)
+        obj = cls._cache.get(leafset)
         if obj is None:
+            idx = cls._leaf2index
+            indices_froz = frozenset(idx[leaf] for leaf in leafset)
             obj = cls(indices_froz)
-            cls._cache[indices_froz] = obj
+            cls._cache[leafset] = obj
         return obj
 
     def __hash__(self):
@@ -1381,23 +1381,28 @@ class Tree:
     ###############################################################################################
 
     def build_remotechildren_dict(self):
-        """Constructs dict of all {parent:{remotechildren}} pairs in efficient manner.
+        """Constructs dict of {parent:frozenset{remotechildren}} for all nodes, in efficient manner.
         This dict can then be used directly or by remote_children() to speed up enquiries."""
 
-        remdict = self._remotechildren_dict = {}
+        child_dict = self.child_dict
+        remdict = {}
+        
+        for leaf in self.leaves:
+            remdict[leaf] = frozenset((leaf,))
+        
         for parent in self.sorted_intnodes(deepfirst=False):
-            remdict[parent] = set()
-            kidstack = list(self.child_dict[parent])
+            remkidset = set()
+            kidstack = list(child_dict[parent])
             while kidstack:
                 curnode = kidstack.pop()
-                if curnode in self.leaves:
-                    remdict[parent].add(curnode)
-                elif curnode in remdict:
-                    remdict[parent].update(remdict[curnode])
+                cur_remkids = remdict.get(curnode)
+                if cur_remkids is not None:
+                    remkidset.update(cur_remkids)
                 else:
-                    kidstack.extend(self.child_dict[curnode])
-        for node in self.leaves:
-            remdict[node] = {node}
+                    kidstack.extend(child_dict[curnode])
+            remdict[parent] = frozenset(remkidset)
+            
+        self._remotechildren_dict = remdict
 
     ###############################################################################################
 
@@ -5769,7 +5774,7 @@ class TreeSummary():
             leaf2index = sumtree.leaf2index
 
             for node in sumtree.nodes:
-                clade = Clade.from_leafset(sumtree.remotechildren_dict[node])
+                clade = Clade.from_leafset(sumtree.remotechildren_dict[node], sumtree)
                 nd = self.cladesummary.get(clade)
                 if nd is None:
                     raise TreeError("Problem while annotating summary tree:\n"
