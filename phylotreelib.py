@@ -388,55 +388,74 @@ class Bipartition:
 class Clade:
     """Class that represents a clade: the set of leaves descended from an internal node"""
 
-    __slots__ = ["all_leaves_set", "leaf_list", "leaf2index",
-                 'indices', '_hash_value']
+    __slots__ = ['indices_froz', '_hash_value']
+                 
+    # Class-level pointers (set once)
+    _all_leaves_set = None
+    _leaf_list = None
+    _leaf2index = None
 
-    def __init__(self, leafset, all_leaves_set, sorted_leaf_list, leaf2index):
-        """Initialise clade objects.
+    # Interning cache (class-level)
+    # Key is indices_froz; value is the Clade object.
+    _cache = {}
+    
+    def __init__(self, indices_froz):
+        self.indices_froz = indices_froz
+        self._hash_value = hash(indices_froz)
+    
+    @classmethod
+    def _setup_clade(cls, tree):
+        """Configure the leaf universe used by all Clade objects.
+        Call this once (e.g., in TreeSummary.__init__) before creating clades.
+        
+        tree: Tree object (which has property methods for these variables)
+        """
+        cls._leaf_list = tuple(tree.sorted_leaf_list)
+        cls._leaf2index = tree.leaf2index
+        cls._all_leaves_set = tree.frozenset_leaves
+        cls._cache = {}
 
-        leafset: set of leaves descending from an internal node
-        all_leaves_set: set of all leaf names in tree
-        sorted_leaf_list: sorted list of all leaf names in tree
-        leaf2index: dict of {leaf:index in sorted_leaf_list}
-
-        Last 3 params will typically point to attributes in parent Tree object"""
-
-        self.all_leaves_set = all_leaves_set
-        self.leaf_list = sorted_leaf_list
-        self.leaf2index = leaf2index
-        leafset = frozenset(leafset)
-        self.indices = {leaf2index[leaf] for leaf in leafset}
-        self._hash_value = hash(leafset)
+    @classmethod
+    def from_leafset(cls, leafset, tree=None):
+        """Constructor: takes leaf names, maps to indices, interns"""
+        if cls._leaf2index is None:
+            cls._setup_clade(tree)
+        idx = cls._leaf2index
+        indices_froz = frozenset(idx[leaf] for leaf in leafset)
+        obj = cls._cache.get(indices_froz)
+        if obj is None:
+            obj = cls(indices_froz)
+            cls._cache[indices_froz] = obj
+        return obj
 
     def __hash__(self):
         # Return the precomputed hash value
         return self._hash_value
 
     def __eq__(self, other):
-        # Python note: assumes hash collisions will never occur!
-        # Empirically this seems to be the case for realistic data, but is not guaranteed
-        return self._hash_value == other._hash_value
+        # Interning makes test of identity very fast
+        if self is other:
+            return True
+        return isinstance(other, Clade) and self.indices_fs == other.indices_fs
+
+    def __len__(self):
+        return len(self.indices_fs)
+
+    def get_clade(self):
+        """Returns the leaf names in this clade."""
+        leaf_list = self.__class__._leaf_list
+        return frozenset(leaf_list[i] for i in self.indices_froz)
 
     # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
     def __iter__(self):
-        # Convert indices to leaf values using set comprehension
-        leaves = frozenset({self.leaf_list[i] for i in self.indices})
-        return iter((leaves))
+        return iter((self.get_clade(),))
 
     def __str__(self):
-        myclade = self.get_clade()
-        return f"\n{str(myclade)}\n"
+        return f"\n{self.get_clade()}\n"
 
     def __repr__(self):
-        return self.__str__()
+        return str(self)
         
-    def __len__(self):
-        return(len(self.indices))
-
-    def get_clade(self):
-        leaves = frozenset({self.leaf_list[i] for i in self.indices})
-        return (leaves)
-
 ###################################################################################################
 ###################################################################################################
 
@@ -948,7 +967,7 @@ class Tree:
     def from_cladedict(cls, cladedict, interner=None):
 
         clade = next(iter(cladedict))
-        leaves = clade.all_leaves_set
+        leaves = clade._all_leaves_set
         obj = cls.from_leaves(leaves)
 
         for clade, nodestruct in cladedict.items():
@@ -2648,10 +2667,7 @@ class Tree:
 
         # For each node: find clade representation, add this and Nodestruct to dict
         for node, node_remkids in self.remotechildren_dict.items():
-            clade = Clade(node_remkids, self.frozenset_leaves,
-                          self.sorted_leaf_list, self.leaf2index)
-            if self.interner:
-                clade = self.interner.intern_clade(clade)
+            clade = Clade.from_leafset(node_remkids, self)
             nodestruct = Nodestruct(self.nodedepth(node), len(node_remkids))
             cladedict[clade] = nodestruct
             
@@ -5605,7 +5621,7 @@ class TreeSummary():
         try:
             for node in sumtree.nodes:
                 remkids = sumtree.remotechildren_dict[node]
-                clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
+                clade = Clade.from_leafset(remkids, sumtree)
                 nodestruct = self.cladesummary[clade]
                 sumtree.set_node_attribute(node, "depth", nodestruct.depth)
                 sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
@@ -5753,7 +5769,7 @@ class TreeSummary():
             leaf2index = sumtree.leaf2index
 
             for node in sumtree.nodes:
-                clade = Clade(sumtree.remotechildren_dict[node], all_leaves, sorted_leafs, leaf2index)
+                clade = Clade.from_leafset(sumtree.remotechildren_dict[node])
                 nd = self.cladesummary.get(clade)
                 if nd is None:
                     raise TreeError("Problem while annotating summary tree:\n"
@@ -5829,7 +5845,7 @@ class TreeSummary():
         try:
             for child in (tree.intnodes - {tree.root}):
                 remkids = tree.remotechildren_dict[child]
-                child_clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
+                child_clade = Clade.from_leafset(remkids, sumtree)
                 clade_cred = self.cladesummary[child_clade].posterior
                 parent = tree.parent(child)
                 tree.setlabel(parent, child, f"{clade_cred:.{precision}g}")
