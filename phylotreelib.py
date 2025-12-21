@@ -5226,7 +5226,7 @@ class TreeSummary():
         
            og: if rooting=og: name of outgroup taxon or list of names
         """
-        
+ 
         # Check that all required parameters are given and consistent
         if (rooting == "og") and (not og):
             raise TreeError(f"Outgroup rooting requested, but no og parameter provided")
