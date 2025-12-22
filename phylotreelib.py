@@ -1366,19 +1366,19 @@ class Tree:
         This dict can then be used directly or by remote_children() to speed up enquiries."""
 
         remdict = self._remotechildren_dict = {}
+
+        for node in self.leaves:
+            remdict[node] = {node}
+
         for parent in self.sorted_intnodes(deepfirst=False):
             remdict[parent] = set()
             kidstack = list(self.child_dict[parent])
             while kidstack:
                 curnode = kidstack.pop()
-                if curnode in self.leaves:
-                    remdict[parent].add(curnode)
-                elif curnode in remdict:
+                if curnode in remdict:
                     remdict[parent].update(remdict[curnode])
                 else:
                     kidstack.extend(self.child_dict[curnode])
-        for node in self.leaves:
-            remdict[node] = {node}
 
     ###############################################################################################
 
