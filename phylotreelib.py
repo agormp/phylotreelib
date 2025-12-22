@@ -392,65 +392,88 @@ class Bipartition:
 class Clade:
     """Class that represents a clade: the set of leaves descended from an internal node"""
 
-    __slots__ = ['indices_froz', '_hash_value']
-                 
-    # Class-level pointers (set once)
-    _all_leaves_set = None
-    _leaf_list = None
-    _leaf2index = None
+    __slots__ = ("_tipset_key", "indices_froz", "_hash_value")
 
-    # Interning cache (class-level)
-    # Key is indices_froz; value is the Clade object.
-    _cache = {}
-    
-    def __init__(self, indices_froz):
+    # Class-level attributes for caching and interning
+
+    # dict of {tipset_key: (tipset_tup, leaf2index, cache)}
+    _tipset_data = {}
+
+    # Hot-path: “current” tipset pointers (avoid dict lookups inside tight loops)
+    _active_key = None
+    _active_tipset_tup = None
+    _active_leaf2index = None
+    _active_cache = None
+          
+    # Only call this via .from_leafset 
+    def __init__(self, tipset_key, indices_froz):
+        self._tipset_key = tipset_key
         self.indices_froz = indices_froz
-        self._hash_value = hash(indices_froz)
+        self._hash_value = hash((tipset_key, indices_froz))
     
     @classmethod
-    def _setup_clade(cls, tree):
-        """Configure the leaf universe used by all Clade objects.
-        Call this once (e.g., in TreeSummary.__init__) before creating clades.
+    def _ensure_tipset(cls, tree):
+        """Ensure tipset resources exist; update hot-path pointers; return tipset_key."""
+        key = tree.frozenset_leaves  # frozenset[str], cached by Tree
         
-        tree: Tree object (which has property methods for these variables)
-        """
-        cls._leaf_list = tuple(tree.sorted_leaf_list)
-        cls._leaf2index = tree.leaf2index
-        cls._all_leaves_set = tree.frozenset_leaves
-        cls._cache = {}
+        # Fast path: same key object as last time
+        if key is cls._active_key:
+            return key
+
+        data = cls._tipset_data.get(key)
+        if data is None:
+            # Build once per tipset
+            tipset_tup = tree.sorted_leaf_tup              # tuple[str, ...]
+            leaf2index = tree.leaf2index                   # dict[str,int]
+            cache = {}                                     # indices_froz -> Clade
+            data = (tipset_tup, leaf2index, cache)
+            cls._tipset_data[key] = data
+
+        # Update hot-path pointers
+        cls._active_key = key
+        cls._active_tipset_tup, cls._active_leaf2index, cls._active_cache = data
+        return key
 
     @classmethod
-    def from_leafset(cls, leafset, tree=None):
-        """Constructor: takes leaf names, maps to indices, interns"""
-        if cls._leaf2index is None:
-            cls._setup_clade(tree)
-        idx = cls._leaf2index
+    def from_leafset(cls, leafset, tree):
+        """Create/intern from leaf names, using the tipset implied by `tree`."""
+        tipset_key = cls._ensure_tipset(tree)
+        idx = cls._active_leaf2index  # local vars are fastest
+        cache = cls._active_cache
+
         indices_froz = frozenset(idx[leaf] for leaf in leafset)
-        obj = cls._cache.get(indices_froz)
+        obj = cache.get(indices_froz)
         if obj is None:
-            obj = cls(indices_froz)
-            cls._cache[indices_froz] = obj
+            obj = cls(tipset_key, indices_froz)
+            cache[indices_froz] = obj
         return obj
 
+    @property
+    def tipset(self):
+        return self._tipset_key
+        
     def __hash__(self):
-        # Return the precomputed hash value
         return self._hash_value
 
     def __eq__(self, other):
-        # Interning makes test of identity very fast
         if self is other:
             return True
-        return isinstance(other, Clade) and self.indices_fs == other.indices_fs
+        return (
+            isinstance(other, Clade)
+            and self._tipset == other._tipset
+            and self.indices_froz == other.indices_froz
+        )
 
     def __len__(self):
-        return len(self.indices_fs)
+        return len(self.indices_froz)
 
     def get_clade(self):
-        """Returns the leaf names in this clade."""
-        leaf_list = self.__class__._leaf_list
-        return frozenset(leaf_list[i] for i in self.indices_froz)
+        """Return leaf names in this clade."""
+        tipset_tup, _, _ = self.__class__._tipset_data[self._tipset_key]
+        return frozenset(tipset_tup[i] for i in self.indices_froz)
 
     # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
+    # 1-tuple; comma is important
     def __iter__(self):
         return iter((self.get_clade(),))
 
@@ -458,8 +481,22 @@ class Clade:
         return f"\n{self.get_clade()}\n"
 
     def __repr__(self):
-        return str(self)
-        
+        return f"Clade(n={len(self)}, ntips={len(self._tipset)})"
+
+    # # ---------------- optional test helpers ----------------
+    # @classmethod
+    # def clear_tipset(cls, tree_or_tipset) -> None:
+    #     """Clear one tipset's registry/cache (useful in tests)."""
+    #     tipset = tree_or_tipset if isinstance(tree_or_tipset, tuple) else tree_or_tipset.sorted_leaf_tup
+    #     cls._tipset_leaf2index.pop(tipset, None)
+    #     cls._cache_by_tipset.pop(tipset, None)
+    #
+    # @classmethod
+    # def clear_all(cls) -> None:
+    #     """Clear all tipsets (useful in tests)."""
+    #     cls._tipset_leaf2index.clear()
+    #     cls._cache_by_tipset.clear()
+
 ###################################################################################################
 ###################################################################################################
 
