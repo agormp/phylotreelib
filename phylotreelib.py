@@ -5656,10 +5656,6 @@ class TreeSummary():
         will have constant depth across input trees).
         """
 
-        all_leaves = sumtree.frozenset_leaves
-        sorted_leafs = sumtree.sorted_leaf_list
-        leaf2index = sumtree.leaf2index
-
         try:
             for node in sumtree.nodes:
                 remkids = sumtree.remotechildren_dict[node]
@@ -5879,10 +5875,6 @@ class TreeSummary():
 
         NOTE: only works if all clades in tree have been observed at least once. The option
                 will therefore not work with all rootings"""
-
-        all_leaves = tree.frozenset_leaves
-        sorted_leafs = tree.sorted_leaf_list
-        leaf2index = tree.leaf2index
 
         try:
             for child in (tree.intnodes - {tree.root}):
