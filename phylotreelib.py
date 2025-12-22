@@ -193,6 +193,7 @@ class Interner():
         self.leafset_interndict = {}
         self.clade_interndict = {}
         self.bip_interndict = {}
+        self.leaftup_interndict = {}
         self.unhashable_dict = {}
 
     def intern_leafset(self, leafset):
@@ -203,6 +204,9 @@ class Interner():
 
     def intern_bipart(self, bipart):
         return self.bip_interndict.setdefault(bipart, bipart)
+
+    def intern_leaftup(self, leaftup):
+        return self.leaftup_interndict.setdefault(leaftup, leaftup)
 
     def store_unhashable(self, name, obj):
         """
@@ -307,20 +311,20 @@ class Bipartition:
     __slots__ = ["leaf_set", "leaf_list", "leaf2index",
                  'indices', '_hash_value']
 
-    def __init__(self, leafset1, all_leaves_set, sorted_leaf_list, leaf2index):
+    def __init__(self, leafset1, all_leaves_set, sorted_leaf_tup, leaf2index):
         """Initialise bipartition objects based on only one half of bipartition.
         If the complement of leafset1 is smaller, then that will be stored instead.
         If they have same size: store leafset with smaller hash.
 
         leafset1: one half of bipartition (to save time in caller)
         all_leaves_set: set of all leaf names
-        sorted_leaf_list: sorted list of all leaf names
-        leaf2index: dict of {leaf:index in sorted_leaf_list}
+        sorted_leaf_tup: sorted tuple of all leaf names
+        leaf2index: dict of {leaf:index in sorted_leaf_tup}
 
         Last 3 params will typically point to attributes in parent Tree object"""
 
         self.leaf_set = all_leaves_set
-        self.leaf_list = sorted_leaf_list
+        self.leaf_list = sorted_leaf_tup
         self.leaf2index = leaf2index
         leafset1 = frozenset(leafset1)
 
@@ -388,54 +392,110 @@ class Bipartition:
 class Clade:
     """Class that represents a clade: the set of leaves descended from an internal node"""
 
-    __slots__ = ["all_leaves_set", "leaf_list", "leaf2index",
-                 'indices', '_hash_value']
+    __slots__ = ("_tipset_key", "indices_froz", "_hash_value")
 
-    def __init__(self, leafset, all_leaves_set, sorted_leaf_list, leaf2index):
-        """Initialise clade objects.
+    # Class-level attributes for caching and interning
 
-        leafset: set of leaves descending from an internal node
-        all_leaves_set: set of all leaf names in tree
-        sorted_leaf_list: sorted list of all leaf names in tree
-        leaf2index: dict of {leaf:index in sorted_leaf_list}
+    # dict of {tipset_key: (tipset_tup, leaf2index, cache)}
+    _tipset_data = {}
 
-        Last 3 params will typically point to attributes in parent Tree object"""
+    # Hot-path: “current” tipset pointers (avoid dict lookups inside tight loops)
+    _active_key = None
+    _active_tipset_tup = None
+    _active_leaf2index = None
+    _active_cache = None
+          
+    # Only call this via .from_leafset 
+    def __init__(self, tipset_key, indices_froz):
+        self._tipset_key = tipset_key
+        self.indices_froz = indices_froz
+        self._hash_value = hash((tipset_key, indices_froz))
+    
+    @classmethod
+    def _ensure_tipset(cls, tree):
+        """Ensure tipset resources exist; update hot-path pointers; return tipset_key."""
+        key = tree.frozenset_leaves  # frozenset[str], cached by Tree
+        
+        # Fast path: same key object as last time
+        if key is cls._active_key:
+            return key
 
-        self.all_leaves_set = all_leaves_set
-        self.leaf_list = sorted_leaf_list
-        self.leaf2index = leaf2index
-        leafset = frozenset(leafset)
-        self.indices = {leaf2index[leaf] for leaf in leafset}
-        self._hash_value = hash(leafset)
+        data = cls._tipset_data.get(key)
+        if data is None:
+            # Build once per tipset
+            tipset_tup = tree.sorted_leaf_tup              # tuple[str, ...]
+            leaf2index = tree.leaf2index                   # dict[str,int]
+            cache = {}                                     # indices_froz -> Clade
+            data = (tipset_tup, leaf2index, cache)
+            cls._tipset_data[key] = data
 
+        # Update hot-path pointers
+        cls._active_key = key
+        cls._active_tipset_tup, cls._active_leaf2index, cls._active_cache = data
+        return key
+
+    @classmethod
+    def from_leafset(cls, leafset, tree):
+        """Create/intern from leaf names, using the tipset implied by `tree`."""
+        tipset_key = cls._ensure_tipset(tree)
+        idx = cls._active_leaf2index  # local vars are fastest
+        cache = cls._active_cache
+
+        indices_froz = frozenset(idx[leaf] for leaf in leafset)
+        obj = cache.get(indices_froz)
+        if obj is None:
+            obj = cls(tipset_key, indices_froz)
+            cache[indices_froz] = obj
+        return obj
+
+    @property
+    def tipset(self):
+        return self._tipset_key
+        
     def __hash__(self):
-        # Return the precomputed hash value
         return self._hash_value
 
     def __eq__(self, other):
-        # Python note: assumes hash collisions will never occur!
-        # Empirically this seems to be the case for realistic data, but is not guaranteed
-        return self._hash_value == other._hash_value
+        if self is other:
+            return True
+        return (
+            isinstance(other, Clade)
+            and self._tipset == other._tipset
+            and self.indices_froz == other.indices_froz
+        )
 
-    # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
-    def __iter__(self):
-        # Convert indices to leaf values using set comprehension
-        leaves = frozenset({self.leaf_list[i] for i in self.indices})
-        return iter((leaves))
-
-    def __str__(self):
-        myclade = self.get_clade()
-        return f"\n{str(myclade)}\n"
-
-    def __repr__(self):
-        return self.__str__()
-        
     def __len__(self):
-        return(len(self.indices))
+        return len(self.indices_froz)
 
     def get_clade(self):
-        leaves = frozenset({self.leaf_list[i] for i in self.indices})
-        return (leaves)
+        """Return leaf names in this clade."""
+        tipset_tup, _, _ = self.__class__._tipset_data[self._tipset_key]
+        return frozenset(tipset_tup[i] for i in self.indices_froz)
+
+    # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
+    # 1-tuple; comma is important
+    def __iter__(self):
+        return iter((self.get_clade(),))
+
+    def __str__(self):
+        return f"\n{self.get_clade()}\n"
+
+    def __repr__(self):
+        return f"Clade(n={len(self)}, ntips={len(self._tipset)})"
+
+    # # ---------------- optional test helpers ----------------
+    # @classmethod
+    # def clear_tipset(cls, tree_or_tipset) -> None:
+    #     """Clear one tipset's registry/cache (useful in tests)."""
+    #     tipset = tree_or_tipset if isinstance(tree_or_tipset, tuple) else tree_or_tipset.sorted_leaf_tup
+    #     cls._tipset_leaf2index.pop(tipset, None)
+    #     cls._cache_by_tipset.pop(tipset, None)
+    #
+    # @classmethod
+    # def clear_all(cls) -> None:
+    #     """Clear all tipsets (useful in tests)."""
+    #     cls._tipset_leaf2index.clear()
+    #     cls._cache_by_tipset.clear()
 
 ###################################################################################################
 ###################################################################################################
@@ -706,7 +766,7 @@ class Tree:
         self._parent_dict = None
         self._remotechildren_dict = None
         self._frozenset_leaves = None
-        self._sorted_leaf_list = None
+        self._sorted_leaf_tup = None
         self._leaf2index = None
         self.dist_dict = None
         self._pathdist_dict = None
@@ -731,7 +791,7 @@ class Tree:
         # structure/topology derived
         for attr in {
             "_parent_dict", "_remotechildren_dict",
-            "_frozenset_leaves", "_sorted_leaf_list", "_leaf2index",
+            "_frozenset_leaves", "_sorted_leaf_tup", "_leaf2index",
             "path_dict",
             "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
             "_topology_bipart", "_topology_clade",
@@ -948,15 +1008,16 @@ class Tree:
     def from_cladedict(cls, cladedict, interner=None):
 
         clade = next(iter(cladedict))
-        leaves = clade.all_leaves_set
+        leaves = clade.tipset
         obj = cls.from_leaves(leaves)
+        all_leaves = obj.frozenset_leaves
 
         for clade, nodestruct in cladedict.items():
             clade_leaves = clade.get_clade()
             if len(clade_leaves) == 1:
                 leaf = next(iter(clade_leaves))
                 obj.nodedict[leaf] = nodestruct
-            elif clade_leaves == leaves:
+            elif clade_leaves == all_leaves:
                 obj.nodedict[obj.root] = nodestruct
             else:
                 mrca = obj.find_mrca(clade_leaves)
@@ -1394,14 +1455,14 @@ class Tree:
     ###############################################################################################
 
     @property
-    def sorted_leaf_list(self):
-        if self._sorted_leaf_list == None:
-            sl = sorted(self.leaves)
+    def sorted_leaf_tup(self):
+        if self._sorted_leaf_tup == None:
+            stup = tuple(sorted(self.leaves))
             if self.interner:
-                self._sorted_leaf_list = self.interner.store_unhashable("sorted_leaf_list", sl)
+                self._sorted_leaf_tup = self.interner.intern_leaftup(stup)
             else:
-                self._sorted_leaf_list = sl
-        return self._sorted_leaf_list
+                self._sorted_leaf_tup = stup
+        return self._sorted_leaf_tup
 
     ###############################################################################################
 
@@ -1409,7 +1470,7 @@ class Tree:
     def leaf2index(self):
         if self._leaf2index == None:
             self._leaf2index = {}
-            for i,leaf in enumerate(self.sorted_leaf_list):
+            for i,leaf in enumerate(self.sorted_leaf_tup):
                 self._leaf2index[leaf] = i
             if self.interner:
                 self._leaf2index = self.interner.store_unhashable("leaf2index", self._leaf2index)
@@ -1538,7 +1599,7 @@ class Tree:
             dictarray = self._pathdist_as_ndarray_unroot
         if dictarray is None:
             distdict = self.pathdist_dict(rooted)
-            leafnames = self.sorted_leaf_list
+            leafnames = self.sorted_leaf_tup
             namepairs = itertools.combinations(leafnames, 2)
             nleaves = len(leafnames)
             npairs = nleaves * (nleaves - 1) // 2
@@ -2611,7 +2672,7 @@ class Tree:
             if child != self.root:
                 parent = self.parent(child)
                 bipartition = Bipartition(child_remkids, self.frozenset_leaves,
-                                          self.sorted_leaf_list, self.leaf2index)
+                                          self.sorted_leaf_tup, self.leaf2index)
                 if self.interner:
                     bipartition = self.interner.intern_bipart(bipartition)
                 origbranch = self.child_dict[parent][child]
@@ -2648,10 +2709,7 @@ class Tree:
 
         # For each node: find clade representation, add this and Nodestruct to dict
         for node, node_remkids in self.remotechildren_dict.items():
-            clade = Clade(node_remkids, self.frozenset_leaves,
-                          self.sorted_leaf_list, self.leaf2index)
-            if self.interner:
-                clade = self.interner.intern_clade(clade)
+            clade = Clade.from_leafset(node_remkids, self)
             nodestruct = Nodestruct(self.nodedepth(node), len(node_remkids))
             cladedict[clade] = nodestruct
             
@@ -2718,7 +2776,7 @@ class Tree:
         leafset2 = self.remote_children(rootkids[1])
         blen1 = self.nodedist(self.root, rootkids[0])
         blen2 = self.nodedist(self.root, rootkids[1])
-        rootbip = Bipartition(leafset1, self.frozenset_leaves, self.sorted_leaf_list, self.leaf2index)
+        rootbip = Bipartition(leafset1, self.frozenset_leaves, self.sorted_leaf_tup, self.leaf2index)
 
         return rootbip, leafset1, blen1, leafset2, blen2
 
@@ -5205,7 +5263,7 @@ class TreeSummary():
         
            og: if rooting=og: name of outgroup taxon or list of names
         """
-        
+ 
         # Check that all required parameters are given and consistent
         if (rooting == "og") and (not og):
             raise TreeError(f"Outgroup rooting requested, but no og parameter provided")
@@ -5541,7 +5599,7 @@ class TreeSummary():
             """Helper function to set root credibility for a branch."""
             leafset1 = sumtree.remotechildren_dict[c]
             bip = Bipartition(leafset1, sumtree.frozenset_leaves, 
-                              sumtree.sorted_leaf_list, sumtree.leaf2index)
+                              sumtree.sorted_leaf_tup, sumtree.leaf2index)
             if bip in self.rootbipsummary:
                 rootcred = self.rootbipsummary[bip].posterior
                 sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
@@ -5598,14 +5656,10 @@ class TreeSummary():
         will have constant depth across input trees).
         """
 
-        all_leaves = sumtree.frozenset_leaves
-        sorted_leafs = sumtree.sorted_leaf_list
-        leaf2index = sumtree.leaf2index
-
         try:
             for node in sumtree.nodes:
                 remkids = sumtree.remotechildren_dict[node]
-                clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
+                clade = Clade.from_leafset(remkids, sumtree)
                 nodestruct = self.cladesummary[clade]
                 sumtree.set_node_attribute(node, "depth", nodestruct.depth)
                 sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
@@ -5714,7 +5768,7 @@ class TreeSummary():
                 for c in sumtree.children(p):
                     bipart1 = sumtree.remotechildren_dict[c]
                     bip = Bipartition(bipart1, sumtree.frozenset_leaves,
-                                      sumtree.sorted_leaf_list, sumtree.leaf2index)
+                                      sumtree.sorted_leaf_tup, sumtree.leaf2index)
                     brstruct = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(p,c,"length", brstruct.length)
                     sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
@@ -5724,7 +5778,7 @@ class TreeSummary():
         kid1,kid2 = sumtree.children(sumtree.root)
         kid1_remkids = sumtree.remotechildren_dict[kid1]
         rootbip = Bipartition(kid1_remkids, sumtree.frozenset_leaves,
-                       sumtree.sorted_leaf_list, sumtree.leaf2index)
+                       sumtree.sorted_leaf_tup, sumtree.leaf2index)
         rootbrstruct = self.bipartsummary[rootbip]
         summary_rootbipstruct = self._rootbip_summary[rootbip]
 
@@ -5749,11 +5803,11 @@ class TreeSummary():
         # Node annotations from cladesummary
         if self.trackclades:
             all_leaves = sumtree.frozenset_leaves
-            sorted_leafs = sumtree.sorted_leaf_list
+            sorted_leafs = sumtree.sorted_leaf_tup
             leaf2index = sumtree.leaf2index
 
             for node in sumtree.nodes:
-                clade = Clade(sumtree.remotechildren_dict[node], all_leaves, sorted_leafs, leaf2index)
+                clade = Clade.from_leafset(sumtree.remotechildren_dict[node], tree=sumtree)
                 nd = self.cladesummary.get(clade)
                 if nd is None:
                     raise TreeError("Problem while annotating summary tree:\n"
@@ -5775,7 +5829,7 @@ class TreeSummary():
             for parent in sumtree.sorted_intnodes():
                 for child in sumtree.children(parent):
                     leafset1 = sumtree.remotechildren_dict[child]
-                    bip = Bipartition(leafset1, sumtree.frozenset_leaves, sumtree.sorted_leaf_list, sumtree.leaf2index)
+                    bip = Bipartition(leafset1, sumtree.frozenset_leaves, sumtree.sorted_leaf_tup, sumtree.leaf2index)
                     br = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(parent, child, "bipartition_cred",
                                                  getattr(br, "bipartition_cred", br.posterior))
@@ -5822,14 +5876,10 @@ class TreeSummary():
         NOTE: only works if all clades in tree have been observed at least once. The option
                 will therefore not work with all rootings"""
 
-        all_leaves = tree.frozenset_leaves
-        sorted_leafs = tree.sorted_leaf_list
-        leaf2index = tree.leaf2index
-
         try:
             for child in (tree.intnodes - {tree.root}):
                 remkids = tree.remotechildren_dict[child]
-                child_clade = Clade(remkids, all_leaves, sorted_leafs, leaf2index)
+                child_clade = Clade.from_leafset(remkids, sumtree)
                 clade_cred = self.cladesummary[child_clade].posterior
                 parent = tree.parent(child)
                 tree.setlabel(parent, child, f"{clade_cred:.{precision}g}")
