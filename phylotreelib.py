@@ -193,6 +193,7 @@ class Interner():
         self.leafset_interndict = {}
         self.clade_interndict = {}
         self.bip_interndict = {}
+        self.leaftup_interndict = {}
         self.unhashable_dict = {}
 
     def intern_leafset(self, leafset):
@@ -203,6 +204,9 @@ class Interner():
 
     def intern_bipart(self, bipart):
         return self.bip_interndict.setdefault(bipart, bipart)
+
+    def intern_leaftup(self, leaftup):
+        return self.leaftup_interndict.setdefault(leaftup, leaftup)
 
     def store_unhashable(self, name, obj):
         """
@@ -307,20 +311,20 @@ class Bipartition:
     __slots__ = ["leaf_set", "leaf_list", "leaf2index",
                  'indices', '_hash_value']
 
-    def __init__(self, leafset1, all_leaves_set, sorted_leaf_list, leaf2index):
+    def __init__(self, leafset1, all_leaves_set, sorted_leaf_tup, leaf2index):
         """Initialise bipartition objects based on only one half of bipartition.
         If the complement of leafset1 is smaller, then that will be stored instead.
         If they have same size: store leafset with smaller hash.
 
         leafset1: one half of bipartition (to save time in caller)
         all_leaves_set: set of all leaf names
-        sorted_leaf_list: sorted list of all leaf names
-        leaf2index: dict of {leaf:index in sorted_leaf_list}
+        sorted_leaf_tup: sorted tuple of all leaf names
+        leaf2index: dict of {leaf:index in sorted_leaf_tup}
 
         Last 3 params will typically point to attributes in parent Tree object"""
 
         self.leaf_set = all_leaves_set
-        self.leaf_list = sorted_leaf_list
+        self.leaf_list = sorted_leaf_tup
         self.leaf2index = leaf2index
         leafset1 = frozenset(leafset1)
 
@@ -725,7 +729,7 @@ class Tree:
         self._parent_dict = None
         self._remotechildren_dict = None
         self._frozenset_leaves = None
-        self._sorted_leaf_list = None
+        self._sorted_leaf_tup = None
         self._leaf2index = None
         self.dist_dict = None
         self._pathdist_dict = None
@@ -750,7 +754,7 @@ class Tree:
         # structure/topology derived
         for attr in {
             "_parent_dict", "_remotechildren_dict",
-            "_frozenset_leaves", "_sorted_leaf_list", "_leaf2index",
+            "_frozenset_leaves", "_sorted_leaf_tup", "_leaf2index",
             "path_dict",
             "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
             "_topology_bipart", "_topology_clade",
@@ -1413,14 +1417,14 @@ class Tree:
     ###############################################################################################
 
     @property
-    def sorted_leaf_list(self):
-        if self._sorted_leaf_list == None:
-            sl = sorted(self.leaves)
+    def sorted_leaf_tup(self):
+        if self._sorted_leaf_tup == None:
+            stup = tuple(sorted(self.leaves))
             if self.interner:
-                self._sorted_leaf_list = self.interner.store_unhashable("sorted_leaf_list", sl)
+                self._sorted_leaf_tup = self.interner.intern_leaftup(stup)
             else:
-                self._sorted_leaf_list = sl
-        return self._sorted_leaf_list
+                self._sorted_leaf_tup = stup
+        return self._sorted_leaf_tup
 
     ###############################################################################################
 
@@ -1428,7 +1432,7 @@ class Tree:
     def leaf2index(self):
         if self._leaf2index == None:
             self._leaf2index = {}
-            for i,leaf in enumerate(self.sorted_leaf_list):
+            for i,leaf in enumerate(self.sorted_leaf_tup):
                 self._leaf2index[leaf] = i
             if self.interner:
                 self._leaf2index = self.interner.store_unhashable("leaf2index", self._leaf2index)
@@ -1557,7 +1561,7 @@ class Tree:
             dictarray = self._pathdist_as_ndarray_unroot
         if dictarray is None:
             distdict = self.pathdist_dict(rooted)
-            leafnames = self.sorted_leaf_list
+            leafnames = self.sorted_leaf_tup
             namepairs = itertools.combinations(leafnames, 2)
             nleaves = len(leafnames)
             npairs = nleaves * (nleaves - 1) // 2
@@ -2630,7 +2634,7 @@ class Tree:
             if child != self.root:
                 parent = self.parent(child)
                 bipartition = Bipartition(child_remkids, self.frozenset_leaves,
-                                          self.sorted_leaf_list, self.leaf2index)
+                                          self.sorted_leaf_tup, self.leaf2index)
                 if self.interner:
                     bipartition = self.interner.intern_bipart(bipartition)
                 origbranch = self.child_dict[parent][child]
@@ -2734,7 +2738,7 @@ class Tree:
         leafset2 = self.remote_children(rootkids[1])
         blen1 = self.nodedist(self.root, rootkids[0])
         blen2 = self.nodedist(self.root, rootkids[1])
-        rootbip = Bipartition(leafset1, self.frozenset_leaves, self.sorted_leaf_list, self.leaf2index)
+        rootbip = Bipartition(leafset1, self.frozenset_leaves, self.sorted_leaf_tup, self.leaf2index)
 
         return rootbip, leafset1, blen1, leafset2, blen2
 
@@ -5557,7 +5561,7 @@ class TreeSummary():
             """Helper function to set root credibility for a branch."""
             leafset1 = sumtree.remotechildren_dict[c]
             bip = Bipartition(leafset1, sumtree.frozenset_leaves, 
-                              sumtree.sorted_leaf_list, sumtree.leaf2index)
+                              sumtree.sorted_leaf_tup, sumtree.leaf2index)
             if bip in self.rootbipsummary:
                 rootcred = self.rootbipsummary[bip].posterior
                 sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
@@ -5730,7 +5734,7 @@ class TreeSummary():
                 for c in sumtree.children(p):
                     bipart1 = sumtree.remotechildren_dict[c]
                     bip = Bipartition(bipart1, sumtree.frozenset_leaves,
-                                      sumtree.sorted_leaf_list, sumtree.leaf2index)
+                                      sumtree.sorted_leaf_tup, sumtree.leaf2index)
                     brstruct = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(p,c,"length", brstruct.length)
                     sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
@@ -5740,7 +5744,7 @@ class TreeSummary():
         kid1,kid2 = sumtree.children(sumtree.root)
         kid1_remkids = sumtree.remotechildren_dict[kid1]
         rootbip = Bipartition(kid1_remkids, sumtree.frozenset_leaves,
-                       sumtree.sorted_leaf_list, sumtree.leaf2index)
+                       sumtree.sorted_leaf_tup, sumtree.leaf2index)
         rootbrstruct = self.bipartsummary[rootbip]
         summary_rootbipstruct = self._rootbip_summary[rootbip]
 
@@ -5791,7 +5795,7 @@ class TreeSummary():
             for parent in sumtree.sorted_intnodes():
                 for child in sumtree.children(parent):
                     leafset1 = sumtree.remotechildren_dict[child]
-                    bip = Bipartition(leafset1, sumtree.frozenset_leaves, sumtree.sorted_leaf_list, sumtree.leaf2index)
+                    bip = Bipartition(leafset1, sumtree.frozenset_leaves, sumtree.sorted_leaf_tup, sumtree.leaf2index)
                     br = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(parent, child, "bipartition_cred",
                                                  getattr(br, "bipartition_cred", br.posterior))
