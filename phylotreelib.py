@@ -1008,15 +1008,16 @@ class Tree:
     def from_cladedict(cls, cladedict, interner=None):
 
         clade = next(iter(cladedict))
-        leaves = clade._all_leaves_set
+        leaves = clade.tipset
         obj = cls.from_leaves(leaves)
+        all_leaves = obj.frozenset_leaves
 
         for clade, nodestruct in cladedict.items():
             clade_leaves = clade.get_clade()
             if len(clade_leaves) == 1:
                 leaf = next(iter(clade_leaves))
                 obj.nodedict[leaf] = nodestruct
-            elif clade_leaves == leaves:
+            elif clade_leaves == all_leaves:
                 obj.nodedict[obj.root] = nodestruct
             else:
                 mrca = obj.find_mrca(clade_leaves)
@@ -5806,11 +5807,11 @@ class TreeSummary():
         # Node annotations from cladesummary
         if self.trackclades:
             all_leaves = sumtree.frozenset_leaves
-            sorted_leafs = sumtree.sorted_leaf_list
+            sorted_leafs = sumtree.sorted_leaf_tup
             leaf2index = sumtree.leaf2index
 
             for node in sumtree.nodes:
-                clade = Clade.from_leafset(sumtree.remotechildren_dict[node])
+                clade = Clade.from_leafset(sumtree.remotechildren_dict[node], tree=sumtree)
                 nd = self.cladesummary.get(clade)
                 if nd is None:
                     raise TreeError("Problem while annotating summary tree:\n"
