@@ -755,6 +755,13 @@ class Tree:
     # The Tree class therefore has several alternate constructors implemented as classmethods
     # The main constructor "__init__" is therefore mostly empty
 
+    # Class-level cache; dict of: {frozenset_leaves: (frozenset_leaves, sorted_leaf_tup, leaf2index) }
+    # Key is tipset (frozenset_leaves), which functions as a universe-id (in case there are 
+    # different types of trees in one Python session)
+    # Cache achieves interning (one copy per treetype of the three variables in the tuple)
+    # and also avoiding repeated construction of sorted_leaf_tup and leaf2index
+    _cache = {}
+
     def __init__(self):
         self.child_dict = {}
         self._nodedict = None
@@ -779,6 +786,22 @@ class Tree:
         self._nodedepthdict = None
         self._topology_bipart = None
         self._topology_clade = None
+        
+    ###############################################################################################
+
+    @classmethod
+    def _get_cached_atrributes(cls, leaves):
+        """Input: iterable of leaves
+           Output: tuple of (frozenset_leaves, sorted_leaf_tup, leaf2index)"""
+        
+        frozenset_leaves = frozenset(leaves)
+        attr_tup = cls._cache.get(frozenset_leaves)
+        if attr_tup is None:
+            sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+            leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
+            attr_tup = (frozenset_leaves, sorted_leaf_tup, leaf2index)
+            cls._cache[frozenset_leaves] = attr_tup
+        return attr_tup
 
     ###############################################################################################
 
@@ -814,20 +837,20 @@ class Tree:
     ###############################################################################################
 
     @classmethod
-    def from_string(cls, orig_treestring, transdict=None, interner=None, format="newick",
+    def from_string(cls, orig_treestring, transdict=None, format="newick",
                     label_attr_name="label", label_type=str):
         """Constructor: Tree object from tree-string in specified format"""
 
         if format.lower() == "newick":
             parser_obj = NewickStringParser(transdict, label_attr_name, label_type)
-        treeobj = cls._from_string_private(parser_obj, orig_treestring, interner)
+        treeobj = cls._from_string_private(parser_obj, orig_treestring)
         del parser_obj
         return treeobj
 
     ###############################################################################################
 
     @classmethod
-    def _from_string_private(cls, parser_obj, orig_treestring, interner=None):
+    def _from_string_private(cls, parser_obj, orig_treestring):
         """Constructor: Tree object from tree-string. 
         This version is meant to be used by e.g. treefile objects that will use same parser
         for a lot of tree-strings, and can then instantiate parser once and reuse with this method.
@@ -837,17 +860,17 @@ class Tree:
         # All action is in parser_obj
         treeobj = cls()
         treeobj = parser_obj.parse(treeobj, orig_treestring)
-        treeobj.interner = interner
-        if treeobj.interner:
-            treeobj.leaves = treeobj.interner.store_unhashable("leaves", treeobj.leaves) 
-            treeobj.intnodes = treeobj.interner.store_unhashable("intnodes", treeobj.intnodes)
-            treeobj.nodes = treeobj.interner.store_unhashable("nodes", treeobj.nodes) 
+        froz_leaves, sorted_tup, leaf2idx = cls._get_cached_atrributes(treeobj.leaves)
+        treeobj._frozenset_leaves = froz_leaves
+        treeobj._sorted_leaf_tup = sorted_tup
+        treeobj._leaf2index = leaf2idx
+
         return treeobj
 
     ###############################################################################################
 
     @classmethod
-    def from_leaves(cls, leaflist, interner=None):
+    def from_leaves(cls, leaflist):
         """Constructor: star-tree object from list of leaves"""
 
         treelist = ["("]
@@ -856,12 +879,12 @@ class Tree:
             treelist.append(",")
         del treelist[-1]
         treelist.append(");")
-        return cls.from_string("".join(treelist), interner)
+        return cls.from_string("".join(treelist))
 
     ###############################################################################################
 
     @classmethod
-    def from_biplist(cls, biplist, interner=None):
+    def from_biplist(cls, biplist):
         """Constructor: Tree object from bipartition list"""
 
         # Input is a bipartitionlist (actually a dictionary of bipartition:Branchstruct pairs):
@@ -874,7 +897,7 @@ class Tree:
         leaves = part1 | part2          # Concatenate them to get all leafnames
 
         # Start by building star-tree, this is resolved branch-by-branch later on
-        obj = Tree.from_leaves(leaves, interner=interner)
+        obj = Tree.from_leaves(leaves)
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for (bip1, bip2), branchstruct in biplist.items():
@@ -926,18 +949,12 @@ class Tree:
                 # Attach Branchstruct to newly created branch
                 obj.insert_node(insertpoint, movelist, branchstruct)
 
-        obj.nodes = set(obj.leaves | obj.intnodes)
-        obj.interner = interner
-        if obj.interner:
-            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
-            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
-            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
         return obj
 
     ###############################################################################################
 
     @classmethod
-    def from_topology(cls, topology, interner=None):
+    def from_topology(cls, topology):
         """Constructor: Tree object from topology"""
 
         # Input is a topology, i.e., a set of bipartitions
@@ -951,7 +968,7 @@ class Tree:
         leaves = part1 | part2          # Concatenate them to get all leafnames
 
         # Start by building star-tree, this is resolved branch-by-branch later on
-        obj = Tree.from_leaves(leaves, interner=interner)
+        obj = Tree.from_leaves(leaves)
 
         # Iterate over all bipartitions, for each: add extra branch and/or update Branchstruct
         for bip1, bip2 in topology:
@@ -990,20 +1007,12 @@ class Tree:
                 # Attach empty Branchstruct to newly created branch (no blen info in topology)
                 obj.insert_node(insertpoint, movelist, Branchstruct())
 
-        obj.nodes = set(obj.leaves | obj.intnodes)
-
-        obj.interner = interner
-        if obj.interner:
-            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
-            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
-            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
-
         return obj
 
     ###############################################################################################
 
     @classmethod
-    def from_cladedict(cls, cladedict, interner=None):
+    def from_cladedict(cls, cladedict):
 
         clade = next(iter(cladedict))
         leaves = clade.tipset
@@ -1094,14 +1103,17 @@ class Tree:
                    f"{list(orphans)}")
             raise TreeError(msg)
 
-        obj.nodes = obj.leaves | obj.intnodes
+        froz_leaves, sorted_tup, leaf2idx = cls._get_cached_atrributes(obj.leaves)
+        obj._frozenset_leaves = froz_leaves
+        obj._sorted_leaf_tup = sorted_tup
+        obj._leaf2index = leaf2idx
 
         return obj
 
     ###############################################################################################
 
     @classmethod
-    def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s", interner=None):
+    def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
         """Constructor: tree with random topology from list of leaf names OR number of tips"""
 
         # Implementation note: random trees are constructed by randomly resolving star-tree
@@ -1120,7 +1132,7 @@ class Tree:
         # If leaflist given:
         #   construct startree using names, then resolve to random bifurcating topology
         if leaflist is not None and ntips is None:
-            tree = cls.from_leaves(leaflist, interner)
+            tree = cls.from_leaves(leaflist)
 
         # If ntips given:
         #   construct list of zeropadded, numbered, names,
@@ -1131,7 +1143,7 @@ class Tree:
             for i in range(ntips):
                 name = "{prefix}{num:0{width}d}".format(prefix=name_prefix, num=i, width=ndigits)
                 namelist.append( name )
-            tree = cls.from_leaves(namelist, interner)   # Star tree with given number of leaves
+            tree = cls.from_leaves(namelist)   # Star tree with given number of leaves
 
         tree.resolve()                         # Randomly resolve to bifurcating tree
 
@@ -1369,6 +1381,60 @@ class Tree:
     ###############################################################################################
 
     @property
+    def intnodes(self):
+        """Lazy evaluation of intnodes"""
+        if self._intnodes is None:
+            self._intnodes = self.child_dict.keys()
+        return self._intnodes
+
+    ###############################################################################################
+
+    @property
+    def nodes(self):
+        """Lazy evaluation of nodes"""
+        if self._nodes is None:
+            self._nodes = self.intnodes | self.leaves
+        return self._nodes
+
+    ###############################################################################################
+
+    @property
+    def frozenset_leaves(self):
+        """Return interned value if present, create class-level cache for new tipset if not"""
+        if self._frozenset_leaves is None:
+            froz_leaves, sorted_tup, leaf2idx = self.__class__._get_cached_atrributes(self.leaves)
+            self._frozenset_leaves = froz_leaves
+            self._sorted_leaf_tup = sorted_tup
+            self._leaf2index = leaf2idx
+        return self._frozenset_leaves
+            
+    ###############################################################################################
+
+    @property
+    def sorted_leaf_tup(self):
+        """Return interned value if present, create class-level cache for new tipset if not"""
+        if self._frozenset_leaves is None:
+            froz_leaves, sorted_tup, leaf2idx = self.__class__._get_cached_atrributes(self.leaves)
+            self._frozenset_leaves = froz_leaves
+            self._sorted_leaf_tup = sorted_tup
+            self._leaf2index = leaf2idx
+        return self._sorted_leaf_tup
+            
+    ###############################################################################################
+
+    @property
+    def leaf2index(self):
+        """Return interned value if present, create class-level cache for new tipset if not"""
+        if self._frozenset_leaves is None:
+            froz_leaves, sorted_tup, leaf2idx = self.__class__._get_cached_atrributes(self.leaves)
+            self._frozenset_leaves = froz_leaves
+            self._sorted_leaf_tup = sorted_tup
+            self._leaf2index = leaf2idx
+        return self._leaf2index
+            
+    ###############################################################################################
+
+    @property
     def nodedict(self):
         """Lazy creation of _nodedict when needed"""
         if not self._has_nodedict():
@@ -1430,41 +1496,6 @@ class Tree:
                     remdict[parent].update(remdict[curnode])
                 else:
                     kidstack.extend(self.child_dict[curnode])
-
-    ###############################################################################################
-
-    @property
-    def frozenset_leaves(self):
-        if self._frozenset_leaves == None:
-            if self.interner:
-                self._frozenset_leaves = self.interner.intern_leafset(frozenset(self.leaves))
-            else:
-                self._frozenset_leaves = frozenset(self.leaves)
-        return self._frozenset_leaves
-
-    ###############################################################################################
-
-    @property
-    def sorted_leaf_tup(self):
-        if self._sorted_leaf_tup == None:
-            stup = tuple(sorted(self.leaves))
-            if self.interner:
-                self._sorted_leaf_tup = self.interner.intern_leaftup(stup)
-            else:
-                self._sorted_leaf_tup = stup
-        return self._sorted_leaf_tup
-
-    ###############################################################################################
-
-    @property
-    def leaf2index(self):
-        if self._leaf2index == None:
-            self._leaf2index = {}
-            for i,leaf in enumerate(self.sorted_leaf_tup):
-                self._leaf2index[leaf] = i
-            if self.interner:
-                self._leaf2index = self.interner.store_unhashable("leaf2index", self._leaf2index)
-        return self._leaf2index
 
     ###############################################################################################
 
@@ -1600,7 +1631,7 @@ class Tree:
 
     ###############################################################################################
 
-    def copy_treeobject(self, copylengths=True, copyattr=True, interner=None):
+    def copy_treeobject(self, copylengths=True, copyattr=True):
         """Returns copy of Tree object.
         copylengths: copy lengths (otherwise set to 0.0)
         copyattr: copy non-length attributes
@@ -6030,7 +6061,7 @@ class Newicktreefile(TreefileBase):
         else:
             treestring = remove_comments(treestring)
             if returntree:
-                tree = Tree.from_string(treestring, self.interner)
+                tree = Tree.from_string(treestring)
                 tree.below_root = self.below_root
                 return tree
 
@@ -6180,7 +6211,7 @@ class Nexustreefile(TreefileBase):
 
         # Return tree object if requested
         if returntree:
-            tree = Tree._from_string_private(self.parser_obj, treestring, self.interner)
+            tree = Tree._from_string_private(self.parser_obj, treestring)
             tree.below_root = self.below_root
             return tree
 
