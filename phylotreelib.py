@@ -635,7 +635,6 @@ class NewickStringParser:
                     self._handle_parse_error(state, token_value, token_type, treestring)
 
         self.sanitychecks(self.treeobj, treestring)
-        self.treeobj.nodes = self.treeobj.leaves | self.treeobj.intnodes
 
         return self.treeobj
 
@@ -671,7 +670,6 @@ class NewickStringParser:
         self.nodeno = 0
         self.treeobj.child_dict[self.nodeno] = {}
         self.node_stack.append(self.nodeno)
-        self.treeobj.intnodes.add(self.nodeno)
 
     ###############################################################################################
 
@@ -681,7 +679,6 @@ class NewickStringParser:
         parent = self.node_stack[-1]
         self.treeobj.child_dict[parent][self.nodeno] = Branchstruct()
         self.node_stack.append(self.nodeno)
-        self.treeobj.intnodes.add(self.nodeno)
 
     ###############################################################################################
 
@@ -762,7 +759,8 @@ class Tree:
         self.child_dict = {}
         self._nodedict = None
         self.leaves = set()
-        self.intnodes = set()   
+        self._intnodes = None  
+        self._nodes = None
         self._parent_dict = None
         self._remotechildren_dict = None
         self._frozenset_leaves = None
@@ -792,7 +790,7 @@ class Tree:
         for attr in {
             "_parent_dict", "_remotechildren_dict",
             "_frozenset_leaves", "_sorted_leaf_tup", "_leaf2index",
-            "path_dict",
+            "path_dict", "_intnodes", "_nodes",
             "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
             "_topology_bipart", "_topology_clade",
         } - set(preserve):
@@ -1031,13 +1029,6 @@ class Tree:
                 # Reset obj caches which are now obsolete
                 obj.clear_caches()
 
-        obj.nodes = set(obj.leaves | obj.intnodes)
-        obj.interner = interner
-        if obj.interner:
-            obj.leaves = obj.interner.store_unhashable("leaves", obj.leaves)
-            obj.intnodes = obj.interner.store_unhashable("intnodes", obj.intnodes)
-            obj.nodes = obj.interner.store_unhashable("nodes", obj.nodes)
-
         return obj
 
     ###############################################################################################
@@ -1086,7 +1077,6 @@ class Tree:
                 obj.child_dict[parent][child] = branch
             else:
                 obj.child_dict[parent] = { child:branch }
-            obj.intnodes.add(parent)
 
         # Leaves are the childnodes that are not in parentlist
         obj.leaves = set(childlist) - set(parentlist)
@@ -1620,9 +1610,6 @@ class Tree:
         obj = Tree()
         obj.root = self.root
         obj.leaves = self.leaves.copy()
-        obj.intnodes = self.intnodes.copy()
-        obj.nodes = self.nodes.copy()
-        obj.interner = interner
         obj.child_dict = self._copy_child_dict(obj, copylengths, copyattr)
         obj._nodedict = self._copy_nodedict(obj)
         return obj
@@ -3090,7 +3077,6 @@ class Tree:
         else:
             # Create empty Tree object. Transfer relevant subset of self's data structure to other
             other = Tree()
-            other.intnodes = {basenode}
             other.root = basenode
             curlevel = [basenode]
             while curlevel:
@@ -3101,12 +3087,10 @@ class Tree:
                     for kid in kids:
                         other.child_dict[parent][kid] = self.child_dict[parent][kid].copy()
                     intnode_kids = kids & self.intnodes
-                    other.intnodes.update(intnode_kids)
                     nextlevel.extend(intnode_kids)
                     leaf_kids = kids & self.leaves
                     other.leaves.update(leaf_kids)
                 curlevel = nextlevel
-            other.nodes = other.leaves | other.intnodes
 
         # If self.nodedict exists: copy relevant parts from self to other
         if self._has_nodedict():
@@ -3174,9 +3158,7 @@ class Tree:
         # Link subtree to graftpoint in self.child_dict
         self.child_dict[graftpoint][other.root] = Branchstruct(length=blen2)
  
-        # Update look-up lists and caches
-        self.nodes.update( other.nodes )
-        self.intnodes.update( other.intnodes )
+        # Update set of leaves
         self.leaves.update( other.leaves )
 
         # If requested: use other.root as graftpoint
@@ -3329,10 +3311,6 @@ class Tree:
             tree[newnode][child] = tree[parent][child]
             del tree[parent][child]
 
-        # Update self.intnodes and self.nodes to include new node.
-        self.intnodes.add(newnode)
-        self.nodes.add(newnode)
-
         self.clear_caches()
 
         return newnode
@@ -3425,16 +3403,9 @@ class Tree:
             newbranch.length += addlen
             self.child_dict[parent][grandchild] = newbranch
 
-        # Delete "child" node and link from parent to child. Update intnodes and nodes
+        # Delete "child" node and link from parent to child. 
         del self.child_dict[child]
         del self.child_dict[parent][child]
-        self.intnodes.remove(child)
-        self.nodes = self.leaves | self.intnodes
-
-        # Update _parent_dict
-        del self._parent_dict[child]
-        for grandchild in grandchildren:
-            self._parent_dict[grandchild] = parent
 
         self.clear_caches()
 
@@ -3465,10 +3436,7 @@ class Tree:
         if (len(childset) == 2) and (leaf in self.children(root)):
             [child2] = childset - {leaf}                    # Remaining item is other child
             del self.child_dict[root]                       # Remove entry for old root
-            self.intnodes.remove(root)
-            self.nodes.remove(root)
             self.root = child2                              # child2 is new root
-            del self._parent_dict[child2]                   # clean up parent_dict: Note: not lazy? change?
 
         # If leaf is part of bifurcation but NOT attached directly to root, then parent
         # must also be removed from tree, and the remaining child needs to be grafted
@@ -3486,9 +3454,6 @@ class Tree:
             del self.child_dict[grandparent][parent]         # Also remove pointer from gp to p
             del self._parent_dict[leaf]                      # Remove unused entries in parent_dict
             del self._parent_dict[parent]
-            self._parent_dict[child2] = grandparent          # Update parent_dict for leaf2
-            self.intnodes.remove(parent)
-            self.nodes.remove(parent)
 
         # If leaf is part of multifurcation, then no special cleanup needed
         else:
@@ -3497,7 +3462,6 @@ class Tree:
 
         # Remove leaf entry from global leaflist. Update intnodeslist
         self.leaves.remove(leaf)
-        self.nodes.remove(leaf)
 
         # Clean up nodedict if present
         if self._has_nodedict():
@@ -3505,7 +3469,7 @@ class Tree:
             for node in remnodes:
                 del self.nodedict[node]
 
-        self.clear_caches(preserve=["_parent_dict"]) 
+        self.clear_caches() 
 
     ###############################################################################################
 
@@ -3869,17 +3833,15 @@ class Tree:
         self.child_dict[parent][newname] = self.child_dict[parent][oldname]
         del self.child_dict[parent][oldname]
 
-        # Update self.leaves and self.nodes
+        # Update self.leaves
         self.leaves.add(newname)
         self.leaves.remove(oldname)
-        self.nodes.add(newname)
-        self.nodes.remove(oldname)
 
         # Update self.parent_dict
         self.parent_dict[newname] = self.parent_dict[oldname]
         del self.parent_dict[oldname]
 
-        self.clear_caches(preserve=["_parent_dict"])
+        self.clear_caches()
 
     ###############################################################################################
 
@@ -3908,18 +3870,6 @@ class Tree:
         else:
             self.child_dict[parent][newnum] = self.child_dict[parent][oldnum]
             del self.child_dict[parent][oldnum]
-
-        # Update look-up lists, caches, and root-marker if relevant
-        self.nodes.add(newnum)
-        self.nodes.remove(oldnum)
-        self.intnodes.add(newnum)
-        self.intnodes.remove(oldnum)
-        self._parent_dict = None
-        # if parent is not None:
-        #     self.parent_dict[newnum] = self.parent_dict[oldnum]
-        #     del self.parent_dict[oldnum]
-        # for child in kidlist:
-        #     self.parent_dict[child] = newnum
 
         self.clear_caches()
 
@@ -4091,9 +4041,7 @@ class Tree:
             # remove previous root
             del self.child_dict[root]
 
-            # update intnode and node attributes and clear caches, which are now unreliable
-            self.intnodes = set(self.child_dict.keys())
-            self.nodes = self.intnodes | self.leaves
+            # clear caches, which are now unreliable
             self.clear_caches()
 
     ###############################################################################################
