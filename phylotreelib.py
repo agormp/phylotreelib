@@ -402,12 +402,6 @@ class Clade:
     # and also avoiding repeated construction of Clade objects
     _tipset_data = {}
 
-    # Hot-path: “current” tipset pointers (avoid dict lookups inside tight loops)
-    _active_key = None
-    _active_sorted_leaf_tup = None
-    _active_leaf2index = None
-    _active_objcache = None
-          
     # Only call this via .from_leafset 
     def __init__(self, frozenset_leaves, frozenset_indices):
         self._frozenset_leaves = frozenset_leaves
@@ -415,36 +409,30 @@ class Clade:
         self._hash_value = hash((frozenset_leaves, frozenset_indices))
     
     @classmethod
-    def _ensure_tipset(cls, tree):
-        """Ensure tipset resources exist; update hot-path pointers; return frozenset_leaves."""
-        key = tree.frozenset_leaves  # frozenset[str], cached by Tree
-        
-        # Fast path: same key object as last time
-        if key is cls._active_key:
-            return key
+    def _get_cached_atrributes(cls, tree):
+        """Input: tree object
+           Output: tuple of (frozenset_leaves, sorted_leaf_tup, leaf2index)"""
 
-        data = cls._tipset_data.get(key)
+        frozenset_leaves = tree.frozenset_leaves  # frozenset[str], cached by Tree
+        data = cls._tipset_data.get(frozenset_leaves)
         if data is None:
             # Build once per tipset
-            tipset_tup = tree.sorted_leaf_tup              # tuple[str, ...]
-            leaf2index = tree.leaf2index                   # dict[str,int]
+            sorted_leaf_tup = tree.sorted_leaf_tup                # tuple[str, ...]
+            leaf2index = tree.leaf2index                          # dict[str,int]
             object_cache = {}                                     # frozenset_indices -> Clade
-            data = (tipset_tup, leaf2index, object_cache)
-            cls._tipset_data[key] = data
+            data = (sorted_leaf_tup, leaf2index, object_cache)
+            cls._tipset_data[frozenset_leaves] = data
+        else:
+            sorted_leaf_tup, leaf2index, object_cache = data
 
-        # Update hot-path pointers
-        cls._active_key = key
-        cls._active_sorted_leaf_tup, cls._active_leaf2index, cls._active_objcache = data
-        return key
+        return frozenset_leaves, leaf2index, object_cache
 
     @classmethod
     def from_leafset(cls, leafset, tree):
         """Create/intern from leaf names, using the tipset implied by `tree`."""
-        frozenset_leaves = cls._ensure_tipset(tree)
-        idx = cls._active_leaf2index  # local vars are fastest
-        object_cache = cls._active_objcache
 
-        frozenset_indices = frozenset(idx[leaf] for leaf in leafset)
+        frozenset_leaves, leaf2index, object_cache = cls._get_cached_atrributes(tree)
+        frozenset_indices = frozenset(leaf2index[leaf] for leaf in leafset)
         obj = object_cache.get(frozenset_indices)
         if obj is None:
             obj = cls(frozenset_leaves, frozenset_indices)
