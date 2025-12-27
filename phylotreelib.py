@@ -417,7 +417,7 @@ class Clade:
         # Given object_cache: 
         # If frozenset_indices seen before: return existing Clade object
         # If not: build and return    
-        frozenset_leaves, _, _, object_cache = cls._ensure_leaf_universe(tree)
+        frozenset_leaves, (_, _, object_cache) = cls._ensure_leaf_universe(tree)
         cached_clade = object_cache.get(frozenset_indices)
         if cached_clade is None:
             cached_clade = cls(frozenset_leaves, frozenset_indices)
@@ -432,7 +432,7 @@ class Clade:
         # Given cached attributes (sorted_leaf_tup, leaf2index, object_cache): 
         # If Clade-leaves seen before: return existing Clade object
         # If not: build and return    
-        frozenset_leaves, _, leaf2index, object_cache = cls._ensure_leaf_universe(tree)
+        frozenset_leaves,( _, leaf2index, object_cache) = cls._ensure_leaf_universe(tree)
         frozenset_indices = frozenset(leaf2index[leaf] for leaf in leafset)
         cached_clade = object_cache.get(frozenset_indices)
         if cached_clade is None:
@@ -455,10 +455,10 @@ class Clade:
             sorted_leaf_tup = tree.sorted_leaf_tup                # tuple[str, ...]
             leaf2index = tree.leaf2index                          # dict[str,int]
             object_cache = {}                                     # frozenset_indices: Clade
-            cached_attr = (frozenset_leaves, sorted_leaf_tup, leaf2index, object_cache)
+            cached_attr = (sorted_leaf_tup, leaf2index, object_cache)
             cls._class_cache[frozenset_leaves] = cached_attr
 
-        return cached_attr
+        return frozenset_leaves, cached_attr
 
     @property
     def tipset(self):
@@ -481,7 +481,7 @@ class Clade:
 
     def get_clade(self):
         """Return leaf names in this clade."""
-        _, sorted_leaf_tup, _, _ = self.__class__._class_cache[self._frozenset_leaves]
+        sorted_leaf_tup, _, _ = self.__class__._class_cache[self._frozenset_leaves]
         return frozenset(sorted_leaf_tup[i] for i in self.frozenset_indices)
 
     # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
