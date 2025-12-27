@@ -410,24 +410,20 @@ class Clade:
         self._hash_value = hash((frozenset_leaves, frozenset_indices))
         
     @classmethod
-    def _get_cached_atrributes(cls, tree):
-        """Input: tree object
-           Output: tuple of (frozenset_leaves, sorted_leaf_tup, leaf2index)"""
+    def from_indices(cls, frozenset_indices, tree):
+        """Constructor method for Clade objects:
+        Create/intern Clade object from frozenset of leaf names, using the tipset implied by `tree`"""
 
-        frozenset_leaves = tree.frozenset_leaves  # frozenset[str], cached by Tree
-        data = cls._tipset_data.get(frozenset_leaves)
-        if data is None:
-            # Build once per tipset
-            sorted_leaf_tup = tree.sorted_leaf_tup                # tuple[str, ...]
-            leaf2index = tree.leaf2index                          # dict[str,int]
-            object_cache = {}                                     # frozenset_indices -> Clade
-            data = (sorted_leaf_tup, leaf2index, object_cache)
-            cls._tipset_data[frozenset_leaves] = data
-        else:
-            sorted_leaf_tup, leaf2index, object_cache = data
-
-        return frozenset_leaves, leaf2index, object_cache
-
+        # Given object_cache: 
+        # If frozenset_indices seen before: return existing Clade object
+        # If not: build and return    
+        frozenset_leaves, _, _, object_cache = cls._ensure_leaf_universe(tree)
+        cached_clade = object_cache.get(frozenset_indices)
+        if cached_clade is None:
+            cached_clade = cls(frozenset_leaves, frozenset_indices)
+            object_cache[frozenset_indices] = cached_clade
+        return cached_clade
+        
     @classmethod
     def from_leafset(cls, leafset, tree):
         """Constructor method for Clade objects:
@@ -438,11 +434,31 @@ class Clade:
         # If not: build and return    
         frozenset_leaves, _, leaf2index, object_cache = cls._ensure_leaf_universe(tree)
         frozenset_indices = frozenset(leaf2index[leaf] for leaf in leafset)
-        obj = object_cache.get(frozenset_indices)
-        if obj is None:
-            obj = cls(frozenset_leaves, frozenset_indices)
-            object_cache[frozenset_indices] = obj
-        return obj
+        cached_clade = object_cache.get(frozenset_indices)
+        if cached_clade is None:
+            cached_clade = cls(frozenset_leaves, frozenset_indices)
+            object_cache[frozenset_indices] = cached_clade
+        return cached_clade
+        
+    @classmethod
+    def _ensure_leaf_universe(cls, tree):
+        """Helper method for Clade constructors:
+        Input: Tree object, 
+        Output: cached versions of frozenset_leaves, sorted_leaf_tup, leaf2index, object_cache
+        
+        If tipset (leaf-universe ID) seen before: use existing object-cache and attribues
+        If not: build once and add to _class_cache
+        """
+        frozenset_leaves = tree._frozenset_leaves or tree.frozenset_leaves     
+        cached_attr = cls._class_cache.get(frozenset_leaves)
+        if cached_attr is None:
+            sorted_leaf_tup = tree.sorted_leaf_tup                # tuple[str, ...]
+            leaf2index = tree.leaf2index                          # dict[str,int]
+            object_cache = {}                                     # frozenset_indices: Clade
+            cached_attr = (frozenset_leaves, sorted_leaf_tup, leaf2index, object_cache)
+            cls._class_cache[frozenset_leaves] = cached_attr
+
+        return cached_attr
 
     @property
     def tipset(self):
@@ -465,7 +481,7 @@ class Clade:
 
     def get_clade(self):
         """Return leaf names in this clade."""
-        sorted_leaf_tup, _, _ = self.__class__._tipset_data[self._frozenset_leaves]
+        _, sorted_leaf_tup, _, _ = self.__class__._class_cache[self._frozenset_leaves]
         return frozenset(sorted_leaf_tup[i] for i in self.frozenset_indices)
 
     # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
@@ -477,7 +493,7 @@ class Clade:
         return f"\n{self.get_clade()}\n"
 
     def __repr__(self):
-        return f"Clade(n={len(self)}, ntips={len(self._tipset)})"
+        return f"Clade(n={len(self)}, ntips={len(self._frozenset_leaves)})"
 
     # # ---------------- optional test helpers ----------------
     # @classmethod
@@ -766,6 +782,7 @@ class Tree:
         self._nodes = None
         self._parent_dict = None
         self._remotechildren_dict = None
+        self._remotechildren_indices_dict = None
         self._frozenset_leaves = None
         self._sorted_leaf_tup = None
         self._leaf2index = None
