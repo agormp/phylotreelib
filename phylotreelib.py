@@ -2754,9 +2754,9 @@ class Tree:
         node2clade = {}     
 
         # For each node: find clade representation, add this and Nodestruct to dict
-        for node, node_remkids in self.remotechildren_dict.items():
-            clade = Clade.from_leafset(node_remkids, self)
-            nodestruct = Nodestruct(self.nodedepth(node), len(node_remkids))
+        for node, remkids_indices in self.remotechildren_indices_dict.items():
+            clade = Clade.from_indices(remkids_indices, self)
+            nodestruct = Nodestruct(self.nodedepth(node), len(remkids_indices))
             cladedict[clade] = nodestruct
             
             # If tracking subcladepairs: remember clade for each node to avoid superfluous Clade
