@@ -395,9 +395,10 @@ class Clade:
     __slots__ = ("_frozenset_leaves", "frozenset_indices", "_hash_value")
 
     # Class-level cache; dict of {frozenset_leaves: (sorted_leaf_tup, leaf2index, object_cache)}
-    # object_cache contains pre-computed Clade objects for previously seen leafsets
-    # Key is tipset (frozenset_leaves), which functions as a universe-id (in case there are 
-    # different types of trees in one Python session)
+    # Key to top-level dict is tipset (frozenset_leaves for all leaves on tree), which functions 
+    # as a universe-id  (in case there are different types of trees in one Python session)
+    # object_cache is itself a dict of {leafset: Clade-object} and contains pre-computed Clade 
+    # objects for previously seen subsets of leaves (leafset)
     # Cache achieves interning (one copy per treetype of Clades, sorted_leaf_tup, and leaf2index)
     # and also avoiding repeated construction of Clade objects
     _tipset_data = {}
@@ -407,7 +408,7 @@ class Clade:
         self._frozenset_leaves = frozenset_leaves
         self.frozenset_indices = frozenset_indices
         self._hash_value = hash((frozenset_leaves, frozenset_indices))
-    
+        
     @classmethod
     def _get_cached_atrributes(cls, tree):
         """Input: tree object
@@ -429,9 +430,13 @@ class Clade:
 
     @classmethod
     def from_leafset(cls, leafset, tree):
-        """Create/intern from leaf names, using the tipset implied by `tree`."""
-
-        frozenset_leaves, leaf2index, object_cache = cls._get_cached_atrributes(tree)
+        """Constructor method for Clade objects:
+        Create/intern Clade object from leaf names, using the tipset implied by `tree`"""
+        
+        # Given cached attributes (sorted_leaf_tup, leaf2index, object_cache): 
+        # If Clade-leaves seen before: return existing Clade object
+        # If not: build and return    
+        frozenset_leaves, _, leaf2index, object_cache = cls._ensure_leaf_universe(tree)
         frozenset_indices = frozenset(leaf2index[leaf] for leaf in leafset)
         obj = object_cache.get(frozenset_indices)
         if obj is None:
