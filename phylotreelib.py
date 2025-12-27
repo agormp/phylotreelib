@@ -1513,6 +1513,21 @@ class Tree:
     ###############################################################################################
 
     @property
+    def remotechildren_indices_dict(self):
+        """Dict of {node:frozenset(leaf-indices)}, evaluated lazily when needed.
+        Uses remotechildren_dict as starting point"""
+        
+        if self._remotechildren_indices_dict is None:
+            remidx_dict = self._remotechildren_indices_dict = {}
+            leaf2index = self.leaf2index
+            for node, remkids in self.remotechildren_dict.items():
+                remidx = frozenset(leaf2index[leaf] for leaf in remkids)
+                remidx_dict[node] = remidx
+        return self._remotechildren_indices_dict
+
+    ###############################################################################################
+
+    @property
     def rootdist(self):
         """Property (dictionary) giving the distance from each node in tree to the root"""
 
