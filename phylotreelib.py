@@ -401,7 +401,7 @@ class Clade:
     # objects for previously seen subsets of leaves (leafset)
     # Cache achieves interning (one copy per treetype of Clades, sorted_leaf_tup, and leaf2index)
     # and also avoiding repeated construction of Clade objects
-    _tipset_data = {}
+    _class_cache = {}
 
     # Only call this via .from_leafset 
     def __init__(self, frozenset_leaves, frozenset_indices):
@@ -756,7 +756,7 @@ class Tree:
     # different types of trees in one Python session)
     # Cache achieves interning (one copy per treetype of the three variables in the tuple)
     # and also avoiding repeated construction of sorted_leaf_tup and leaf2index
-    _cache = {}
+    _class_cache = {}
 
     def __init__(self):
         self.child_dict = {}
@@ -791,12 +791,12 @@ class Tree:
            Output: tuple of (frozenset_leaves, sorted_leaf_tup, leaf2index)"""
         
         frozenset_leaves = frozenset(leaves)
-        attr_tup = cls._cache.get(frozenset_leaves)
+        attr_tup = cls._class_cache.get(frozenset_leaves)
         if attr_tup is None:
             sorted_leaf_tup = tuple(sorted(frozenset_leaves))
             leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
             attr_tup = (frozenset_leaves, sorted_leaf_tup, leaf2index)
-            cls._cache[frozenset_leaves] = attr_tup
+            cls._class_cache[frozenset_leaves] = attr_tup
         return attr_tup
 
     ###############################################################################################
