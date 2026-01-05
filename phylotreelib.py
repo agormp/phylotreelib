@@ -1565,6 +1565,29 @@ class Tree:
     ###############################################################################################
 
     @property
+    def remotechildren_mask_dict(self):
+        """Dict of {node: remkids_as_bitset}.
+        Computed once per tree; fast to query in bipdict() and cladedict()."""
+        
+        if self._remotechildren_mask_dict is None:
+            frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes            
+
+            # remchild[leaf] = leaf, so remchild-masks for leaves = those in leaf2mask
+            rembitdict = self._remotechildren_mask_dict = leaf2mask.copy()
+            
+            # Adding non-overlapping bitsets is equivalent to OR (=> set union of individual bits)
+            # This works since we start iterating from leaves, so child values already computed
+            for parent in self.sorted_intnodes(deepfirst=False):
+                mask = 0
+                for child in self.children(parent):
+                    mask += rembitdict[child]
+                rembitdict[parent] = mask
+
+        return self._remotechildren_mask_dict
+        
+    ###############################################################################################
+
+    @property
     def rootdist(self):
         """Property (dictionary) giving the distance from each node in tree to the root"""
 
