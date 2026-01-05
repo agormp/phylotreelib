@@ -308,83 +308,117 @@ class Bipartition:
     to a branch in a tree. Class has a fast method for hashing and therefore useful when
     comparing Bipartitions"""
 
-    __slots__ = ["leaf_set", "leaf_list", "leaf2index",
-                 'indices', '_hash_value']
+    __slots__ = ("_mask", "_sorted_leaf_tup")
 
-    def __init__(self, leafset1, all_leaves_set, sorted_leaf_tup, leaf2index):
-        """Initialise bipartition objects based on only one half of bipartition.
-        If the complement of leafset1 is smaller, then that will be stored instead.
-        If they have same size: store leafset with smaller hash.
+    # Class-level cache
+    # dict of {_tipset_id: object_cache}
+    # object_cache: {canonical_mask: Bipartition}
+    _class_cache = {}
+    
+    # Called only from other constructors, not directly
+    # mask: int interpreted as bitset of leaf indices
+    def __init__(self, mask, sorted_leaf_tup):
+        self._mask = mask
+        self._sorted_leaf_tup = sorted_leaf_tup
 
-        leafset1: one half of bipartition (to save time in caller)
-        all_leaves_set: set of all leaf names
-        sorted_leaf_tup: sorted tuple of all leaf names
-        leaf2index: dict of {leaf:index in sorted_leaf_tup}
+    @classmethod
+    def from_halfmask(cls, halfmask, alltips_mask, object_cache, sorted_leaf_tup):
+        """Bipartition constructor that relies on caller knowing leaf universe and providing
+        required information:
+        
+        halfmask: int representing bitset of indices for half of bipartition
+        object_cache: class-level cache for bipartition objects belonging to this leaf-universe
+        alltips_mask, sorted_leaf_tup: for this leaf universe; cached and interned on Tree class
 
-        Last 3 params will typically point to attributes in parent Tree object"""
+        returns Bipartition object 
+        Achieves interning + caching to avoid repeated object construction"""
+        
+        # Represent bipartition using just one half of leaves 
+        # Choose bitset corresponding to smaller int (canonical_mask)
+        canonical_mask = min(halfmask, alltips_mask ^ halfmask)
+        obj = object_cache.get(canonical_mask)
+        if obj is None:
+            obj = cls(canonical_mask, sorted_leaf_tup)
+            object_cache[canonical_mask] = obj
+        return obj
 
-        self.leaf_set = all_leaves_set
-        self.leaf_list = sorted_leaf_tup
-        self.leaf2index = leaf2index
-        leafset1 = frozenset(leafset1)
+    @classmethod
+    def from_halfmask_unknown_leafuniverse(cls, halfmask, tree):
+        """halfmask: int representing bitset of indices for half of bipartition
+        tree: Tree object that this Bipartition belongs to (for access to cached attributes)
+        returns Bipartition object 
+        Achieves interning + caching to avoid repeated object construction"""
+        
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = tree.cached_attributes
 
-        nleaves = len(self.leaf_set)
-        l1 = len(leafset1)
-        l2 = nleaves - l1
-        if l1 < l2:
-            self.indices = sorted([leaf2index[leaf] for leaf in leafset1])
-            self._hash_value = hash(leafset1)
-        elif l2 < l1:
-            leafset2 = frozenset(self.leaf_set) - leafset1
-            self.indices = sorted([leaf2index[leaf] for leaf in leafset2])
-            self._hash_value = hash(leafset2)
-        else:
-            leafset2 = frozenset(self.leaf_set) - frozenset(leafset1)
-            h1, h2 = hash(leafset1), hash(leafset2)
-            if h1 < h2:
-                indices = sorted([leaf2index[leaf] for leaf in leafset1])
-                self.indices = indices
-                self._hash_value = h1
-            else:
-                indices = sorted([leaf2index[leaf] for leaf in leafset2])
-                self.indices = indices
-                self._hash_value = h2
+        object_cache = cls._class_cache.get(frozenset_leaves)
+        if object_cache is None:
+            object_cache = {}
+            cls._class_cache[frozenset_leaves] = object_cache
+            
+        canonical_mask = min(halfmask, halfmask ^ alltips_mask)
+        obj = object_cache.get(canonical_mask)
+        if obj is None:
+            obj = cls(canonical_mask, sorted_leaf_tup)
+            object_cache[canonical_mask] = obj
+        return obj
 
+    @classmethod
+    def from_leafset(cls, leafset, tree):
+        # optional compatibility constructor if some callers still pass leaf names
+        halfmask = 0
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = tree.cached_attributes
+        for leaf in leafset:
+            #halfmask |= (1 << leaf2idx[leaf])
+            halfmask += leaf2mask[leaf]
+        return cls.from_halfmask_unknown_leafuniverse(halfmask, tree)
+        
+    @staticmethod
+    def _canonical_half(halfmask, alltips_mask, ntips):
+        """Return canonical representation of a split (smaller side; deterministic tie-break).
+        masks are ints representing bitsets for leaf indices"""
+        k = halfmask.bit_count()
+        if k > ntips - k:
+            halfmask = alltips_mask ^ halfmask
+            k = ntips - k
+        elif k == ntips - k:
+            other = alltips_mask ^ halfmask
+            if other < halfmask:
+                halfmask = other
+        return halfmask
+    
     def __hash__(self):
-        # Return the precomputed hash value
-        return self._hash_value
+        # Python note: this strategy (using only the halfmask as hash) depends on never comparing
+        # Bipartitions across leaf-universes. In class-level cache this is ensured by having
+        # object_cache be indexed by tipset_id
+        return self._mask
 
     def __eq__(self, other):
-        # Python note: assumes hash collisions will never occur!
-        # Empirically this seems to be the case for realistic data, but is not guaranteed
-        return self._hash_value == other._hash_value
-
-    # Python note: this allows unpacking as if the class was a tuple: bip1, bip2 = bipartition
+        # Python note: see note under __hash__
+        if self is other:
+            return True
+        return self._mask == other._mask
+        
+    def get_bipartitions(self):
+        """Return (side1, side2) as frozensets of leaf names."""
+        sorted_leaf_tup = self._sorted_leaf_tup
+        ntips = len(sorted_leaf_tup)
+        side1 = frozenset(sorted_leaf_tup[i] for i in range(ntips) if (self._mask >> i) & 1)
+        side2 = frozenset(sorted_leaf_tup) - side1
+        return side1, side2
+        
     def __iter__(self):
-        # Convert indices to leaf values using set comprehension
-        primary_set = frozenset({self.leaf_list[i] for i in self.indices})
-        complement_set = frozenset(self.leaf_set) - primary_set
-        return iter((primary_set, complement_set))
-
+        return iter(self.get_bipartitions())
+        
     def __str__(self):
         bip1,bip2 = self.get_bipartitions()
-        # if len(bip1) < len(bip2):
-        #     return f"\nleaf set 1:\n{str(bip1)}\n\nleaf set 2:\n{str(bip2)}\n"
-        # else:
-        #     return f"\nleaf set 1:\n{str(bip2)}\n\nleaf set 2:\n{str(bip1)}\n"
         if len(bip1) < len(bip2):
-            return f"\nleaf set 1 (smaller half):\n{str(bip1)}"
+            return f"leaf set 1:\n{str(bip1)}\nleaf set 2:\n{str(bip2)}"
         else:
-            return f"\nleaf set 1 (smaller half):\n{str(bip2)}"
+            return f"leaf set 1:\n{str(bip2)}\nleaf set 2:\n{str(bip1)}"
 
     def __repr__(self):
         return self.__str__()
-
-    def get_bipartitions(self):
-        # Convert to sets before returning
-        primary_set = frozenset({self.leaf_list[i] for i in self.indices})
-        complement_set = frozenset(self.leaf_set) - primary_set
-        return (primary_set, complement_set)
 
 ###################################################################################################
 ###################################################################################################
