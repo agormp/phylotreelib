@@ -2803,33 +2803,36 @@ class Tree:
     def bipdict(self, keep_remchild_dict = False):
         """Returns tree in the form of a "bipartition dictionary" """
 
-        # Names of leaves on one side of a branch are represented as an immutable set
-        # A bipartition is represented as an immutable set of two such (complementary) sets
+        # Names of leaves on one side of a branch are represented as a bitset (int) where 
+        # set bits correspond to leaf indices in sorted leaf tuple.
+        # A bipartition is represented as the bitset with fewer set bits of two such (complementary) sets
         # The entire tree is represented as a dictionary where the keys are bipartitions
         # The values are Branchstructs
         bipdict = {}
+        remmask = self.remotechildren_mask_dict  
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
+        from_halfmask = Bipartition.from_halfmask        
 
-        # For each branch: find bipartition representation, add this and Branchstruct to list.
+        object_cache = Bipartition._class_cache.get(frozenset_leaves)
+        if object_cache is None:
+            object_cache = {}
+            Bipartition._class_cache[frozenset_leaves] = object_cache
+
+        # For each branch: find bipartition representation, add this and Branchstruct to dict.
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
         # Note: if root has two kids, then the root bipartition is added twice
         # This will be dealt with below
-        for child, child_remkids in self.remotechildren_dict.items():
-            if child != self.root:
-                parent = self.parent(child)
-                bipartition = Bipartition(child_remkids, self.frozenset_leaves,
-                                          self.sorted_leaf_tup, self.leaf2index)
-                if self.interner:
-                    bipartition = self.interner.intern_bipart(bipartition)
-                origbranch = self.child_dict[parent][child]
-                bipdict[bipartition] = origbranch.copy()
+        for parent in self.child_dict:
+            for child in self.children(parent):
+                halfmask = remmask[child]
+                bipartition = from_halfmask(halfmask, alltips_mask, object_cache, sorted_leaf_tup)
+                bipdict[bipartition] = self.child_dict[parent][child] 
 
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, merge other attributes)
         rootkids = self.children(self.root)
         if len(rootkids) == 2:
             rootbip, leafset1, blen1, leafset2, blen2 = self.rootbip()
-            if self.interner:
-                rootbip = self.interner.intern_bipart(rootbip)
             kid1, kid2 = rootkids
             branch1 = self.child_dict[self.root][kid1]
             branch2 = self.child_dict[self.root][kid2]
