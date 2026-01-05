@@ -5706,9 +5706,8 @@ class TreeSummary():
 
         def set_branch_credibility(p, c):
             """Helper function to set root credibility for a branch."""
-            leafset1 = sumtree.remotechildren_dict[c]
-            bip = Bipartition(leafset1, sumtree.frozenset_leaves, 
-                              sumtree.sorted_leaf_tup, sumtree.leaf2index)
+            remkids_indices = sumtree.remotechildren_indices_dict[c]
+            bip = Bipartition.from_indices(remkids_indices, sumtree)
             if bip in self.rootbipsummary:
                 rootcred = self.rootbipsummary[bip].posterior
                 sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
@@ -5875,9 +5874,8 @@ class TreeSummary():
         for p in sumtree.sorted_intnodes():
             if p != sumtree.root:
                 for c in sumtree.children(p):
-                    bipart1 = sumtree.remotechildren_dict[c]
-                    bip = Bipartition(bipart1, sumtree.frozenset_leaves,
-                                      sumtree.sorted_leaf_tup, sumtree.leaf2index)
+                    remkids_indices = sumtree.remotechildren_indices_dict[c]
+                    bip = Bipartition.from_indices(remkids_indices, sumtree)
                     brstruct = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(p,c,"length", brstruct.length)
                     sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
@@ -5885,9 +5883,8 @@ class TreeSummary():
 
         # Handle root bipartition separately
         kid1,kid2 = sumtree.children(sumtree.root)
-        kid1_remkids = sumtree.remotechildren_dict[kid1]
-        rootbip = Bipartition(kid1_remkids, sumtree.frozenset_leaves,
-                       sumtree.sorted_leaf_tup, sumtree.leaf2index)
+        kid1_remkids_indices = sumtree.remotechildren_indices_dict[kid1]
+        rootbip = Bipartition.from_indices(kid1_remkids_indices, sumtree)
         rootbrstruct = self.bipartsummary[rootbip]
         summary_rootbipstruct = self._rootbip_summary[rootbip]
 
