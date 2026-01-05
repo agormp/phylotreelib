@@ -5751,8 +5751,8 @@ class TreeSummary():
 
         def set_branch_credibility(p, c):
             """Helper function to set root credibility for a branch."""
-            remkids_indices = sumtree.remotechildren_indices_dict[c]
-            bip = Bipartition.from_indices(remkids_indices, sumtree)
+            remkids = sumtree.remotechildren_dict[c]
+            bip = Bipartition.from_leafset(remkids, sumtree)
             if bip in self.rootbipsummary:
                 rootcred = self.rootbipsummary[bip].posterior
                 sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
@@ -5919,8 +5919,8 @@ class TreeSummary():
         for p in sumtree.sorted_intnodes():
             if p != sumtree.root:
                 for c in sumtree.children(p):
-                    remkids_indices = sumtree.remotechildren_indices_dict[c]
-                    bip = Bipartition.from_indices(remkids_indices, sumtree)
+                    remkids = sumtree.remotechildren_dict[c]
+                    bip = Bipartition.from_leafset(remkids, sumtree)
                     brstruct = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(p,c,"length", brstruct.length)
                     sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
@@ -5928,8 +5928,8 @@ class TreeSummary():
 
         # Handle root bipartition separately
         kid1,kid2 = sumtree.children(sumtree.root)
-        kid1_remkids_indices = sumtree.remotechildren_indices_dict[kid1]
-        rootbip = Bipartition.from_indices(kid1_remkids_indices, sumtree)
+        kid1_remkids = sumtree.remotechildren_dict[kid1]
+        rootbip = Bipartition.from_leafset(kid1_remkids, sumtree)
         rootbrstruct = self.bipartsummary[rootbip]
         summary_rootbipstruct = self._rootbip_summary[rootbip]
 
