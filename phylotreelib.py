@@ -349,6 +349,16 @@ class Nodestruct:
         self.depth = depth
         self.nleaves = nleaves
         self.subcladepairs = set()
+        self.best_pair = None
+        self.SUMW = 0.0
+        self.mean = 0.0
+        self.n = 0
+        self.clade_cred = None
+        self.posterior = None
+        self.freq = None
+        self.depth_var = None
+        self.depth_sd = None
+        self.clade_score = None
 
     def __str__(self):
         return f"depth: {self.depth}\n"
