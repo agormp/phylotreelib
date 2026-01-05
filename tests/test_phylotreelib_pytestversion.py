@@ -65,13 +65,13 @@ class Test_copy_Branchstruct:
         mylabel = "0.9965"
         b1 = pt.Branchstruct(length=mylength)
         b1.label=mylabel
-        b1.myatt1 = "howdy"
-        b1.myatt2 = 0.34984
+        b1.freq = 0.9876
+        b1.posterior = 0.34984
         b2 = b1.copy()
         assert b1.length == b2.length
         assert b1.label == b2.label
-        assert b1.myatt1 == b2.myatt1
-        assert b1.myatt2 == b2.myatt2
+        assert b1.freq == b2.freq
+        assert b1.posterior == b2.posterior
 
 ###################################################################################################
 ###################################################################################################
