@@ -2841,7 +2841,7 @@ class Tree:
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
-            self._remotechildren_dict = None
+            self._remotechildren_mask_dict = None
 
         return bipdict
 
