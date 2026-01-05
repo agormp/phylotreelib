@@ -1902,6 +1902,32 @@ class Tree:
 
     ###############################################################################################
 
+    def intnodes_postorder(self):
+        """Returns sorted list of intnodes for post-order traversal of tree 
+        (i.e., a node is only visited after all its children have been visited)"""
+        
+        # if self._sorted_intnodes_shallow:
+        #     return self._sorted_intnodes_shallow
+        
+        out = []
+        stack = [(self.root, 0)]  # (node, state) where state=0 means "expand", 1 means "emit"
+        while stack:
+            node, state = stack.pop()
+            if state == 0:
+                stack.append((node, 1))
+                # push children to expand first
+                if node not in self.leaves:
+                    for ch in self.children(node):
+                        stack.append((ch, 0))
+            else:
+                if node not in self.leaves:
+                    out.append(node)
+                    
+        # self._sorted_intnodes_shallow = out
+        return out
+
+    ###############################################################################################
+
     def is_bifurcation(self, node):
         """Checks if internal node is at bifurcation (has two children)"""
         try:
