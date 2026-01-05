@@ -1856,27 +1856,40 @@ class Tree:
     ###############################################################################################
 
     def sorted_intnodes(self, deepfirst=True):
-        """Returns sorted intnode list for breadth-first traversal of tree"""
+        """Returns sorted intnode list for breadth-first traversal of tree
+        deepfirst=False: returns internal nodes in bottom-up (reverse level) order"""
 
         # "intnodes" is a set, meaning iteration occurs in no defined order.
         # This function returns a list sorted such that deep nodes generally go before
         # shallow nodes (deepfirst=False reverses this)
-        if deepfirst and self._sorted_intnodes_deep:
-            return self._sorted_intnodes_deep
-        if not deepfirst and self._sorted_intnodes_shallow:
-            return self._sorted_intnodes_shallow
+        if deepfirst:
+            cached = self._sorted_intnodes_deep
+            if cached:
+                return cached
+        else:
+            cached = self._sorted_intnodes_shallow
+            if cached:
+                return cached        
 
         # Add nodes one tree-level at a time.
         # First root, then children of root, then children of those, etc
         sorted_nodes = []
-        curlevel = {self.root}
+        curlevel = [self.root]
+
+        children = self.children
+        intnodes = self.intnodes
+        sorted_nodes_extend = sorted_nodes.extend
+
         while curlevel:
-            sorted_nodes.extend(curlevel)
+            sorted_nodes_extend(curlevel)
             nextlevel = []
+            nextlevel_append = nextlevel.append 
 
             # For each node in current level: add those children that are also internal nodes
-            for node in curlevel:
-                nextlevel.extend(self.children(node) & self.intnodes)
+            for parent in curlevel:
+                for child in children(parent):
+                    if child in intnodes:
+                        nextlevel_append(child)
 
             curlevel = nextlevel
 
