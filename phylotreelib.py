@@ -2924,7 +2924,7 @@ class Tree:
         leafset2 = self.remote_children(rootkids[1])
         blen1 = self.nodedist(self.root, rootkids[0])
         blen2 = self.nodedist(self.root, rootkids[1])
-        rootbip = Bipartition(leafset1, self.frozenset_leaves, self.sorted_leaf_tup, self.leaf2index)
+        rootbip = Bipartition.from_leafset(leafset1, self)
 
         return rootbip, leafset1, blen1, leafset2, blen2
 
@@ -5937,8 +5937,8 @@ class TreeSummary():
         if self.trackbips:
             for parent in sumtree.sorted_intnodes():
                 for child in sumtree.children(parent):
-                    leafset1 = sumtree.remotechildren_dict[child]
-                    bip = Bipartition(leafset1, sumtree.frozenset_leaves, sumtree.sorted_leaf_tup, sumtree.leaf2index)
+                    remkids = sumtree.remotechildren_dict[child]
+                    bip = Bipartition.from_leafset(remkids, sumtree)
                     br = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(parent, child, "bipartition_cred",
                                                  getattr(br, "bipartition_cred", br.posterior))
