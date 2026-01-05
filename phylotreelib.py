@@ -5907,8 +5907,8 @@ class TreeSummary():
 
     def set_mean_biplen(self, sumtree):
         """Only to be used when goal is to set bipartition-based branch-length stats
-        on sumtree, and those were not already set during construction. This happens for instance
-        when treetype in {MCC, MBC} (but not when treetype in {con, all}).
+        on sumtree, and those were not already set during construction. 
+        This happens when treetype is MCC
         NOTE: requires rooting to be tracked in order to properly split branch length on
         root bipartition"""
 
