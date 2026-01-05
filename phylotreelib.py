@@ -801,12 +801,13 @@ class Tree:
     # The Tree class therefore has several alternate constructors implemented as classmethods
     # The main constructor "__init__" is therefore mostly empty
 
-    # Class-level cache; dict of: {frozenset_leaves: (frozenset_leaves, sorted_leaf_tup, leaf2index) }
+    # Class-level cache; 
+    # dict of: {frozenset_leaves: (frozenset_leaves, sorted_leaf_tup, alltips_mask, ntips) }
     # Key is tipset (frozenset_leaves), which functions as a universe-id (in case there are 
     # different types of trees in one Python session)
-    # Cache achieves interning (one copy per treetype of the three variables in the tuple)
-    # and also avoiding repeated construction of sorted_leaf_tup and leaf2index
-    _class_cache = {}
+    # Cache achieves interning (one copy per treetype of the variables in the tuple)
+    # and also avoiding repeated construction of the variables
+    _class_cache = {}    
 
     def __init__(self):
         self.child_dict = {}
@@ -817,8 +818,8 @@ class Tree:
         self._parent_dict = None
         self._remotechildren_dict = None
         self._remotechildren_indices_dict = None
+        self._remotechildren_mask_dict = None 
         self._frozenset_leaves = None
-        self._sorted_leaf_tup = None
         self._leaf2index = None
         self.dist_dict = None
         self._pathdist_dict = None
@@ -833,23 +834,8 @@ class Tree:
         self._nodedepthdict = None
         self._topology_bipart = None
         self._topology_clade = None
+        self._cached_attributes = None
         
-    ###############################################################################################
-
-    @classmethod
-    def _get_cached_atrributes(cls, leaves):
-        """Input: iterable of leaves
-           Output: tuple of (frozenset_leaves, sorted_leaf_tup, leaf2index)"""
-        
-        frozenset_leaves = frozenset(leaves)
-        attr_tup = cls._class_cache.get(frozenset_leaves)
-        if attr_tup is None:
-            sorted_leaf_tup = tuple(sorted(frozenset_leaves))
-            leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
-            attr_tup = (frozenset_leaves, sorted_leaf_tup, leaf2index)
-            cls._class_cache[frozenset_leaves] = attr_tup
-        return attr_tup
-
     ###############################################################################################
 
     def clear_caches(self, preserve=[]):
@@ -858,8 +844,9 @@ class Tree:
 
         # structure/topology derived
         for attr in {
-            "_parent_dict", "_remotechildren_dict",
-            "_frozenset_leaves", "_sorted_leaf_tup", "_leaf2index",
+            "_parent_dict", "_remotechildren_dict", "_remotechildren_indices_dict",
+            "_remotechildren_mask_dict",
+            "_cached_attributes", "_leaf2index",
             "path_dict", "_intnodes", "_nodes",
             "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
             "_topology_bipart", "_topology_clade",
@@ -907,11 +894,6 @@ class Tree:
         # All action is in parser_obj
         treeobj = cls()
         treeobj = parser_obj.parse(treeobj, orig_treestring)
-        froz_leaves, sorted_tup, leaf2idx = cls._get_cached_atrributes(treeobj.leaves)
-        treeobj._frozenset_leaves = froz_leaves
-        treeobj._sorted_leaf_tup = sorted_tup
-        treeobj._leaf2index = leaf2idx
-
         return treeobj
 
     ###############################################################################################
@@ -1149,11 +1131,6 @@ class Tree:
             msg = (f"Missing branch-information: these (non-root) internal nodes have no parent: "
                    f"{list(orphans)}")
             raise TreeError(msg)
-
-        froz_leaves, sorted_tup, leaf2idx = cls._get_cached_atrributes(obj.leaves)
-        obj._frozenset_leaves = froz_leaves
-        obj._sorted_leaf_tup = sorted_tup
-        obj._leaf2index = leaf2idx
 
         return obj
 
@@ -1428,6 +1405,29 @@ class Tree:
     ###############################################################################################
 
     @property
+    def cached_attributes(self):
+        """Return tuple of cached, interned 
+                  (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask)
+        If not present on instance: Check class cache. 
+        If not present on class: build, cache on class and instance, and return"""
+        
+        if self._cached_attributes is None:
+            frozenset_leaves = frozenset(self.leaves)
+            class_cached_attr = type(self)._class_cache.get(frozenset_leaves)
+            if class_cached_attr is None:
+                sorted_leaf_tup = sorted(frozenset_leaves)
+                leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
+                leaf2mask = {leaf:(1<<i) for leaf,i in leaf2index.items()}
+                ntips = len(sorted_leaf_tup)
+                alltips_mask = (1 << ntips) - 1
+                class_cached_attr = (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask)
+                type(self)._class_cache[frozenset_leaves] = class_cached_attr
+            self._cached_attributes = class_cached_attr    
+        return self._cached_attributes
+
+    ###############################################################################################
+
+    @property
     def intnodes(self):
         """Lazy evaluation of intnodes"""
         if self._intnodes is None:
@@ -1447,38 +1447,41 @@ class Tree:
 
     @property
     def frozenset_leaves(self):
-        """Return interned value if present, create class-level cache for new tipset if not"""
-        if self._frozenset_leaves is None:
-            froz_leaves, sorted_tup, leaf2idx = self.__class__._get_cached_atrributes(self.leaves)
-            self._frozenset_leaves = froz_leaves
-            self._sorted_leaf_tup = sorted_tup
-            self._leaf2index = leaf2idx
-        return self._frozenset_leaves
+        """Return value cached and interned on class.
+        Ensures attributes (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask) are cached and
+        interned on class, and copy cached on instance"""
+        
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
+        return frozenset_leaves
             
     ###############################################################################################
 
     @property
     def sorted_leaf_tup(self):
-        """Return interned value if present, create class-level cache for new tipset if not"""
-        if self._frozenset_leaves is None:
-            froz_leaves, sorted_tup, leaf2idx = self.__class__._get_cached_atrributes(self.leaves)
-            self._frozenset_leaves = froz_leaves
-            self._sorted_leaf_tup = sorted_tup
-            self._leaf2index = leaf2idx
-        return self._sorted_leaf_tup
+        """Return value cached and interned on class.
+        Ensures attributes (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask) are cached and
+        interned on class, and copy cached on instance"""
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
+        return sorted_leaf_tup
             
+    ###############################################################################################
+            
+    @property
+    def alltips_mask(self):
+        """Return value cached and interned on class.
+        Ensures attributes (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask) are cached and
+        interned on class, and copy cached on instance"""
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
+        return alltips_mask
+
     ###############################################################################################
 
     @property
     def leaf2index(self):
-        """Return interned value if present, create class-level cache for new tipset if not"""
-        if self._frozenset_leaves is None:
-            froz_leaves, sorted_tup, leaf2idx = self.__class__._get_cached_atrributes(self.leaves)
-            self._frozenset_leaves = froz_leaves
-            self._sorted_leaf_tup = sorted_tup
-            self._leaf2index = leaf2idx
-        return self._leaf2index
-            
+        """Return interned value if present, create instance-level cache if not"""
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
+        return leaf2index
+        
     ###############################################################################################
 
     @property
