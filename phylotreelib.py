@@ -1556,9 +1556,9 @@ class Tree:
         
         if self._remotechildren_indices_dict is None:
             remidx_dict = self._remotechildren_indices_dict = {}
-            leaf2index = self.leaf2index
+            getitem = self.leaf2index.__getitem__            
             for node, remkids in self.remotechildren_dict.items():
-                remidx = frozenset(leaf2index[leaf] for leaf in remkids)
+                remidx = frozenset(map(getitem, remkids))
                 remidx_dict[node] = remidx
         return self._remotechildren_indices_dict
 
