@@ -220,28 +220,106 @@ class Interner():
 
 class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
-
-    def __init__(self, length=0.0, **attributes):
+    
+    __slots__ = ("length", "label", 
+                 "SUMW", "mean", "M2", "n", 
+                 "length_var", "length_sd", 
+                 "posterior", "freq", "bipartition_cred", "rootcred", 
+                 "parent_height", "kid_height")
+        
+    # Used by __str__ when deciding which attributes to print (those with non-defaul values)         
+    _DEFAULTS = {
+        "length": 0.0,
+        "label": "",
+        "SUMW": 0.0,
+        "mean": 0.0,
+        "M2": 0.0,
+        "n": 0,
+        "length_var": 0.0,
+        "length_sd": 0.0,
+        "posterior": None,
+        "freq": None,
+        "bipartition_cred": None,
+        "rootcred": None,
+        "parent_height": None,
+        "kid_height": None,
+    }
+                 
+    def __init__(self, length=0.0, label=""):
         self.length = length
-        self.__dict__.update(attributes)
+        self.label = label
+        self.SUMW = 0.0
+        self.mean = 0.0
+        self.M2 = 0.0
+        self.n = 0
+        self.length_var = 0.0
+        self.length_sd = 0.0
+        self.posterior = None
+        self.freq = None
+        self.bipartition_cred = None
+        self.rootcred = None
+        self.parent_height = None
+        self.kid_height = None
+        
+    ###################################################################################################
+    # The code below is used by Tree.__str__ when choosing which attr to print)
+            
+    @classmethod
+    def printable_attrs(cls):
+        """Attrs eligible to appear as extra columns (excludes 'length' because it's printed as branchlen)."""
+        return tuple(a for a in cls.__slots__ if a != "length")
+
+    @classmethod
+    def default_for(cls, attr: str):
+        return cls._DEFAULTS.get(attr, None)
+
+    @classmethod
+    def is_interesting(cls, attr: str, value) -> bool:
+        """Decide whether a value should cause the column to be included / printed."""
+        default = cls.default_for(attr)
+        return value != default
+
+    def interesting_attrs(self):
+        """Yield attrs that are interesting on *this* branch (non-default)."""
+        for attr in self.printable_attrs():
+            v = getattr(self, attr)
+            if self.is_interesting(attr, v):
+                yield attr
+
+    def format_attr(self, attr: str) -> str:
+        """String to show in table cell (boring values become '')."""
+        v = getattr(self, attr)
+        if not self.is_interesting(attr, v):
+            return ""
+        if isinstance(v, float):
+            return f"{v:.6g}"       
+        return str(v)
+        
+    ###################################################################################################
+        
 
     def __str__(self):
-        attrs = [f"{k}: {v}" for k, v in vars(self).items()]
-        return ", ".join(attrs) + "\n"
+        return f"length: {self.length}\n"
 
     def __repr__(self):
         return self.__str__()
 
     ###############################################################################################
 
-    def copy(self):
-        """Returns copy of Branchstruct object, with all attributes included"""
+    def copy(self, copylengths=True, copyattr=True):
+        """Returns copy of Branchstruct object, with selected attributes included
+        copylength: copy .length attribute
+        copyattr: copy remaining attributes"""
 
         # Python note: only works as deepcopy if all attributes are immutable. Rewrite!
         obj = Branchstruct()
-        obj.__dict__.update(self.__dict__)
+        if copylengths:
+            obj.length = self.length
+        if copyattr:
+            for name in self.__slots__[1:]:
+                setattr(obj, name, getattr(self, name))
         return obj
-
+        
     ###############################################################################################
 
     def merge(self, other, check_compat=False):
@@ -1227,20 +1305,19 @@ class Tree:
             for kid in sorted_kids:
                 parentstr = str(parent)
                 kidstr = str(kid)
-                dist = "{num:.6g}".format(num=self.child_dict[parent][kid].length)
                 branch = self.child_dict[parent][kid]
+                dist = "{num:.6g}".format(num=branch.length)
                 data_rows.append([parentstr, kidstr, dist, branch])
-                # Collect attribute names, excluding 'length'
-                for attr in branch.__dict__.keys():
-                    if attr != 'length':
-                        attr_set.add(attr)
 
+                # Slots-based: include only attrs that are non-default on at least one branch
+                attr_set.update(branch.interesting_attrs())
+                
         # Sort and initialize attribute names
         attr_list = sorted(attr_set)
 
         # Initialize headers and maxwidths for fixed columns
         headers = fixed_columns.copy()
-        maxwidths = [max(len(col), 6) for col in fixed_columns]
+        maxwidths = [max(len(col), 6) for col in fixed_columns]  # Python note: superseded by code below?
 
         # Compute max widths for fixed columns
         for i, col in enumerate(fixed_columns):
@@ -1256,7 +1333,7 @@ class Tree:
             maxw = len(attr)
             for data_row in data_rows:
                 branch = data_row[3]
-                value_str = str(getattr(branch, attr, ""))
+                value_str = branch.format_attr(attr)
                 maxw = min(max(len(value_str), maxw), max_col_width)
             maxwidth_dict[attr] = maxw
 
@@ -1278,18 +1355,18 @@ class Tree:
 
         # Build table rows
         table = [headers]
-        for data_row in data_rows:
-            parentstr, kidstr, dist, branch = data_row
+        for parentstr, kidstr, dist, branch in data_rows:
             row = [parentstr, kidstr, dist]
             for attr in included_attrs:
                 value = getattr(branch, attr, "")
-                value_str = str(value)[:max_col_width]
+                value_str = branch.format_attr(attr)[:max_col_width]
                 row.append(value_str)
             table.append(row)
 
         # Build the formatted table string
         border_line = "+" + "-" * (totwidth - 2) + "+\n"
         tabstring = border_line
+        
         # Add header row
         for i, header in enumerate(headers):
             col_width = maxwidths[i] + padding * 2
@@ -1301,8 +1378,7 @@ class Tree:
         for row in table[1:]:
             for i, value in enumerate(row):
                 col_width = maxwidths[i] + padding * 2
-                value_str = value.rjust(maxwidths[i])
-                tabstring += "|" + (padding * " ") + value_str.rjust(col_width - 2*padding) + (padding * " ")
+                tabstring += "|" + (padding * " ") + str(value).rjust(col_width - 2 * padding) + (padding * " ")
             tabstring += "|\n"
         tabstring += border_line
 
@@ -1742,16 +1818,7 @@ class Tree:
             newdict[parent] = {}
             for child in origdict[parent]:
                 origbranch = origdict[parent][child]
-                if copylengths:
-                    blen = origbranch.length
-                else:
-                    blen = 0.0
-                newbranch = Branchstruct(blen)
-                if copyattr:
-                    # Python note: should check for immutability, and use .copy if not
-                    for attrname in origbranch.__dict__.keys() - {("length")}:
-                        origvalue =  origbranch.__dict__[attrname]
-                        setattr(newbranch, attrname, origvalue)
+                newbranch = origbranch.copy(copylengths, copyattr)
                 newdict[parent][child] = newbranch
         return newdict
 
