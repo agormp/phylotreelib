@@ -1093,8 +1093,7 @@ class Tree:
     def from_cladedict(cls, cladedict):
 
         clade = next(iter(cladedict))
-        leaves = clade.tipset
-        obj = cls.from_leaves(leaves)
+        obj = cls.from_leaves(clade._sorted_leaf_tup)
         all_leaves = obj.frozenset_leaves
 
         for clade, nodestruct in cladedict.items():
@@ -2892,11 +2891,19 @@ class Tree:
 
         cladedict = {}
         node2clade = {}
+        
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
+        from_mask = Clade.from_mask
+
+        object_cache = Clade._class_cache.get(frozenset_leaves)
+        if object_cache is None:
+            object_cache = {}
+            Clade._class_cache[frozenset_leaves] = object_cache
 
         # For each node: find clade representation, add this and Nodestruct to dict
-        for node, remkids_indices in self.remotechildren_indices_dict.items():
-            clade = Clade.from_indices(remkids_indices, self)
-            nodestruct = Nodestruct(self.nodedepth(node), len(remkids_indices))
+        for node, remkids_mask in self.remotechildren_mask_dict.items():
+            clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
+            nodestruct = Nodestruct(self.nodedepth(node), remkids_mask.bit_count())
             cladedict[clade] = nodestruct
 
             # If tracking subcladepairs: remember clade for each node to avoid superfluous Clade
@@ -2923,7 +2930,7 @@ class Tree:
 
         # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
-            self._remotechildren_dict = None
+            self._remotechildren_mask_dict = None
 
         return cladedict
 
