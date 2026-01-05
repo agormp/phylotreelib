@@ -2849,6 +2849,7 @@ class Tree:
         remmask = self.remotechildren_mask_dict
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
         from_halfmask = Bipartition.from_halfmask
+        child_dict = self.child_dict
 
         object_cache = Bipartition._class_cache.get(frozenset_leaves)
         if object_cache is None:
@@ -2859,20 +2860,20 @@ class Tree:
         # Remote kids of node most distant from root (or node itself) forms one part of bipartition
         # Note: if root has two kids, then the root bipartition is added twice
         # This will be dealt with below
-        for parent in self.child_dict:
-            for child in self.children(parent):
+        for parent in child_dict:
+            for child in child_dict[parent]:
                 halfmask = remmask[child]
                 bipartition = from_halfmask(halfmask, alltips_mask, object_cache, sorted_leaf_tup)
-                bipdict[bipartition] = self.child_dict[parent][child]
-
+                bipdict[bipartition] = child_dict[parent][child]
+                
         # If root is attached to exactly two nodes, then two branches correspond to the same
         # bipartition. Clean up by collapsing two branches (add lengths, merge other attributes)
         rootkids = self.children(self.root)
         if len(rootkids) == 2:
             rootbip, leafset1, blen1, leafset2, blen2 = self.rootbip()
             kid1, kid2 = rootkids
-            branch1 = self.child_dict[self.root][kid1]
-            branch2 = self.child_dict[self.root][kid2]
+            branch1 = child_dict[self.root][kid1]
+            branch2 = child_dict[self.root][kid2]
             branch_merged = branch1.merge(branch2, check_compat=True)      # Sums up branch lengths, merges attributes
             bipdict[rootbip] = branch_merged
 
