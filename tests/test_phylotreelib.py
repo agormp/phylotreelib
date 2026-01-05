@@ -10,6 +10,7 @@ import itertools
 import random
 from io import StringIO
 import pytest
+from types import SimpleNamespace
 
 ###################################################################################################
 ###################################################################################################
@@ -594,14 +595,19 @@ class Treesummarytests(TreeTestBase):
         names1, names2, meanvar = mbresults[0].strip().split("|")
         bip1 = names1.strip().split()
         bip2 = names2.strip().split()
-        total_leaves = bip1 + bip2
-        sorted_leaves = sorted(total_leaves)
-        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaves)}
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(bip1 + bip2)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf:(1<<i) for leaf,i in leaf2index.items()}
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        mocktree.cached_attributes = (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask)
         for line in mbresults:
             names1, names2, meanvar = line.strip().split("|")
             bip1 = names1.strip().split()
             bip2 = names2.strip().split()
-            bipart = pt.Bipartition(bip1, total_leaves, sorted_leaves, leaf2index)
+            bipart = pt.Bipartition.from_leafset(frozenset(bip1), mocktree)
             vals = meanvar.strip().split()
             mean = float(vals[0])
             var = float(vals[1])
@@ -700,9 +706,17 @@ class Topologytests(TreeTestBase):
         sorted_leaflist = sorted(total_leaves)
         leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaflist)}
         bipdict = mytree.bipdict()
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(total_leaves)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf:(1<<i) for leaf,i in leaf2index.items()}
+        mocktree.cached_attributes = (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask)
 
         # Test that key for central branch is present, and that length and label are as expected
-        expectedkey = pt.Bipartition(["YAL016W", "SBC669_26"], total_leaves, sorted_leaflist, leaf2index)
+        expectedkey = pt.Bipartition.from_leafset(frozenset(["YAL016W", "SBC669_26"]), mocktree)
         expectedlen = 0.124263
         expectedlab = "0.0507"
 
@@ -716,14 +730,22 @@ class Topologytests(TreeTestBase):
         total_leaves = set(["s4", "s1", "s3", "s2", "s5"])
         sorted_leaflist = sorted(total_leaves)
         leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaflist)}
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(total_leaves)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf:(1<<i) for leaf,i in leaf2index.items()}
+        mocktree.cached_attributes = (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask)
         bipdict = mytree.bipdict()
-        expectedkeys = [pt.Bipartition(["s1"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s2"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s3"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s4"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s5"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s4", "s5"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s1", "s2"],total_leaves, sorted_leaflist, leaf2index)]
+        expectedkeys = [pt.Bipartition.from_leafset(["s1"],mocktree),
+                        pt.Bipartition.from_leafset(["s2"],mocktree),
+                        pt.Bipartition.from_leafset(["s3"],mocktree),
+                        pt.Bipartition.from_leafset(["s4"],mocktree),
+                        pt.Bipartition.from_leafset(["s5"],mocktree),
+                        pt.Bipartition.from_leafset(["s4", "s5"],mocktree),
+                        pt.Bipartition.from_leafset(["s1", "s2"],mocktree)]
 
         expectedvals = [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.25]
 
@@ -745,14 +767,22 @@ class Topologytests(TreeTestBase):
         total_leaves = set(["s4", "s1", "s3", "s2", "s5"])
         sorted_leaflist = sorted(total_leaves)
         leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaflist)}
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(total_leaves)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        leaf2index = {leaf:i for i,leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf:(1<<i) for leaf,i in leaf2index.items()}
+        mocktree.cached_attributes = (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask)
 
-        expectedtop = frozenset([pt.Bipartition(["s4", "s5"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s4", "s5", "s3"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s4", "s5", "s3", "s2"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s4", "s5", "s3", "s1"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s4", "s5", "s1", "s2"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s1", "s5", "s3", "s2"],total_leaves, sorted_leaflist, leaf2index),
-                        pt.Bipartition(["s4", "s1", "s3", "s2"],total_leaves, sorted_leaflist, leaf2index)])
+        expectedtop = frozenset([pt.Bipartition.from_leafset(["s4", "s5"],mocktree),
+                        pt.Bipartition.from_leafset(["s4", "s5", "s3"],mocktree),
+                        pt.Bipartition.from_leafset(["s4", "s5", "s3", "s2"],mocktree),
+                        pt.Bipartition.from_leafset(["s4", "s5", "s3", "s1"],mocktree),
+                        pt.Bipartition.from_leafset(["s4", "s5", "s1", "s2"],mocktree),
+                        pt.Bipartition.from_leafset(["s1", "s5", "s3", "s2"],mocktree),
+                        pt.Bipartition.from_leafset(["s4", "s1", "s3", "s2"],mocktree)])
 
         self.assertEqual(topology, expectedtop)
 
