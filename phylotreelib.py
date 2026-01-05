@@ -339,14 +339,19 @@ class Branchstruct:
 class Nodestruct:
     """Class that emulates a struct. Keeps node-related info"""
 
+    __slots__ = ("depth", "nleaves", "subcladepairs", "best_pair",
+                 "SUMW", "mean", "M2", "n",
+                 "clade_cred", "posterior", "freq",
+                 "depth_var", "depth_sd",
+                 "clade_score")
+
     def __init__(self, depth=0.0, nleaves=None):
         self.depth = depth
         self.nleaves = nleaves
         self.subcladepairs = set()
 
     def __str__(self):
-        attrs = [f"{k}: {v}" for k, v in vars(self).items()]
-        return ", ".join(attrs) + "\n"
+        return f"depth: {self.depth}\n"
 
     def __repr__(self):
         return self.__str__()
@@ -363,8 +368,8 @@ class Nodestruct:
 
         # Python note: will cause problems if any values are not immutable
         obj = Nodestruct()
-        for attrname, value in vars(self).items():
-            setattr(obj, attrname, value)
+        for name in self.__slots__:
+            setattr(obj, name, getattr(self, name))
         return obj
 
 ###################################################################################################
@@ -504,97 +509,77 @@ class Bipartition:
 class Clade:
     """Class that represents a clade: the set of leaves descended from an internal node"""
 
-    __slots__ = ("_frozenset_leaves", "frozenset_indices", "_hash_value")
+    __slots__ = ("_mask", "_sorted_leaf_tup")
 
-    # Class-level cache; dict of {frozenset_leaves: (sorted_leaf_tup, leaf2index, object_cache)}
-    # Key to top-level dict is tipset (frozenset_leaves for all leaves on tree), which functions
-    # as a universe-id  (in case there are different types of trees in one Python session)
-    # object_cache is itself a dict of {leafset: Clade-object} and contains pre-computed Clade
-    # objects for previously seen subsets of leaves (leafset)
-    # Cache achieves interning (one copy per treetype of Clades, sorted_leaf_tup, and leaf2index)
-    # and also avoiding repeated construction of Clade objects
+    # Class-level cache
+    # dict of {_tipset_id: object_cache}
+    # object_cache: {mask: Clade}
     _class_cache = {}
 
-    # Only call this via .from_leafset
-    def __init__(self, frozenset_leaves, frozenset_indices):
-        self._frozenset_leaves = frozenset_leaves
-        self.frozenset_indices = frozenset_indices
-        self._hash_value = hash((frozenset_leaves, frozenset_indices))
-
+    # Called only from other constructors, not directly
+    # mask: int interpreted as bitset of leaf indices in clade
+    def __init__(self, mask, sorted_leaf_tup):
+        self._mask = mask
+        self._sorted_leaf_tup = sorted_leaf_tup
+        
     @classmethod
-    def from_indices(cls, frozenset_indices, tree):
-        """Constructor method for Clade objects:
-        Create/intern Clade object from frozenset of leaf names, using the tipset implied by `tree`"""
+    def from_mask(cls, mask, object_cache, sorted_leaf_tup):
+        """Clade constructor that relies on caller knowing leaf universe and providing
+        required information:
 
-        # Given object_cache:
-        # If frozenset_indices seen before: return existing Clade object
-        # If not: build and return
-        frozenset_leaves, (_, _, object_cache) = cls._ensure_leaf_universe(tree)
-        cached_clade = object_cache.get(frozenset_indices)
+        mask: int representing bitset of indices for leaves in Clade
+        object_cache: class-level cache for clade objects belonging to this leaf-universe
+        sorted_leaf_tup: for this leaf universe; cached and interned on Tree class
+
+        returns Clade object
+        Achieves interning + caching to avoid repeated object construction"""
+
+        cached_clade = object_cache.get(mask)
         if cached_clade is None:
-            cached_clade = cls(frozenset_leaves, frozenset_indices)
-            object_cache[frozenset_indices] = cached_clade
+            cached_clade = cls(mask, sorted_leaf_tup)
+            object_cache[mask] = cached_clade
         return cached_clade
 
     @classmethod
     def from_leafset(cls, leafset, tree):
-        """Constructor method for Clade objects:
-        Create/intern Clade object from leaf names, using the tipset implied by `tree`"""
+        """Convenience constructor for tests and interactive use where clade is given as 
+        leafset, and this method has to handle object_cache retrieval and construction."""
 
-        # Given cached attributes (sorted_leaf_tup, leaf2index, object_cache):
-        # If Clade-leaves seen before: return existing Clade object
-        # If not: build and return
-        frozenset_leaves,( _, leaf2index, object_cache) = cls._ensure_leaf_universe(tree)
-        frozenset_indices = frozenset(leaf2index[leaf] for leaf in leafset)
-        cached_clade = object_cache.get(frozenset_indices)
-        if cached_clade is None:
-            cached_clade = cls(frozenset_leaves, frozenset_indices)
-            object_cache[frozenset_indices] = cached_clade
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = tree.cached_attributes
+        
+        object_cache = cls._class_cache.get(frozenset_leaves)
+        if object_cache is None:
+            object_cache = {}
+            cls._class_cache[frozenset_leaves] = object_cache
+        
+        mask = 0
+        for leaf in leafset:
+            mask += leaf2mask[leaf]
+
+        cached_clade = cls.from_mask(mask, object_cache, sorted_leaf_tup)
+
         return cached_clade
 
-    @classmethod
-    def _ensure_leaf_universe(cls, tree):
-        """Helper method for Clade constructors:
-        Input: Tree object,
-        Output: cached versions of frozenset_leaves, sorted_leaf_tup, leaf2index, object_cache
-
-        If tipset (leaf-universe ID) seen before: use existing object-cache and attribues
-        If not: build once and add to _class_cache
-        """
-        frozenset_leaves = tree._frozenset_leaves or tree.frozenset_leaves
-        cached_attr = cls._class_cache.get(frozenset_leaves)
-        if cached_attr is None:
-            sorted_leaf_tup = tree.sorted_leaf_tup                # tuple[str, ...]
-            leaf2index = tree.leaf2index                          # dict[str,int]
-            object_cache = {}                                     # frozenset_indices: Clade
-            cached_attr = (sorted_leaf_tup, leaf2index, object_cache)
-            cls._class_cache[frozenset_leaves] = cached_attr
-
-        return frozenset_leaves, cached_attr
-
-    @property
-    def tipset(self):
-        return self._frozenset_leaves
-
     def __hash__(self):
-        return self._hash_value
+        # Python note: this strategy (using only the mask as hash) depends on never comparing
+        # Clades across leaf-universes. In class-level cache this is ensured by having
+        # object_cache be indexed by tipset_id
+        return self._mask
 
     def __eq__(self, other):
         if self is other:
             return True
-        return (
-            isinstance(other, Clade)
-            and self._frozenset_leaves == other._frozenset_leaves
-            and self.frozenset_indices == other.frozenset_indices
-        )
+        return self._mask == other._mask
 
     def __len__(self):
-        return len(self.frozenset_indices)
+        return len(self._sorted_leaf_tup)
 
     def get_clade(self):
         """Return leaf names in this clade."""
-        sorted_leaf_tup, _, _ = self.__class__._class_cache[self._frozenset_leaves]
-        return frozenset(sorted_leaf_tup[i] for i in self.frozenset_indices)
+        sorted_leaf_tup = self._sorted_leaf_tup
+        ntips = len(sorted_leaf_tup)
+        leafnames = frozenset(sorted_leaf_tup[i] for i in range(ntips) if (self._mask >> i) & 1)
+        return leafnames
 
     # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
     # 1-tuple; comma is important
@@ -605,21 +590,7 @@ class Clade:
         return f"\n{self.get_clade()}\n"
 
     def __repr__(self):
-        return f"Clade(n={len(self)}, ntips={len(self._frozenset_leaves)})"
-
-    # # ---------------- optional test helpers ----------------
-    # @classmethod
-    # def clear_tipset(cls, tree_or_tipset) -> None:
-    #     """Clear one tipset's registry/cache (useful in tests)."""
-    #     tipset = tree_or_tipset if isinstance(tree_or_tipset, tuple) else tree_or_tipset.sorted_leaf_tup
-    #     cls._tipset_leaf2index.pop(tipset, None)
-    #     cls._cache_by_tipset.pop(tipset, None)
-    #
-    # @classmethod
-    # def clear_all(cls) -> None:
-    #     """Clear all tipsets (useful in tests)."""
-    #     cls._tipset_leaf2index.clear()
-    #     cls._cache_by_tipset.clear()
+        return f"Clade(n={len(self)}, ntips={len(self._sorted_leaf_tup)})"
 
 ###################################################################################################
 ###################################################################################################
