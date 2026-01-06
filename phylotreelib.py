@@ -1644,9 +1644,8 @@ class Tree:
         if self._rootdist is None:
             self._rootdist = {self.root: 0.0}
             for parent in self.sorted_intnodes(deepfirst=True):
-                for child in self.children(parent):
-                    self._rootdist[child] = (self._rootdist[parent] +
-                                             self.child_dict[parent][child].length)
+                for child, branch in self.child_dict[parent].items():
+                    self._rootdist[child] = (self._rootdist[parent] + branch.length)
         return self._rootdist
 
     ###############################################################################################
