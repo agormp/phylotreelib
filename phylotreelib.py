@@ -2276,7 +2276,7 @@ class Tree:
 
     ###############################################################################################
 
-    def find_mrca_orig(self, leaves):
+    def find_mrca(self, leaves):
         """Finds Most Recent Common Ancestor for the provided set of leaves.
         MRCA for a leaf is leaf itself"""
 
@@ -2304,7 +2304,7 @@ class Tree:
 
     ###############################################################################################
 
-    def find_mrca(self, leaves):
+    def find_mrca_mask(self, leaves):
         """MRCA using bitmasks. leaves can be set[str] or iterable[str]."""
 
         # special case: mrca for leaf is leaf itself
