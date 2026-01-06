@@ -1627,12 +1627,13 @@ class Tree:
             # remchild[leaf] = leaf, so remchild-masks for leaves = those in leaf2mask
             rembitdict = self._remotechildren_mask_dict = leaf2mask.copy()
 
-            # Adding non-overlapping bitsets is equivalent to OR (=> set union of individual bits)
+            # Mask = union of individual bits in leaves
             # This works since we start iterating from leaves, so child values already computed
+            child_dict = self.child_dict
             for parent in self.sorted_intnodes(deepfirst=False):
                 mask = 0
-                for child in self.children(parent):
-                    mask += rembitdict[child]
+                for child in child_dict(parent):
+                    mask |= rembitdict[child]
                 rembitdict[parent] = mask
 
         return self._remotechildren_mask_dict
