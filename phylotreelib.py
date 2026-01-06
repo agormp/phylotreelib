@@ -801,9 +801,10 @@ class NewickStringParser:
     def _handle_add_leaf_with_transdict(self, name):
         child = sys.intern(self.transdict[name])
         parent = self.node_stack[-1]
-        self.treeobj.child_dict[parent][child] = Branchstruct()
+        treeobj = self.treeobj
+        treeobj.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
-        self.treeobj.leaves.add(child)
+        treeobj.leaves.add(child)
 
     ###############################################################################################
 
