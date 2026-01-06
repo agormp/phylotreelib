@@ -2940,11 +2940,7 @@ class Tree:
         If requested: Nodestructs also sets .subcladepairs attribute (set)
         """
         cladedict = {}
-
-        if track_subcladepairs:
-            node2clade = {}
-        else:
-            node2clade = None
+        node2clade = {} if track_subcladepairs else None
         it = self.iter_cladeinfo(node2clade=node2clade, keep_remchild_dict=keep_remchild_dict)
 
         Nodestruct_ = Nodestruct  # local bind
