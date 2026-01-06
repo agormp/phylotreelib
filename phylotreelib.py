@@ -1654,15 +1654,16 @@ class Tree:
     @property
     def nodedepthdict(self):
         if self._nodedepthdict is None:
-            self._nodedepthdict = {}
+            nd = self._nodedepthdict = {}
+            rootdist = self.rootdist
             maxdist = 0
             for leaf in self.leaves:
-                dist_root_leaf = self.rootdist[leaf]
+                dist_root_leaf = rootdist[leaf]
                 if dist_root_leaf > maxdist:
                     maxdist = dist_root_leaf
-            rootdepth = self._nodedepthdict[self.root] = maxdist
+            rootdepth = nd[self.root] = maxdist
             for node in self.nodes - {self.root}:
-                self._nodedepthdict[node] = rootdepth - self.rootdist[node]
+                nd[node] = rootdepth - rootdist[node]
         return self._nodedepthdict
 
     ###############################################################################################
