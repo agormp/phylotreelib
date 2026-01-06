@@ -5246,8 +5246,8 @@ class TreeSummary():
                 except ValueError:
                     msg = (
                         f"Error while tracking subclade_pairs - clade has more than 2 children: "
-                        f"parent-node: {node}    children: {curtree.children(node)}"
-                        f"Are you sure input trees are rooted, e.g. using a clock-model?"
+                        f"\n\tparent-node: {node}\n\tchildren:    {curtree.children(node)}"
+                        f"\nAre you sure input trees are rooted, e.g. using a clock-model?"
                     )
                     raise TreeError(msg)
 
