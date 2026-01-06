@@ -2888,15 +2888,20 @@ class Tree:
         return bipdict
 
     ###############################################################################################
-    
-    def cladedict(self, keep_remchild_dict=False, track_subcladepairs=False):
-        """Returns tree in the form of a "clade dictionary": {clade: nodestruct}
-        Nodestructs get the .depth attribute set during construction.
-        If requested: Nodestructs also sets .subcladepairs attribute (set)"""
 
-        cladedict = {}
-        node2clade = {}
-        
+    def iter_cladeinfo(self, node2clade=None, keep_remchild_dict=False):
+        """
+        Stream clade info for each node.
+
+        Yields:
+            (node, clade, depth, nleaves)
+
+        Side effects:
+            If node2clade is a dict, fills node2clade[node] = clade.
+
+       This avoids building cladedict and avoids allocating Nodestruct per node per tree
+        """
+
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
         from_mask = Clade.from_mask
 
@@ -2905,37 +2910,67 @@ class Tree:
             object_cache = {}
             Clade._class_cache[frozenset_leaves] = object_cache
 
-        # For each node: find clade representation, add this and Nodestruct to dict
-        for node, remkids_mask in self.remotechildren_mask_dict.items():
-            clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
-            nodestruct = Nodestruct(self.nodedepth(node), remkids_mask.bit_count())
-            cladedict[clade] = nodestruct
+        # Local binds for speed
+        remkid_items = self.remotechildren_mask_dict.items
+        nodedepth = self.nodedepth
 
-            # If tracking subcladepairs: remember clade for each node to avoid superfluous Clade
-            # construction for the two sub-clades in each iteration (already built as parent clade)
-            if track_subcladepairs:
+        if node2clade is None:
+            for node, remkids_mask in remkid_items():
+                clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
+                yield node, clade, nodedepth(node), remkids_mask.bit_count()
+        else:
+            # fill node2clade
+            for node, remkids_mask in remkid_items():
+                clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
                 node2clade[node] = clade
+                yield node, clade, nodedepth(node), remkids_mask.bit_count()
 
-        if track_subcladepairs:
-            for node in self.intnodes:
-                try:
-                    kid1, kid2 = self.child_dict[node].keys()   # Instead of .children() for speed
-                except ValueError:
-                    msg = (
-                            f"Error while tracking subclade_pairs - clade has more than 2 children: "
-                            f"parent-node: {node}    children: {self.children(node)}"
-                            f"Are you sure input trees are rooted, e.g. using a clock-model?"
-                    )
-                    raise TreeError(msg)
-                clade = node2clade[node]
-                nodestruct = cladedict[clade]
-                c1 = node2clade[kid1]
-                c2 = node2clade[kid2]
-                nodestruct.add_subcladepair(c1, c2)
-
-        # Python note: to save memory. Maybe this should be dealt with centrally?
         if not keep_remchild_dict:
             self._remotechildren_mask_dict = None
+
+    ###############################################################################################
+    
+    def cladedict(self, keep_remchild_dict=False, track_subcladepairs=False):
+        """
+        Deprecated: use generator version iter_cladeinfo when possible.
+        This function only to maintain backwards-compatible materialization of dict
+
+        Returns tree in the form of a "clade dictionary": {clade: nodestruct}
+        Nodestructs get the .depth and ntips attributes set during construction.
+        If requested: Nodestructs also sets .subcladepairs attribute (set)
+        """
+        cladedict = {}
+
+        if track_subcladepairs:
+            node2clade = {}
+        else:
+            node2clade = None
+        it = self.iter_cladeinfo(node2clade=node2clade, keep_remchild_dict=keep_remchild_dict)
+
+        Nodestruct_ = Nodestruct  # local bind
+        for node, clade, depth, nleaves in it:
+            cladedict[clade] = Nodestruct_(depth, nleaves)
+
+        if track_subcladepairs:
+            # Second pass: attach observed child clade pairs to the per-tree nodestructs
+            child_dict = self.child_dict
+            intnodes = self.intnodes
+
+            for node in intnodes:
+                try:
+                    kid1, kid2 = child_dict[node].keys()
+                except ValueError:
+                    msg = (
+                        f"Error while tracking subclade_pairs - clade has more than 2 children: "
+                        f"parent-node: {node}    children: {self.children(node)}"
+                        f"Are you sure input trees are rooted, e.g. using a clock-model?"
+                    )
+                    raise TreeError(msg)
+
+                parent_clade = node2clade[node]
+                ns = cladedict[parent_clade]
+                if ns.nleaves > 2:
+                    ns.add_subcladepair(node2clade[kid1], node2clade[kid2])
 
         return cladedict
 
