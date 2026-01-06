@@ -2275,7 +2275,7 @@ class Tree:
 
     ###############################################################################################
 
-    def find_mrca(self, leaves):
+    def find_mrca_orig(self, leaves):
         """Finds Most Recent Common Ancestor for the provided set of leaves.
         MRCA for a leaf is leaf itself"""
 
@@ -2297,6 +2297,33 @@ class Tree:
 
         # Walk down the tree from the initially picked node, until remkids include all of "leafset"
         while not leafset <= remotechildren_dict[parent]:
+            parent = parent_dict[parent]
+
+        return parent
+
+    ###############################################################################################
+
+    def find_mrca(self, leaves):
+        """MRCA using bitmasks. leaves can be set[str] or iterable[str]."""
+
+        # special case: mrca for leaf is leaf itself
+        if len(leaves) == 1:
+            return next(iter(leaves))
+
+        # Build query mask
+        leaf2mask = self.cached_attributes[3]  # (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ...)
+        qmask = 0
+        for leaf in leaves:
+            qmask |= leaf2mask[leaf]
+
+        remmask = self.remotechildren_mask_dict
+        parent_dict = self.parent_dict
+
+        # start at parent of an arbitrary leaf
+        random_leaf = next(iter(leaves))
+        parent = parent_dict[random_leaf]
+
+        while (qmask & remmask[parent]) != qmask:
             parent = parent_dict[parent]
 
         return parent
