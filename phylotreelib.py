@@ -5179,26 +5179,33 @@ class TreeSummary():
 
         # Local binding for faster access to function
         online_weighted_update_mean_var = self.online_weighted_update_mean_var
+        cladesummary = self._cladesummary
+        track_subcladepairs = self.track_subcladepairs
+        trackdepth = self.trackdepth
 
         for clade, nodestruct in cladedict.items():
             depth = nodestruct.depth
 
-            if clade in self._cladesummary:
-                s =  self._cladesummary[clade]
-                s.SUMW += weight
-                if self.trackdepth:
-                    online_weighted_update_mean_var(s, depth, weight)
-                if self.track_subcladepairs and (nodestruct.nleaves > 2):
-                    c1, c2 = next(iter(nodestruct.subcladepairs))
-                    s.add_subcladepair(c1, c2)
-            else:
+            s = cladesummary.get(clade)
+            
+            # First time we see this clade
+            if s is None:
                 s = nodestruct
                 s.SUMW = weight
-                if self.trackdepth:
+                if trackdepth:
                     s.n = 1
                     s.mean = depth
                     s.M2 = 0.0
-                self._cladesummary[clade] = s
+                cladesummary[clade] = s
+                
+            # Clade seen before
+            else:
+                s.SUMW += weight
+                if trackdepth:
+                    online_weighted_update_mean_var(s, depth, weight)
+                if (nodestruct.nleaves > 2) and track_subcladepairs:
+                    c1, c2 = next(iter(nodestruct.subcladepairs))
+                    s.add_subcladepair(c1, c2)
 
         return cladedict
 
