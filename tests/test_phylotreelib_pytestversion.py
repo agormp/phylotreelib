@@ -638,7 +638,7 @@ class Test_is_bifurcation:
         for i in range(10):
             t = pt.Tree.randtree(ntips=50)
             for intnode in t.intnodes:
-                kid = t.children(intnode).pop()
+                kid = next(iter(t.children(intnode)))
                 if kid not in t.leaves:
                     t.remove_branch(intnode, kid)
                     assert not t.is_bifurcation(intnode)

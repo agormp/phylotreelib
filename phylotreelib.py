@@ -2040,7 +2040,7 @@ class Tree:
         # Python note: does not seem to benefit from lru_caching, and leads to multiple problems
 
         try:
-            return set(self.child_dict[parent].keys())
+            return self.child_dict[parent].keys()
         except KeyError as err:
             msg = "Node %s is not an internal node" % parent
             raise TreeError(msg) from err
@@ -4422,7 +4422,7 @@ class Tree:
         # Initialise overall minimum to be distance zero from first intnode on one of its branches
         minvar = distvar[0]
         minparent = nodes[0]
-        minchild = self.children(minparent).pop()
+        minchild = next(iter(self.children(minparent)))
         minpardist = 0.0
 
         # Iterate over branches in tree,
@@ -4481,7 +4481,7 @@ class Tree:
                 # Bifurcation:
                 # old root will be removed. Find new minparent (one of root's other children)
                 if len(rootkids) == 2:
-                    rootkids.remove(minchild)
+                    rootkids = rootkids - {minchild}
                     minparent = rootkids.pop()    # Chose one of root's other children as minparent
                     minpardist = minpardist + self.dist_dict[self.root][minparent]
                     self.deroot()

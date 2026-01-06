@@ -352,7 +352,7 @@ class Match_nodes(TreeTestBase):
             t2.rename_intnode(id, id+delta_id)
         t2.deroot()
         parent = random.choice(tuple(t2.intnodes))
-        kid = t2.children(parent).pop()
+        kid = next(iter(t2.children(parent)))
         blen = t2.nodedist(parent,kid)
         t2.reroot(parent,kid,node1dist=blen/2)
         t1origroot = t1.root
