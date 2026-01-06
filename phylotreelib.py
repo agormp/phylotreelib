@@ -575,7 +575,7 @@ class Clade:
         # Clades across leaf-universes. In class-level cache this is ensured by having
         # object_cache be indexed by tipset_id
         return self._mask
-
+    
     def __eq__(self, other):
         if self is other:
             return True
@@ -600,7 +600,7 @@ class Clade:
         return f"\n{self.get_clade()}\n"
 
     def __repr__(self):
-        return f"Clade(n={len(self)}, ntips={len(self._sorted_leaf_tup)})"
+        return self.__str__()
 
 ###################################################################################################
 ###################################################################################################
@@ -699,7 +699,7 @@ class NewickStringParser:
         return re.compile(pattern)
 
     ###############################################################################################
-
+    
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
         # Tree is represented as a dictionary of dictionaries.
@@ -2888,7 +2888,7 @@ class Tree:
         return bipdict
 
     ###############################################################################################
-
+    
     def cladedict(self, keep_remchild_dict=False, track_subcladepairs=False):
         """Returns tree in the form of a "clade dictionary": {clade: nodestruct}
         Nodestructs get the .depth attribute set during construction.
