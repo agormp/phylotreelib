@@ -221,14 +221,14 @@ class Interner():
 
 class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
-    
-    __slots__ = ("length", "label", 
-                 "SUMW", "mean", "M2", "n", 
-                 "length_var", "length_sd", 
-                 "posterior", "freq", "bipartition_cred", "rootcred", 
+
+    __slots__ = ("length", "label",
+                 "SUMW", "mean", "M2", "n",
+                 "length_var", "length_sd",
+                 "posterior", "freq", "bipartition_cred", "rootcred",
                  "parent_height", "kid_height")
-        
-    # Used by __str__ when deciding which attributes to print (those with non-defaul values)         
+
+    # Used by __str__ when deciding which attributes to print (those with non-defaul values)
     _DEFAULTS = {
         "length": 0.0,
         "label": "",
@@ -245,7 +245,7 @@ class Branchstruct:
         "parent_height": None,
         "kid_height": None,
     }
-                 
+
     def __init__(self, length=0.0, label=""):
         self.length = length
         self.label = label
@@ -261,10 +261,10 @@ class Branchstruct:
         self.rootcred = None
         self.parent_height = None
         self.kid_height = None
-        
+
     ###################################################################################################
     # The code below is used by Tree.__str__ when choosing which attr to print)
-            
+
     @classmethod
     def printable_attrs(cls):
         """Attrs eligible to appear as extra columns (excludes 'length' because it's printed as branchlen)."""
@@ -293,11 +293,11 @@ class Branchstruct:
         if not self.is_interesting(attr, v):
             return ""
         if isinstance(v, float):
-            return f"{v:.6g}"       
+            return f"{v:.6g}"
         return str(v)
-        
+
     ###################################################################################################
-        
+
 
     def __str__(self):
         return f"length: {self.length}\n"
@@ -320,7 +320,7 @@ class Branchstruct:
             for name in self.__slots__[1:]:
                 setattr(obj, name, getattr(self, name))
         return obj
-        
+
     ###############################################################################################
 
     def merge(self, other, check_compat=False):
@@ -532,7 +532,7 @@ class Clade:
     def __init__(self, mask, sorted_leaf_tup):
         self._mask = mask
         self._sorted_leaf_tup = sorted_leaf_tup
-        
+
     @classmethod
     def from_mask(cls, mask, object_cache, sorted_leaf_tup):
         """Clade constructor that relies on caller knowing leaf universe and providing
@@ -553,16 +553,16 @@ class Clade:
 
     @classmethod
     def from_leafset(cls, leafset, tree):
-        """Convenience constructor for tests and interactive use where clade is given as 
+        """Convenience constructor for tests and interactive use where clade is given as
         leafset, and this method has to handle object_cache retrieval and construction."""
 
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = tree.cached_attributes
-        
+
         object_cache = cls._class_cache.get(frozenset_leaves)
         if object_cache is None:
             object_cache = {}
             cls._class_cache[frozenset_leaves] = object_cache
-        
+
         mask = 0
         for leaf in leafset:
             mask += leaf2mask[leaf]
@@ -576,7 +576,7 @@ class Clade:
         # Clades across leaf-universes. In class-level cache this is ensured by having
         # object_cache be indexed by tipset_id
         return self._mask
-    
+
     def __eq__(self, other):
         if self is other:
             return True
@@ -700,7 +700,7 @@ class NewickStringParser:
         return re.compile(pattern)
 
     ###############################################################################################
-    
+
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
         # Tree is represented as a dictionary of dictionaries.
@@ -1292,7 +1292,7 @@ class Tree:
 
                 # Slots-based: include only attrs that are non-default on at least one branch
                 attr_set.update(branch.interesting_attrs())
-                
+
         # Sort and initialize attribute names
         attr_list = sorted(attr_set)
 
@@ -1347,7 +1347,7 @@ class Tree:
         # Build the formatted table string
         border_line = "+" + "-" * (totwidth - 2) + "+\n"
         tabstring = border_line
-        
+
         # Add header row
         for i, header in enumerate(headers):
             col_width = maxwidths[i] + padding * 2
@@ -2048,8 +2048,8 @@ class Tree:
 
     def child_edges(self, parent):
         """Returns child_edges dict {kid1:branchstruct, kid2:branchstruct [...]} for parent"""
-        
-        return self.child_dict[parent]  
+
+        return self.child_dict[parent]
 
     ###############################################################################################
 
@@ -2895,9 +2895,9 @@ class Tree:
 
     def bipdict(self, keep_remchild_dict = False):
         """Deprecated: use generator/streaming version iter_bipinfo when possible.
-        Returns tree in the form of a "bipartition dictionary" 
+        Returns tree in the form of a "bipartition dictionary"
         """
-        
+
         return dict(self.iter_bipinfo(keep_remchild_dict=keep_remchild_dict))
 
     ###############################################################################################
@@ -2942,7 +2942,7 @@ class Tree:
             self._remotechildren_mask_dict = None
 
     ###############################################################################################
-    
+
     def cladedict(self, keep_remchild_dict=False, track_subcladepairs=False):
         """
         Deprecated: use generator version iter_cladeinfo when possible.
@@ -5229,9 +5229,9 @@ class TreeSummary():
         for node, clade, depth, nleaves in curtree.iter_cladeinfo(node2clade=node2clade):
             if cladeset is not None:
                 cladeset.add(clade)
-            
+
             s = cladesummary.get(clade)
-            
+
             # First time clade is seen
             if s is None:
                 s = Nodestruct(depth, nleaves)
@@ -5241,13 +5241,13 @@ class TreeSummary():
                     s.mean = depth
                     s.M2 = 0.0
                 cladesummary[clade] = s
-                
+
             # Clade seen before
             else:
                 s.SUMW += weight
                 if trackdepth:
                     online_update(s, depth, weight)
-            
+
         # If requested: add subcladepairs to the GLOBAL summary
         if trackpairs:
             child_dict = curtree.child_dict
@@ -5287,7 +5287,7 @@ class TreeSummary():
 
     def _add_bips(self, curtree, weight):
         """Helper method to add_tree: handles bipartitions"""
-        
+
         self._bipartsummary_processed = False
         self._sorted_biplist = None
         online_update = self.online_weighted_update_mean_var
@@ -5308,13 +5308,13 @@ class TreeSummary():
                     s.n = 1
                     s.mean = length
                     s.M2 = 0.0
-                bipartsummary[bipart] = s                
+                bipartsummary[bipart] = s
             else:
                 s.SUMW += weight
                 if trackblen:
                     online_update(s, length, weight)
 
-        # If tracking topology, update it here 
+        # If tracking topology, update it here
         if tracktopo:
             self._biptoposummary_processed = False
             topology = frozenset(bipset)
@@ -5991,7 +5991,7 @@ class TreeSummary():
 
     def set_mean_biplen(self, sumtree):
         """Only to be used when goal is to set bipartition-based branch-length stats
-        on sumtree, and those were not already set during construction. 
+        on sumtree, and those were not already set during construction.
         This happens when treetype is MCC
         NOTE: requires rooting to be tracked in order to properly split branch length on
         root bipartition"""
