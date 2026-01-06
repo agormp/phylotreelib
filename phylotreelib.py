@@ -2841,15 +2841,12 @@ class Tree:
 
     ###############################################################################################
 
-    def bipdict(self, keep_remchild_dict = False):
-        """Returns tree in the form of a "bipartition dictionary" """
-
-        # Names of leaves on one side of a branch are represented as a bitset (int) where
-        # set bits correspond to leaf indices in sorted leaf tuple.
-        # A bipartition is represented as the bitset with fewer set bits of two such (complementary) sets
-        # The entire tree is represented as a dictionary where the keys are bipartitions
-        # The values are Branchstructs
-        bipdict = {}
+    def iter_bipinfo(self, keep_remchild_dict=False):
+        """
+        Stream bipartitions for all branches.
+        Yields: (bipartition, branchstruct)
+        Avoids building a bipdict.
+        """
         remmask = self.remotechildren_mask_dict
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
         from_halfmask = Bipartition.from_halfmask
@@ -2860,32 +2857,42 @@ class Tree:
             object_cache = {}
             Bipartition._class_cache[frozenset_leaves] = object_cache
 
-        # For each branch: find bipartition representation, add this and Branchstruct to dict.
-        # Remote kids of node most distant from root (or node itself) forms one part of bipartition
-        # Note: if root has two kids, then the root bipartition is added twice
-        # This will be dealt with below
-        for parent in child_dict:
-            for child in child_dict[parent]:
-                halfmask = remmask[child]
-                bipartition = from_halfmask(halfmask, alltips_mask, object_cache, sorted_leaf_tup)
-                bipdict[bipartition] = child_dict[parent][child]
-                
-        # If root is attached to exactly two nodes, then two branches correspond to the same
-        # bipartition. Clean up by collapsing two branches (add lengths, merge other attributes)
-        rootkids = self.children(self.root)
-        if len(rootkids) == 2:
-            rootbip, leafset1, blen1, leafset2, blen2 = self.rootbip()
-            kid1, kid2 = rootkids
-            branch1 = child_dict[self.root][kid1]
-            branch2 = child_dict[self.root][kid2]
-            branch_merged = branch1.merge(branch2, check_compat=True)      # Sums up branch lengths, merges attributes
-            bipdict[rootbip] = branch_merged
+        root = self.root
+        rootkids = self.children(root)
 
-        # Python note: to save memory. Maybe this should be dealt with centrally?
+        # If exactly two root kids, we will skip yielding the two root edges and yield the merged one later
+        do_root_merge = (len(rootkids) == 2)
+        if do_root_merge:
+            kid1, kid2 = rootkids
+
+        for parent, child_edges in child_dict.items():
+            # skip the two root edges (root->kid1 and root->kid2) if we will merge them
+            if parent == root and do_root_merge:
+                continue
+
+            for child, branch in child_edges.items():
+                halfmask = remmask[child]
+                bip = from_halfmask(halfmask, alltips_mask, object_cache, sorted_leaf_tup)
+                yield bip, branch
+
+        if do_root_merge:
+            rootbip, leafset1, blen1, leafset2, blen2 = self.rootbip()
+            branch1 = child_dict[root][kid1]
+            branch2 = child_dict[root][kid2]
+            branch_merged = branch1.merge(branch2, check_compat=True)
+            yield rootbip, branch_merged
+
         if not keep_remchild_dict:
             self._remotechildren_mask_dict = None
 
-        return bipdict
+    ###############################################################################################
+
+    def bipdict(self, keep_remchild_dict = False):
+        """Deprecated: use generator/streaming version iter_bipinfo when possible.
+        Returns tree in the form of a "bipartition dictionary" 
+        """
+        
+        return dict(self.iter_bipinfo(keep_remchild_dict=keep_remchild_dict))
 
     ###############################################################################################
 
