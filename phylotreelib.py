@@ -5183,9 +5183,7 @@ class TreeSummary():
                 self._addbiptopo(bipdict, curtree, weight)
 
         if self.trackclades:
-            cladedict = self._add_clades(curtree, weight)
-            if self.tracktopo:
-                self._addcladetopo(cladedict, curtree, weight)
+            self._add_clades(curtree, weight)
 
     ###############################################################################################
 
@@ -5203,25 +5201,29 @@ class TreeSummary():
     ###############################################################################################
 
     def _add_clades(self, curtree, weight):
-        """Helper method to add_tree: handles clades"""
+        """Helper method to add_tree: handles clades (streaming, optional topo/pairs)"""
 
         self._cladesummary_processed = False
-        cladedict = curtree.cladedict(track_subcladepairs=self.track_subcladepairs)
-
-        # Local binding for faster access to function
-        online_weighted_update_mean_var = self.online_weighted_update_mean_var
         cladesummary = self._cladesummary
-        track_subcladepairs = self.track_subcladepairs
         trackdepth = self.trackdepth
+        trackpairs = self.track_subcladepairs
+        tracktopo = self.tracktopo
+        online_update = self.online_weighted_update_mean_var
 
-        for clade, nodestruct in cladedict.items():
-            depth = nodestruct.depth
+        # Only allocate these when needed
+        node2clade = {} if trackpairs else None
+        cladeset = set() if tracktopo else None
 
+        # Stream clades: update summary + (optionally) fill node2clade + collect topology
+        for node, clade, depth, nleaves in curtree.iter_cladeinfo(node2clade=node2clade):
+            if cladeset is not None:
+                cladeset.add(clade)
+            
             s = cladesummary.get(clade)
             
-            # First time we see this clade
+            # First time clade is seen
             if s is None:
-                s = nodestruct
+                s = Nodestruct(depth, nleaves)
                 s.SUMW = weight
                 if trackdepth:
                     s.n = 1
@@ -5233,12 +5235,42 @@ class TreeSummary():
             else:
                 s.SUMW += weight
                 if trackdepth:
-                    online_weighted_update_mean_var(s, depth, weight)
-                if (nodestruct.nleaves > 2) and track_subcladepairs:
-                    c1, c2 = next(iter(nodestruct.subcladepairs))
-                    s.add_subcladepair(c1, c2)
+                    online_update(s, depth, weight)
+            
+        # If requested: add subcladepairs to the GLOBAL summary
+        if trackpairs:
+            child_dict = curtree.child_dict
+            for node in curtree.intnodes:
+                try:
+                    kid1, kid2 = child_dict[node].keys()
+                except ValueError:
+                    msg = (
+                        f"Error while tracking subclade_pairs - clade has more than 2 children: "
+                        f"parent-node: {node}    children: {curtree.children(node)}"
+                        f"Are you sure input trees are rooted, e.g. using a clock-model?"
+                    )
+                    raise TreeError(msg)
 
-        return cladedict
+                parent_clade = node2clade[node]
+                parent_ns = cladesummary[parent_clade]
+                if parent_ns.nleaves > 2:
+                    parent_ns.add_subcladepair(node2clade[kid1],node2clade[kid2])
+
+        # If tracking topology: update topo summary directly here (no need to return cladedict)
+        if tracktopo:
+            self._cladetoposummary_processed = False
+            topology = frozenset(cladeset)
+
+            ts = self._cladetoposummary.get(topology)
+            if ts is None:
+                ts = Topostruct()
+                ts.weight = weight
+                self._cladetoposummary[topology] = ts
+                if self.store_trees:
+                    curtree.clear_caches()
+                    ts.tree = curtree
+            else:
+                ts.weight += weight
 
     ###############################################################################################
 
@@ -5288,24 +5320,6 @@ class TreeSummary():
             if self.store_trees:
                 curtree.clear_caches()
                 self._biptoposummary[topology].tree = curtree
-
-    ###############################################################################################
-
-    def _addcladetopo(self, cladedict, curtree, weight):
-
-        self._cladetoposummary_processed = False
-
-        # If cladetopology has never been seen before, then add it and initialize count
-        # If topology HAS been seen before then update count
-        topology = frozenset(cladedict.keys())
-        if topology in self._cladetoposummary:
-            self._cladetoposummary[topology].weight += weight
-        else:
-            self._cladetoposummary[topology]=Topostruct()
-            self._cladetoposummary[topology].weight = weight
-            if self.store_trees:
-                curtree.clear_caches()
-                self._cladetoposummary[topology].tree = curtree
 
     ###############################################################################################
 
