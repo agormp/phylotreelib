@@ -5181,13 +5181,10 @@ class TreeSummary():
         self.tree_weight_sum += weight       # The weighted equivalent of tree_count
 
         if self.trackroot:
-            self._sorted_rootbips = None
             self._add_root(curtree)
 
         if self.trackbips:
-            bipdict = self._add_bips(curtree, weight)
-            if self.tracktopo:
-                self._addbiptopo(bipdict, curtree, weight)
+            self._add_bips(curtree, weight)
 
         if self.trackclades:
             self._add_clades(curtree, weight)
@@ -5198,6 +5195,7 @@ class TreeSummary():
         """Helper method for add_tree: handles roots"""
 
         self._rootbip_summary_processed = False
+        self._sorted_rootbips = None
 
         bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbip()
         if bipartition in self._rootbip_summary:
@@ -5283,32 +5281,48 @@ class TreeSummary():
 
     def _add_bips(self, curtree, weight):
         """Helper method to add_tree: handles bipartitions"""
-
+        
         self._bipartsummary_processed = False
         self._sorted_biplist = None
+        online_update = self.online_weighted_update_mean_var
+        bipartsummary = self._bipartsummary
+        trackblen = self.trackblen
+        tracktopo = self.tracktopo
+        bipset = set() if tracktopo else None
 
-        # Local binding for faster access to function
-        online_weighted_update_mean_var = self.online_weighted_update_mean_var
-
-        bipdict = curtree.bipdict()
-        for bipart, branchstruct in bipdict.items():
+        for bipart, branchstruct in curtree.iter_bipinfo():
+            if bipset is not None:
+                bipset.add(bipart)
             length = branchstruct.length
-
-            if bipart in self._bipartsummary:
-                s = self._bipartsummary[bipart]
-                s.SUMW += weight
-                if self.trackblen:
-                    online_weighted_update_mean_var(s, length, weight)
-            else:
+            s = bipartsummary.get(bipart)
+            if s is None:
                 s = branchstruct
                 s.SUMW = weight
-                if self.trackblen:
+                if trackblen:
                     s.n = 1
                     s.mean = length
                     s.M2 = 0.0
-                self._bipartsummary[bipart] = s
+                bipartsummary[bipart] = s                
+            else:
+                s.SUMW += weight
+                if trackblen:
+                    online_update(s, length, weight)
 
-        return bipdict
+        # If tracking topology, update it here 
+        if tracktopo:
+            self._biptoposummary_processed = False
+            topology = frozenset(bipset)
+
+            ts = self._biptoposummary.get(topology)
+            if ts is None:
+                ts = Topostruct()
+                ts.weight = weight
+                self._biptoposummary[topology] = ts
+                if self.store_trees:
+                    curtree.clear_caches()
+                    ts.tree = curtree
+            else:
+                ts.weight += weight
 
     ###############################################################################################
 
