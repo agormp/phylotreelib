@@ -2034,15 +2034,21 @@ class Tree:
     ###############################################################################################
 
     def children(self, parent):
-        """Returns set containing parent's immediate descendants"""
+        """Returns dict_keys object (similar to set) containing parent's immediate descendants"""
 
         # Python note: does not seem to benefit from lru_caching, and leads to multiple problems
 
         try:
             return self.child_dict[parent].keys()
         except KeyError as err:
-            msg = "Node %s is not an internal node" % parent
-            raise TreeError(msg) from err
+            raise TreeError(f"Node {parent} is not an internal node") from err
+
+    ###############################################################################################
+
+    def child_edges(self, parent):
+        """Returns child_edges dict {kid1:branchstruct, kid2:branchstruct [...]} for parent"""
+        
+        return self.child_dict[parent]  
 
     ###############################################################################################
 
