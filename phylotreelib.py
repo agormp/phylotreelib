@@ -2306,29 +2306,18 @@ class Tree:
 
     ###############################################################################################
 
-    def find_mrca_mask(self, leaves):
-        """MRCA using bitmasks. leaves can be set[str] or iterable[str]."""
-
-        # special case: mrca for leaf is leaf itself
-        if len(leaves) == 1:
-            return next(iter(leaves))
-
-        # Build query mask
-        leaf2mask = self.cached_attributes[3]  # (frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ...)
-        qmask = 0
-        for leaf in leaves:
-            qmask |= leaf2mask[leaf]
+    def find_mrca_mask(self, query_mask, start_leaf):
+        """MRCA using bitmasks. Relies on caller having precomputed query_mask
+        
+        query_mask: set of leaves represented as a bitmask, i.e., an int with bits set on 
+                    relevant positions (position = index in sorted leaf tuple)
+        start_leaf: which leaf in query to start climbing towards root from (random)"""
 
         remmask = self.remotechildren_mask_dict
         parent_dict = self.parent_dict
-
-        # start at parent of an arbitrary leaf
-        random_leaf = next(iter(leaves))
-        parent = parent_dict[random_leaf]
-
-        while (qmask & remmask[parent]) != qmask:
+        parent = parent_dict[start_leaf]
+        while (remmask[parent] & query_mask) != query_mask:  # Is query_mask subset?
             parent = parent_dict[parent]
-
         return parent
 
     ###############################################################################################
