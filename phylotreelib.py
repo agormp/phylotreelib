@@ -1037,6 +1037,7 @@ class Tree:
 
                 # Add new internal node and move relevant children to this.
                 # Attach Branchstruct to newly created branch
+                # Note: this method calls clear_caches
                 obj.insert_node(insertpoint, movelist, branchstruct)
 
         return obj
