@@ -6121,11 +6121,11 @@ class TreeSummary():
             sumtree.set_node_attribute(node, "depth_sd", sd)
 
         return sumtree
-        
+
     ###############################################################################################
-    
-    set_ca_node_depths = set_ca_node_depths_orig
-    
+
+    set_ca_node_depths = set_ca_node_depths_inline
+
     ###############################################################################################
 
     def set_mean_biplen(self, sumtree):
