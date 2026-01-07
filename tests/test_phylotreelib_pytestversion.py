@@ -590,7 +590,7 @@ class Test_sorted_intnodes:
             sorted_nodes_shallowfirst = tree.sorted_intnodes(deepfirst=False)
 
             # The reversed list of deepfirst should be equal to shallowfirst
-            assert list(reversed(sorted_nodes_deepfirst)) == sorted_nodes_shallowfirst
+            assert tuple(reversed(sorted_nodes_deepfirst)) == sorted_nodes_shallowfirst
 
     def test_tree_consistency(self, treedata):
 
@@ -617,7 +617,7 @@ class Test_sorted_intnodes:
     def test_simplestring_sorted_intnodes(self, treedata):
         t = pt.Tree.from_string(treedata["simplestring"])
         result = t.sorted_intnodes(deepfirst=True)
-        expected_result = [0,1,2]
+        expected_result = (0,1,2)
 
         # Assert that the result matches the expected result
         assert result == expected_result

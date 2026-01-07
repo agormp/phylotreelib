@@ -1907,43 +1907,39 @@ class Tree:
         # "intnodes" is a set, meaning iteration occurs in no defined order.
         # This function returns a list sorted such that deep nodes generally go before
         # shallow nodes (deepfirst=False reverses this)
-        if deepfirst:
-            cached = self._sorted_intnodes_deep
-            if cached:
-                return cached
-        else:
-            cached = self._sorted_intnodes_shallow
-            if cached:
-                return cached
+        cached = self._sorted_intnodes_deep if deepfirst else self._sorted_intnodes_shallow
+        if cached is not None:
+            return cached
 
         # Add nodes one tree-level at a time.
         # First root, then children of root, then children of those, etc
-        sorted_nodes = []
+        child_dict = self.child_dict
+        intnodes = child_dict.keys()
+        
         curlevel = [self.root]
-
-        children = self.children
-        intnodes = self.intnodes
-        sorted_nodes_extend = sorted_nodes.extend
+        sorted_nodes = []
+        sorted_append = sorted_nodes.append
 
         while curlevel:
-            sorted_nodes_extend(curlevel)
             nextlevel = []
             nextlevel_append = nextlevel.append
 
             # For each node in current level: add those children that are also internal nodes
             for parent in curlevel:
-                for child in children(parent):
+                sorted_append(parent)
+                for child in child_dict[parent]:
                     if child in intnodes:
                         nextlevel_append(child)
-
+                        
             curlevel = nextlevel
+            
+        deep = tuple(sorted_nodes)
+        shallow = tuple(reversed(sorted_nodes))
 
-        self._sorted_intnodes_deep = sorted_nodes.copy()
-        if not deepfirst:
-            sorted_nodes.reverse()
-            self._sorted_intnodes_shallow = sorted_nodes.copy()
-
-        return sorted_nodes
+        self._sorted_intnodes_deep = deep
+        self._sorted_intnodes_shallow = shallow
+        
+        return deep if deepfirst else shallow        
 
     ###############################################################################################
 
@@ -4430,7 +4426,7 @@ class Tree:
         # Python note: This can be optimized
         self.build_dist_dict()
         intnodes = self.sorted_intnodes()
-        leaves = self.leaflist()
+        leaves = tuple(self.leaves)
         nodes = intnodes + leaves
         distmat = np.empty(shape=(len(nodes), len(leaves)))
         for i,node in enumerate(nodes):
