@@ -2307,10 +2307,13 @@ class Tree:
     ###############################################################################################
 
     def find_mrca_mask(self, query_mask, start_leaf):
-        """MRCA using bitmasks. Relies on caller having precomputed query_mask
+        """MRCA using bitmasks. 
+        
+        Relies on caller having precomputed query_mask using same sorted_leaf_tup as self
         
         query_mask: set of leaves represented as a bitmask, i.e., an int with bits set on 
                     relevant positions (position = index in sorted leaf tuple)
+        
         start_leaf: which leaf in query to start climbing towards root from (random)"""
 
         remmask = self.remotechildren_mask_dict
@@ -5990,7 +5993,7 @@ class TreeSummary():
 
                 # force building remmask and nodedepthdict once per input-tree 
                 nodedepthdict = input_tree.nodedepthdict
-                _ = input_tree.remotechildren_mask_dict      # Used by input_tree.find_mrca_qmask
+                _ = input_tree.remotechildren_mask_dict      # Used by input_tree.find_mrca_mask
 
                 # local binding for speed
                 find_mrca_mask = input_tree.find_mrca_mask
