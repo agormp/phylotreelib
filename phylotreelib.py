@@ -1915,7 +1915,7 @@ class Tree:
         # First root, then children of root, then children of those, etc
         child_dict = self.child_dict
         intnodes = child_dict.keys()
-        
+
         curlevel = [self.root]
         sorted_nodes = []
         sorted_append = sorted_nodes.append
@@ -1930,16 +1930,16 @@ class Tree:
                 for child in child_dict[parent]:
                     if child in intnodes:
                         nextlevel_append(child)
-                        
+
             curlevel = nextlevel
-            
+
         deep = tuple(sorted_nodes)
         shallow = tuple(reversed(sorted_nodes))
 
         self._sorted_intnodes_deep = deep
         self._sorted_intnodes_shallow = shallow
-        
-        return deep if deepfirst else shallow        
+
+        return deep if deepfirst else shallow
 
     ###############################################################################################
 
@@ -2304,13 +2304,13 @@ class Tree:
     ###############################################################################################
 
     def find_mrca_mask(self, query_mask, start_leaf):
-        """MRCA using bitmasks. 
-        
+        """MRCA using bitmasks.
+
         Relies on caller having precomputed query_mask using same sorted_leaf_tup as self
-        
-        query_mask: set of leaves represented as a bitmask, i.e., an int with bits set on 
+
+        query_mask: set of leaves represented as a bitmask, i.e., an int with bits set on
                     relevant positions (position = index in sorted leaf tuple)
-        
+
         start_leaf: which leaf in query to start climbing towards root from (random)"""
 
         remmask = self.remotechildren_mask_dict
