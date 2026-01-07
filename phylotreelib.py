@@ -5951,10 +5951,21 @@ class TreeSummary():
 
         # Create local bindings and precomputed list for variables used in tight loops
         online_weighted_update_mean_var = self.online_weighted_update_mean_var
-        sumtree_remkid_dict = sumtree.remotechildren_dict
+        sumtree_remkids = sumtree.remotechildren_dict
+        sumtree_remmask = sumtree.remotechildren_mask_dict
         sumtree_intnodes = sumtree.intnodes
         sumtree_leaves = sumtree.leaves
-        intnode_remkids = [(node, sumtree_remkid_dict[node]) for node in sumtree_intnodes]
+        leaf2mask_sum = sumtree.cached_attributes[3]
+        
+        # list of (intnode, bitmask, start_leaf) queries, to iterate over for each input tree
+        # start-leaf chosen randomly from remote-children of intnode
+        # Python note: choice of start-leaf could be optimised to start as close to the root
+        # as possible perhaps?
+        intnode_queries = []
+        for intnode in sumtree_intnodes:
+            qmask = sumtree_remmask[intnode]
+            start_leaf = next(iter(sumtree_remkids[intnode])) 
+            intnode_queries.append((intnode, qmask, start_leaf))
 
         # Make online accumulators for node stats
         acc = {}
@@ -5977,18 +5988,20 @@ class TreeSummary():
 
             for input_tree in treefile:
 
-                # local bindings for speed
-                find_mrca = input_tree.find_mrca
+                # force building remmask and nodedepthdict once per input-tree 
                 nodedepthdict = input_tree.nodedepthdict
+                _ = input_tree.remotechildren_mask_dict      # Used by input_tree.find_mrca_qmask
 
-                # internal nodes: MRCA depths
-                for node, sumtree_remkids in intnode_remkids:
+                # local binding for speed
+                find_mrca_mask = input_tree.find_mrca_mask
+
+                for node, query_mask, start_leaf in intnode_queries:
                     s = acc[node]
                     s.SUMW += w_tree
-                    input_mrca = find_mrca(sumtree_remkids)
+                    input_mrca = find_mrca_mask(query_mask, start_leaf)
                     depth = nodedepthdict[input_mrca]
                     online_weighted_update_mean_var(s, depth, w_tree)
-
+    
                 # leaves: mean depths (CA depth for singleton)
                 for node in sumtree_leaves:
                     s = acc[node]
