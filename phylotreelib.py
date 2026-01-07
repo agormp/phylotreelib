@@ -5956,16 +5956,6 @@ class TreeSummary():
         sumtree_intnodes = sumtree.intnodes
         sumtree_leaves = sumtree.leaves
         leaf2mask_sum = sumtree.cached_attributes[3]
-        
-        # list of (intnode, bitmask, start_leaf) queries, to iterate over for each input tree
-        # start-leaf chosen randomly from remote-children of intnode
-        # Python note: choice of start-leaf could be optimised to start as close to the root
-        # as possible perhaps?
-        intnode_queries = []
-        for intnode in sumtree_intnodes:
-            qmask = sumtree_remmask[intnode]
-            start_leaf = next(iter(sumtree_remkids[intnode])) 
-            intnode_queries.append((intnode, qmask, start_leaf))
 
         # Make online accumulators for node stats
         acc = {}
@@ -5976,6 +5966,19 @@ class TreeSummary():
             s.mean = 0.0
             s.M2 = 0.0
             acc[node] = s
+
+        # list of (intnode, bitmask, start_leaf) queries, to iterate over for each input tree
+        # start-leaf chosen randomly from remote-children of intnode
+        # Python note: choice of start-leaf could be optimised to start as close to the root
+        # as possible perhaps?
+        intnode_queries = []
+        for intnode in sumtree_intnodes:
+            qmask = sumtree_remmask[intnode]
+            start_leaf = next(iter(sumtree_remkids[intnode]))
+            s = acc[intnode]
+            intnode_queries.append((s, qmask, start_leaf))
+
+        leaf_queries = [(acc[leaf], leaf) for leaf in sumtree_leaves]
 
         # Stream trees and update stats online
         for file_weight, count, burnin, filename in wt_count_burnin_filename_list:
@@ -5988,25 +5991,23 @@ class TreeSummary():
 
             for input_tree in treefile:
 
-                # force building remmask and nodedepthdict once per input-tree 
+                # force building remmask and nodedepthdict once per input-tree
                 nodedepthdict = input_tree.nodedepthdict
                 _ = input_tree.remotechildren_mask_dict      # Used by input_tree.find_mrca_mask
 
                 # local binding for speed
                 find_mrca_mask = input_tree.find_mrca_mask
 
-                for node, query_mask, start_leaf in intnode_queries:
-                    s = acc[node]
+                for s, query_mask, start_leaf in intnode_queries:
                     s.SUMW += w_tree
                     input_mrca = find_mrca_mask(query_mask, start_leaf)
                     depth = nodedepthdict[input_mrca]
                     online_weighted_update_mean_var(s, depth, w_tree)
-    
+
                 # leaves: mean depths (CA depth for singleton)
-                for node in sumtree_leaves:
-                    s = acc[node]
+                for s, leaf in leaf_queries:
                     s.SUMW += w_tree
-                    depth = nodedepthdict[node]
+                    depth = nodedepthdict[leaf]
                     online_weighted_update_mean_var(s, depth, w_tree)
 
         # Write results onto sumtree with domain names
@@ -6046,24 +6047,12 @@ class TreeSummary():
         sumtree_intnodes = sumtree.intnodes
         sumtree_leaves = sumtree.leaves
         _, sorted_leaf_tup, _, _, _, _ = sumtree.cached_attributes
-        
+
         # Helper method to pick leaf with smallest index from clade mask
         def pick_start_leaf_from_qmask(qmask):
             lsb = qmask & -qmask
             idx = lsb.bit_length() - 1
             return sorted_leaf_tup[idx]
-
-        # Group queries by start leaf
-        queries_by_startleaf = defaultdict(list)
-        for intnode in sumtree_intnodes:
-            qmask = sumtree_remmask[intnode]
-            start_leaf = pick_start_leaf_from_qmask(qmask)
-            nleaves = qmask.bit_count()
-            queries_by_startleaf[start_leaf].append((intnode, qmask, nleaves))
-
-        # Sort queries per start leaf from small to large clades
-        for start_leaf, qlist in queries_by_startleaf.items():
-            qlist.sort(key=lambda x: x[2])        
 
         # Make online accumulators for node stats
         acc = {}
@@ -6074,6 +6063,21 @@ class TreeSummary():
             s.mean = 0.0
             s.M2 = 0.0
             acc[node] = s
+
+        # Group queries by start leaf
+        queries_by_startleaf = defaultdict(list)
+        for intnode in sumtree_intnodes:
+            qmask = sumtree_remmask[intnode]
+            start_leaf = pick_start_leaf_from_qmask(qmask)
+            nleaves = qmask.bit_count()
+            s = acc[intnode]
+            queries_by_startleaf[start_leaf].append((s, qmask, nleaves))
+
+        leaf_queries = [(acc[leaf], leaf) for leaf in sumtree_leaves]
+
+        # Sort queries per start leaf from small to large clades
+        for start_leaf, qlist in queries_by_startleaf.items():
+            qlist.sort(key=lambda x: x[2])
 
         # Stream trees and update stats online
         # Python note: no calls to find_mrca_mask: inlined logic here instead
@@ -6095,19 +6099,17 @@ class TreeSummary():
                 # Monotone climb: parent only moves upward
                 for start_leaf, qlist in queries_by_startleaf.items():
                     parent = parent_dict[start_leaf]
-                    for node, qmask, _nleaves in qlist:
+                    for s, qmask, _nleaves in qlist:
                         while (remmask[parent] & qmask) != qmask:
                             parent = parent_dict[parent]
-                        s = acc[node]
                         s.SUMW += w_tree
                         depth = nodedepthdict[parent]
                         online_weighted_update_mean_var(s, depth, w_tree)
-    
+
                 # leaves: mean depths (CA depth for singleton)
-                for node in sumtree_leaves:
-                    s = acc[node]
+                for s, leaf in leaf_queries:
                     s.SUMW += w_tree
-                    depth = nodedepthdict[node]
+                    depth = nodedepthdict[leaf]
                     online_weighted_update_mean_var(s, depth, w_tree)
 
         # Write results onto sumtree with domain names
