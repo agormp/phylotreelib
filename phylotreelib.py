@@ -5930,7 +5930,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def set_ca_node_depths(self, sumtree, wt_count_burnin_filename_list):
+    def set_ca_node_depths_orig(self, sumtree, wt_count_burnin_filename_list):
         """Set node depths on summary tree based on mean node depth of clade's MRCAs on set
         of input trees (same as "--height ca" in BEAST's treeannotator).
         This means that all input trees are used when computing mean depth for each node
@@ -6019,6 +6019,111 @@ class TreeSummary():
 
         return sumtree
 
+    ###############################################################################################
+
+    def set_ca_node_depths_inline(self, sumtree, wt_count_burnin_filename_list):
+        """Set node depths on summary tree based on mean node depth of clade's MRCAs on set
+        of input trees (same as "--height ca" in BEAST's treeannotator).
+        This means that all input trees are used when computing mean depth for each node
+        (not just the input trees where that exact monophyletic clade is present).
+        Proper interpretation of node depth is then "depth of MRCA of descendant leaves".
+
+        Node-depths of _leaves_ will be the mean value observed across input trees.
+        This only matters for leaves whose depth is being estimated (all other nodes
+        will have constant depth across input trees).
+        """
+
+        sumtree.clear_caches()   # Python note: ever necessary? Mostly worried about nodedepthdict
+
+        # Find mean common ancestor depth for all internal nodes
+        # Find mean node depth for leaves (for a leaf: mean depth == CA depth)
+        # (most leaves will have constant depth across input trees, but if some
+        # leaf dates are being estimated, then these will vary)
+
+        # Create local bindings and precomputed list for variables used in tight loops
+        online_weighted_update_mean_var = self.online_weighted_update_mean_var
+        sumtree_remmask = sumtree.remotechildren_mask_dict
+        sumtree_intnodes = sumtree.intnodes
+        sumtree_leaves = sumtree.leaves
+        _, sorted_leaf_tup, _, _, _, _ = sumtree.cached_attributes
+        
+        # Helper method to pick leaf with smallest index from clade mask
+        def pick_start_leaf_from_qmask(qmask):
+            lsb = qmask & -qmask
+            idx = lsb.bit_length() - 1
+            return sorted_leaf_tup[idx]
+
+        # Group queries by start leaf
+        queries_by_startleaf = defaultdict(list)
+        for intnode in sumtree_intnodes:
+            qmask = sumtree_remmask[intnode]
+            start_leaf = pick_start_leaf_from_qmask(qmask)
+            nleaves = qmask.bit_count()
+            queries_by_startleaf[start_leaf].append((intnode, qmask, nleaves))
+
+        # Sort queries per start leaf from small to large clades
+        for start_leaf, qlist in queries_by_startleaf.items():
+            qlist.sort(key=lambda x: x[2])        
+
+        # Make online accumulators for node stats
+        acc = {}
+        for node in sumtree.nodes:
+            s = Nodestruct()
+            s.SUMW = 0.0
+            s.n = 0
+            s.mean = 0.0
+            s.M2 = 0.0
+            acc[node] = s
+
+        # Stream trees and update stats online
+        # Python note: no calls to find_mrca_mask: inlined logic here instead
+        # in order to enable sharing results seen while climbing ancestor path for given startleaf
+        for file_weight, count, burnin, filename in wt_count_burnin_filename_list:
+            ntrees = count - burnin
+            w_tree = file_weight / ntrees
+
+            treefile = Treefile(filename)
+            for _ in range(burnin):
+                treefile.readtree(returntree=False)
+
+            for input_tree in treefile:
+                nodedepthdict = input_tree.nodedepthdict
+                remmask = input_tree.remotechildren_mask_dict
+                parent_dict = input_tree.parent_dict
+
+                # Start from parent of the leaf
+                # Monotone climb: parent only moves upward
+                for start_leaf, qlist in queries_by_startleaf.items():
+                    parent = parent_dict[start_leaf]
+                    for node, qmask, _nleaves in qlist:
+                        while (remmask[parent] & qmask) != qmask:
+                            parent = parent_dict[parent]
+                        s = acc[node]
+                        s.SUMW += w_tree
+                        depth = nodedepthdict[parent]
+                        online_weighted_update_mean_var(s, depth, w_tree)
+    
+                # leaves: mean depths (CA depth for singleton)
+                for node in sumtree_leaves:
+                    s = acc[node]
+                    s.SUMW += w_tree
+                    depth = nodedepthdict[node]
+                    online_weighted_update_mean_var(s, depth, w_tree)
+
+        # Write results onto sumtree with domain names
+        for node in sumtree.nodes:
+            s = acc[node]
+            mean, var, sd = self.finalize_online_weighted(s)
+            sumtree.set_node_attribute(node, "depth", mean)
+            sumtree.set_node_attribute(node, "depth_var", var)
+            sumtree.set_node_attribute(node, "depth_sd", sd)
+
+        return sumtree
+        
+    ###############################################################################################
+    
+    set_ca_node_depths = set_ca_node_depths_orig
+    
     ###############################################################################################
 
     def set_mean_biplen(self, sumtree):
