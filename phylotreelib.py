@@ -999,10 +999,10 @@ class Tree:
                 else:
                     (leaf, ) = bip2
 
-                # Find childdict containing leaf, and update branchstruct
-                for childdict in obj.child_dict.values():
-                    if leaf in childdict:
-                        childdict[leaf] = branchstruct
+                # Find child_edges dict containing leaf, and update branchstruct
+                for child_edges in obj.child_dict.values():
+                    if leaf in child_edges:
+                        child_edges[leaf] = branchstruct
                         break
 
             # If bipartition represents internal branch:
