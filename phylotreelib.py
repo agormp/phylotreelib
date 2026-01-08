@@ -701,6 +701,30 @@ class NewickStringParser:
 
     ###############################################################################################
 
+    def iter_tokens_newick(self, s, delimset):
+        # yields token strings: delimiters as 1-char strings, and "NUM_NAME" chunks as strings
+        i = 0
+        n = len(s)
+        while i < n:
+            c = s[i]
+            if c.isspace():
+                i += 1
+                continue
+            if c in delimset:
+                yield c
+                i += 1
+                continue
+            j = i + 1
+            while j < n:
+                cj = s[j]
+                if cj.isspace() or (cj in delimset):
+                    break
+                j += 1
+            yield s[i:j]
+            i = j
+        
+    ###############################################################################################
+
     def parse(self, treeobj, treestring):
         # Construct Tree object that is filled out while parsing
         # Tree is represented as a dictionary of dictionaries.
@@ -727,8 +751,9 @@ class NewickStringParser:
         dispatch = self.dispatch
         delimset = self.delimset
         state = "TREE_START"
-        tree_parts_list = self.regex.split(treestring)
-        for token_value in tree_parts_list:
+        # tree_parts_list = self.regex.split(treestring)
+        # for token_value in tree_parts_list:
+        for token_value in self.iter_tokens_newick(treestring, delimset):
             if token_value:
                 if token_value in delimset:
                     token_type = token_value
