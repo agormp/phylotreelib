@@ -648,7 +648,7 @@ class NewickStringParser:
             "TREE_START":       {   "(":        (self._handle_add_root_intnode,     "INTNODE_START")    },
             "INTNODE_START":    {   "(":        (self._handle_add_intnode,          "INTNODE_START"),
                                     "NUM_NAME": (self._handle_add_leaf,             "LEAF")             },
-            "LEAF":             {   ":":        (self._handle_transition_brlen,      "EXPECTING_BRLEN"),
+            "LEAF":             {   ":":        (self._handle_transition_brlen,     "EXPECTING_BRLEN"),
                                     ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
                                     ")":        (self._handle_intnode_end,          "INTNODE_END")      },
             "EXPECTING_BRLEN":  {   "NUM_NAME": (self._handle_add_brlen,            "BRLEN")            },
