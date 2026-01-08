@@ -776,25 +776,25 @@ class NewickStringParser:
 
     def _handle_add_root_intnode(self, token_value):
         self.nodeno = 0
-        self.treeobj.child_dict[self.nodeno] = {}
-        self.node_stack.append(self.nodeno)
+        self.treeobj.child_dict[self.nodeno] = nodes_child_edges = {}
+        self.node_stack.append((self.nodeno, nodes_child_edges))
 
     ###############################################################################################
 
     def _handle_add_intnode(self, token_value):
         self.nodeno += 1
-        self.treeobj.child_dict[self.nodeno] = {}
-        parent = self.node_stack[-1]
-        self.treeobj.child_dict[parent][self.nodeno] = Branchstruct()
-        self.node_stack.append(self.nodeno)
+        self.treeobj.child_dict[self.nodeno] = nodes_child_edges = {}
+        parent, parents_child_edges = self.node_stack[-1]
+        parents_child_edges[self.nodeno] = Branchstruct()
+        self.node_stack.append((self.nodeno, nodes_child_edges))
 
     ###############################################################################################
 
     def _handle_add_leaf(self, name):
         child = sys.intern(name)
-        parent = self.node_stack[-1]
-        self.treeobj.child_dict[parent][child] = Branchstruct()
-        self.node_stack.append(child)
+        parent, parents_child_edges = self.node_stack[-1]
+        parents_child_edges[child] = Branchstruct()
+        self.node_stack.append((child, None))
         self.treeobj.leaves.add(child)
         self.ntips += 1
 
@@ -802,11 +802,10 @@ class NewickStringParser:
 
     def _handle_add_leaf_with_transdict(self, name):
         child = sys.intern(self.transdict[name])
-        parent = self.node_stack[-1]
-        treeobj = self.treeobj
-        treeobj.child_dict[parent][child] = Branchstruct()
-        self.node_stack.append(child)
-        treeobj.leaves.add(child)
+        parent, parents_child_edges = self.node_stack[-1]
+        parents_child_edges[child] = Branchstruct()
+        self.node_stack.append((child, None))
+        self.treeobj.leaves.add(child)
 
     ###############################################################################################
 
@@ -823,11 +822,11 @@ class NewickStringParser:
     def _handle_add_brlen(self, brlen_string):
         try:
             brlen = float(brlen_string)
-            child = self.node_stack[-1]
-            parent = self.node_stack[-2]
-            self.treeobj.child_dict[parent][child].length = brlen
         except ValueError:
             raise TreeError(f"Expected branch length: {brlen_string}")
+        parent, parents_child_edges = self.node_stack[-2]
+        child ,_ = self.node_stack[-1]
+        parents_child_edges[child].length = brlen
 
     ###############################################################################################
 
@@ -837,9 +836,9 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_label(self, label):
-        child = self.node_stack[-1]
-        parent = self.node_stack[-2]
-        branchstruct = self.treeobj.child_dict[parent][child]
+        parent, parents_child_edges = self.node_stack[-2]
+        child ,_ = self.node_stack[-1]
+        branchstruct = parents_child_edges[child]
         setattr(branchstruct, self.label_attr_name, self.label_type(label))
 
     ###############################################################################################
