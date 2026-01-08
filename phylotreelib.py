@@ -744,6 +744,175 @@ class NewickStringParser:
 
         return self.treeobj
 
+    def parse_fast(self, treeobj, treestring):
+        treeobj.child_dict.clear()
+        treeobj.leaves.clear()
+        treeobj.root = 0
+
+        # Parser-local state
+        node_stack = []
+        ntips = 0
+        nodeno = 0  # root internal node id
+
+        # Local binds (big deal in hot loops)
+        child_dict = treeobj.child_dict
+        leaves_add = treeobj.leaves.add
+        Branchstruct_ = Branchstruct
+        intern_ = sys.intern
+
+        # label conversion config (often str / float)
+        label_attr = self.label_attr_name
+        label_conv = self.label_type
+
+        # transdict leaf handling (optional)
+        transdict = getattr(self, "transdict", None)
+        use_trans = transdict is not None
+
+        # Optional whitespace removal: avoid copy unless needed
+        if (" " in treestring) or ("\t" in treestring) or ("\n" in treestring) or ("\r" in treestring):
+            treestring = "".join(treestring.split())
+
+        parts = self.regex.split(treestring)
+
+        # States (ints)
+        TREE_START = 0
+        INTNODE_START = 1
+        LEAF = 2
+        EXPECT_BRLEN = 3
+        BRLEN = 4
+        EXPECT_CHILD = 5
+        INTNODE_END = 6
+        LABEL = 7
+
+        state = TREE_START
+
+        # If you decide to include [] in delimiters later:
+        # in_comment = False
+
+        # Helper to set branch length quickly
+        def set_blen(brlen_str):
+            try:
+                brlen = float(brlen_str)
+            except ValueError:
+                raise TreeError(f"Expected branch length: {brlen_str}")
+            child = node_stack[-1]
+            parent = node_stack[-2]
+            child_dict[parent][child].length = brlen
+
+        for tok in parts:
+            if not tok:
+                continue
+
+            # If you include [] as delimiters and want to ignore comments:
+            # if tok == "[":
+            #     in_comment = True
+            #     continue
+            # if in_comment:
+            #     if tok == "]":
+            #         in_comment = False
+            #     continue
+
+            c = tok[0]
+            if len(tok) == 1 and c in self.delimset:
+                # delimiter token
+                if c == "(":
+                    if state == TREE_START:
+                        nodeno = 0
+                        child_dict[nodeno] = {}
+                        node_stack.append(nodeno)
+                        state = INTNODE_START
+                    elif state in (INTNODE_START, EXPECT_CHILD):
+                        nodeno += 1
+                        child_dict[nodeno] = {}
+                        parent = node_stack[-1]
+                        child_dict[parent][nodeno] = Branchstruct_()
+                        node_stack.append(nodeno)
+                        state = INTNODE_START
+                    else:
+                        raise self._parse_fast_error(state, tok, treestring)
+
+                elif c == ",":
+                    # end current child; expect another child
+                    if state in (LEAF, BRLEN, LABEL, INTNODE_END):
+                        node_stack.pop()
+                        state = EXPECT_CHILD
+                    else:
+                        raise self._parse_fast_error(state, tok, treestring)
+
+                elif c == ")":
+                    if state in (LEAF, BRLEN, LABEL, INTNODE_END):
+                        node_stack.pop()
+                        state = INTNODE_END
+                    else:
+                        raise self._parse_fast_error(state, tok, treestring)
+
+                elif c == ":":
+                    if state in (LEAF, INTNODE_END, LABEL):
+                        state = EXPECT_BRLEN
+                    else:
+                        raise self._parse_fast_error(state, tok, treestring)
+
+                elif c == ";":
+                    if state == INTNODE_END:
+                        node_stack.pop()
+                        state = TREE_START
+                    else:
+                        raise self._parse_fast_error(state, tok, treestring)
+
+                else:
+                    # other delimiters if you later add them
+                    raise self._parse_fast_error(state, tok, treestring)
+
+            else:
+                # NUM_NAME token
+                if state in (INTNODE_START, EXPECT_CHILD):
+                    # add leaf
+                    name = tok
+                    if use_trans:
+                        child = intern_(transdict[name])
+                    else:
+                        child = intern_(name)
+
+                    parent = node_stack[-1]
+                    child_dict[parent][child] = Branchstruct_()
+                    node_stack.append(child)
+                    leaves_add(child)
+                    ntips += 1
+                    state = LEAF
+
+                elif state == EXPECT_BRLEN:
+                    set_blen(tok)
+                    state = BRLEN
+
+                elif state == INTNODE_END:
+                    # label on internal branch: )label
+                    child = node_stack[-1]
+                    parent = node_stack[-2]
+                    bs = child_dict[parent][child]
+                    # fast path for common cases can go here
+                    setattr(bs, label_attr, label_conv(tok))
+                    state = LABEL
+
+                else:
+                    raise self._parse_fast_error(state, tok, treestring)
+
+        # sanity
+        if node_stack:
+            raise TreeError(f"Nodes remaining on stack after parsing treestring: {node_stack}")
+        if ntips > len(treeobj.leaves):
+            raise TreeError(f"Duplicated leafnames in treestring:\n{treestring}")
+
+        return treeobj
+
+
+    def _parse_fast_error(self, state, token_value, treestring):
+        # keep your existing nice error messages but avoid expensive count() unless error happens
+        msg = (f"Parsing error (fast): unexpected token for this state:\n"
+               f"Parser state: {state}\n"
+               f"Token-value:  {token_value}\n"
+               f"Tree-string:  {treestring}\n")
+        raise TreeError(msg)
+    
     ###############################################################################################
 
     def sanitychecks(self, treeobj, treestring):
@@ -956,7 +1125,7 @@ class Tree:
 
         # All action is in parser_obj
         treeobj = cls()
-        treeobj = parser_obj.parse(treeobj, orig_treestring)
+        treeobj = parser_obj.parse_fast(treeobj, orig_treestring)
         return treeobj
 
     ###############################################################################################
