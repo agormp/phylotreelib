@@ -755,7 +755,7 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def _handle_parse_error(self, state, token_value, token_type, treestring):
+    def _handle_parse_error(self, state, token_value, token_type, treestring, tree_parts_list):
         # If unexpected token-type was encountered: first check if parentheses are balanced:
         if treestring.count("(") != treestring.count(")"):
             msg = "Imbalance in tree-string: different number of left- and right-parentheses\n"
@@ -764,10 +764,12 @@ class NewickStringParser:
         else:
             # If that was not the problem: report current parser-state, token-type, and token-value
             msg = ("Parsing error: unexpected token-type for this state:\n"
-                   f"Parser state: {state}\n"
-                   f"Token_type:   {token_type}\n"
-                   f"Token-value:  {token_value}\n"
-                   f"Tree-string:  {treestring}\n")
+                   f"Parser state:     {state}\n"
+                   f"Token_type:       {token_type}\n"
+                   f"Token-value:      {token_value}\n"
+                   f"Tree-string:      {treestring}\n"
+                   f"Tree-parts list:  {tree_parts_list}\n")
+                   
             raise TreeError(msg)
 
     ###############################################################################################
