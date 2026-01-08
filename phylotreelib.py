@@ -736,9 +736,9 @@ class NewickStringParser:
                     token_type = "NUM_NAME"
                 try:
                     handler, state = dispatch[state][token_type]
-                    handler(token_value)
                 except KeyError:
-                    self._handle_parse_error(state, token_value, token_type, treestring)
+                    self._handle_parse_error(state, token_value, token_type, treestring, tree_parts_list)
+                handler(token_value)
 
         self.sanitychecks(self.treeobj, treestring)
 
