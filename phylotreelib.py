@@ -5007,8 +5007,9 @@ class TreeSummary():
     """Class summarizing requested attributes (bipartitions, clades, root location, branch lengths,
        node depths, topologies) from many trees"""
 
-    def __init__(self, trackbips=False, trackclades=False, trackroot=False, trackblen=False,
-                       trackdepth=False, tracktopo=False, track_subcladepairs= False,
+    def __init__(self, trackbips=False, trackclades=False, trackroot=False, 
+                       trackblen=False, trackdepth=False, trackrootblen=False,
+                       tracktopo=False, track_subcladepairs=False,
                        store_trees=False):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
@@ -5021,6 +5022,7 @@ class TreeSummary():
         self.trackclades = trackclades
         self.trackblen = trackblen
         self.trackdepth = trackdepth
+        self.trackrootblen = trackrootblen
         self.tracktopo = tracktopo
         self.track_subcladepairs = track_subcladepairs
         self.store_trees = store_trees
@@ -5144,11 +5146,12 @@ class TreeSummary():
 
     @property
     def rootbipsummary(self):
-        """Property method for lazy evaluation of freq (=rootcred) for rootbips"""
+        """Property method for lazy evaluation of freq (=rootcred) for rootbips
+        Returns dict of {Bipartition: RootBipStruct}"""
         if not self._rootbip_summary_processed:
             for rootbipstruct in self._rootbip_summary.values():
                 # Python note: should i divide by tree_weight_sum, not tree_count?
-                rootbipstruct.posterior = rootbipstruct.count / self.tree_count
+                rootbipstruct.freq = rootbipstruct.rootcount / self.tree_count
             self._rootbip_summary_processed = True
         return self._rootbip_summary
 
@@ -5162,7 +5165,7 @@ class TreeSummary():
         if self._sorted_rootbips == None:
             self._sorted_rootbips = []
             for bip,rootbipstruct in self.rootbipsummary.items():
-                self._sorted_rootbips.append((rootbipstruct.count, bip, rootbipstruct))
+                self._sorted_rootbips.append((rootbipstruct._rootcount, bip, rootbipstruct))
             self._sorted_rootbips.sort(key=itemgetter(0), reverse=True)
         return self._sorted_rootbips
 
@@ -5229,12 +5232,18 @@ class TreeSummary():
         self._rootbip_summary_processed = False
         self._sorted_rootbips = None
 
-        bipartition, leafset1, blen1, leafset2, blen2 = curtree.rootbip()
-        if bipartition in self._rootbip_summary:
-            self._rootbip_summary[bipartition].add(leafset1, blen1, leafset2, blen2)
+        if self.trackrootblen:
+            rootbip, frac = curtree.rootbip_with_frac()
         else:
-            self._rootbip_summary[bipartition] = RootBipStruct(leafset1, blen1, leafset2, blen2)
+            rootbip = curtree.rootbip()
+            frac = None
 
+        s = self._rootbip_summary.get(rootbip)
+        if s is None:
+            self._rootbip_summary[rootbip] = RootBipStruct(frac)
+        else:
+            s.add_rootbip(frac)
+        
     ###############################################################################################
 
     def _add_clades(self, curtree, weight):
@@ -5464,15 +5473,13 @@ class TreeSummary():
 
     def _updateroot(self, other):
 
-        # Python note: am i missing something here???
-
         other_rootbipsum = other._rootbip_summary
         self_rootbipsum = self._rootbip_summary
-        for rootbip in other_rootbipsum:
-            if rootbip in self_rootbipsum:
-                self_rootbipsum[rootbip].merge(other_rootbipsum[rootbip])
+        for other_rootbip, other_s in other_rootbipsum.items():
+            if other_rootbip in self_rootbipsum:
+                self_rootbipsum[other_rootbip].merge(other_s)
             else:
-                self_rootbipsum[rootbip] = other_rootbipsum[rootbip]
+                self_rootbipsum[other_rootbip] = other_s
 
     ###############################################################################################
 
