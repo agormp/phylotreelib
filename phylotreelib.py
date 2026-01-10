@@ -5002,39 +5002,31 @@ class TreeSet():
 ###################################################################################################
 
 class RootBipStruct:
-    def __init__(self, leafset1, blen1, leafset2, blen2):
-        combined_length = blen1 + blen2
-        self.count = 1
-        self.leafset1 = leafset1
-        self.fraction1 = blen1 / combined_length
-        self.leafset2 = leafset2
-        self.fraction2 = blen2 / combined_length
+    
+    __slots__ = ("rootcount", "freq", "sum_frac_canon")
+    
+    def __init__(self, frac_to_canon=None):
+        self.rootcount = 1
+        self.freq = None
+        self.sum_frac_canon = frac_to_canon
 
-    def add(self, leafset1, blen1, leafset2, blen2):
-        """Adds branch length fractions to the current sum and increments the count."""
-        # Make sure blen1 and blen2 refer to the correct leafsets
-        if leafset1 != self.leafset1:
-            blen2,blen1 = blen1,blen2
-        combined_length = blen1 + blen2
-        self.count += 1
-        self.fraction1 += blen1 / combined_length
-        self.fraction2 += blen2 / combined_length
+    def add_rootbip(self, frac_to_canon=None):
+        self.rootcount += 1
+        if frac_to_canon is not None:
+            self.sum_frac_canon += frac_to_canon
 
     def merge(self, other):
         """Merges this RootBipStruct with another (for same bipartition)"""
-        fraction1, fraction2 = other.fraction1, other.fraction2
-        if other.leafset1 != self.leafset1:
-            fraction1, fraction2 = fraction2, fraction1
-        self.count += other.count
-        self.fraction1 += fraction1
-        self.fraction2 += fraction2
+        self.rootcount += other.rootcount
+        if self.sum_frac_canon is not None:
+            self.sum_frac_canon += other.sum_frac_canon
 
-    def avg_frac(self, leafset):
-        if leafset == self.leafset1:
-            return self.fraction1 / self.count
-        else:
-            return self.fraction2 / self.count
-
+    def mean_frac_to_canon(self):
+        """Return mean fraction to canonical side."""
+        if self.sum_frac_canon is None:
+            raise RuntimeError("Root branch-length fractions were not tracked")
+        return self.sum_frac_canon / self.rootcount
+                
 ###################################################################################################
 ###################################################################################################
 
@@ -5907,7 +5899,7 @@ class TreeSummary():
             remkids = sumtree.remotechildren_dict[c]
             bip = Bipartition.from_leafset(remkids, sumtree)
             if bip in self.rootbipsummary:
-                rootcred = self.rootbipsummary[bip].posterior
+                rootcred = self.rootbipsummary[bip].freq
                 sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
             else:
                 sumtree.set_branch_attribute(p, c, "rootcred", 0.0)
