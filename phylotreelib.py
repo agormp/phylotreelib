@@ -5851,8 +5851,9 @@ class TreeSummary():
         rootcred = fraction of trees in input set where the root was on this branch (bipartition)
         If root was never on a branch: assign the value 0.0
         Added as attribute .rootcred to Branchstruct for branches on sumtree
-        Also sets tree-attribute cumrootcred:
-            sum of rootcredibilities for all branches (bipartitions) included on tree
+        Also sets tree-attributes: 
+            rootcred: the rootcred of the actually used root bipartition
+            cumrootcred: sum of rootcred for all branches (bipartitions) included on tree
         """
 
         if not self.trackroot:
@@ -6270,25 +6271,6 @@ class TreeSummary():
                             + f"\n{e.args[0]}")
 
         return tree
-
-    ###############################################################################################
-
-    def compute_rootcred(self, tree):
-        """Returns root credibility (frequency of tree's root among observed trees) based
-        on current root of sumtree and information in self._rootbip_summary.
-        Note: mostly meaningfull for MCC trees, and will crash if current root was
-        not observed among input trees"""
-
-        tree_rootbip, _, _, _, _ = tree.rootbip()
-        try:
-            summary_rootbipstruct = self._rootbip_summary[tree_rootbip]
-        except KeyError as e:
-            raise TreeError("Problem while setting root credibilility: the current rooting "
-                            + "has not been observed among input trees. Make sure that input "
-                            + "trees are rooted (e.g., by using a clock model)."
-                            + f"\n\nCurrent root bipartition: {e.args[0]}")
-
-        return summary_rootbipstruct.count / self.tree_count
 
 ########################################################################################
 ########################################################################################
