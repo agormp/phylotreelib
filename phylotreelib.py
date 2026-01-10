@@ -5825,19 +5825,19 @@ class TreeSummary():
                                       # reroot seems to assume not rooted at birfurcation
                                       # rethink reroot function and others depending on it!
                     sumtree.reroot(child, parent)
-                sumtree.rootcred = count / self.tree_count
 
                 # If branch lengths or node depths have been tracked:
                 # Divide branch lengths for two rootkids according to fractions
                 # seen for this rootbip across trees in ._rootbip_summary
-                if self.trackblen or self.trackdepth:
-                    kid1,kid2 = sumtree.children(sumtree.root)
-                    biplen = sumtree.nodedist(kid1, kid2)
-                    kid1_remkids = sumtree.remotechildren_dict[kid1]
-                    dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
-                    dist_to_kid2 = biplen - dist_to_kid1
-                    sumtree.child_dict[sumtree.root][kid1].length = dist_to_kid1
-                    sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
+                # if self.trackblen or self.trackdepth:
+                #     kid1,kid2 = sumtree.children(sumtree.root)
+                #     biplen = sumtree.nodedist(kid1, kid2)
+                #     kid1_remkids = sumtree.remotechildren_dict[kid1]
+                #     dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+                #     dist_to_kid2 = biplen - dist_to_kid1
+                #     sumtree.child_dict[sumtree.root][kid1].length = dist_to_kid1
+                #     sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
+                # REWRITE TO USE NEW ROOTBIP!!!!!
 
                 return sumtree
 
