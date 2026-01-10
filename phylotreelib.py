@@ -6176,15 +6176,18 @@ class TreeSummary():
         """Only to be used when goal is to set bipartition-based branch-length stats
         on sumtree, and those were not already set during construction.
         This happens when treetype is MCC
-        NOTE: requires rooting to be tracked in order to properly split branch length on
-        root bipartition"""
+        
+        NOTE: requires rooting and rootblen to be tracked in order to properly split branch 
+              length on root bipartition"""
 
-        if not self.trackroot:
-            raise TreeError("Root was not tracked - impossible to use biplen on this summary tree\n"
-                            "(needed in order to properly split branch length on root bipartition)")
+        if not self.trackrootblen:
+            raise TreeError("Branch lengths for root-to-rootkids was not tracked - impossible to\n"
+                            "use biplen on this summary tree (needed in order to properly split\n"
+                            "branch length on root bipartition)")
 
+        sumtree_root = sumtree.root
         for p in sumtree.sorted_intnodes():
-            if p != sumtree.root:
+            if p != sumtree_root:
                 for c in sumtree.children(p):
                     remkids = sumtree.remotechildren_dict[c]
                     bip = Bipartition.from_leafset(remkids, sumtree)
