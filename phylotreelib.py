@@ -3024,29 +3024,64 @@ class Tree:
 
     ###############################################################################################
 
+    def _rootbip_core(self, trackrootblen=False):
+        """Helper method for rootbip and rootbip_with_frac.
+        
+        Returns 
+            rootbip, root-kid1, root-kid2, halfmask
+        
+        where halfmask is the canonical halfmask for root bipartition
+        """
+        
+        root = self.root
+        rootkids = self.child_dict[root]
+        if len(rootkids) != 2:
+            raise TreeError(
+                "Tree rooted at multifurcation - not possible to assign a unique root-bipartition")
+
+        kid1, kid2 = rootkids.keys()
+        halfmask = self.remotechildren_mask_dict[kid1]
+        
+        frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
+        object_cache = Bipartition._class_cache.get(frozenset_leaves)
+        if object_cache is None:
+            object_cache = {}
+            Bipartition._class_cache[frozenset_leaves] = object_cache        
+        rootbip = Bipartition.from_halfmask(halfmask, alltips_mask, object_cache, sorted_leaf_tup)
+
+        return rootbip, kid1, kid2, halfmask
+            
+    ###############################################################################################
+
     def rootbip(self):
-        """For a tree rooted at a bifurcation: returns a tuple giving the following information
-        about the bipartition on which the root is located:
-                (Bipartition, leafset1, blen1, leafset2, blen2)
-        where leafset1 and leafset2 are the two halves of the bipartition, and blen1 and blen2
-        are the lengths of the branches leading from the root to their two basal nodes"""
+        """For a tree rooted at a bifurcation: returns Bipartition object corresponding to 
+        bipartition present at root"""
+        
+        rootbip, kid1, kid2, halfmask = self._rootbip_core()
+        return rootbip
 
-        rootkids = list(self.children(self.root))
+    ###############################################################################################
 
-        # If rooted at multifurcation: raise error
-        # Python note: rethink logic here...
-        if len(rootkids) > 2:
-            msg = ("Tree rooted at multifurcation - not possible to assign a unique root-bipartition"
-                   f"\nRoot's child-nodes: {rootkids}")
-            raise TreeError(msg)
+    def rootbip_with_frac(self):
+        """For a tree rooted at a bifurcation: returns Bipartition object and blen info
+                (Bipartition, frac_to_canon)
+        frac_to_canon = blen_canonical / (blen1 + blen2)
+        where "canonical" means the side whose mask equals rootbip._mask
+        """
+        
+        rootbip, kid1, kid2, halfmask = self._rootbip_core()
 
-        leafset1 = self.remote_children(rootkids[0])
-        leafset2 = self.remote_children(rootkids[1])
-        blen1 = self.nodedist(self.root, rootkids[0])
-        blen2 = self.nodedist(self.root, rootkids[1])
-        rootbip = Bipartition.from_leafset(leafset1, self)
+        root_child_edges = self.child_dict[self.root]
+        blen1 = root_child_edges[kid1].length
+        blen2 = root_child_edges[kid2].length
 
-        return rootbip, leafset1, blen1, leafset2, blen2
+        denom = blen1 + blen2
+        frac1 = 0.5 if denom <= 0.0 else blen1 / denom
+
+        # canonical side = rootbip._mask
+        frac_to_canon = frac1 if (halfmask == rootbip._mask) else (1.0 - frac1)
+
+        return rootbip, frac_to_canon
 
     ###############################################################################################
 
