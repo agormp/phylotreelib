@@ -2908,7 +2908,7 @@ class Tree:
                 yield bip, branch
 
         if do_root_merge:
-            rootbip, leafset1, blen1, leafset2, blen2 = self.rootbip()
+            rootbip = self.rootbip()
             branch1 = child_dict[root][kid1]
             branch2 = child_dict[root][kid2]
             branch_merged = branch1.merge(branch2, check_compat=True)
@@ -5820,7 +5820,7 @@ class TreeSummary():
         # Starting with most frequent root location: find one that is compatible
         # Python note: should i just try number 1 on sorted list?
         if sumtree.is_bifurcation(sumtree.root):
-            cur_rootbip, _, _, _, _ = sumtree.rootbip()
+            cur_rootbip, blenfrac_canonical_mask = sumtree.rootbip_with_frac()
         else:
             cur_rootbip = None
         for count, bip, summary_rootbipstruct in self.sorted_rootbips:
@@ -5886,13 +5886,15 @@ class TreeSummary():
         # Handle root bipartition separately
         p = sumtree.root
         if sumtree.is_bifurcation(p):
-            rootbip, _, _, _, _ = sumtree.rootbip()
-            rootcred = self.rootbipsummary[rootbip].posterior
+            rootbip = sumtree.rootbip()
+            rootcred = self.rootbipsummary[rootbip].freq
             c1, c2 = sumtree.children(p)
             sumtree.set_branch_attribute(p, c1, "rootcred", rootcred)
             sumtree.set_branch_attribute(p, c2, "rootcred", rootcred)
+            sumtree.rootcred = rootcred
             cumcred_correction = rootcred # Counted twice if i just sum over branches. Hackish solution...
         else:
+            sumtree.rootcred = None   # sumtree is not rooted on bipartition, so no single rootcred
             for c in sumtree.children(p):
                 set_branch_credibility(p, c)
             cumcred_correction = 0.0
@@ -6165,17 +6167,21 @@ class TreeSummary():
                     sumtree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
 
         # Handle root bipartition separately
-        kid1,kid2 = sumtree.children(sumtree.root)
-        kid1_remkids = sumtree.remotechildren_dict[kid1]
-        rootbip = Bipartition.from_leafset(kid1_remkids, sumtree)
-        rootbrstruct = self.bipartsummary[rootbip]
+        rootbip = sumtree.rootbip()
+        rootbiplen = self.bipartsummary[rootbip].length
+        kid1,kid2 = sumtree.child_dict[sumtree_root]
+        
         summary_rootbipstruct = self._rootbip_summary[rootbip]
+        frac_to_canon = summary_rootbipstruct.mean_frac_to_canon()
 
-        rootbiplen = rootbrstruct.length
-        dist_to_kid1 = rootbiplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+        kid1_mask = sumtree.remotechildren_mask_dict[kid1]
+        is_kid1_canon = (kid1_mask == rootbip._mask)
+
+        dist_to_kid1 = rootbiplen * (frac_to_canon if is_kid1_canon else (1.0 - frac_to_canon))
         dist_to_kid2 = rootbiplen - dist_to_kid1
-        sumtree.child_dict[sumtree.root][kid1].length = dist_to_kid1
-        sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
+
+        sumtree.child_dict[sumtree_root][kid1].length = dist_to_kid1
+        sumtree.child_dict[sumtree_root][kid2].length = dist_to_kid2
 
         return sumtree
 
