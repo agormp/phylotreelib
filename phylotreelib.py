@@ -500,7 +500,12 @@ class Bipartition:
         side1 = frozenset(sorted_leaf_tup[i] for i in range(ntips) if (self._mask >> i) & 1)
         side2 = frozenset(sorted_leaf_tup) - side1
         return side1, side2
-
+        
+    def get_canonical_clade(self):
+        """Returns a frozenset of leaves included in canonical mask (= side1 from get_bipartitions)"""
+        side1,side2 = self.get_bipartitions()
+        return side1
+        
     def __iter__(self):
         return iter(self.get_bipartitions())
 
