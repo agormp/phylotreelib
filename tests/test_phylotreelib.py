@@ -605,7 +605,6 @@ class Treesummarytests(TreeTestBase):
         for line in mbresults:
             names1, names2, meanvar = line.strip().split("|")
             bip1 = names1.strip().split()
-            bip2 = names2.strip().split()
             bipart = pt.Bipartition.from_leafset(frozenset(bip1), mocktree)
             vals = meanvar.strip().split()
             mean = float(vals[0])
