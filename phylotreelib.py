@@ -223,7 +223,7 @@ class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
 
     __slots__ = ("length", "label",
-                 "SUMW", "mean", "M2", "n",
+                 "mean", "M2", "n",
                  "length_var", "length_sd",
                  "posterior", "freq", "bipartition_cred", "rootcred",
                  "parent_height", "kid_height")
@@ -232,7 +232,6 @@ class Branchstruct:
     _DEFAULTS = {
         "length": 0.0,
         "label": "",
-        "SUMW": 0.0,
         "mean": 0.0,
         "M2": 0.0,
         "n": 0,
@@ -249,7 +248,6 @@ class Branchstruct:
     def __init__(self, length=0.0, label=""):
         self.length = length
         self.label = label
-        self.SUMW = 0.0
         self.mean = 0.0
         self.M2 = 0.0
         self.n = 0
@@ -341,7 +339,7 @@ class Nodestruct:
     """Class that emulates a struct. Keeps node-related info"""
 
     __slots__ = ("depth", "nleaves", "subcladepairs", "best_pair",
-                 "SUMW", "mean", "M2", "n",
+                 "mean", "M2", "n",
                  "clade_cred", "posterior", "freq",
                  "depth_var", "depth_sd",
                  "clade_score")
@@ -351,7 +349,6 @@ class Nodestruct:
         self.nleaves = nleaves
         self.subcladepairs = set()
         self.best_pair = None
-        self.SUMW = 0.0
         self.mean = 0.0
         self.n = 0
         self.clade_cred = None
@@ -389,10 +386,7 @@ class Nodestruct:
 class Topostruct:
     """Class that emulates a struct. Keeps topology-related info"""
 
-    __slots__ = ["weight", "tree", "posterior"]
-
-    # Python note: perhaps replace with dataclass, available since python 3.7
-    pass
+    __slots__ = ["n", "tree", "posterior"]
 
 ###################################################################################################
 ###################################################################################################
@@ -5003,21 +4997,21 @@ class TreeSet():
 
 class RootBipStruct:
     
-    __slots__ = ("rootcount", "freq", "sum_frac_canon")
+    __slots__ = ("n", "freq", "sum_frac_canon")
     
     def __init__(self, frac_to_canon=None):
-        self.rootcount = 1
+        self.n = 1
         self.freq = None
         self.sum_frac_canon = frac_to_canon
 
     def add_rootbip(self, frac_to_canon=None):
-        self.rootcount += 1
+        self.n += 1
         if frac_to_canon is not None:
             self.sum_frac_canon += frac_to_canon
 
     def merge(self, other):
         """Merges this RootBipStruct with another (for same bipartition)"""
-        self.rootcount += other.rootcount
+        self.n += other.n
         if self.sum_frac_canon is not None:
             self.sum_frac_canon += other.sum_frac_canon
 
@@ -5025,7 +5019,7 @@ class RootBipStruct:
         """Return mean fraction to canonical side."""
         if self.sum_frac_canon is None:
             raise RuntimeError("Root branch-length fractions were not tracked")
-        return self.sum_frac_canon / self.rootcount
+        return self.sum_frac_canon / self.n
                 
 ###################################################################################################
 ###################################################################################################
@@ -5042,7 +5036,6 @@ class TreeSummary():
         self.transdict = None
         self.translateblock = None
         self.tree_count = 0
-        self.tree_weight_sum = 0.0
 
         self.trackroot = trackroot
         self.trackbips = trackbips
@@ -5075,30 +5068,24 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def online_weighted_update_mean_var(self, struct, x, w):
+    def online_update_mean_var(self, struct, x):
         """
-        Weighted online update of mean + M2 (sum of weighted squared deviations).
+        Online update of mean + M2 (sum of squared deviations).
             x: value whose mean and variance will be computed (e.g. branch length or node depth)
-            w: weight
 
-        Assumes struct has attributes: SUMW, mean, M2, n
+        Assumes struct has attributes: mean, M2, n
         """
 
-        # I am interested in being able to compute weighted mean and variance of various
+        # I am interested in being able to compute mean and variance of various
         # node and branch attributes, and to do this "online" in a single pass.
-        # In order to do this I follow the robust (= no underflow/overflow problems), one-pass
-        # approach described in D.H.D. West, "Updating Mean and Variance Estimates: An Improved
-        # Method", Communications of the ACM, 22(9), 1979.
-
-        struct.n += 1
         delta = x - struct.mean
-        struct.mean += (w / struct.SUMW) * delta
-        struct.M2 += w * delta * (x - struct.mean)
+        struct.mean += (delta / struct.n)
+        struct.M2 += delta * (x - struct.mean)
 
     ###############################################################################################
 
-    def finalize_online_weighted(self, struct):
-        """Helper for online_weighted_update_mean_var() method:
+    def finalize_online(self, struct):
+        """Helper for online_update_mean_var() method:
         compute final mean, var, and sd when all values have been collected"""
 
         if struct.n == 0:
@@ -5108,7 +5095,7 @@ class TreeSummary():
             return (struct.mean, "NA", "NA")
         else:
             # Could compute variance without bias correction n/n-1 but I think mrbayes etc uses it
-            var = (struct.M2 / struct.SUMW) * (struct.n / (struct.n - 1))
+            var = (struct.M2 / (struct.n - 1))
             sd = math.sqrt(var)
             return (struct.mean, var, sd)
 
@@ -5120,9 +5107,9 @@ class TreeSummary():
         if not self._bipartsummary_processed:
             for branchstruct in self._bipartsummary.values():
                 br = branchstruct
-                br.bipartition_cred = br.posterior = br.freq = br.SUMW / self.tree_weight_sum
+                br.bipartition_cred = br.posterior = br.freq = br.n / self.tree_count
                 if self.trackblen:
-                    br.length, br.length_var, br.length_sd = self.finalize_online_weighted(br)
+                    br.length, br.length_var, br.length_sd = self.finalize_online(br)
             self._bipartsummary_processed = True
         return self._bipartsummary
 
@@ -5134,9 +5121,9 @@ class TreeSummary():
         if not self._cladesummary_processed:
             for nodestruct in self._cladesummary.values():
                 nd = nodestruct
-                nd.clade_cred = nd.posterior = nd.freq = nd.SUMW / self.tree_weight_sum
+                nd.clade_cred = nd.posterior = nd.freq = nd.n / self.tree_count
                 if self.trackdepth:
-                    nd.depth, nd.depth_var, nd.depth_sd = self.finalize_online_weighted(nd)
+                    nd.depth, nd.depth_var, nd.depth_sd = self.finalize_online(nd)
             self._cladesummary_processed = True
         return self._cladesummary
 
@@ -5177,8 +5164,7 @@ class TreeSummary():
         Returns dict of {Bipartition: RootBipStruct}"""
         if not self._rootbip_summary_processed:
             for rootbipstruct in self._rootbip_summary.values():
-                # Python note: should i divide by tree_weight_sum, not tree_count?
-                rootbipstruct.freq = rootbipstruct.rootcount / self.tree_count
+                rootbipstruct.freq = rootbipstruct.n / self.tree_count
             self._rootbip_summary_processed = True
         return self._rootbip_summary
 
@@ -5192,7 +5178,7 @@ class TreeSummary():
         if self._sorted_rootbips == None:
             self._sorted_rootbips = []
             for bip,rootbipstruct in self.rootbipsummary.items():
-                self._sorted_rootbips.append((rootbipstruct._rootcount, bip, rootbipstruct))
+                self._sorted_rootbips.append((rootbipstruct.n, bip, rootbipstruct))
             self._sorted_rootbips.sort(key=itemgetter(0), reverse=True)
         return self._sorted_rootbips
 
@@ -5204,7 +5190,7 @@ class TreeSummary():
         biptoposummary: dict of {biptopology: Topostruct}"""
         if not self._biptoposummary_processed:
             for topostruct in self._biptoposummary.values():
-                topostruct.posterior = topostruct.weight / self.tree_weight_sum
+                topostruct.posterior = topostruct.n / self.tree_count
             self._biptoposummary_processed = True
 
         return self._biptoposummary
@@ -5217,14 +5203,14 @@ class TreeSummary():
            cladetoposummary: dict of {cladetopology: Topostruct}"""
         if not self._cladetoposummary_processed:
             for topostruct in self._cladetoposummary.values():
-                topostruct.posterior = topostruct.weight / self.tree_weight_sum
+                topostruct.posterior = topostruct.n / self.tree_count
             self._cladetoposummary_processed = True
 
         return self._cladetoposummary
 
     ###############################################################################################
 
-    def add_tree(self, curtree, weight=1.0):
+    def add_tree(self, curtree):
         """Add tree object to treesummary, update all relevant summaries"""
 
         # Main interface to TreeSummary.
@@ -5240,16 +5226,15 @@ class TreeSummary():
             raise TreeError(msg)
 
         self.tree_count += 1
-        self.tree_weight_sum += weight       # The weighted equivalent of tree_count
 
         if self.trackroot:
             self._add_root(curtree)
 
         if self.trackbips:
-            self._add_bips(curtree, weight)
+            self._add_bips(curtree)
 
         if self.trackclades:
-            self._add_clades(curtree, weight)
+            self._add_clades(curtree)
 
     ###############################################################################################
 
@@ -5273,7 +5258,7 @@ class TreeSummary():
         
     ###############################################################################################
 
-    def _add_clades(self, curtree, weight):
+    def _add_clades(self, curtree):
         """Helper method to add_tree: handles clades (streaming, optional topo/pairs)"""
 
         self._cladesummary_processed = False
@@ -5281,7 +5266,7 @@ class TreeSummary():
         trackdepth = self.trackdepth
         trackpairs = self.track_subcladepairs
         tracktopo = self.tracktopo
-        online_update = self.online_weighted_update_mean_var
+        online_update = self.online_update_mean_var
 
         # Only allocate these when needed
         node2clade = {} if trackpairs else None
@@ -5297,18 +5282,17 @@ class TreeSummary():
             # First time clade is seen
             if s is None:
                 s = Nodestruct(depth, nleaves)
-                s.SUMW = weight
+                s.n = 1
                 if trackdepth:
-                    s.n = 1
                     s.mean = depth
                     s.M2 = 0.0
                 cladesummary[clade] = s
 
             # Clade seen before
             else:
-                s.SUMW += weight
+                s.n += 1
                 if trackdepth:
-                    online_update(s, depth, weight)
+                    online_update(s, depth)
 
         # If requested: add subcladepairs to the GLOBAL summary
         if trackpairs:
@@ -5337,22 +5321,22 @@ class TreeSummary():
             ts = self._cladetoposummary.get(topology)
             if ts is None:
                 ts = Topostruct()
-                ts.weight = weight
+                ts.n = 1
                 self._cladetoposummary[topology] = ts
                 if self.store_trees:
                     curtree.clear_caches()
                     ts.tree = curtree
             else:
-                ts.weight += weight
+                ts.n += 1
 
     ###############################################################################################
 
-    def _add_bips(self, curtree, weight):
+    def _add_bips(self, curtree):
         """Helper method to add_tree: handles bipartitions"""
 
         self._bipartsummary_processed = False
         self._sorted_biplist = None
-        online_update = self.online_weighted_update_mean_var
+        online_update = self.online_update_mean_var
         bipartsummary = self._bipartsummary
         trackblen = self.trackblen
         tracktopo = self.tracktopo
@@ -5365,16 +5349,15 @@ class TreeSummary():
             s = bipartsummary.get(bipart)
             if s is None:
                 s = branchstruct
-                s.SUMW = weight
+                s.n = 1
                 if trackblen:
-                    s.n = 1
                     s.mean = length
                     s.M2 = 0.0
                 bipartsummary[bipart] = s
             else:
-                s.SUMW += weight
+                s.n += 1
                 if trackblen:
-                    online_update(s, length, weight)
+                    online_update(s, length)
 
         # If tracking topology, update it here
         if tracktopo:
@@ -5384,17 +5367,17 @@ class TreeSummary():
             ts = self._biptoposummary.get(topology)
             if ts is None:
                 ts = Topostruct()
-                ts.weight = weight
+                ts.n = 1
                 self._biptoposummary[topology] = ts
                 if self.store_trees:
                     curtree.clear_caches()
                     ts.tree = curtree
             else:
-                ts.weight += weight
+                ts.n += 1
 
     ###############################################################################################
 
-    def _addbiptopo(self, bipdict, curtree, weight):
+    def _addbiptopo(self, bipdict, curtree):
 
         self._biptoposummary_processed = False
 
@@ -5402,10 +5385,10 @@ class TreeSummary():
         # If topology HAS been seen before then update count
         topology = frozenset(bipdict.keys())
         if topology in self._biptoposummary:
-            self._biptoposummary[topology].weight += weight
+            self._biptoposummary[topology].n += 1
         else:
             self._biptoposummary[topology]=Topostruct()
-            self._biptoposummary[topology].weight = weight
+            self._biptoposummary[topology].n = 1
             if self.store_trees:
                 curtree.clear_caches()
                 self._biptoposummary[topology].tree = curtree
@@ -5420,9 +5403,8 @@ class TreeSummary():
             msg = "Not all trees have same set of leaves."
             raise TreeError(msg)
 
-        # Update treecount and weight
+        # Update treecount
         self.tree_count += other.tree_count
-        self.tree_weight_sum += other.tree_weight_sum
 
         if self.trackbips:
             self._updatebip(other)
@@ -5438,30 +5420,37 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def _merge_online_accumulators(self, a, b):
+        """Merges n, mean, M2 for two online accumulators, enabling computation of mean and var
+        Expects attributes: n, mean, M2"""
+        delta = b.mean - a.mean
+        ntot = a.n + b.n
+        a.mean = a.mean + delta * (b.n / ntot)
+        a.M2 = a.M2 + b.M2 + delta * delta * (a.n * b.n / ntot)
+        a.n = ntot
+
+    ###############################################################################################
+
     def _updatebip(self, other):
 
         # Merge "self.bipartsummary" with "other.bipartsummary"
         other_bipsum = other.bipartsummary
         self_bipsum = self.bipartsummary
 
-        for bipart in other_bipsum:
+        for bip in other_bipsum:
+            
             # If bipart already in self.bipartsummary, update fields
-            if bipart in self_bipsum:
+            if bip in self_bipsum:
+                # If branch lengths are tracked: update n, mean, M2 using special method
                 if self.trackblen:
-                    sumw1 = self_bipsum[bipart].SUMW
-                    sumw2 = other_bipsum[bipart].SUMW
-                    mean1 = self_bipsum[bipart].mean
-                    mean2 = other_bipsum[bipart].mean
-                    M21 = self_bipsum[bipart].M2
-                    M22 = other_bipsum[bipart].M2
-                    self_bipsum[bipart].n += other_bipsum[bipart].n
-                    self_bipsum[bipart].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
-                    self_bipsum[bipart].M2 = M21+M22+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
-                self_bipsum[bipart].SUMW += other_bipsum[bipart].SUMW
+                    self._merge_online_accumulators(self_bipsum[bip], other_bipsum[bip])
+                # else: only update n
+                else:
+                    self_bipsum[bip].n += other_bipsum[bip].n
 
             # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
             else:
-                self_bipsum[bipart] = other_bipsum[bipart]
+                self_bipsum[bip] = other_bipsum[bip]
 
         self._bipartsummary_processed = False
         self._sorted_biplist = None
@@ -5475,19 +5464,13 @@ class TreeSummary():
         self_cladesum = self.cladesummary
 
         for clade in other_cladesum:
+
             # If bipart already in self.cladesummary, update fields
             if clade in self_cladesum:
                 if self.trackdepth:
-                    sumw1 = self_cladesum[clade].SUMW
-                    sumw2 = other_cladesum[clade].SUMW
-                    mean1 = self_cladesum[clade].mean
-                    mean2 = other_cladesum[clade].mean
-                    M21 = self_cladesum[clade].M2
-                    M22 = other_cladesum[clade].M2
+                    self._merge_online_accumulators(self_cladesum[clade], other_cladesum[clade])
+                else:
                     self_cladesum[clade].n += other_cladesum[clade].n
-                    self_cladesum[clade].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
-                    self_cladesum[clade].M2 = M21+M22+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
-                self_cladesum[clade].SUMW += other_cladesum[clade].SUMW
 
             # If clade has never been seen before: transfer Nodestruct from other_cladesum:
             else:
@@ -5519,7 +5502,7 @@ class TreeSummary():
         for biptopology in other._biptoposummary:
             # If topology already in self.toposummary, update count
             if biptopology in self._biptoposummary:
-                self._biptoposummary[biptopology].weight += other._biptoposummary[biptopology].weight
+                self._biptoposummary[biptopology].n += other._biptoposummary[biptopology].n
             # If topology has never been seen before, simply transfer entry
             else:
                 self._biptoposummary[biptopology]=other._biptoposummary[biptopology]
@@ -5527,7 +5510,7 @@ class TreeSummary():
         for cladetopology in other._cladetoposummary:
             # If topology already in self.toposummary, update count
             if cladetopology in self._cladetoposummary:
-                self._cladetoposummary[cladetopology].weight += other._cladetoposummary[cladetopology].weight
+                self._cladetoposummary[cladetopology].n += other._cladetoposummary[cladetopology].n
             # If topology has never been seen before, simply transfer entry
             else:
                 self._cladetoposummary[cladetopology]=other._cladetoposummary[cladetopology]
@@ -5535,7 +5518,7 @@ class TreeSummary():
     ###############################################################################################
 
     def compute_sumtree(self, treetype="con", blen="biplen", rooting=None,
-                        og=None, wt_count_burnin_filename_list=None):
+                        og=None, count_burnin_filename_list=None):
         """Compute and annotate summary tree: find topology, set root, set branch lengths,
            annotate branches and nodes with relevant available information (eg, sd for blen)
 
@@ -5565,7 +5548,7 @@ class TreeSummary():
         # Check that all required parameters are given and consistent
         if (rooting == "og") and (not og):
             raise TreeError(f"Outgroup rooting requested, but no og parameter provided")
-        if (blen == "cadepth") and (not wt_count_burnin_filename_list):
+        if (blen == "cadepth") and (not count_burnin_filename_list):
             raise TreeError("Requested cadepth but no wt_count_burnin_filename_list provided")
 
         # Choose summary tree topology
@@ -5604,7 +5587,7 @@ class TreeSummary():
             sumtree = self.set_mean_node_depths(sumtree)
             sumtree.set_blens_from_depths()
         elif blen == "cadepth":
-            sumtree = self.set_ca_node_depths(sumtree, wt_count_burnin_filename_list)
+            sumtree = self.set_ca_node_depths(sumtree, count_burnin_filename_list)
             sumtree.set_blens_from_depths()
         elif (blen == "biplen"):
             if treetype == "mcc":
@@ -5974,7 +5957,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def set_ca_node_depths_orig(self, sumtree, wt_count_burnin_filename_list):
+    def set_ca_node_depths_orig(self, sumtree, count_burnin_filename_list):
         """Set node depths on summary tree based on mean node depth of clade's MRCAs on set
         of input trees (same as "--height ca" in BEAST's treeannotator).
         This means that all input trees are used when computing mean depth for each node
@@ -5994,7 +5977,7 @@ class TreeSummary():
         # leaf dates are being estimated, then these will vary)
 
         # Create local bindings and precomputed list for variables used in tight loops
-        online_weighted_update_mean_var = self.online_weighted_update_mean_var
+        online_update_mean_var = self.online_update_mean_var
         sumtree_remkids = sumtree.remotechildren_dict
         sumtree_remmask = sumtree.remotechildren_mask_dict
         sumtree_intnodes = sumtree.intnodes
@@ -6005,7 +5988,6 @@ class TreeSummary():
         acc = {}
         for node in sumtree.nodes:
             s = Nodestruct()
-            s.SUMW = 0.0
             s.n = 0
             s.mean = 0.0
             s.M2 = 0.0
@@ -6025,11 +6007,10 @@ class TreeSummary():
         leaf_queries = [(acc[leaf], leaf) for leaf in sumtree_leaves]
 
         # Stream trees and update stats online
-        for file_weight, count, burnin, filename in wt_count_burnin_filename_list:
+        for count, burnin, filename in count_burnin_filename_list:
             ntrees = count - burnin
-            w_tree = file_weight / ntrees
-
             treefile = Treefile(filename)
+            
             for _ in range(burnin):
                 treefile.readtree(returntree=False)
 
@@ -6043,21 +6024,21 @@ class TreeSummary():
                 find_mrca_mask = input_tree.find_mrca_mask
 
                 for s, query_mask, start_leaf in intnode_queries:
-                    s.SUMW += w_tree
+                    s.n += 1
                     input_mrca = find_mrca_mask(query_mask, start_leaf)
                     depth = nodedepthdict[input_mrca]
-                    online_weighted_update_mean_var(s, depth, w_tree)
+                    online_update_mean_var(s, depth)
 
                 # leaves: mean depths (CA depth for singleton)
                 for s, leaf in leaf_queries:
-                    s.SUMW += w_tree
+                    s.n += 1
                     depth = nodedepthdict[leaf]
-                    online_weighted_update_mean_var(s, depth, w_tree)
+                    online_update_mean_var(s, depth)
 
         # Write results onto sumtree with domain names
         for node in sumtree.nodes:
             s = acc[node]
-            mean, var, sd = self.finalize_online_weighted(s)
+            mean, var, sd = self.finalize_online(s)
             sumtree.set_node_attribute(node, "depth", mean)
             sumtree.set_node_attribute(node, "depth_var", var)
             sumtree.set_node_attribute(node, "depth_sd", sd)
@@ -6066,7 +6047,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def set_ca_node_depths_inline(self, sumtree, wt_count_burnin_filename_list):
+    def set_ca_node_depths_inline(self, sumtree, count_burnin_filename_list):
         """Set node depths on summary tree based on mean node depth of clade's MRCAs on set
         of input trees (same as "--height ca" in BEAST's treeannotator).
         This means that all input trees are used when computing mean depth for each node
@@ -6086,7 +6067,7 @@ class TreeSummary():
         # leaf dates are being estimated, then these will vary)
 
         # Create local bindings and precomputed list for variables used in tight loops
-        online_weighted_update_mean_var = self.online_weighted_update_mean_var
+        online_update_mean_var = self.online_update_mean_var
         sumtree_remmask = sumtree.remotechildren_mask_dict
         sumtree_intnodes = sumtree.intnodes
         sumtree_leaves = sumtree.leaves
@@ -6102,7 +6083,6 @@ class TreeSummary():
         acc = {}
         for node in sumtree.nodes:
             s = Nodestruct()
-            s.SUMW = 0.0
             s.n = 0
             s.mean = 0.0
             s.M2 = 0.0
@@ -6126,9 +6106,8 @@ class TreeSummary():
         # Stream trees and update stats online
         # Python note: no calls to find_mrca_mask: inlined logic here instead
         # in order to enable sharing results seen while climbing ancestor path for given startleaf
-        for file_weight, count, burnin, filename in wt_count_burnin_filename_list:
+        for count, burnin, filename in count_burnin_filename_list:
             ntrees = count - burnin
-            w_tree = file_weight / ntrees
 
             treefile = Treefile(filename)
             for _ in range(burnin):
@@ -6146,20 +6125,20 @@ class TreeSummary():
                     for s, qmask, _nleaves in qlist:
                         while (remmask[parent] & qmask) != qmask:
                             parent = parent_dict[parent]
-                        s.SUMW += w_tree
+                        s.n += 1
                         depth = nodedepthdict[parent]
-                        online_weighted_update_mean_var(s, depth, w_tree)
+                        online_update_mean_var(s, depth)
 
                 # leaves: mean depths (CA depth for singleton)
                 for s, leaf in leaf_queries:
-                    s.SUMW += w_tree
+                    s.n += 1
                     depth = nodedepthdict[leaf]
-                    online_weighted_update_mean_var(s, depth, w_tree)
+                    online_update_mean_var(s, depth)
 
         # Write results onto sumtree with domain names
         for node in sumtree.nodes:
             s = acc[node]
-            mean, var, sd = self.finalize_online_weighted(s)
+            mean, var, sd = self.finalize_online(s)
             sumtree.set_node_attribute(node, "depth", mean)
             sumtree.set_node_attribute(node, "depth_var", var)
             sumtree.set_node_attribute(node, "depth_sd", sd)
