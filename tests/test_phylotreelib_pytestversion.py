@@ -85,17 +85,13 @@ class Test_create_Topostruct:
 
     def test_attributes(self):
         ts = pt.Topostruct()
-        w = 0.345
-        t = "(A,(B,(C,D)));"  # not actually a tree but fine for testing...
-        f = 0.97
-        x = "not supposed to be an attribute"
+        ts.tree = "(A,(B,(C,D)));"  # not actually a tree but fine for testing...
+        ts.posterior = 0.97
+        ts.n = 23
         # Note: main test here is to see if class accepts (only) attribues named in __slots__
-        # Assertion is done implicitly: if exception is raised here then test fails
-        ts.weight = w
-        ts.tree = t
-        ts.posterior = f
+        # Assertion is done implicitly: if exception is raised above then test fails        
         with pytest.raises(AttributeError):
-            ts.notanatt = x
+            ts.notanatt = "not supposed to be an attribute"
 
 ###################################################################################################
 ###################################################################################################
@@ -860,7 +856,7 @@ class Test_compute_sumtree:
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mcc", blen="cadepth",
-                                    wt_count_burnin_filename_list=[(1, 1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
+                                    count_burnin_filename_list=[(1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
         
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_ca")
