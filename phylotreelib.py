@@ -5670,7 +5670,7 @@ class TreeSummary():
         for _, bip in self.sorted_biplist:
             i += 1
             branch = self.bipartsummary[bip]
-            if branch.posterior < cutoff:
+            if branch.freq < cutoff:
                 break
             conbipdict[bip] = branch
         contree = Tree.from_biplist(conbipdict)
@@ -6220,7 +6220,7 @@ class TreeSummary():
                                     + f"{clade}")
                 else:
                     # consensus clade WAS observed
-                    sumtree.set_node_attribute(node, "clade_cred", getattr(nd, "clade_cred", nd.posterior))
+                    sumtree.set_node_attribute(node, "clade_cred", getattr(nd, "clade_cred", nd.freq))
                     node_attrs.add("clade_cred")
                     if self.trackdepth:
                         sumtree.set_node_attribute(node, "depth", nd.depth)
@@ -6236,7 +6236,7 @@ class TreeSummary():
                     bip = Bipartition.from_leafset(remkids, sumtree)
                     br = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(parent, child, "bipartition_cred",
-                                                 getattr(br, "bipartition_cred", br.posterior))
+                                                 getattr(br, "bipartition_cred", br.freq))
                     branch_attrs.add("bipartition_cred")
 
                     if self.trackblen:
