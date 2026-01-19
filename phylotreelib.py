@@ -223,7 +223,8 @@ class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
 
     __slots__ = ("length", "label",
-                 "mean", "M2", "n",
+                 "mean", "M2", "n", 
+                 "quantiles", "ci", "length_median",
                  "length_var", "length_sd",
                  "posterior", "freq", "bipartition_cred", "rootcred",
                  "parent_height", "kid_height")
@@ -235,6 +236,9 @@ class Branchstruct:
         "mean": 0.0,
         "M2": 0.0,
         "n": 0,
+        "quantiles": None,
+        "ci": None,
+        "length_median": None,
         "length_var": 0.0,
         "length_sd": 0.0,
         "posterior": None,
@@ -251,6 +255,9 @@ class Branchstruct:
         self.mean = 0.0
         self.M2 = 0.0
         self.n = 0
+        self.quantiles = None
+        self.ci = None            # dict of {label: (lo, hi)}, where e.g. label = "90%_CI"
+        self.length_median = None
         self.length_var = 0.0
         self.length_sd = 0.0
         self.posterior = None
@@ -339,7 +346,8 @@ class Nodestruct:
     """Class that emulates a struct. Keeps node-related info"""
 
     __slots__ = ("depth", "nleaves", "subcladepairs", "best_pair",
-                 "mean", "M2", "n",
+                 "mean", "M2", "n", 
+                 "quantiles", "ci", "depth_median",
                  "clade_cred", "posterior", "freq",
                  "depth_var", "depth_sd",
                  "clade_score")
@@ -350,7 +358,11 @@ class Nodestruct:
         self.subcladepairs = set()
         self.best_pair = None
         self.mean = 0.0
+        self.M2 = 0.0
         self.n = 0
+        self.quantiles = None
+        self.ci = None             # dict of {label: (lo, hi)}, where e.g. label = "90%_CI"
+        self.depth_median = None
         self.clade_cred = None
         self.posterior = None
         self.freq = None
@@ -359,7 +371,23 @@ class Nodestruct:
         self.clade_score = None
 
     def __str__(self):
-        return f"depth: {self.depth}\n"
+        lines = []
+        for attr in self.__slots__:
+            val = getattr(self, attr)
+            if val is None:
+                continue
+            if attr == "quantiles":
+                continue  # internal object, not user-facing
+            if isinstance(val, set) and not val:
+                continue
+            if isinstance(val, float):
+                sval = f"{val:.6g}"
+            else:
+                sval = str(val)
+            lines.append(f"{attr}: {sval}")
+        if not lines:
+            return "Nodestruct()"
+        return "Nodestruct(\n  " + "\n  ".join(lines) + "\n)"
 
     def __repr__(self):
         return self.__str__()
@@ -5024,14 +5052,117 @@ class RootBipStruct:
 ###################################################################################################
 ###################################################################################################
 
+class QuantileAccumulator:
+    """
+    Approximate quantiles using log-scaled buckets. Mergeable, one-pass.
+    Used by TreeSummary objects when tracking credible intervals for branch lengths or 
+    node depths.
+    
+    - b uses (k+1) bits via direct multiplication: b = int(m * 2^(k+1))
+    - bucket key = (e << (k+1)) | b : Puts b into the lower k+1 bits, and e in higher bits
+    """
+
+    __slots__ = ("k", "shift", "scale", "mask", "neg_bucket", "counts", "n")
+
+    def __init__(self, k = 7):
+        self.k = k
+        self.shift = self.k + 1
+        self.scale = 1 << self.shift
+        self.mask = self.scale - 1
+        self.neg_bucket = -(10**18)          # int sentinel for x<=0 / non-finite
+        self.counts = defaultdict(int)
+        self.n = 0
+
+    def _bucket(self, x):
+        if x <= 0.0 or not math.isfinite(x):
+            return self.neg_bucket
+        m, e = math.frexp(x)                 # x = m * 2^e, m in [0.5, 1)
+        b = int(m * self.scale)              # b in [2^k, 2^(k+1)-1]
+        return (e << self.shift) | b
+        
+    def _bucket_value(self, bkey):
+            """Representative value for a bucket key."""
+            if bkey == self.neg_bucket:
+                return 0.0
+            e = bkey >> self.shift
+            b = bkey & self.mask
+            mant = (b + 0.5) / self.scale
+            return math.ldexp(mant, e)      # mant * 2**e
+
+    def add(self, x):
+        bkey = self._bucket(x)
+        self.counts[bkey] += 1
+        self.n += 1
+
+    def merge(self, other: "QuantileAccumulator"):
+        if self.shift != other.shift:
+            raise ValueError(f"Incompatible accumulators: shift {self.shift} vs {other.shift}")
+        if self.neg_bucket != other.neg_bucket:
+            raise ValueError("Incompatible accumulators: different neg_bucket sentinel")
+        for bkey, c in other.counts.items():
+            self.counts[bkey] += c
+        self.n += other.n
+
+    def quantile(self, prob):
+        """Single q-quantile (prob in [0,1])."""
+        out = self.quantiles([prob])
+        return out[0]
+
+    def quantiles(self, probs):
+        """
+        Multiple quantiles in one pass. 
+        probs: list of probabilities
+        Returns a list of quantiles, in the same order as probs
+        """
+        if self.n == 0:
+            raise TreeError(f"No values accumulated; can't compute quantiles")
+
+        n = self.n
+        targets = []
+        for p_idx,p in enumerate(probs):
+            if not (0.00 <= p <= 1.0):
+                raise TreeError(f"quantile prob has to be in range 0-1: {p}")
+            rank = 1.0 + p * (n - 1)   # in [1..n]
+            targets.append((rank, p_idx))
+        targets.sort(key=lambda x: x[0])
+        
+        # One cumulative pass over buckets
+        n_probs = len(probs)
+        results = [0.0] * n_probs
+
+        cum = 0
+        t_idx = 0
+        n_targets = len(targets)
+        
+        for bkey in sorted(self.counts):
+            cum += self.counts[bkey]
+            value = self._bucket_value(bkey)
+
+            # Assign this bucket value to all quantiles whose rank has been reached.
+            while t_idx < n_targets:
+                rank, p_idx = targets[t_idx]   
+                if cum < rank:
+                    break
+                results[p_idx] = value
+                t_idx += 1
+
+            if t_idx == n_targets:
+                break
+
+        return results
+        
+###################################################################################################
+###################################################################################################
+
 class TreeSummary():
     """Class summarizing requested attributes (bipartitions, clades, root location, branch lengths,
        node depths, topologies) from many trees"""
 
     def __init__(self, trackbips=False, trackclades=False, trackroot=False, 
                        trackblen=False, trackdepth=False, trackrootblen=False,
-                       tracktopo=False, track_subcladepairs=False,
-                       store_trees=False):
+                       tracktopo=False, track_subcladepairs=False, 
+                       store_trees=False, 
+                       trackci=False, ci_probs=None):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.transdict = None
         self.translateblock = None
@@ -5103,13 +5234,37 @@ class TreeSummary():
 
     @property
     def bipartsummary(self):
-        """Property method for lazy evaluation of freq, var, and sd for branchstructs"""
+        """Property method for lazy evaluation of freq, var, and sd for branchstructs
+        Also computes quantiles if tracked"""
         if not self._bipartsummary_processed:
             for branchstruct in self._bipartsummary.values():
                 br = branchstruct
                 br.bipartition_cred = br.posterior = br.freq = br.n / self.tree_count
                 if self.trackblen:
                     br.length, br.length_var, br.length_sd = self.finalize_online(br)
+            
+            # Also finalize computation of selected quantiles if requested 
+            if self.trackci and self.ci_probs and self.trackblen:
+                
+                # Create list of [lo_p1, hi_p1, lo_p2, hi_p2, ..., 0.5]
+                # for calling quantiles method (last prob is for median)
+                # Order of lo,hi pairs is same as self.ci_probs and self.ci_labels
+                # Known order => output can be parsed to set lo and hi for CIs
+                probs = []
+                for p in self.ci_probs:
+                    a = (1.0 - p) / 2.0
+                    probs.extend([a, 1.0 - a])
+                probs.append(0.5)
+
+                for br in self._bipartsummary.values():
+                    qvals = br.quantiles.quantiles(probs)  # list in same order as probs
+                    br.ci = {}
+                    for i,lab in enumerate(self.ci_labels):
+                        lo_idx = i * 2
+                        hi_idx = lo_idx + 1   
+                        br.ci[lab] = (qvals[lo_idx], qvals[hi_idx])
+                    br.length_median = qvals[-1]
+
             self._bipartsummary_processed = True
         return self._bipartsummary
 
@@ -5117,13 +5272,32 @@ class TreeSummary():
 
     @property
     def cladesummary(self):
-        """Property method for lazy evaluation of freq, var, and sd for nodestructs"""
+        """Property method for lazy evaluation of freq, var, and sd for nodestructs
+        Also computes quantiles if tracked"""
         if not self._cladesummary_processed:
             for nodestruct in self._cladesummary.values():
                 nd = nodestruct
                 nd.clade_cred = nd.posterior = nd.freq = nd.n / self.tree_count
                 if self.trackdepth:
                     nd.depth, nd.depth_var, nd.depth_sd = self.finalize_online(nd)
+
+            # Also finalize computation of selected quantiles if requested 
+            if self.trackci and self.ci_probs and self.trackdepth:
+                probs = []
+                for p in self.ci_probs:
+                    a = (1.0 - p) / 2.0
+                    probs.extend([a, 1.0 - a])
+                probs.append(0.5)
+
+                for nd in self._cladesummary.values():
+                    qvals = nd.quantiles.quantiles(probs)  # list in same order as probs
+                    nd.ci = {}
+                    for i,lab in enumerate(self.ci_labels):
+                        lo_idx = i * 2
+                        hi_idx = lo_idx + 1   
+                        nd.ci[lab] = (qvals[lo_idx], qvals[hi_idx])
+                    nd.depth_median = qvals[-1]
+                        
             self._cladesummary_processed = True
         return self._cladesummary
 
@@ -5265,6 +5439,7 @@ class TreeSummary():
         cladesummary = self._cladesummary
         trackdepth = self.trackdepth
         trackpairs = self.track_subcladepairs
+        do_ci = self.trackci and trackdepth
         tracktopo = self.tracktopo
         online_update = self.online_update_mean_var
 
@@ -5276,23 +5451,18 @@ class TreeSummary():
         for node, clade, depth, nleaves in curtree.iter_cladeinfo(node2clade=node2clade):
             if cladeset is not None:
                 cladeset.add(clade)
-
             s = cladesummary.get(clade)
-
-            # First time clade is seen
             if s is None:
                 s = Nodestruct(depth, nleaves)
-                s.n = 1
-                if trackdepth:
-                    s.mean = depth
-                    s.M2 = 0.0
-                cladesummary[clade] = s
-
-            # Clade seen before
+                cladesummary[clade] = s          
+                if do_ci:
+                    s.quantiles = QuantileAccumulator()
+            if trackdepth:
+                online_update(s, depth)
+                if do_ci:
+                    s.quantiles.add(depth)
             else:
                 s.n += 1
-                if trackdepth:
-                    online_update(s, depth)
 
         # If requested: add subcladepairs to the GLOBAL summary
         if trackpairs:
@@ -5340,6 +5510,7 @@ class TreeSummary():
         bipartsummary = self._bipartsummary
         trackblen = self.trackblen
         tracktopo = self.tracktopo
+        do_ci = self.trackci and trackblen
         bipset = set() if tracktopo else None
 
         for bipart, branchstruct in curtree.iter_bipinfo():
@@ -5349,15 +5520,15 @@ class TreeSummary():
             s = bipartsummary.get(bipart)
             if s is None:
                 s = branchstruct
-                s.n = 1
-                if trackblen:
-                    s.mean = length
-                    s.M2 = 0.0
                 bipartsummary[bipart] = s
+                if do_ci:
+                    s.quantiles = QuantileAccumulator()                
+            if trackblen:
+                online_update(s, length)
+                if do_ci:
+                    s.quantiles.add(length)
             else:
                 s.n += 1
-                if trackblen:
-                    online_update(s, length)
 
         # If tracking topology, update it here
         if tracktopo:
@@ -5417,7 +5588,7 @@ class TreeSummary():
 
         if self.tracktopo:
             self._updatetopo(other)
-
+            
     ###############################################################################################
 
     def _merge_online_accumulators(self, a, b):
@@ -5428,30 +5599,29 @@ class TreeSummary():
         a.mean = a.mean + delta * (b.n / ntot)
         a.M2 = a.M2 + b.M2 + delta * delta * (a.n * b.n / ntot)
         a.n = ntot
-
+                    
     ###############################################################################################
 
     def _updatebip(self, other):
 
         # Merge "self.bipartsummary" with "other.bipartsummary"
-        other_bipsum = other.bipartsummary
-        self_bipsum = self.bipartsummary
+        self_bipsum = self._bipartsummary
+        other_bipsum = other._bipartsummary
+        trackblen = self.trackblen
+        do_ci = self.trackci and trackblen
 
-        for bip in other_bipsum:
-            
-            # If bipart already in self.bipartsummary, update fields
-            if bip in self_bipsum:
-                # If branch lengths are tracked: update n, mean, M2 using special method
-                if self.trackblen:
-                    self._merge_online_accumulators(self_bipsum[bip], other_bipsum[bip])
-                # else: only update n
-                else:
-                    self_bipsum[bip].n += other_bipsum[bip].n
-
-            # If bipartition has never been seen before: transfer Branchstruct from other_bipsum:
+        for bip, br_other in other_bipsum.items():
+            br_self = self_bipsum.get(bip)
+            if br_self is None:
+                self_bipsum[bip] = br_other
             else:
-                self_bipsum[bip] = other_bipsum[bip]
-
+                if trackblen:
+                    self._merge_online_accumulators(br_self, br_other)
+                    if do_ci:
+                        br_self.quantiles.merge(br_other.quantiles)
+                else:
+                    br_self.n += br_other.n
+                
         self._bipartsummary_processed = False
         self._sorted_biplist = None
 
@@ -5460,21 +5630,22 @@ class TreeSummary():
     def _updateclade(self, other):
 
         # Merge "treesummary.cladesummary" with "self.cladesummary"
-        other_cladesum = other.cladesummary
-        self_cladesum = self.cladesummary
+        self_cladesum = self._cladesummary
+        other_cladesum = other._cladesummary
+        trackdepth = self.trackdepth
+        do_ci = self.trackci and trackdepth
 
-        for clade in other_cladesum:
-
-            # If bipart already in self.cladesummary, update fields
-            if clade in self_cladesum:
-                if self.trackdepth:
-                    self._merge_online_accumulators(self_cladesum[clade], other_cladesum[clade])
-                else:
-                    self_cladesum[clade].n += other_cladesum[clade].n
-
-            # If clade has never been seen before: transfer Nodestruct from other_cladesum:
+        for clade, nd_other in other_cladesum.items():
+            nd_self = self_cladesum.get(clade)
+            if nd_self is None:
+                self_cladesum[clade] = nd_other
             else:
-                self_cladesum[clade] = other_cladesum[clade]
+                if trackdepth:
+                    self._merge_online_accumulators(nd_self, nd_other)
+                    if do_ci:
+                        nd_self.quantiles.merge(nd_other.quantiles)
+                else:
+                    nd_self.n += nd_other.n
 
         self._cladesummary_processed = False
         self._sorted_biplist = None
@@ -5626,11 +5797,20 @@ class TreeSummary():
 
         if self.trackroot:
             branch_attrs.add("rootcred")
+            
+        if self.trackci:
+            if blen == "biplen" and self.trackblen:
+                branch_attrs.update({"length_median", "ci"})
+            if blen == "meandepth" and self.trackdepth:
+                node_attrs.update({"depth_median", "ci"})
+            if blen == "cadepth":
+                node_attrs.update({"depth_median", "ci"})
 
         # attach for printing
         sumtree._print_node_attributes = tuple(sorted(node_attrs))
         sumtree._print_branch_attributes = tuple(sorted(branch_attrs))
-
+        sumtree._ci_labels = self.ci_labels   
+        
         return sumtree
 
     ###############################################################################################
@@ -5982,17 +6162,19 @@ class TreeSummary():
         sumtree_remmask = sumtree.remotechildren_mask_dict
         sumtree_intnodes = sumtree.intnodes
         sumtree_leaves = sumtree.leaves
-        leaf2mask_sum = sumtree.cached_attributes[3]
 
         # Make online accumulators for node stats
         acc = {}
+        do_ci = self.trackci and bool(self.ci_probs)
         for node in sumtree.nodes:
             s = Nodestruct()
             s.n = 0
             s.mean = 0.0
             s.M2 = 0.0
+            if do_ci:
+                s.quantiles = QuantileAccumulator()
             acc[node] = s
-
+        
         # list of (intnode, bitmask, start_leaf) queries, to iterate over for each input tree
         # start-leaf chosen randomly from remote-children of intnode
         # Python note: choice of start-leaf could be optimised to start as close to the root
@@ -6024,24 +6206,42 @@ class TreeSummary():
                 find_mrca_mask = input_tree.find_mrca_mask
 
                 for s, query_mask, start_leaf in intnode_queries:
-                    s.n += 1
                     input_mrca = find_mrca_mask(query_mask, start_leaf)
                     depth = nodedepthdict[input_mrca]
                     online_update_mean_var(s, depth)
+                    if do_ci:
+                        s.quantiles.add(depth)
 
                 # leaves: mean depths (CA depth for singleton)
                 for s, leaf in leaf_queries:
-                    s.n += 1
                     depth = nodedepthdict[leaf]
                     online_update_mean_var(s, depth)
+                    if do_ci:
+                        s.quantiles.add(depth)
 
         # Write results onto sumtree with domain names
+        if do_ci:
+            probs = []
+            for p in self.ci_probs:
+                a = (1.0 - p) / 2.0
+                probs.extend([a, 1.0 - a])
+            probs.append(0.5)
         for node in sumtree.nodes:
             s = acc[node]
             mean, var, sd = self.finalize_online(s)
             sumtree.set_node_attribute(node, "depth", mean)
             sumtree.set_node_attribute(node, "depth_var", var)
             sumtree.set_node_attribute(node, "depth_sd", sd)
+            if do_ci:                
+                qvals = s.quantiles.quantiles(probs)  # list in same order as probs
+                ci = {}
+                for i, lab in enumerate(self.ci_labels):
+                    lo_idx = i * 2
+                    hi_idx = lo_idx + 1
+                    ci[lab] = (qvals[lo_idx], qvals[hi_idx])
+
+                sumtree.set_node_attribute(node, "ci", ci)
+                sumtree.set_node_attribute(node, "depth_median", qvals[-1])
 
         return sumtree
 
@@ -6227,13 +6427,19 @@ class TreeSummary():
                         sumtree.set_node_attribute(node, "depth_sd", nd.depth_sd)
                         sumtree.set_node_attribute(node, "depth_var", nd.depth_var)
                         node_attrs.update({"depth", "depth_sd", "depth_var"})
+                        if self.trackci:
+                            # these attributes may or may not exist; set if present
+                            for attr in ("ci", "depth_median"):
+                                if hasattr(nd, attr):
+                                    sumtree.set_node_attribute(node, attr, getattr(nd, attr))
+                                    node_attrs.add(attr)
 
         # Branch annotations from bipartsummary
         if self.trackbips:
             for parent in sumtree.sorted_intnodes():
                 for child in sumtree.children(parent):
-                    remkids = sumtree.remotechildren_dict[child]
-                    bip = Bipartition.from_leafset(remkids, sumtree)
+                    halfmask = sumtree.remotechildren_mask_dict[child]
+                    bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
                     br = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(parent, child, "bipartition_cred",
                                                  getattr(br, "bipartition_cred", br.freq))
@@ -6244,6 +6450,11 @@ class TreeSummary():
                         sumtree.set_branch_attribute(parent, child, "length_sd", br.length_sd)
                         sumtree.set_branch_attribute(parent, child, "length_var", br.length_var)
                         branch_attrs.update({"length", "length_sd", "length_var"})
+                        if self.trackci:
+                            for attr in ("ci", "length_median"):
+                                if hasattr(br, attr):
+                                    sumtree.set_branch_attribute(parent, child, attr, getattr(br, attr))
+                                    branch_attrs.add(attr)
 
         # Set Newick internal node labels (numbers after ')')
         # For each internal node (except root), set the label on its incoming branch.
@@ -6291,7 +6502,6 @@ class TreeSummary():
             raise TreeError("Problem while setting clade credibililities: the following clade has not been "
                             + "observed among input trees: check rooting of tree."
                             + f"\n{e.args[0]}")
-
         return tree
 
 ########################################################################################
