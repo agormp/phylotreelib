@@ -604,14 +604,14 @@ class Clade:
         return self._mask == other._mask
 
     def __len__(self):
-        return len(self._sorted_leaf_tup)
+        return self._mask.bit_count()
 
     def get_clade(self):
         """Return leaf names in this clade."""
         sorted_leaf_tup = self._sorted_leaf_tup
         ntips = len(sorted_leaf_tup)
         leafnames = frozenset(sorted_leaf_tup[i] for i in range(ntips) if (self._mask >> i) & 1)
-        return leafnames
+        return leafnames        
 
     # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
     # 1-tuple; comma is important
