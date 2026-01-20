@@ -2787,24 +2787,60 @@ class Tree:
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6,
-               transdict=None, node_attributes=None, branch_attributes=None):
+               transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
+               print_meta=False):
         """Returns Newick format tree string representation of tree object, with optional metacomments"""
+               
+        if node_attributes is None:
+            node_attributes = getattr(self, "_print_node_attributes", None)
+        if branch_attributes is None:
+            branch_attributes = getattr(self, "_print_branch_attributes", None)
+        if ci_labels is None:
+            ci_labels = getattr(self, "_ci_labels", None)
+            
+        # If meta printing is disabled, suppress all meta-related output
+        if not print_meta:
+            node_attributes = None
+            branch_attributes = None
+            ci_labels = None        
 
-        def create_metacomment(struct, attributes):
-            """Helper function to create metacomment strings based on attributes of a structure"""
-            tmplist = []
-            for attrname in attributes:
-                try:
-                    value = getattr(struct, attrname)
-                except AttributeError:
-                    msg = (f"'{struct.__class__.__name__}' object has no attribute '{attrname}'.\n"
-                          f"Available attributes: {list(vars(struct).keys())}")
-                    raise TreeError(msg)
+        def create_metacomment(struct, attributes, ci_labels, ci_prefix=None):
+            """Helper function to create metacomment strings based on attributes of a structure
+            - skips missing attributes
+            - skips None 
+            - collapses *_ci_lo/_ci_hi into <prefix>_<ci_label>={lo,hi}
+              if ci_label is provided"""
+            
+            def fmt(value):
+                if value is None:
+                    return None
                 if isinstance(value, float):
-                    tmplist.append(f"{attrname}={value:.{precision}g}")
-                else:
-                    tmplist.append(f"{attrname}={value}")
-            return f"[&{','.join(tmplist)}]"
+                    return f"{value:.{precision}g}"
+                return str(value)
+
+            parts = []
+            requested = set(attributes)
+
+            # 1) regular attributes 
+            for attr in attributes:
+                if attr == "ci":
+                    continue
+                if not hasattr(struct, attr):
+                    continue
+                fmt_value = fmt(getattr(struct, attr))
+                if fmt_value is not None:
+                    parts.append(f"{attr}={fmt_value}")
+
+            # 2) CI ranges (only if label requested)
+            if ci_labels and hasattr(struct, "ci") and struct.ci:
+                for lab in ci_labels:
+                    lo, hi = struct.ci[lab]
+                    parts.append(f"{ci_prefix}_{lab}={{{fmt(lo)},{fmt(hi)}}}")
+
+            if not parts:
+                return ""
+            return f"[&{','.join(parts)}]"
+                
 
         def append_children(parentnode):
             """Recursive function that has main responsibility for building Newick tree string"""
@@ -2825,25 +2861,28 @@ class Tree:
                         else:
                             treelist.append(f"{label}")
                 if node_attributes:
-                    metacomment_node = create_metacomment(self.nodedict[child], node_attributes)
+                    metacomment_node = create_metacomment(self.nodedict[child], node_attributes,
+                                                          ci_labels, ci_prefix="depth")
                     treelist.append(metacomment_node)
                 if printdist:
                     treelist.append(f":{dist:.{precision}g}")
                 if branch_attributes:
-                    metacomment_branch = create_metacomment(branchstruct, branch_attributes)
+                    metacomment_branch = create_metacomment(branchstruct, branch_attributes,
+                                                            ci_labels, ci_prefix="length")
                     treelist.append(metacomment_branch)
 
                 treelist.append(",")
             del treelist[-1]  # Remove last comma when no more siblings
 
         # EXECUTION STARTS HERE!
-        if node_attributes and (self._nodedict is None):
-            raise TreeError(f"Tree has no nodedict. Can not print node-related attributes: {node_attributes}")
+        # If these are not passed to the function: Check if tree object itself has them as attributes
+        # (eg: TreeSummary.compute_sumtree adds them in this way)
         root = self.root
         treelist = ["("]
         append_children(root)
         if node_attributes:
-            metacomment_node = create_metacomment(self.nodedict[root], node_attributes)
+            metacomment_node = create_metacomment(self.nodedict[root], node_attributes,
+                                                  ci_labels, ci_prefix="depth")
             treelist.append(f"){metacomment_node};")
         else:
             treelist.append(");")
@@ -2854,8 +2893,18 @@ class Tree:
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6,
               translateblock=False,  node_attributes=None, branch_attributes=None,
-              colorlist=None, colorfg="#0000FF", colorbg="#000000"):
+              colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
+              print_meta=False):
         """Returns nexus format tree as a string"""
+
+        # If these are not passed to the function: Check if tree object itself has them as attributes
+        # (eg: TreeSummary.compute_sumtree adds them in this way)
+        if node_attributes is None:
+            node_attributes = getattr(self, "_print_node_attributes", None)
+        if branch_attributes is None:
+            branch_attributes = getattr(self, "_print_branch_attributes", None)
+        if ci_labels is None:
+            ci_labels = getattr(self, "_ci_labels", None)
 
         # Construct header
         if colorlist:
@@ -2879,8 +2928,9 @@ class Tree:
         # Add newick tree string with optional meta-comments for figtree format
         stringlist.append("\ttree nexus_tree = ")
         stringlist.append(self.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
-                                      precision=precision, transdict=transdict,
-                                      node_attributes=node_attributes, branch_attributes=branch_attributes))
+                                      precision=precision, transdict=transdict, 
+                                      node_attributes=node_attributes, branch_attributes=branch_attributes,
+                                      ci_labels=ci_labels, print_meta=print_meta))
 
         # Add footer
         stringlist.append("\nend;\n")
