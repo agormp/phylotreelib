@@ -6530,10 +6530,12 @@ class TreeSummary():
                 # Otherwise use bipartition support if available on the branch
                 elif hasattr(br, "bipartition_cred"):
                     br.label = br.bipartition_cred
+                elif hasattr(br, "freq"):
+                    br.label = br.freq
                 else:
                     # Optional: set empty label (or leave unchanged)
                     br.label = ""
-
+                    
         # Root annotations
         if self.trackroot:
             self.set_rootcredibility(sumtree)
