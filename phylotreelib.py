@@ -2327,7 +2327,7 @@ class Tree:
     ###############################################################################################
 
     def find_mrca_mask(self, query_mask, start_leaf):
-        """MRCA using bitmasks.
+        """Find MRCA of leaves represented as bitmask.
 
         Relies on caller having precomputed query_mask using same sorted_leaf_tup as self
 
@@ -5170,13 +5170,20 @@ class TreeSummary():
         self.trackrootblen = trackrootblen
         self.tracktopo = tracktopo
         self.track_subcladepairs = track_subcladepairs
+        self.trackci = trackci
+        self.ci_probs = tuple(ci_probs or ())
+        if self.ci_probs:
+            self.ci_labels = tuple(f"{int(round(p*100))}%_CI" for p in self.ci_probs)
+        else:
+            self.ci_labels = ()
+            
         self.store_trees = store_trees
 
-        self._bipartsummary = {}        # Dict: {bipartition:branchstruct with extra fields}
+        self._bipartsummary = {}        # Dict: {bipartition:branchstruct}
         self._bipartsummary_processed = False
-        self._cladesummary = {}         # Dict: {clade:nodestruct with extra fields}
+        self._cladesummary = {}         # Dict: {clade:nodestruct}
         self._cladesummary_processed = False
-        self._rootbip_summary = {}
+        self._rootbip_summary = {}      # Dict: {bipartition:rootbipstruct}
         self._rootbip_summary_processed = False
         self._biptoposummary = {}
         self._biptoposummary_processed = False
@@ -6395,6 +6402,10 @@ class TreeSummary():
         """
         Annotate sumtree nodes/branches with whatever TreeSummary tracked.
         """
+        
+        # Python note: a bit messy, and i suspect i am roundtripping some of these 
+        # attributes unnecessarily.
+        
         # Keep track of which attributes can be printed
         node_attrs = set()
         branch_attrs = set()
