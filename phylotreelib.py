@@ -488,20 +488,6 @@ class Bipartition:
             halfmask |= leaf2mask[leaf]
         return cls.from_halfmask_unknown_leafuniverse(halfmask, tree)
 
-    @staticmethod
-    def _canonical_half(halfmask, alltips_mask, ntips):
-        """Return canonical representation of a split (smaller side; deterministic tie-break).
-        masks are ints representing bitsets for leaf indices"""
-        k = halfmask.bit_count()
-        if k > ntips - k:
-            halfmask = alltips_mask ^ halfmask
-            k = ntips - k
-        elif k == ntips - k:
-            other = alltips_mask ^ halfmask
-            if other < halfmask:
-                halfmask = other
-        return halfmask
-
     def __hash__(self):
         # Python note: this strategy (using only the halfmask as hash) depends on never comparing
         # Bipartitions across leaf-universes. In class-level cache this is ensured by having
