@@ -485,8 +485,7 @@ class Bipartition:
         halfmask = 0
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = tree.cached_attributes
         for leaf in leafset:
-            #halfmask |= (1 << leaf2idx[leaf])
-            halfmask += leaf2mask[leaf]
+            halfmask |= leaf2mask[leaf]
         return cls.from_halfmask_unknown_leafuniverse(halfmask, tree)
 
     @staticmethod
@@ -592,7 +591,7 @@ class Clade:
 
         mask = 0
         for leaf in leafset:
-            mask += leaf2mask[leaf]
+            mask |= leaf2mask[leaf]
 
         cached_clade = cls.from_mask(mask, object_cache, sorted_leaf_tup)
 
