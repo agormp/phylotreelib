@@ -6893,11 +6893,13 @@ class Nexustreefile(TreefileBase):
             self.treefile.close()
             raise StopIteration
 
-        # Return tree object if requested
+        # Return tree object if requested. else return treestring
         if returntree:
             tree = Tree._from_string_private(self.parser_obj, treestring)
             tree.below_root = self.below_root
             return tree
+        else:
+            return treestring
 
 ###################################################################################################
 ###################################################################################################
