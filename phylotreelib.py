@@ -224,8 +224,7 @@ class Branchstruct:
 
     __slots__ = ("length", "label",
                  "mean", "M2", "n", 
-                 "quantiles", "ci", "length_median",
-                 "length_var", "length_sd",
+                 "quantiles", "ci", "length_median", "length_sd",
                  "posterior", "freq", "bipartition_cred", "rootcred",
                  "parent_height", "kid_height")
 
@@ -239,7 +238,6 @@ class Branchstruct:
         "quantiles": None,
         "ci": None,
         "length_median": None,
-        "length_var": 0.0,
         "length_sd": 0.0,
         "posterior": None,
         "freq": None,
@@ -258,7 +256,6 @@ class Branchstruct:
         self.quantiles = None
         self.ci = None            # dict of {label: (lo, hi)}, where e.g. label = "90%_CI"
         self.length_median = None
-        self.length_var = 0.0
         self.length_sd = 0.0
         self.posterior = None
         self.freq = None
@@ -348,8 +345,7 @@ class Nodestruct:
     __slots__ = ("depth", "nleaves", "subcladepairs", "best_pair",
                  "mean", "M2", "n", 
                  "quantiles", "ci", "depth_median",
-                 "clade_cred", "posterior", "freq",
-                 "depth_var", "depth_sd",
+                 "clade_cred", "posterior", "freq", "depth_sd",
                  "clade_score")
 
     def __init__(self, depth=0.0, nleaves=None):
@@ -366,7 +362,6 @@ class Nodestruct:
         self.clade_cred = None
         self.posterior = None
         self.freq = None
-        self.depth_var = None
         self.depth_sd = None
         self.clade_score = None
 
@@ -5250,7 +5245,7 @@ class TreeSummary():
 
     ###############################################################################################
 
-    def online_update_mean_var(self, struct, x):
+    def online_update_mean_sd(self, struct, x):
         """
         Online update of mean + M2 (sum of squared deviations).
             x: value whose mean and variance will be computed (e.g. branch length or node depth)
@@ -5268,19 +5263,19 @@ class TreeSummary():
     ###############################################################################################
 
     def finalize_online(self, struct):
-        """Helper for online_update_mean_var() method:
-        compute final mean, var, and sd when all values have been collected"""
+        """Helper for online_update_mean_sd() method:
+        compute final mean and sd when all values have been collected"""
 
         if struct.n == 0:
             msg = f"Can't compute mean and sd for item with 0 observations:\n{struct}"
             raise TreeError(msg)
         elif struct.n == 1:
-            return (struct.mean, None, None)
+            return (struct.mean, None)
         else:
             # Could compute variance without bias correction n/n-1 but I think mrbayes etc uses it
             var = (struct.M2 / (struct.n - 1))
             sd = math.sqrt(var)
-            return (struct.mean, var, sd)
+            return (struct.mean, sd)
 
     ###############################################################################################
 
@@ -5293,7 +5288,7 @@ class TreeSummary():
                 br = branchstruct
                 br.bipartition_cred = br.posterior = br.freq = br.n / self.tree_count
                 if self.trackblen:
-                    br.length, br.length_var, br.length_sd = self.finalize_online(br)
+                    br.length, br.length_sd = self.finalize_online(br)
             
             # Also finalize computation of selected quantiles if requested 
             if self.trackci and self.ci_probs and self.trackblen:
@@ -5331,7 +5326,7 @@ class TreeSummary():
                 nd = nodestruct
                 nd.clade_cred = nd.posterior = nd.freq = nd.n / self.tree_count
                 if self.trackdepth:
-                    nd.depth, nd.depth_var, nd.depth_sd = self.finalize_online(nd)
+                    nd.depth, nd.depth_sd = self.finalize_online(nd)
 
             # Also finalize computation of selected quantiles if requested 
             if self.trackci and self.ci_probs and self.trackdepth:
@@ -5493,7 +5488,7 @@ class TreeSummary():
         trackpairs = self.track_subcladepairs
         do_ci = self.trackci and trackdepth
         tracktopo = self.tracktopo
-        online_update = self.online_update_mean_var
+        online_update = self.online_update_mean_sd
 
         # Only allocate these when needed
         node2clade = {} if trackpairs else None
@@ -5558,7 +5553,7 @@ class TreeSummary():
 
         self._bipartsummary_processed = False
         self._sorted_biplist = None
-        online_update = self.online_update_mean_var
+        online_update = self.online_update_mean_sd
         bipartsummary = self._bipartsummary
         trackblen = self.trackblen
         tracktopo = self.tracktopo
@@ -5831,12 +5826,12 @@ class TreeSummary():
             branch_attrs.add("bipartition_cred")
 
         if blen in ("meandepth", "cadepth"):
-            node_attrs.update({"depth", "depth_sd", "depth_var"})
+            node_attrs.update({"depth", "depth_sd"})
 
         if blen == "biplen":
             branch_attrs.add("length")
             if self.trackblen:
-                branch_attrs.update({"length_sd", "length_var"})
+                branch_attrs.update({"length_sd"})
 
         elif blen in ("meandepth", "cadepth"):
             branch_attrs.add("length")
@@ -6210,7 +6205,7 @@ class TreeSummary():
         # leaf dates are being estimated, then these will vary)
 
         # Create local bindings and precomputed list for variables used in tight loops
-        online_update_mean_var = self.online_update_mean_var
+        online_update_mean_sd = self.online_update_mean_sd
         sumtree_remkids = sumtree.remotechildren_dict
         sumtree_remmask = sumtree.remotechildren_mask_dict
         sumtree_intnodes = sumtree.intnodes
@@ -6261,14 +6256,14 @@ class TreeSummary():
                 for s, query_mask, start_leaf in intnode_queries:
                     input_mrca = find_mrca_mask(query_mask, start_leaf)
                     depth = nodedepthdict[input_mrca]
-                    online_update_mean_var(s, depth)
+                    online_update_mean_sd(s, depth)
                     if do_ci:
                         s.quantiles.add(depth)
 
                 # leaves: mean depths (CA depth for singleton)
                 for s, leaf in leaf_queries:
                     depth = nodedepthdict[leaf]
-                    online_update_mean_var(s, depth)
+                    online_update_mean_sd(s, depth)
                     if do_ci:
                         s.quantiles.add(depth)
 
@@ -6281,9 +6276,8 @@ class TreeSummary():
             probs.append(0.5)
         for node in sumtree.nodes:
             s = acc[node]
-            mean, var, sd = self.finalize_online(s)
+            mean, sd = self.finalize_online(s)
             sumtree.set_node_attribute(node, "depth", mean)
-            sumtree.set_node_attribute(node, "depth_var", var)
             sumtree.set_node_attribute(node, "depth_sd", sd)
             if do_ci:                
                 qvals = s.quantiles.quantiles(probs)  # list in same order as probs
@@ -6320,7 +6314,7 @@ class TreeSummary():
         # leaf dates are being estimated, then these will vary)
 
         # Create local bindings and precomputed list for variables used in tight loops
-        online_update_mean_var = self.online_update_mean_var
+        online_update_mean_sd = self.online_update_mean_sd
         sumtree_remmask = sumtree.remotechildren_mask_dict
         sumtree_intnodes = sumtree.intnodes
         sumtree_leaves = sumtree.leaves
@@ -6380,20 +6374,19 @@ class TreeSummary():
                             parent = parent_dict[parent]
                         s.n += 1
                         depth = nodedepthdict[parent]
-                        online_update_mean_var(s, depth)
+                        online_update_mean_sd(s, depth)
 
                 # leaves: mean depths (CA depth for singleton)
                 for s, leaf in leaf_queries:
                     s.n += 1
                     depth = nodedepthdict[leaf]
-                    online_update_mean_var(s, depth)
+                    online_update_mean_sd(s, depth)
 
         # Write results onto sumtree with domain names
         for node in sumtree.nodes:
             s = acc[node]
-            mean, var, sd = self.finalize_online(s)
+            mean, sd = self.finalize_online(s)
             sumtree.set_node_attribute(node, "depth", mean)
-            sumtree.set_node_attribute(node, "depth_var", var)
             sumtree.set_node_attribute(node, "depth_sd", sd)
 
         return sumtree
@@ -6426,7 +6419,6 @@ class TreeSummary():
                     bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
                     brstruct = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(p,c,"length", brstruct.length)
-                    sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
                     sumtree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
 
         # Handle root bipartition separately
@@ -6483,8 +6475,7 @@ class TreeSummary():
                     if self.trackdepth:
                         sumtree.set_node_attribute(node, "depth", nd.depth)
                         sumtree.set_node_attribute(node, "depth_sd", nd.depth_sd)
-                        sumtree.set_node_attribute(node, "depth_var", nd.depth_var)
-                        node_attrs.update({"depth", "depth_sd", "depth_var"})
+                        node_attrs.update({"depth", "depth_sd"})
                         if self.trackci:
                             # these attributes may or may not exist; set if present
                             for attr in ("ci", "depth_median"):
@@ -6506,8 +6497,7 @@ class TreeSummary():
                     if self.trackblen:
                         sumtree.set_branch_attribute(parent, child, "length", br.length)
                         sumtree.set_branch_attribute(parent, child, "length_sd", br.length_sd)
-                        sumtree.set_branch_attribute(parent, child, "length_var", br.length_var)
-                        branch_attrs.update({"length", "length_sd", "length_var"})
+                        branch_attrs.update({"length", "length_sd"})
                         if self.trackci:
                             for attr in ("ci", "length_median"):
                                 if hasattr(br, attr):
