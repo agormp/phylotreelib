@@ -564,6 +564,15 @@ class Clade:
         return cached_clade
 
     @classmethod
+    def from_mask_unknown_leafuniverse(cls, mask, tree):
+        frozenset_leaves, sorted_leaf_tup, *_ = tree.cached_attributes
+        object_cache = cls._class_cache.get(frozenset_leaves)
+        if object_cache is None:
+            object_cache = {}
+            cls._class_cache[frozenset_leaves] = object_cache
+        return cls.from_mask(mask, object_cache, sorted_leaf_tup)
+    
+    @classmethod
     def from_leafset(cls, leafset, tree):
         """Convenience constructor for tests and interactive use where clade is given as
         leafset, and this method has to handle object_cache retrieval and construction."""
@@ -6044,8 +6053,8 @@ class TreeSummary():
 
         def set_branch_credibility(p, c):
             """Helper function to set root credibility for a branch."""
-            remkids = sumtree.remotechildren_dict[c]
-            bip = Bipartition.from_leafset(remkids, sumtree)
+            halfmask = sumtree.remotechildren_mask_dict[c]
+            bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
             if bip in self.rootbipsummary:
                 rootcred = self.rootbipsummary[bip].freq
                 sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
@@ -6105,9 +6114,10 @@ class TreeSummary():
         """
 
         try:
+            remmask = sumtree.remotechildren_mask_dict  # local binding
             for node in sumtree.nodes:
-                remkids = sumtree.remotechildren_dict[node]
-                clade = Clade.from_leafset(remkids, sumtree)
+                mask = remmask[node]
+                clade = Clade.from_mask_unknown_leafuniverse(mask, sumtree)
                 nodestruct = self.cladesummary[clade]
                 sumtree.set_node_attribute(node, "depth", nodestruct.depth)
                 sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
@@ -6353,8 +6363,8 @@ class TreeSummary():
         for p in sumtree.sorted_intnodes():
             if p != sumtree_root:
                 for c in sumtree.children(p):
-                    remkids = sumtree.remotechildren_dict[c]
-                    bip = Bipartition.from_leafset(remkids, sumtree)
+                    halfmask = sumtree.remotechildren_mask_dict[c]
+                    bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
                     brstruct = self.bipartsummary[bip]
                     sumtree.set_branch_attribute(p,c,"length", brstruct.length)
                     sumtree.set_branch_attribute(p,c,"length_var", brstruct.length_var)
@@ -6396,7 +6406,7 @@ class TreeSummary():
             leaf2index = sumtree.leaf2index
 
             for node in sumtree.nodes:
-                clade = Clade.from_leafset(sumtree.remotechildren_dict[node], tree=sumtree)
+                clade = Clade.from_mask_unknown_leafuniverse(sumtree.remotechildren_mask_dict[node], sumtree)
                 nd = self.cladesummary.get(clade)
                 if nd is None:
                     raise TreeError("Problem while annotating summary tree:\n"
@@ -6477,9 +6487,10 @@ class TreeSummary():
                 will therefore not work with all rootings"""
 
         try:
+            remmask = tree.remotechildren_mask_dict  # local binding
             for child in (tree.intnodes - {tree.root}):
-                remkids = tree.remotechildren_dict[child]
-                child_clade = Clade.from_leafset(remkids, sumtree)
+                mask = remmask[child]
+                child_clade = Clade.from_mask_unknown_leafuniverse(mask, tree)
                 clade_cred = self.cladesummary[child_clade].posterior
                 parent = tree.parent(child)
                 tree.setlabel(parent, child, f"{clade_cred:.{precision}g}")
