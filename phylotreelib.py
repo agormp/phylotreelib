@@ -5260,8 +5260,9 @@ class TreeSummary():
 
         # I am interested in being able to compute mean and variance of various
         # node and branch attributes, and to do this "online" in a single pass.
+        struct.n += 1
         delta = x - struct.mean
-        struct.mean += (delta / struct.n)
+        struct.mean += delta / struct.n
         struct.M2 += delta * (x - struct.mean)
 
     ###############################################################################################
