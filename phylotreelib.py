@@ -5275,7 +5275,7 @@ class TreeSummary():
             msg = f"Can't compute mean and sd for item with 0 observations:\n{struct}"
             raise TreeError(msg)
         elif struct.n == 1:
-            return (struct.mean, "NA", "NA")
+            return (struct.mean, None, None)
         else:
             # Could compute variance without bias correction n/n-1 but I think mrbayes etc uses it
             var = (struct.M2 / (struct.n - 1))
