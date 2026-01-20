@@ -5203,6 +5203,7 @@ class TreeSummary():
                        store_trees=False, 
                        trackci=False, ci_probs=None):
         """TreeSummary constructor. Initializes relevant data structures"""
+        self.leaves = None
         self.transdict = None
         self.translateblock = None
         self.tree_count = 0
@@ -5613,13 +5614,29 @@ class TreeSummary():
 
     ###############################################################################################
 
+    def _adopt_universe_from(self, other):
+            """Adopt leaves/transdict/translateblock from another TreeSummary if self is empty"""
+            if getattr(other, "leaves", None) is None:
+                raise TreeError("Cannot adopt leaf universe from an empty TreeSummary")
+            self.leaves = other.leaves
+            self.transdict = other.transdict
+            self.translateblock = other.translateblock
+
+    ###############################################################################################
+
     def update(self, other):
         """Merge this object with external treesummary"""
 
-        # Sanity check: do two treesummaries refer to same set of leaves?
-        if self.leaves != other.leaves:
-            msg = "Not all trees have same set of leaves."
-            raise TreeError(msg)
+        # If we haven't seen any trees yet, adopt leaf universe from other treesummary
+        # Useful when using an empty global TreeSummary object to accumulate smaller TreeSummaries
+        # Else: check that other contains trees and leaves match
+        if self.leaves is None:
+            self._adopt_universe_from(other)
+        else:
+            if other.leaves is None:
+                raise TreeError("Cannot update from an empty TreeSummary")
+            if self.leaves != other.leaves:
+                raise TreeError("Not all trees have same set of leaves.")
 
         # Update treecount
         self.tree_count += other.tree_count
