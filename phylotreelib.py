@@ -5814,7 +5814,7 @@ class TreeSummary():
             sumtree.set_blens_from_depths()
         elif (blen == "biplen"):
             if treetype == "mcc":
-                sumtree = self.set_mean_biplen(sumtree)
+                sumtree = self.set_biplen_on_existing_tree(sumtree)
         else:
             raise TreeError(f"Unknown branch-length method: {blen}")
 
@@ -6400,11 +6400,12 @@ class TreeSummary():
 
     ###############################################################################################
 
-    set_ca_node_depths = set_ca_node_depths_inline
+    #set_ca_node_depths = set_ca_node_depths_inline
+    set_ca_node_depths = set_ca_node_depths_orig
 
     ###############################################################################################
 
-    def set_mean_biplen(self, sumtree):
+    def set_biplen_on_existing_tree(self, sumtree):
         """Only to be used when goal is to set bipartition-based branch-length stats
         on sumtree, and those were not already set during construction.
         This happens when treetype is MCC
