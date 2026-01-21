@@ -5697,6 +5697,7 @@ class TreeSummary():
         self_cladesum = self._cladesummary
         other_cladesum = other._cladesummary
         trackdepth = self.trackdepth
+        trackpairs = self.track_subcladepairs
         do_ci = self.trackci and trackdepth
 
         for clade, nd_other in other_cladesum.items():
@@ -5710,7 +5711,9 @@ class TreeSummary():
                         nd_self.quantiles.merge(nd_other.quantiles)
                 else:
                     nd_self.n += nd_other.n
-
+                if trackpairs:
+                    nd_self.subcladepairs.update(nd_other.subcladepairs)
+                
         self._cladesummary_processed = False
         self._sorted_biplist = None
 
