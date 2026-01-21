@@ -6000,10 +6000,10 @@ class TreeSummary():
         # For larger clades:
         #     clade_score = max[ clade_score(c1) + clade_score(c2) ]
         #                       + log(cladefreq) + majrule_reward (if freq>0.5)
-        #     for all observed pairs of subclades
-        cladesum = self.cladesummary
+        #     for all observed pairs of subclades c1, c2
+        cladesummary = self.cladesummary
         majrule_reward = 1E10
-        clades_by_size = [(nd.nleaves, clade, nd) for clade,nd in self.cladesummary.items()]
+        clades_by_size = [(nd.nleaves, clade, nd) for clade,nd in cladesummary.items()]
         clades_by_size = sorted(clades_by_size, key=itemgetter(0))
 
         for nleaves, clade, nd in clades_by_size:
@@ -6025,9 +6025,9 @@ class TreeSummary():
                 best_score = -math.inf
                 best_pairs = []
                 for c1,c2 in nd.subcladepairs:
-                    freqsum = cladesum[c1].freq + cladesum[c2].freq # Used to break tied scores (see treeannotator)
-                    clade_score = (cladesum[c1].clade_score +
-                                   cladesum[c2].clade_score +
+                    freqsum = cladesummary[c1].freq + cladesummary[c2].freq # Used to break tied scores (see treeannotator)
+                    clade_score = (cladesummary[c1].clade_score +
+                                   cladesummary[c2].clade_score +
                                    log_cladefreq +
                                    reward)
                     if clade_score > best_score:
@@ -6053,7 +6053,7 @@ class TreeSummary():
             if nd.best_pair:
                 # Iterate over the two subclades
                 for subclade in nd.best_pair:
-                    nd = cladesum[subclade]
+                    nd = cladesummary[subclade]
                     hip_clades[subclade] = nd
                     stack.append(nd)
         hipstr_tree = Tree.from_cladedict(hip_clades)
