@@ -6036,7 +6036,7 @@ class SummaryTreeBuilder():
 
         # If allcompat has been requested: add remaining, compatible bipartitions to contree
         if allcompat:
-            for j in range(i, len(self.sorted_biplist)):
+            for j in range(i, len(self.treesum.sorted_biplist)):
                 if contree.is_resolved():
                     break
                 _,bip = self.treesum.sorted_biplist[j]
@@ -6046,7 +6046,7 @@ class SummaryTreeBuilder():
                     parentnode, childnodes = insert_tuple
                     contree.insert_node(parentnode, childnodes, branch)
 
-        logcred = self.treesum.log_bipart_credibility(contree.topology())
+        logcred = self.log_bipart_credibility(contree.topology())
         contree.logcred = logcred
         contree.cred_type = "bipartition"
 
@@ -6059,7 +6059,7 @@ class SummaryTreeBuilder():
 
         maxlogcred = -math.inf
         for biptopology in self.treesum.biptoposummary:
-            logcred = self.treesum.log_bipart_credibility(biptopology)
+            logcred = self.log_bipart_credibility(biptopology)
             if logcred > maxlogcred:
                 maxlogcred = logcred
                 maxlogcredbiptopo = biptopology
@@ -6083,7 +6083,7 @@ class SummaryTreeBuilder():
 
         maxlogcred = -math.inf
         for clade_topology in self.treesum.cladetoposummary:
-            logcred = self.treesum.log_clade_credibility(clade_topology)
+            logcred = self.log_clade_credibility(clade_topology)
             if logcred > maxlogcred:
                 maxlogcred = logcred
                 maxlogcred_cladetopo = clade_topology
@@ -6170,12 +6170,11 @@ class SummaryTreeBuilder():
                     stack.append(nd)
         hipstr_tree = Tree.from_cladedict(hip_clades)
         hipstr_tree.clade_score = root_nd.clade_score
-        hipstr_tree.logcred = self.treesum.log_clade_credibility(hipstr_tree.topology_clade)
+        hipstr_tree.logcred = self.log_clade_credibility(hipstr_tree.topology_clade)
         hipstr_tree.cred_type = "hipstr"
 
         return hipstr_tree
     
-###################################################################################################
 ###################################################################################################
 ###################################################################################################
 
