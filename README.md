@@ -225,7 +225,7 @@ print(f"Path difference distance: {pd:.2f}")
 ### Read set of input tree samples from BEAST (discarding burnin), compute maximum clade credibility tree, set branch lengths based on common ancestor heights
 The code below creates a TreeSummary object that will keep track of clades and topologies in the input tree-set, opens a file containing tree samples from a BEAST run, discards the first 500 as burnin, adds the remaining trees to the TreeSummary object, computes a maximum clade credibility (MCC) tree from the tree-summary, sets the branch lengths based on the common ancestor heights (based on original tree file), and writes the result to a nexus file (branch labels will correspond to clade credibility values).
 
-**NOTE**: The command-line program [sumt](https://github.com/agormp/sumt) exposes all phylotreelib's functionality related to consensus trees, and allows the user to create consensus, MCC, and MBC trees with various options for branch lengths and rooting, without having to write scripts.
+**NOTE**: The command-line program [sumt](https://github.com/agormp/sumt) exposes all phylotreelib's functionality related to consensus trees, and allows the user to create consensus, MCC, MBC, HIPSTR, and mrHIPSTR trees with various options for branch lengths and rooting, without having to write scripts.
 
 ```python
 import phylotreelib as pt
