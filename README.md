@@ -38,15 +38,19 @@ To cite phylotreelib: use the link in the right sidebar under About --> Cite thi
 * Trees can be pruned to a smaller, specified number of representative leaves
 * Nodes can be inserted or deleted while keeping the rest of the tree structure sane, leaves can be renamed, branch lengths can be set
 * Trees can be grafted to each other, or a subtree can be moved using subtree pruning and regrafting (SPR)
-* Method for computing the distance between two trees (Robinson-Foulds, and derived normalised measures; returns information about number of unique and shared bipartitions)
+* Methods for computing the distance between two trees:
+    * Robinson-Foulds, and derived normalised measures; returns information about number of unique and shared bipartitions
+	* Path difference (PD) distance (Steel & Penny 1993): the Euclidean distance between the two trees’ vectors of pairwise tip-to-tip path lengths
 * The Distmatrix class contains methods for building trees from distance matrices
 * Methods for computing summary tree from sets of input trees:
     * Majority rule consensus tree
 	* Majority rule consensus tree, with all compatible bipartitions added
 	* Maximum Clade Credibility (MCC) tree
 	* Maximum Bipartition Credibility (MBC) tree
+	* HIPSTR summary tree (Highest Independent Posterior SubTree)
+	* MrHIPSTR summary tree (majority rule HIPSTR tree)
 	* Branch lengths can be set based on node depth (common ancestor or mean) and mean bipartition branch lengths.
-    * Methods also yield information on the frequencies of clades and topologies, and on the distribution of branch lengths for bipartitions
+    * Methods also yield information on the frequencies of bipartitions, clades, and topologies, and on the distribution of branch lengths for bipartitions
 * Library has been optimized for high speed and low memory consumption
 * NOTE: labels are interpreted as belonging to branches (bipartitions), not to internal nodes, and this association is maintained after re-rooting etc.
 
