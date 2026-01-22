@@ -5757,7 +5757,7 @@ class TreeSummary():
     ###############################################################################################
     
     # Temporary wrappers for methods originally in TreeSummary but now in SummaryTreeBuilder
-    # Remove when tests are updated (and perhaps after period with deprecation warning for users)
+    # Remove when tests and client scripts are updated (after period with deprecation warning)
     
     def contree(self, cutoff=0.5, allcompat=False):
         stb = SummaryTreeBuilder(self)
@@ -5787,7 +5787,7 @@ class TreeSummary():
     ###############################################################################################
     
     # Temporary wrappers for methods originally in TreeSummary but now in TreePostProcessor
-    # Remove when tests are updated (and perhaps after period with deprecation warning for users)
+    # Remove when tests and client scripts are updated (after period with deprecation warning)
 
     def root_maxfreq(self, sumtree):
         tpp = TreePostProcessor(self)
