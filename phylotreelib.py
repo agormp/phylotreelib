@@ -5754,6 +5754,37 @@ class TreeSummary():
                 self._cladetoposummary[cladetopology]=other._cladetoposummary[cladetopology]
 
     ###############################################################################################
+    ###############################################################################################
+    
+    # Temporary wrappers for methods originally in TreeSummary but now in SummaryTreeBuilder
+    # Remove when tests are updated (and perhaps after period with deprecation warning for users)
+    
+    def contree(self, cutoff=0.5, allcompat=False):
+        stb = SummaryTreeBuilder(self)
+        return stb.contree(cutoff, allcompat)
+     
+    def max_bipart_cred_tree(self):
+        stb = SummaryTreeBuilder(self)
+        return stb.max_bipart_cred_tree()
+        
+    def max_clade_cred_tree(self):
+        stb = SummaryTreeBuilder(self)
+        return stb.max_clade_cred_tree()
+        
+    def hipstr_tree(self, majrule=False):
+        stb = SummaryTreeBuilder(self)
+        return stb.hipstr_tree(majrule)
+      
+    def log_bipart_credibility(self, biptopology):
+        stb = SummaryTreeBuilder(self)
+        return stb.log_bipart_credibility(biptopology)
+        
+    def log_clade_credibility(self, cladetopology):
+        stb = SummaryTreeBuilder(self)
+        return stb.log_clade_credibility(cladetopology)
+    
+    ###############################################################################################
+    ###############################################################################################
 
     def compute_sumtree(self, treetype="con", blen="biplen", rooting=None,
                         og=None, count_burnin_filename_list=None):
@@ -5879,189 +5910,6 @@ class TreeSummary():
         sumtree._ci_labels = self.ci_labels   
         
         return sumtree
-
-    ###############################################################################################
-
-    def log_bipart_credibility(self, biptopology):
-        """Compute log bipartition credibility for topology (sum of log(freq) for all branches)"""
-
-        bipartsummary = self.bipartsummary
-        logsum = 0.0
-        for bipartition in biptopology:
-            logsum += math.log(bipartsummary[bipartition].posterior)
-        return logsum
-
-    ###############################################################################################
-
-    def log_clade_credibility(self, cladetopology):
-        """Compute log clade credibility for topology (sum of log(freq) for all clades)"""
-
-        cladesummary = self.cladesummary
-        logsum = 0.0
-        for clade in cladetopology:
-            logsum += math.log(cladesummary[clade].posterior)
-        return logsum
-
-    ###############################################################################################
-
-    def contree(self, cutoff=0.5, allcompat=False):
-        """Find consensus tree built from selected bipartitions. Annotate tree with logcred"""
-
-        if cutoff < 0.5:
-            msg = "Consensus tree cutoff has to be at least 0.5"
-            raise TreeError(msg)
-
-        # Transfer biparts and branches with freq>cutoff to new bipdict, create tree
-        conbipdict = {}
-        i = 0
-        for _, bip in self.sorted_biplist:
-            i += 1
-            branch = self.bipartsummary[bip]
-            if branch.freq < cutoff:
-                break
-            conbipdict[bip] = branch
-        contree = Tree.from_biplist(conbipdict)
-
-        # If allcompat has been requested: add remaining, compatible bipartitions to contree
-        if allcompat:
-            for j in range(i, len(self.sorted_biplist)):
-                if contree.is_resolved():
-                    break
-                _,bip = self.sorted_biplist[j]
-                branch = self.bipartsummary[bip]
-                is_present, is_compatible, insert_tuple = contree.check_bip_compatibility(bip)
-                if is_compatible and (not is_present):
-                    parentnode, childnodes = insert_tuple
-                    contree.insert_node(parentnode, childnodes, branch)
-
-        logcred = self.log_bipart_credibility(contree.topology())
-        contree.logcred = logcred
-        contree.cred_type = "bipartition"
-
-        return contree
-
-    ###############################################################################################
-
-    def max_bipart_cred_tree(self):
-        """Find maximum bipartition credibility tree. Annotate tree with logcred/cred_type"""
-
-        maxlogcred = -math.inf
-        for biptopology in self.biptoposummary:
-            logcred = self.log_bipart_credibility(biptopology)
-            if logcred > maxlogcred:
-                maxlogcred = logcred
-                maxlogcredbiptopo = biptopology
-
-        maxcredbipdict = {}
-        for bipartition in maxlogcredbiptopo:
-            branch = self.bipartsummary[bipartition]
-            maxcredbipdict[bipartition] = branch
-
-        # Build tree from bipartitions in new bipdict, annotate with logcred and type
-        maxcredtree = Tree.from_biplist(maxcredbipdict)
-        maxcredtree.logcred = maxlogcred
-        maxcredtree.cred_type = "bipartition"
-
-        return maxcredtree
-
-    ###############################################################################################
-
-    def max_clade_cred_tree(self):
-        """Find maximum clade credibility tree. Annotate tree with logcred/cred_type"""
-
-        maxlogcred = -math.inf
-        for clade_topology in self.cladetoposummary:
-            logcred = self.log_clade_credibility(clade_topology)
-            if logcred > maxlogcred:
-                maxlogcred = logcred
-                maxlogcred_cladetopo = clade_topology
-
-        maxcred_cladedict = {}
-        for clade in maxlogcred_cladetopo:
-            nodestruct = self.cladesummary[clade]
-            maxcred_cladedict[clade] = nodestruct
-        maxcredtree = Tree.from_cladedict(maxcred_cladedict)
-        maxcredtree.logcred = maxlogcred
-        maxcredtree.cred_type = "clade"
-
-        return maxcredtree
-
-    ###############################################################################################
-
-    def hipstr_tree(self, majrule=False):
-        """Construct HIPSTR summary tree, or mrHIPSTR tree (majrule=True)
-        HIPSTR: highest independent posterior subtree reconstruction in TreeAnnotator X
-        Baele et al., Bioinformatics, 2025, 41(10), https://doi.org/10.1093/bioinformatics/btaf488"""
-
-        # For each clade, starting with the smallest:
-        #     find hipstr clade_score and optimal pair of subclades
-        # For clade of size 1 or 2:
-        #     clade_score = log(freq)
-        # For larger clades:
-        #     clade_score = max[ clade_score(c1) + clade_score(c2) ]
-        #                       + log(cladefreq) + majrule_reward (if freq>0.5)
-        #     for all observed pairs of subclades c1, c2
-        cladesummary = self.cladesummary
-        majrule_reward = 1E10
-        clades_by_size = [(nd.nleaves, clade, nd) for clade,nd in cladesummary.items()]
-        clades_by_size = sorted(clades_by_size, key=itemgetter(0))
-
-        for nleaves, clade, nd in clades_by_size:
-            cladefreq = nd.freq
-            log_cladefreq = math.log(cladefreq)
-
-            if majrule and (cladefreq > 0.5):
-                reward = majrule_reward
-            else:
-                reward = 0.0
-
-            if nleaves == 1:
-                nd.clade_score = log_cladefreq # Always log(1.0) = 0.0
-                nd.best_pair = None
-            elif nleaves == 2:
-                nd.clade_score = log_cladefreq + reward
-                nd.best_pair = None
-            else:
-                best_score = -math.inf
-                best_pairs = []
-                for c1,c2 in nd.subcladepairs:
-                    freqsum = cladesummary[c1].freq + cladesummary[c2].freq # Used to break tied scores (see treeannotator)
-                    clade_score = (cladesummary[c1].clade_score +
-                                   cladesummary[c2].clade_score +
-                                   log_cladefreq +
-                                   reward)
-                    if clade_score > best_score:
-                        best_score = clade_score
-                        best_pairs = [(freqsum, c1, c2)]
-                    elif clade_score == best_score:
-                        best_pairs.append((freqsum, c1, c2))
-
-                if len(best_pairs) > 1:
-                    best_pairs.sort(key = itemgetter(0), reverse=True)
-
-                freqsum, best_sub1, best_sub2 = best_pairs[0]
-                nd.clade_score = best_score
-                nd.best_pair = (best_sub1, best_sub2)
-
-        # Starting from root clade (all leaves): add the clades in max_subcladepair, and then their
-        # max_subcladepair, etc until tree fully resolved (no deeper max_subcladepairs)
-        nleaves, root_clade, root_nd = clades_by_size[-1]
-        hip_clades = {root_clade:root_nd}
-        stack = [root_nd]
-        while stack:
-            nd = stack.pop()
-            if nd.best_pair:
-                # Iterate over the two subclades
-                for subclade in nd.best_pair:
-                    nd = cladesummary[subclade]
-                    hip_clades[subclade] = nd
-                    stack.append(nd)
-        hipstr_tree = Tree.from_cladedict(hip_clades)
-        hipstr_tree.clade_score = root_nd.clade_score
-        hipstr_tree.logcred = self.log_clade_credibility(hipstr_tree.topology_clade)
-        hipstr_tree.cred_type = "hipstr"
-
-        return hipstr_tree
 
     ###############################################################################################
 
@@ -6575,14 +6423,232 @@ class TreeSummary():
                             + f"\n{e.args[0]}")
         return tree
 
+
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
 
-class BigTreeSummary(TreeSummary):
-    """DEPRECATED: thin alias left for backwards compatibility"""
-    def __init__(self, store_trees=False, **kwargs):
-        super().__init__(track_topology=True, store_trees=store_trees, **kwargs)
+class SummaryTreeBuilder():
+    """Class handling construction of summary tree topology. 
+    Input: TreeSummary object with accumulated stats"""
+    
+    def __init__(self, treesummary):
+        """Takes populated TreeSummary object as input, preparing this class to construct
+        summary tree from that class' attributes"""
+        
+        self.treesum = treesummary
+        if getattr(treesummary, "tree_count", 0) == 0:
+            msg = "TreeSummary is empty (tree_count == 0). Add trees to it before using for building a summary tree."
+            raise TreeError(msg)
+        if getattr(treesummary, "leaves", None) is None:
+            msg = "TreeSummary has no leaf universe (leaves is None)."
+            raise TreeError(msg)
+        
+    ###############################################################################################
+
+    def log_bipart_credibility(self, biptopology):
+        """Compute log bipartition credibility for topology (sum of log(freq) for all branches)"""
+
+        bipartsummary = self.treesum.bipartsummary
+        logsum = 0.0
+        for bipartition in biptopology:
+            logsum += math.log(bipartsummary[bipartition].posterior)
+        return logsum
+
+    ###############################################################################################
+
+    def log_clade_credibility(self, cladetopology):
+        """Compute log clade credibility for topology (sum of log(freq) for all clades)"""
+
+        cladesummary = self.treesum.cladesummary
+        logsum = 0.0
+        for clade in cladetopology:
+            logsum += math.log(cladesummary[clade].posterior)
+        return logsum
+
+    ###############################################################################################
+
+    def contree(self, cutoff=0.5, allcompat=False):
+        """Find consensus tree built from selected bipartitions. Annotate tree with logcred"""
+
+        if cutoff < 0.5:
+            msg = "Consensus tree cutoff has to be at least 0.5"
+            raise TreeError(msg)
+
+        # Transfer biparts and branches with freq>cutoff to new bipdict, create tree
+        conbipdict = {}
+        i = 0
+        for _, bip in self.treesum.sorted_biplist:
+            i += 1
+            branch = self.treesum.bipartsummary[bip]
+            if branch.freq < cutoff:
+                break
+            conbipdict[bip] = branch
+        contree = Tree.from_biplist(conbipdict)
+
+        # If allcompat has been requested: add remaining, compatible bipartitions to contree
+        if allcompat:
+            for j in range(i, len(self.sorted_biplist)):
+                if contree.is_resolved():
+                    break
+                _,bip = self.treesum.sorted_biplist[j]
+                branch = self.treesum.bipartsummary[bip]
+                is_present, is_compatible, insert_tuple = contree.check_bip_compatibility(bip)
+                if is_compatible and (not is_present):
+                    parentnode, childnodes = insert_tuple
+                    contree.insert_node(parentnode, childnodes, branch)
+
+        logcred = self.treesum.log_bipart_credibility(contree.topology())
+        contree.logcred = logcred
+        contree.cred_type = "bipartition"
+
+        return contree
+
+    ###############################################################################################
+
+    def max_bipart_cred_tree(self):
+        """Find maximum bipartition credibility tree. Annotate tree with logcred/cred_type"""
+
+        maxlogcred = -math.inf
+        for biptopology in self.treesum.biptoposummary:
+            logcred = self.treesum.log_bipart_credibility(biptopology)
+            if logcred > maxlogcred:
+                maxlogcred = logcred
+                maxlogcredbiptopo = biptopology
+
+        maxcredbipdict = {}
+        for bipartition in maxlogcredbiptopo:
+            branch = self.treesum.bipartsummary[bipartition]
+            maxcredbipdict[bipartition] = branch
+
+        # Build tree from bipartitions in new bipdict, annotate with logcred and type
+        maxcredtree = Tree.from_biplist(maxcredbipdict)
+        maxcredtree.logcred = maxlogcred
+        maxcredtree.cred_type = "bipartition"
+
+        return maxcredtree
+
+    ###############################################################################################
+
+    def max_clade_cred_tree(self):
+        """Find maximum clade credibility tree. Annotate tree with logcred/cred_type"""
+
+        maxlogcred = -math.inf
+        for clade_topology in self.treesum.cladetoposummary:
+            logcred = self.treesum.log_clade_credibility(clade_topology)
+            if logcred > maxlogcred:
+                maxlogcred = logcred
+                maxlogcred_cladetopo = clade_topology
+
+        maxcred_cladedict = {}
+        for clade in maxlogcred_cladetopo:
+            nodestruct = self.treesum.cladesummary[clade]
+            maxcred_cladedict[clade] = nodestruct
+        maxcredtree = Tree.from_cladedict(maxcred_cladedict)
+        maxcredtree.logcred = maxlogcred
+        maxcredtree.cred_type = "clade"
+
+        return maxcredtree
+
+    ###############################################################################################
+
+    def hipstr_tree(self, majrule=False):
+        """Construct HIPSTR summary tree, or mrHIPSTR tree (majrule=True)
+        HIPSTR: highest independent posterior subtree reconstruction in TreeAnnotator X
+        Baele et al., Bioinformatics, 2025, 41(10), https://doi.org/10.1093/bioinformatics/btaf488"""
+
+        # For each clade, starting with the smallest:
+        #     find hipstr clade_score and optimal pair of subclades
+        # For clade of size 1 or 2:
+        #     clade_score = log(freq)
+        # For larger clades:
+        #     clade_score = max[ clade_score(c1) + clade_score(c2) ]
+        #                       + log(cladefreq) + majrule_reward (if freq>0.5)
+        #     for all observed pairs of subclades c1, c2
+        cladesummary = self.treesum.cladesummary
+        majrule_reward = 1E10
+        clades_by_size = [(nd.nleaves, clade, nd) for clade,nd in cladesummary.items()]
+        clades_by_size = sorted(clades_by_size, key=itemgetter(0))
+
+        for nleaves, clade, nd in clades_by_size:
+            cladefreq = nd.freq
+            log_cladefreq = math.log(cladefreq)
+
+            if majrule and (cladefreq > 0.5):
+                reward = majrule_reward
+            else:
+                reward = 0.0
+
+            if nleaves == 1:
+                nd.clade_score = log_cladefreq # Always log(1.0) = 0.0
+                nd.best_pair = None
+            elif nleaves == 2:
+                nd.clade_score = log_cladefreq + reward
+                nd.best_pair = None
+            else:
+                best_score = -math.inf
+                best_pairs = []
+                for c1,c2 in nd.subcladepairs:
+                    freqsum = cladesummary[c1].freq + cladesummary[c2].freq # Used to break tied scores (see treeannotator)
+                    clade_score = (cladesummary[c1].clade_score +
+                                   cladesummary[c2].clade_score +
+                                   log_cladefreq +
+                                   reward)
+                    if clade_score > best_score:
+                        best_score = clade_score
+                        best_pairs = [(freqsum, c1, c2)]
+                    elif clade_score == best_score:
+                        best_pairs.append((freqsum, c1, c2))
+
+                if len(best_pairs) > 1:
+                    best_pairs.sort(key = itemgetter(0), reverse=True)
+
+                freqsum, best_sub1, best_sub2 = best_pairs[0]
+                nd.clade_score = best_score
+                nd.best_pair = (best_sub1, best_sub2)
+
+        # Starting from root clade (all leaves): add the clades in max_subcladepair, and then their
+        # max_subcladepair, etc until tree fully resolved (no deeper max_subcladepairs)
+        nleaves, root_clade, root_nd = clades_by_size[-1]
+        hip_clades = {root_clade:root_nd}
+        stack = [root_nd]
+        while stack:
+            nd = stack.pop()
+            if nd.best_pair:
+                # Iterate over the two subclades
+                for subclade in nd.best_pair:
+                    nd = cladesummary[subclade]
+                    hip_clades[subclade] = nd
+                    stack.append(nd)
+        hipstr_tree = Tree.from_cladedict(hip_clades)
+        hipstr_tree.clade_score = root_nd.clade_score
+        hipstr_tree.logcred = self.treesum.log_clade_credibility(hipstr_tree.topology_clade)
+        hipstr_tree.cred_type = "hipstr"
+
+        return hipstr_tree
+    
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+class TreePostProcessor():
+    """Class handling annotation of tree (setting of branch lenghts, node depths, 
+    clade frequencies, etc). Takes TreeSummary and Tree objects as input"""
+    pass
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+class CADepthEstimator():
+    """Class for accumulating Common Ancestor node depths from set of input trees,
+    and keyed by clades present on target summary tree.
+    Input: iterable over Tree objects or tree-strings + target tree"""
+    
+    pass
+   
+    
+    
 
 ###################################################################################################
 ###################################################################################################
