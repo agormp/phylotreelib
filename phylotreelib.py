@@ -5816,6 +5816,36 @@ class TreeSummary():
     ###############################################################################################
     ###############################################################################################
 
+    # Temporary wrapper for set_ca_node_depts method, which is now handled by CADepthEstimator
+    # Remove when tests and client scripts are updated (after period with deprecation warning)
+
+    def set_ca_node_depths(self, sumtree, count_burnin_filename_list):
+        """
+        Backwards-compatible wrapper:
+        - builds CA plan from sumtree
+        - streams input trees from files (serial)
+        - writes depth/depth_sd (+ optional CI/median) into sumtree
+        """
+        plan = CADepthEstimator.build_plan(
+            sumtree,
+            trackci=self.trackci and bool(self.ci_probs),
+            ci_probs=self.ci_probs,
+        )
+        est = CADepthEstimator(plan, trackci=self.trackci and bool(self.ci_probs))
+
+        for count, burnin, filename in count_burnin_filename_list:
+            with Treefile(filename) as tf:     # or pt.Treefile if you prefer
+                for _ in range(burnin):
+                    tf.readtree(returntree=False)
+                for _ in range(burnin, count):
+                    t = tf.readtree(returntree=True)
+                    est.add_tree(t)
+
+        return est.write_into(sumtree)
+
+    ###############################################################################################
+    ###############################################################################################
+    
     def compute_sumtree(self, treetype="con", blen="biplen", rooting=None,
                         og=None, count_burnin_filename_list=None):
         """Compute and annotate summary tree: find topology, set root, set branch lengths,
@@ -5941,221 +5971,6 @@ class TreeSummary():
         
         return sumtree
 
-     ###############################################################################################
-
-    def set_ca_node_depths_orig(self, sumtree, count_burnin_filename_list):
-        """Set node depths on summary tree based on mean node depth of clade's MRCAs on set
-        of input trees (same as "--height ca" in BEAST's treeannotator).
-        This means that all input trees are used when computing mean depth for each node
-        (not just the input trees where that exact monophyletic clade is present).
-        Proper interpretation of node depth is then "depth of MRCA of descendant leaves".
-
-        Node-depths of _leaves_ will be the mean value observed across input trees.
-        This only matters for leaves whose depth is being estimated (all other nodes
-        will have constant depth across input trees).
-        """
-
-        sumtree.clear_caches()   # Python note: ever necessary? Mostly worried about nodedepthdict
-
-        # Find mean common ancestor depth for all internal nodes
-        # Find mean node depth for leaves (for a leaf: mean depth == CA depth)
-        # (most leaves will have constant depth across input trees, but if some
-        # leaf dates are being estimated, then these will vary)
-
-        # Create local bindings and precomputed list for variables used in tight loops
-        online_update_mean_sd = self.online_update_mean_sd
-        sumtree_remkids = sumtree.remotechildren_dict
-        sumtree_remmask = sumtree.remotechildren_mask_dict
-        sumtree_intnodes = sumtree.intnodes
-        sumtree_leaves = sumtree.leaves
-
-        # Make online accumulators for node stats
-        acc = {}
-        do_ci = self.trackci and bool(self.ci_probs)
-        for node in sumtree.nodes:
-            s = Nodestruct()
-            s.n = 0
-            s.mean = 0.0
-            s.M2 = 0.0
-            if do_ci:
-                s.quantiles = QuantileAccumulator()
-            acc[node] = s
-        
-        # list of (intnode, bitmask, start_leaf) queries, to iterate over for each input tree
-        # start-leaf chosen randomly from remote-children of intnode
-        # Python note: choice of start-leaf could be optimised to start as close to the root
-        # as possible perhaps?
-        intnode_queries = []
-        for intnode in sumtree_intnodes:
-            qmask = sumtree_remmask[intnode]
-            start_leaf = next(iter(sumtree_remkids[intnode]))
-            s = acc[intnode]
-            intnode_queries.append((s, qmask, start_leaf))
-
-        leaf_queries = [(acc[leaf], leaf) for leaf in sumtree_leaves]
-
-        # Stream trees and update stats online
-        for count, burnin, filename in count_burnin_filename_list:
-            ntrees = count - burnin
-            treefile = Treefile(filename)
-            
-            for _ in range(burnin):
-                treefile.readtree(returntree=False)
-
-            for input_tree in treefile:
-
-                # force building remmask and nodedepthdict once per input-tree
-                nodedepthdict = input_tree.nodedepthdict
-                _ = input_tree.remotechildren_mask_dict      # Used by input_tree.find_mrca_mask
-
-                # local binding for speed
-                find_mrca_mask = input_tree.find_mrca_mask
-
-                for s, query_mask, start_leaf in intnode_queries:
-                    input_mrca = find_mrca_mask(query_mask, start_leaf)
-                    depth = nodedepthdict[input_mrca]
-                    online_update_mean_sd(s, depth)
-                    if do_ci:
-                        s.quantiles.add(depth)
-
-                # leaves: mean depths (CA depth for singleton)
-                for s, leaf in leaf_queries:
-                    depth = nodedepthdict[leaf]
-                    online_update_mean_sd(s, depth)
-                    if do_ci:
-                        s.quantiles.add(depth)
-
-        # Write results onto sumtree with domain names
-        if do_ci:
-            probs = []
-            for p in self.ci_probs:
-                a = (1.0 - p) / 2.0
-                probs.extend([a, 1.0 - a])
-            probs.append(0.5)
-        for node in sumtree.nodes:
-            s = acc[node]
-            mean, sd = self.finalize_online(s)
-            sumtree.set_node_attribute(node, "depth", mean)
-            sumtree.set_node_attribute(node, "depth_sd", sd)
-            if do_ci:                
-                qvals = s.quantiles.quantiles(probs)  # list in same order as probs
-                ci = {}
-                for i, lab in enumerate(self.ci_labels):
-                    lo_idx = i * 2
-                    hi_idx = lo_idx + 1
-                    ci[lab] = (qvals[lo_idx], qvals[hi_idx])
-
-                sumtree.set_node_attribute(node, "ci", ci)
-                sumtree.set_node_attribute(node, "depth_median", qvals[-1])
-
-        return sumtree
-
-    ###############################################################################################
-
-    def set_ca_node_depths_inline(self, sumtree, count_burnin_filename_list):
-        """Set node depths on summary tree based on mean node depth of clade's MRCAs on set
-        of input trees (same as "--height ca" in BEAST's treeannotator).
-        This means that all input trees are used when computing mean depth for each node
-        (not just the input trees where that exact monophyletic clade is present).
-        Proper interpretation of node depth is then "depth of MRCA of descendant leaves".
-
-        Node-depths of _leaves_ will be the mean value observed across input trees.
-        This only matters for leaves whose depth is being estimated (all other nodes
-        will have constant depth across input trees).
-        """
-
-        sumtree.clear_caches()   # Python note: ever necessary? Mostly worried about nodedepthdict
-
-        # Find mean common ancestor depth for all internal nodes
-        # Find mean node depth for leaves (for a leaf: mean depth == CA depth)
-        # (most leaves will have constant depth across input trees, but if some
-        # leaf dates are being estimated, then these will vary)
-
-        # Create local bindings and precomputed list for variables used in tight loops
-        online_update_mean_sd = self.online_update_mean_sd
-        sumtree_remmask = sumtree.remotechildren_mask_dict
-        sumtree_intnodes = sumtree.intnodes
-        sumtree_leaves = sumtree.leaves
-        _, sorted_leaf_tup, _, _, _, _ = sumtree.cached_attributes
-
-        # Helper method to pick leaf with smallest index from clade mask
-        def pick_start_leaf_from_qmask(qmask):
-            lsb = qmask & -qmask
-            idx = lsb.bit_length() - 1
-            return sorted_leaf_tup[idx]
-
-        # Make online accumulators for node stats
-        acc = {}
-        for node in sumtree.nodes:
-            s = Nodestruct()
-            s.n = 0
-            s.mean = 0.0
-            s.M2 = 0.0
-            acc[node] = s
-
-        # Group queries by start leaf
-        queries_by_startleaf = defaultdict(list)
-        for intnode in sumtree_intnodes:
-            qmask = sumtree_remmask[intnode]
-            start_leaf = pick_start_leaf_from_qmask(qmask)
-            nleaves = qmask.bit_count()
-            s = acc[intnode]
-            queries_by_startleaf[start_leaf].append((s, qmask, nleaves))
-
-        leaf_queries = [(acc[leaf], leaf) for leaf in sumtree_leaves]
-
-        # Sort queries per start leaf from small to large clades
-        for start_leaf, qlist in queries_by_startleaf.items():
-            qlist.sort(key=lambda x: x[2])
-
-        # Stream trees and update stats online
-        # Python note: no calls to find_mrca_mask: inlined logic here instead
-        # in order to enable sharing results seen while climbing ancestor path for given startleaf
-        for count, burnin, filename in count_burnin_filename_list:
-            ntrees = count - burnin
-
-            treefile = Treefile(filename)
-            for _ in range(burnin):
-                treefile.readtree(returntree=False)
-
-            for input_tree in treefile:
-                nodedepthdict = input_tree.nodedepthdict
-                remmask = input_tree.remotechildren_mask_dict
-                parent_dict = input_tree.parent_dict
-
-                # Start from parent of the leaf
-                # Monotone climb: parent only moves upward
-                for start_leaf, qlist in queries_by_startleaf.items():
-                    parent = parent_dict[start_leaf]
-                    for s, qmask, _nleaves in qlist:
-                        while (remmask[parent] & qmask) != qmask:
-                            parent = parent_dict[parent]
-                        s.n += 1
-                        depth = nodedepthdict[parent]
-                        online_update_mean_sd(s, depth)
-
-                # leaves: mean depths (CA depth for singleton)
-                for s, leaf in leaf_queries:
-                    s.n += 1
-                    depth = nodedepthdict[leaf]
-                    online_update_mean_sd(s, depth)
-
-        # Write results onto sumtree with domain names
-        for node in sumtree.nodes:
-            s = acc[node]
-            mean, sd = self.finalize_online(s)
-            sumtree.set_node_attribute(node, "depth", mean)
-            sumtree.set_node_attribute(node, "depth_sd", sd)
-
-        return sumtree
-
-    ###############################################################################################
-
-    #set_ca_node_depths = set_ca_node_depths_inline
-    set_ca_node_depths = set_ca_node_depths_orig
-
-
-###################################################################################################
 ###################################################################################################
 ###################################################################################################
 
@@ -6684,21 +6499,188 @@ class TreePostProcessor():
 
 ###################################################################################################
 ###################################################################################################
+
+class CAQuery:
+    """Helper class for CADepthEstimator: contains info for one MRCA query for input tree"""
+    __slots__ = ("node", "qmask", "start_leaf")
+
+    def __init__(self, node, qmask: int, start_leaf: str):
+        self.node = node
+        self.qmask = int(qmask)
+        self.start_leaf = start_leaf
+
+###################################################################################################
+###################################################################################################
+
+class CAPlan:
+    """Helper class for CADepthEstimator: contains tuple of CAQueries, ci_probs, and ci_labels"""
+    __slots__ = ("queries", "leaves", "probs", "ci_labels")
+
+    def __init__(self, queries, leaves, probs=(), ci_labels=()):
+        # store tuples for pickling + iteration speed
+        self.queries = tuple(queries)   # tuple[CAQuery]
+        self.leaves = tuple(leaves)     # tuple[str]
+        self.probs = tuple(probs)       # tuple[float] (includes median at end) or ()
+        self.ci_labels = tuple(ci_labels)
+
+###################################################################################################
 ###################################################################################################
 
 class CADepthEstimator():
     """Class for accumulating Common Ancestor node depths from set of input trees,
-    and keyed by clades present on target summary tree.
-    Input: iterable over Tree objects or tree-strings + target tree"""
+      - add_tree(tree): update online mean/M2 (+ optional quantiles)
+      - merge(other): merge partial estimators (for multiprocessing)
+      - write_into(sumtree): write depth, depth_sd (+ optional CI) onto sumtree"""
     
-    pass
-   
+    __slots__ = ("plan", "trackci", "acc")
     
+    ###############################################################################################
+
+    def __init__(self, plan, trackci = False):
+        self.plan = plan                                # CAPlan object with tuple of MRCA queries
+        self.trackci = bool(trackci and plan.probs)
+
+        # {node:Nodestruct} dict for accumulating depth info from input trees
+        acc = {}
+        self.acc = acc
+
+        def make_acc():
+            s = Nodestruct()
+            s.n = 0
+            s.mean = 0.0
+            s.M2 = 0.0
+            if self.trackci:
+                s.quantiles = QuantileAccumulator()
+            return s
+
+        for q in plan.queries:
+            acc[q.node] = make_acc()
+        for leaf in plan.leaves:
+            acc[leaf] = make_acc()
+
+    ###############################################################################################
     
+    @classmethod
+    def build_plan(cls, sumtree, trackci=False, ci_probs=None):
+        """Build a CAPlan from the target summary tree."""
+        
+        # IMPORTANT: query_mask must be in the same leaf universe ordering as input trees.
+        # This holds if all trees share the same tipset and Tree.cached_attributes uses that.
+        
+        # Ensure these exist
+        remmask = sumtree.remotechildren_mask_dict
+        _, sorted_leaf_tup, *_ = sumtree.cached_attributes  # sorted, deterministic
+
+        def pick_start_leaf_from_mask(mask):
+            # deterministic: pick the lowest-index leaf in the clade
+            lsb = mask & -mask
+            idx = lsb.bit_length() - 1
+            return sorted_leaf_tup[idx]
+
+        queries = []
+        for node in sumtree.intnodes:
+            qmask = remmask[node]
+            start_leaf = pick_start_leaf_from_mask(qmask)
+            queries.append(CAQuery(node=node, qmask=qmask, start_leaf=start_leaf))
+
+        # CI precomputation
+        if trackci and ci_probs:
+            ci_probs = tuple(ci_probs)
+            ci_labels = tuple(f"{int(round(p * 100))}%_CI" for p in ci_probs)
+            probs = []
+            for p in ci_probs:
+                a = (1.0 - p) / 2.0
+                probs.extend([a, 1.0 - a])
+            probs.append(0.5)  # median
+            return CAPlan(queries=queries, leaves=sorted_leaf_tup, probs=tuple(probs), ci_labels=ci_labels)
+
+        return CAPlan(queries=queries, leaves=sorted_leaf_tup)
+    
+    @staticmethod
+    def _online_update(s, x: float):
+        s.n += 1
+        delta = x - s.mean
+        s.mean += delta / s.n
+        s.M2 += delta * (x - s.mean)
+
+    @staticmethod
+    def _merge_online(a, b):
+        # merge (n,mean,M2)
+        delta = b.mean - a.mean
+        ntot = a.n + b.n
+        a.mean = a.mean + delta * (b.n / ntot)
+        a.M2 = a.M2 + b.M2 + delta * delta * (a.n * b.n / ntot)
+        a.n = ntot
+
+    @staticmethod
+    def _finalize(s):
+        if s.n == 0:
+            raise TreeError("CA depth accumulator has 0 observations")
+        if s.n == 1:
+            return (s.mean, None)
+        var = s.M2 / (s.n - 1)
+        return (s.mean, math.sqrt(var))
+
+    def add_tree(self, input_tree):
+        nodedepth = input_tree.nodedepthdict
+        _ = input_tree.remotechildren_mask_dict  # ensure remmask exists for MRCA climb
+        find_mrca_mask = input_tree.find_mrca_mask
+
+        acc = self.acc
+        trackci = self.trackci
+
+        # Internal nodes: MRCA depth for each query
+        for q in self.plan.queries:
+            mrca = find_mrca_mask(q.qmask, q.start_leaf)
+            depth = nodedepth[mrca]
+            s = acc[q.node]
+            self._online_update(s, depth)
+            if trackci:
+                s.quantiles.add(depth)
+
+        # Leaves: singleton depth
+        for leaf in self.plan.leaves:
+            depth = nodedepth[leaf]
+            s = acc[leaf]
+            self._online_update(s, depth)
+            if trackci:
+                s.quantiles.add(depth)
+    
+    def merge(self, other):
+        if self.trackci != other.trackci or self.plan.probs != other.plan.probs:
+            raise TreeError("Incompatible CADepthEstimator merge (CI config differs)")
+
+        for node, s_other in other.acc.items():
+            s_self = self.acc.get(node)
+            if s_self is None:
+                self.acc[node] = s_other
+            else:
+                self._merge_online(s_self, s_other)
+                if self.trackci:
+                    s_self.quantiles.merge(s_other.quantiles)
+    
+    def write_into(self, sumtree):
+        probs = self.plan.probs
+        ci_labels = self.plan.ci_labels
+
+        for node, s in self.acc.items():
+            mean, sd = self._finalize(s)
+            sumtree.set_node_attribute(node, "depth", mean)
+            sumtree.set_node_attribute(node, "depth_sd", sd)
+
+            if self.trackci:
+                qvals = s.quantiles.quantiles(probs)
+                ci = {}
+                for i, lab in enumerate(ci_labels):
+                    ci[lab] = (qvals[2*i], qvals[2*i + 1])
+                sumtree.set_node_attribute(node, "ci", ci)
+                sumtree.set_node_attribute(node, "depth_median", qvals[-1])
+
+        return sumtree
 
 ###################################################################################################
 ###################################################################################################
-###################################################################################################
+
 
 class TreefileBase():
     """Abstract base-class for representing tree file objects."""
