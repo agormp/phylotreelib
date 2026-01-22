@@ -5488,6 +5488,9 @@ class TreeSummary():
                     self_cladesum[clade].mean = (mean1*sumw1 + mean2*sumw2)/(sumw1+sumw2)
                     self_cladesum[clade].M2 = M21+M22+sumw1*sumw2*(mean2-mean1)*(mean2-mean1)/(sumw1+sumw2)
                 self_cladesum[clade].SUMW += other_cladesum[clade].SUMW
+                
+                if self.track_subcladepairs:
+                    self_cladesum[clade].subcladepairs.update(other_cladesum[clade].subcladepairs)
 
             # If clade has never been seen before: transfer Nodestruct from other_cladesum:
             else:
