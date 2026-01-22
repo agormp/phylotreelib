@@ -5785,6 +5785,36 @@ class TreeSummary():
     
     ###############################################################################################
     ###############################################################################################
+    
+    # Temporary wrappers for methods originally in TreeSummary but now in TreePostProcessor
+    # Remove when tests are updated (and perhaps after period with deprecation warning for users)
+
+    def root_maxfreq(self, sumtree):
+        tpp = TreePostProcessor(self)
+        return tpp.root_maxfreq(sumtree)
+
+    def set_rootcredibility(self, sumtree, precision=6):
+        tpp = TreePostProcessor(self)
+        return tpp.set_rootcredibility(sumtree, precision=6)
+
+    def set_mean_node_depths(self, sumtree):
+        tpp = TreePostProcessor(self)
+        return tpp.set_mean_node_depths(sumtree)
+
+    def set_biplen_on_existing_tree(self, sumtree):
+        tpp = TreePostProcessor(self)
+        return tpp.set_biplen_on_existing_tree(sumtree)
+
+    def annotate_sumtree(self, sumtree):
+        tpp = TreePostProcessor(self)
+        return tpp.annotate_sumtree(sumtree)
+
+    def set_clade_credibility(self, tree, precision=6):
+        tpp = TreePostProcessor(self)
+        return tpp.set_clade_credibility(tree, precision=6)
+
+    ###############################################################################################
+    ###############################################################################################
 
     def compute_sumtree(self, treetype="con", blen="biplen", rooting=None,
                         og=None, count_burnin_filename_list=None):
@@ -5911,147 +5941,7 @@ class TreeSummary():
         
         return sumtree
 
-    ###############################################################################################
-
-    def root_maxfreq(self, sumtree):
-        """Uses info about root bipartitions in TreeSummary to place root on summary tree.
-        Also sets tree attribute rootcred:
-            probability (freq among input trees) of current location of root
-
-        If tree has branch lengths:
-        Divides length of root bipartition among two branches in accordance with average
-        fraction of lengths seen for this rootbip across all trees."""
-
-        # Starting with most frequent root location: find one that is compatible
-        # Python note: should i just try number 1 on sorted list?
-        if sumtree.is_bifurcation(sumtree.root):
-            cur_rootbip, blenfrac_canonical_mask = sumtree.rootbip_with_frac()
-        else:
-            cur_rootbip = None
-        for count, bip, summary_rootbipstruct in self.sorted_rootbips:
-            if sumtree.bipart_is_present(bip):
-                # Only reroot if tree not already rooted correctly
-                if (cur_rootbip is None) or (bip != cur_rootbip):
-                    parent,child = sumtree.find_bipart_nodes(bip)
-                    sumtree.deroot()  # Python note: necessary?
-                                      # reroot seems to assume not rooted at birfurcation
-                                      # rethink reroot function and others depending on it!
-                    sumtree.reroot(child, parent)
-
-                # If branch lengths or node depths have been tracked:
-                # Divide branch lengths for two rootkids according to fractions
-                # seen for this rootbip across trees in ._rootbip_summary
-                # if self.trackblen or self.trackdepth:
-                #     kid1,kid2 = sumtree.children(sumtree.root)
-                #     biplen = sumtree.nodedist(kid1, kid2)
-                #     kid1_remkids = sumtree.remotechildren_dict[kid1]
-                #     dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
-                #     dist_to_kid2 = biplen - dist_to_kid1
-                #     sumtree.child_dict[sumtree.root][kid1].length = dist_to_kid1
-                #     sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
-                # REWRITE TO USE NEW ROOTBIP!!!!!
-
-                return sumtree
-
-        # If we did not return by now, then bipart not in contree
-        raise TreeError(f"sumtree tree not compatible with any observed root locations")
-
-    ###############################################################################################
-
-    def set_rootcredibility(self, sumtree, precision=6):
-        """Returns sumtree with root credibilities as attributes on each branch
-        rootcred = fraction of trees in input set where the root was on this branch (bipartition)
-        If root was never on a branch: assign the value 0.0
-        Added as attribute .rootcred to Branchstruct for branches on sumtree
-        Also sets tree-attributes: 
-            rootcred: the rootcred of the actually used root bipartition
-            cumrootcred: sum of rootcred for all branches (bipartitions) included on tree
-        """
-
-        if not self.trackroot:
-            msg = "Not possible to compute root credibilities: TreeSummary.trackroot is False"
-            raise TreeError(msg)
-
-        def set_branch_credibility(p, c):
-            """Helper function to set root credibility for a branch."""
-            halfmask = sumtree.remotechildren_mask_dict[c]
-            bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
-            if bip in self.rootbipsummary:
-                rootcred = self.rootbipsummary[bip].freq
-                sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
-            else:
-                sumtree.set_branch_attribute(p, c, "rootcred", 0.0)
-
-        # Find rootcred for all non-root bipartitions on sumtree
-        for p in sumtree.sorted_intnodes():
-            if p != sumtree.root:
-                for c in sumtree.children(p):
-                    set_branch_credibility(p, c)
-
-        # Handle root bipartition separately
-        p = sumtree.root
-        if sumtree.is_bifurcation(p):
-            rootbip = sumtree.rootbip()
-            rootcred = self.rootbipsummary[rootbip].freq
-            c1, c2 = sumtree.children(p)
-            sumtree.set_branch_attribute(p, c1, "rootcred", rootcred)
-            sumtree.set_branch_attribute(p, c2, "rootcred", rootcred)
-            sumtree.rootcred = rootcred
-            cumcred_correction = rootcred # Counted twice if i just sum over branches. Hackish solution...
-        else:
-            sumtree.rootcred = None   # sumtree is not rooted on bipartition, so no single rootcred
-            for c in sumtree.children(p):
-                set_branch_credibility(p, c)
-            cumcred_correction = 0.0
-
-        # Compute cumulated rootcred = sum of rootcred on all tree branches
-        # Note: can be < 100% since sumtree may not contain all observed root bipartitions
-        cumulated_rootcred = 0.0
-        for p in sumtree.intnodes:
-            for c in sumtree.children(p):
-                cumulated_rootcred += sumtree.get_branch_attribute(p, c, "rootcred")
-        cumulated_rootcred -= cumcred_correction  # If root at bifurcation: counted once too many...
-        sumtree.cumulated_rootcred = cumulated_rootcred
-
-        return sumtree
-
-    ###############################################################################################
-
-    def set_mean_node_depths(self, sumtree):
-        """Set node depths on summary tree based on mean node depths for clades.
-        Also set info about depth variation (sd and sem).
-        All information obtained from TreeSummary.cladesummary
-
-        NOTE 1: only meaningful if input trees are based on a clock model.
-        NOTE 2: only works if all clades in sumtree have been observed at least once. The option
-                will therefore not work with all rootings, and may also fail for majority rule
-                consensus trees
-        NOTE 3: only uses node depths from monophyletic clades (so some values may be set
-                based on very few input trees)
-
-        Node-depths of leaves will be the mean value observed across input trees.
-        This only matters for leaves whose depth is being estimated (all other nodes
-        will have constant depth across input trees).
-        """
-
-        try:
-            remmask = sumtree.remotechildren_mask_dict  # local binding
-            for node in sumtree.nodes:
-                mask = remmask[node]
-                clade = Clade.from_mask_unknown_leafuniverse(mask, sumtree)
-                nodestruct = self.cladesummary[clade]
-                sumtree.set_node_attribute(node, "depth", nodestruct.depth)
-                sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
-        except KeyError as e:
-            raise TreeError("Problem while setting mean node depths on summary tree: "
-                            + "the following clade has not been observed among input trees. "
-                            + "Summary tree is probably rooted differently from input trees - "
-                            + "consider changing rooting option.\n"
-                            + f"Unobserved clade:\n{e.args[0]}")
-
-        return sumtree
-
-    ###############################################################################################
+     ###############################################################################################
 
     def set_ca_node_depths_orig(self, sumtree, count_burnin_filename_list):
         """Set node depths on summary tree based on mean node depth of clade's MRCAs on set
@@ -6264,165 +6154,6 @@ class TreeSummary():
     #set_ca_node_depths = set_ca_node_depths_inline
     set_ca_node_depths = set_ca_node_depths_orig
 
-    ###############################################################################################
-
-    def set_biplen_on_existing_tree(self, sumtree):
-        """Only to be used when goal is to set bipartition-based branch-length stats
-        on sumtree, and those were not already set during construction.
-        This happens when treetype is MCC
-        
-        NOTE: requires rooting and rootblen to be tracked in order to properly split branch 
-              length on root bipartition"""
-
-        if not self.trackrootblen:
-            raise TreeError("Branch lengths for root-to-rootkids was not tracked - impossible to\n"
-                            "use biplen on this summary tree (needed in order to properly split\n"
-                            "branch length on root bipartition)")
-
-        sumtree_root = sumtree.root
-        for p in sumtree.sorted_intnodes():
-            if p != sumtree_root:
-                for c in sumtree.children(p):
-                    halfmask = sumtree.remotechildren_mask_dict[c]
-                    bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
-                    brstruct = self.bipartsummary[bip]
-                    sumtree.set_branch_attribute(p,c,"length", brstruct.length)
-                    sumtree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
-
-        # Handle root bipartition separately
-        rootbip = sumtree.rootbip()
-        rootbiplen = self.bipartsummary[rootbip].length
-        kid1,kid2 = sumtree.child_dict[sumtree_root]
-        
-        summary_rootbipstruct = self._rootbip_summary[rootbip]
-        frac_to_canon = summary_rootbipstruct.mean_frac_to_canon()
-
-        kid1_mask = sumtree.remotechildren_mask_dict[kid1]
-        is_kid1_canon = (kid1_mask == rootbip._mask)
-
-        dist_to_kid1 = rootbiplen * (frac_to_canon if is_kid1_canon else (1.0 - frac_to_canon))
-        dist_to_kid2 = rootbiplen - dist_to_kid1
-
-        sumtree.child_dict[sumtree_root][kid1].length = dist_to_kid1
-        sumtree.child_dict[sumtree_root][kid2].length = dist_to_kid2
-
-        return sumtree
-
-    ###############################################################################################
-
-    def annotate_sumtree(self, sumtree):
-        """
-        Annotate sumtree nodes/branches with whatever TreeSummary tracked.
-        """
-        
-        # Python note: a bit messy, and i suspect i am roundtripping some of these 
-        # attributes unnecessarily.
-        
-        # Keep track of which attributes can be printed
-        node_attrs = set()
-        branch_attrs = set()
-
-        # Node annotations from cladesummary
-        if self.trackclades:
-            all_leaves = sumtree.frozenset_leaves
-            sorted_leafs = sumtree.sorted_leaf_tup
-            leaf2index = sumtree.leaf2index
-
-            for node in sumtree.nodes:
-                clade = Clade.from_mask_unknown_leafuniverse(sumtree.remotechildren_mask_dict[node], sumtree)
-                nd = self.cladesummary.get(clade)
-                if nd is None:
-                    raise TreeError("Problem while annotating summary tree:\n"
-                                    + "the following clade has not been observed among input trees.\n"
-                                    + "Check rooting of tree:\n"
-                                    + f"{clade}")
-                else:
-                    # consensus clade WAS observed
-                    sumtree.set_node_attribute(node, "clade_cred", getattr(nd, "clade_cred", nd.freq))
-                    node_attrs.add("clade_cred")
-                    if self.trackdepth:
-                        sumtree.set_node_attribute(node, "depth", nd.depth)
-                        sumtree.set_node_attribute(node, "depth_sd", nd.depth_sd)
-                        node_attrs.update({"depth", "depth_sd"})
-                        if self.trackci:
-                            # these attributes may or may not exist; set if present
-                            for attr in ("ci", "depth_median"):
-                                if hasattr(nd, attr):
-                                    sumtree.set_node_attribute(node, attr, getattr(nd, attr))
-                                    node_attrs.add(attr)
-
-        # Branch annotations from bipartsummary
-        if self.trackbips:
-            for parent in sumtree.sorted_intnodes():
-                for child in sumtree.children(parent):
-                    halfmask = sumtree.remotechildren_mask_dict[child]
-                    bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
-                    br = self.bipartsummary[bip]
-                    sumtree.set_branch_attribute(parent, child, "bipartition_cred",
-                                                 getattr(br, "bipartition_cred", br.freq))
-                    branch_attrs.add("bipartition_cred")
-
-                    if self.trackblen:
-                        sumtree.set_branch_attribute(parent, child, "length", br.length)
-                        sumtree.set_branch_attribute(parent, child, "length_sd", br.length_sd)
-                        branch_attrs.update({"length", "length_sd"})
-                        if self.trackci:
-                            for attr in ("ci", "length_median"):
-                                if hasattr(br, attr):
-                                    sumtree.set_branch_attribute(parent, child, attr, getattr(br, attr))
-                                    branch_attrs.add(attr)
-
-        # Set Newick internal node labels (numbers after ')')
-        # For each internal node (except root), set the label on its incoming branch.
-        for parent in sumtree.sorted_intnodes():
-            for child in sumtree.children(parent):
-                if child in sumtree.leaves:
-                    continue  # no label needed for tips
-
-                br = sumtree.child_dict[parent][child]
-                nd = sumtree.nodedict.get(child)
-
-                # Prefer clade support if available on the node
-                if nd is not None and hasattr(nd, "clade_cred"):
-                    br.label = nd.clade_cred
-                # Otherwise use bipartition support if available on the branch
-                elif hasattr(br, "bipartition_cred"):
-                    br.label = br.bipartition_cred
-                elif hasattr(br, "freq"):
-                    br.label = br.freq
-                else:
-                    # Optional: set empty label (or leave unchanged)
-                    br.label = ""
-                    
-        # Root annotations
-        if self.trackroot:
-            self.set_rootcredibility(sumtree)
-            branch_attrs.add("rootcred")
-
-        return sumtree
-
-    ###############################################################################################
-
-    def set_clade_credibility(self, tree, precision=6):
-        """Set clade credibility on provided target tree based on freq of clade in TreeSummary.
-
-        NOTE: only works if all clades in tree have been observed at least once. The option
-                will therefore not work with all rootings"""
-
-        try:
-            remmask = tree.remotechildren_mask_dict  # local binding
-            for child in (tree.intnodes - {tree.root}):
-                mask = remmask[child]
-                child_clade = Clade.from_mask_unknown_leafuniverse(mask, tree)
-                clade_cred = self.cladesummary[child_clade].posterior
-                parent = tree.parent(child)
-                tree.setlabel(parent, child, f"{clade_cred:.{precision}g}")
-        except KeyError as e:
-            raise TreeError("Problem while setting clade credibililities: the following clade has not been "
-                            + "observed among input trees: check rooting of tree."
-                            + f"\n{e.args[0]}")
-        return tree
-
 
 ###################################################################################################
 ###################################################################################################
@@ -6431,6 +6162,8 @@ class TreeSummary():
 class SummaryTreeBuilder():
     """Class handling construction of summary tree topology. 
     Input: TreeSummary object with accumulated stats"""
+
+    ###################################################################################################
     
     def __init__(self, treesummary):
         """Takes populated TreeSummary object as input, preparing this class to construct
@@ -6634,7 +6367,320 @@ class SummaryTreeBuilder():
 class TreePostProcessor():
     """Class handling annotation of tree (setting of branch lenghts, node depths, 
     clade frequencies, etc). Takes TreeSummary and Tree objects as input"""
-    pass
+    
+    ###############################################################################################
+    
+    def __init__(self, treesummary):
+        """Takes populated TreeSummary object as input, preparing this class to construct
+        summary tree from that class' attributes"""
+        
+        self.treesum = treesummary
+        if getattr(treesummary, "tree_count", 0) == 0:
+            msg = "TreeSummary is empty (tree_count == 0). Add trees to it before using for building a summary tree."
+            raise TreeError(msg)
+        if getattr(treesummary, "leaves", None) is None:
+            msg = "TreeSummary has no leaf universe (leaves is None)."
+            raise TreeError(msg)
+
+    ###############################################################################################
+
+    def root_maxfreq(self, sumtree):
+        """Uses info about root bipartitions in TreeSummary to place root on summary tree.
+        Also sets tree attribute rootcred:
+            probability (freq among input trees) of current location of root
+
+        If tree has branch lengths:
+        Divides length of root bipartition among two branches in accordance with average
+        fraction of lengths seen for this rootbip across all trees."""
+
+        # Starting with most frequent root location: find one that is compatible
+        # Python note: should i just try number 1 on sorted list?
+        if sumtree.is_bifurcation(sumtree.root):
+            cur_rootbip, blenfrac_canonical_mask = sumtree.rootbip_with_frac()
+        else:
+            cur_rootbip = None
+        for count, bip, summary_rootbipstruct in self.treesum.sorted_rootbips:
+            if sumtree.bipart_is_present(bip):
+                # Only reroot if tree not already rooted correctly
+                if (cur_rootbip is None) or (bip != cur_rootbip):
+                    parent,child = sumtree.find_bipart_nodes(bip)
+                    sumtree.deroot()  # Python note: necessary?
+                                      # reroot seems to assume not rooted at birfurcation
+                                      # rethink reroot function and others depending on it!
+                    sumtree.reroot(child, parent)
+
+                # If branch lengths or node depths have been tracked:
+                # Divide branch lengths for two rootkids according to fractions
+                # seen for this rootbip across trees in ._rootbip_summary
+                # if self.treesum.trackblen or self.treesum.trackdepth:
+                #     kid1,kid2 = sumtree.children(sumtree.root)
+                #     biplen = sumtree.nodedist(kid1, kid2)
+                #     kid1_remkids = sumtree.remotechildren_dict[kid1]
+                #     dist_to_kid1 = biplen * summary_rootbipstruct.avg_frac(kid1_remkids)
+                #     dist_to_kid2 = biplen - dist_to_kid1
+                #     sumtree.child_dict[sumtree.root][kid1].length = dist_to_kid1
+                #     sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
+                # REWRITE TO USE NEW ROOTBIP!!!!!
+
+                return sumtree
+
+        # If we did not return by now, then bipart not in contree
+        raise TreeError(f"sumtree tree not compatible with any observed root locations")
+
+    ###############################################################################################
+
+    def set_rootcredibility(self, sumtree, precision=6):
+        """Returns sumtree with root credibilities as attributes on each branch
+        rootcred = fraction of trees in input set where the root was on this branch (bipartition)
+        If root was never on a branch: assign the value 0.0
+        Added as attribute .rootcred to Branchstruct for branches on sumtree
+        Also sets tree-attributes: 
+            rootcred: the rootcred of the actually used root bipartition
+            cumrootcred: sum of rootcred for all branches (bipartitions) included on tree
+        """
+
+        if not self.treesum.trackroot:
+            msg = "Not possible to compute root credibilities: TreeSummary.trackroot is False"
+            raise TreeError(msg)
+
+        def set_branch_credibility(p, c):
+            """Helper function to set root credibility for a branch."""
+            halfmask = sumtree.remotechildren_mask_dict[c]
+            bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
+            if bip in self.treesum.rootbipsummary:
+                rootcred = self.treesum.rootbipsummary[bip].freq
+                sumtree.set_branch_attribute(p, c, "rootcred", rootcred)
+            else:
+                sumtree.set_branch_attribute(p, c, "rootcred", 0.0)
+
+        # Find rootcred for all non-root bipartitions on sumtree
+        for p in sumtree.sorted_intnodes():
+            if p != sumtree.root:
+                for c in sumtree.children(p):
+                    set_branch_credibility(p, c)
+
+        # Handle root bipartition separately
+        p = sumtree.root
+        if sumtree.is_bifurcation(p):
+            rootbip = sumtree.rootbip()
+            rootcred = self.treesum.rootbipsummary[rootbip].freq
+            c1, c2 = sumtree.children(p)
+            sumtree.set_branch_attribute(p, c1, "rootcred", rootcred)
+            sumtree.set_branch_attribute(p, c2, "rootcred", rootcred)
+            sumtree.rootcred = rootcred
+            cumcred_correction = rootcred # Counted twice if i just sum over branches. Hackish solution...
+        else:
+            sumtree.rootcred = None   # sumtree is not rooted on bipartition, so no single rootcred
+            for c in sumtree.children(p):
+                set_branch_credibility(p, c)
+            cumcred_correction = 0.0
+
+        # Compute cumulated rootcred = sum of rootcred on all tree branches
+        # Note: can be < 100% since sumtree may not contain all observed root bipartitions
+        cumulated_rootcred = 0.0
+        for p in sumtree.intnodes:
+            for c in sumtree.children(p):
+                cumulated_rootcred += sumtree.get_branch_attribute(p, c, "rootcred")
+        cumulated_rootcred -= cumcred_correction  # If root at bifurcation: counted once too many...
+        sumtree.cumulated_rootcred = cumulated_rootcred
+
+        return sumtree
+
+    ###############################################################################################
+
+    def set_mean_node_depths(self, sumtree):
+        """Set node depths on summary tree based on mean node depths for clades.
+        Also set info about depth variation (sd and sem).
+        All information obtained from TreeSummary.cladesummary
+
+        NOTE 1: only meaningful if input trees are based on a clock model.
+        NOTE 2: only works if all clades in sumtree have been observed at least once. The option
+                will therefore not work with all rootings, and may also fail for majority rule
+                consensus trees
+        NOTE 3: only uses node depths from monophyletic clades (so some values may be set
+                based on very few input trees)
+
+        Node-depths of leaves will be the mean value observed across input trees.
+        This only matters for leaves whose depth is being estimated (all other nodes
+        will have constant depth across input trees).
+        """
+
+        try:
+            remmask = sumtree.remotechildren_mask_dict  # local binding
+            for node in sumtree.nodes:
+                mask = remmask[node]
+                clade = Clade.from_mask_unknown_leafuniverse(mask, sumtree)
+                nodestruct = self.treesum.cladesummary[clade]
+                sumtree.set_node_attribute(node, "depth", nodestruct.depth)
+                sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
+        except KeyError as e:
+            raise TreeError("Problem while setting mean node depths on summary tree: "
+                            + "the following clade has not been observed among input trees. "
+                            + "Summary tree is probably rooted differently from input trees - "
+                            + "consider changing rooting option.\n"
+                            + f"Unobserved clade:\n{e.args[0]}")
+
+        return sumtree
+
+    ###############################################################################################
+
+    def set_biplen_on_existing_tree(self, sumtree):
+        """Only to be used when goal is to set bipartition-based branch-length stats
+        on sumtree, and those were not already set during construction.
+        This happens when treetype is MCC
+        
+        NOTE: requires rooting and rootblen to be tracked in order to properly split branch 
+              length on root bipartition"""
+
+        if not self.treesum.trackrootblen:
+            raise TreeError("Branch lengths for root-to-rootkids was not tracked - impossible to\n"
+                            "use biplen on this summary tree (needed in order to properly split\n"
+                            "branch length on root bipartition)")
+
+        sumtree_root = sumtree.root
+        for p in sumtree.sorted_intnodes():
+            if p != sumtree_root:
+                for c in sumtree.children(p):
+                    halfmask = sumtree.remotechildren_mask_dict[c]
+                    bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
+                    brstruct = self.treesum.bipartsummary[bip]
+                    sumtree.set_branch_attribute(p,c,"length", brstruct.length)
+                    sumtree.set_branch_attribute(p,c,"length_sd", brstruct.length_sd)
+
+        # Handle root bipartition separately
+        rootbip = sumtree.rootbip()
+        rootbiplen = self.treesum.bipartsummary[rootbip].length
+        kid1,kid2 = sumtree.child_dict[sumtree_root]
+        
+        summary_rootbipstruct = self.treesum._rootbip_summary[rootbip]
+        frac_to_canon = summary_rootbipstruct.mean_frac_to_canon()
+
+        kid1_mask = sumtree.remotechildren_mask_dict[kid1]
+        is_kid1_canon = (kid1_mask == rootbip._mask)
+
+        dist_to_kid1 = rootbiplen * (frac_to_canon if is_kid1_canon else (1.0 - frac_to_canon))
+        dist_to_kid2 = rootbiplen - dist_to_kid1
+
+        sumtree.child_dict[sumtree_root][kid1].length = dist_to_kid1
+        sumtree.child_dict[sumtree_root][kid2].length = dist_to_kid2
+
+        return sumtree
+
+    ###############################################################################################
+
+    def annotate_sumtree(self, sumtree):
+        """
+        Annotate sumtree nodes/branches with whatever TreeSummary tracked.
+        """
+        
+        # Python note: a bit messy, and i suspect i am roundtripping some of these 
+        # attributes unnecessarily.
+        
+        # Keep track of which attributes can be printed
+        node_attrs = set()
+        branch_attrs = set()
+
+        # Node annotations from cladesummary
+        if self.treesum.trackclades:
+            all_leaves = sumtree.frozenset_leaves
+            sorted_leafs = sumtree.sorted_leaf_tup
+            leaf2index = sumtree.leaf2index
+
+            for node in sumtree.nodes:
+                clade = Clade.from_mask_unknown_leafuniverse(sumtree.remotechildren_mask_dict[node], sumtree)
+                nd = self.treesum.cladesummary.get(clade)
+                if nd is None:
+                    raise TreeError("Problem while annotating summary tree:\n"
+                                    + "the following clade has not been observed among input trees.\n"
+                                    + "Check rooting of tree:\n"
+                                    + f"{clade}")
+                else:
+                    # consensus clade WAS observed
+                    sumtree.set_node_attribute(node, "clade_cred", getattr(nd, "clade_cred", nd.freq))
+                    node_attrs.add("clade_cred")
+                    if self.treesum.trackdepth:
+                        sumtree.set_node_attribute(node, "depth", nd.depth)
+                        sumtree.set_node_attribute(node, "depth_sd", nd.depth_sd)
+                        node_attrs.update({"depth", "depth_sd"})
+                        if self.treesum.trackci:
+                            # these attributes may or may not exist; set if present
+                            for attr in ("ci", "depth_median"):
+                                if hasattr(nd, attr):
+                                    sumtree.set_node_attribute(node, attr, getattr(nd, attr))
+                                    node_attrs.add(attr)
+
+        # Branch annotations from bipartsummary
+        if self.treesum.trackbips:
+            for parent in sumtree.sorted_intnodes():
+                for child in sumtree.children(parent):
+                    halfmask = sumtree.remotechildren_mask_dict[child]
+                    bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
+                    br = self.treesum.bipartsummary[bip]
+                    sumtree.set_branch_attribute(parent, child, "bipartition_cred",
+                                                 getattr(br, "bipartition_cred", br.freq))
+                    branch_attrs.add("bipartition_cred")
+
+                    if self.treesum.trackblen:
+                        sumtree.set_branch_attribute(parent, child, "length", br.length)
+                        sumtree.set_branch_attribute(parent, child, "length_sd", br.length_sd)
+                        branch_attrs.update({"length", "length_sd"})
+                        if self.treesum.trackci:
+                            for attr in ("ci", "length_median"):
+                                if hasattr(br, attr):
+                                    sumtree.set_branch_attribute(parent, child, attr, getattr(br, attr))
+                                    branch_attrs.add(attr)
+
+        # Set Newick internal node labels (numbers after ')')
+        # For each internal node (except root), set the label on its incoming branch.
+        for parent in sumtree.sorted_intnodes():
+            for child in sumtree.children(parent):
+                if child in sumtree.leaves:
+                    continue  # no label needed for tips
+
+                br = sumtree.child_dict[parent][child]
+                nd = sumtree.nodedict.get(child)
+
+                # Prefer clade support if available on the node
+                if nd is not None and hasattr(nd, "clade_cred"):
+                    br.label = nd.clade_cred
+                # Otherwise use bipartition support if available on the branch
+                elif hasattr(br, "bipartition_cred"):
+                    br.label = br.bipartition_cred
+                elif hasattr(br, "freq"):
+                    br.label = br.freq
+                else:
+                    # Optional: set empty label (or leave unchanged)
+                    br.label = ""
+                    
+        # Root annotations
+        if self.treesum.trackroot:
+            self.treesum.set_rootcredibility(sumtree)
+            branch_attrs.add("rootcred")
+
+        return sumtree
+
+    ###############################################################################################
+
+    def set_clade_credibility(self, tree, precision=6):
+        """Set clade credibility on provided target tree based on freq of clade in TreeSummary.
+
+        NOTE: only works if all clades in tree have been observed at least once. The option
+                will therefore not work with all rootings"""
+
+        try:
+            remmask = tree.remotechildren_mask_dict  # local binding
+            for child in (tree.intnodes - {tree.root}):
+                mask = remmask[child]
+                child_clade = Clade.from_mask_unknown_leafuniverse(mask, tree)
+                clade_cred = self.treesum.cladesummary[child_clade].posterior
+                parent = tree.parent(child)
+                tree.setlabel(parent, child, f"{clade_cred:.{precision}g}")
+        except KeyError as e:
+            raise TreeError("Problem while setting clade credibililities: the following clade has not been "
+                            + "observed among input trees: check rooting of tree."
+                            + f"\n{e.args[0]}")
+        return tree
+   
 
 ###################################################################################################
 ###################################################################################################
