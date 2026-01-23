@@ -58,50 +58,57 @@ import numpy as np
 # Various functions used by methods, that do not fit neatly in any class
 ###################################################################################################
 
-def remove_comments(text):
-    """Takes input string and strips away commented text, delimited by '[' and ']'.
-        Also deals with nested comments."""
-
-    # Python note: could be simplified
-
-    # Before spending any time:
-    # bail if there are no comment delimiters in string
-    # raise exception if comment delimiters not balanced
+def remove_comments(text: str) -> str:
+    """Strip NEXUS/Newick bracket comments: [...], allowing nesting.
+    Ignores brackets inside single-quoted labels (NEXUS quoting, '' escapes).
+    Raises TreeError on unbalanced brackets.
+    """
     if "[" not in text:
         return text
-    elif text.count("[") != text.count("]"):
-        raise TreeError("String contains different number of left and right comment delimiters")
 
-    # Preprocess delims for use in re etc
-    leftdelim = re.escape("[")
-    rightdelim = re.escape("]")
+    out = []
+    depth = 0
+    in_quote = False
+    i = 0
+    n = len(text)
 
-    # Construct sorted list of tuples of the form [(0, 'start'), (5, 'stop'), (7, 'start'), ...]
-    delimlist = [(match.start(), match.end(), "start") for match in re.finditer(leftdelim, text)]
-    delimlist.extend([(match.start(), match.end(), "stop") for match in re.finditer(rightdelim, text)])
-    delimlist.sort()
+    while i < n:
+        ch = text[i]
 
-    # Traverse text; along the way copy text not inside comment-delimiter pairs.
-    # Use stack ("unmatched_starts") to keep track of nesting
-    unmatched_starts = 0
-    prevpos = 0
-    processed_text = []
-    for (match_start, match_end, match_type) in delimlist:
-        if match_type == "start":
-            unmatched_starts += 1
-            if unmatched_starts == 1:                               # Beginning of new comment region
-                processed_text.append(text[prevpos:match_start])
-        elif match_type == "stop":
-            unmatched_starts -= 1
-            if unmatched_starts == 0:                               # End of comment region
-                prevpos = match_end
-            elif unmatched_starts == -1:                            # Error: more right delims than left delims
-                raise TreeError("Unmatched end-comment delimiter. Context: '{}'".format(text[prevpos-10:prevpos+10]))
+        # NEXUS single-quote handling (outside comments)
+        if depth == 0 and ch == "'":
+            # doubled quote inside quote => literal quote
+            if in_quote and i + 1 < n and text[i + 1] == "'":
+                out.append("'")
+                out.append("'")
+                i += 2
+                continue
+            in_quote = not in_quote
+            out.append(ch)
+            i += 1
+            continue
 
-    # Add final block of text if relevant (i.e., if text does not stop with rightdelim), return processed text
-    if prevpos < len(text):
-        processed_text.append(text[prevpos:])
-    return "".join(processed_text)
+        if not in_quote:
+            if ch == "[":
+                depth += 1
+                i += 1
+                continue
+            if ch == "]":
+                depth -= 1
+                if depth < 0:
+                    raise TreeError("Unmatched end-comment delimiter ']'")
+                i += 1
+                continue
+
+        if depth == 0:
+            out.append(ch)
+
+        i += 1
+
+    if depth != 0:
+        raise TreeError("Unmatched start-comment delimiter '['")
+
+    return "".join(out)
 
 ####################################################################################
 
