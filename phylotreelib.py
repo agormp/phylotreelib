@@ -6873,10 +6873,11 @@ class Nexustreefile(TreefileBase):
                                     """, re.IGNORECASE | re.VERBOSE)
 
         self.tree_header_pattern = re.compile(r"""
-                                    ^.*?u?tree              # Anything up to the first "(u)tree"
-                                    \s+(\*\s)?\s*           # tree name may be preceeded by "* "
-                                    [\w\-\/\.]+             # Tree name
-                                    \s*=                    # Whitespace and "="
+                                    ^.*?u?tree              # up to first tree/utree
+                                    \s+(\*\s)?\s*           # optional "*"
+                                    [\w\-\/\.]+             # tree name
+                                    (?:\s*\[[^\[\]]*\]\s*)* # optional comments (BEAST inserts these)
+                                    \s*=                    # equals
                                     """, re.IGNORECASE | re.DOTALL | re.VERBOSE)
 
         self.end_pattern = re.compile(r"\send(block)?;", re.IGNORECASE)
