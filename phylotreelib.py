@@ -58,57 +58,20 @@ import numpy as np
 # Various functions used by methods, that do not fit neatly in any class
 ###################################################################################################
 
-def remove_comments(text: str) -> str:
-    """Strip NEXUS/Newick bracket comments: [...], allowing nesting.
-    Ignores brackets inside single-quoted labels (NEXUS quoting, '' escapes).
-    Raises TreeError on unbalanced brackets.
+# Compiled regular expression for comment removal, stored on the module
+_COMMENT_NONNESTED_RE = re.compile(r"\[[^\[\]]*\]")
+
+def remove_comments(text):
+    """Fast removal of non-nested [ ... ] comments (BEAST/figtree-style).
+    Does NOT support nesting; 
     """
-    if "[" not in text:
-        return text
+        
+    if "[" in text:
+        if text.count("[") != text.count("]"):
+            raise TreeError("Unbalanced comment brackets")
+        text = _COMMENT_NONNESTED_RE.sub("", text)
 
-    out = []
-    depth = 0
-    in_quote = False
-    i = 0
-    n = len(text)
-
-    while i < n:
-        ch = text[i]
-
-        # NEXUS single-quote handling (outside comments)
-        if depth == 0 and ch == "'":
-            # doubled quote inside quote => literal quote
-            if in_quote and i + 1 < n and text[i + 1] == "'":
-                out.append("'")
-                out.append("'")
-                i += 2
-                continue
-            in_quote = not in_quote
-            out.append(ch)
-            i += 1
-            continue
-
-        if not in_quote:
-            if ch == "[":
-                depth += 1
-                i += 1
-                continue
-            if ch == "]":
-                depth -= 1
-                if depth < 0:
-                    raise TreeError("Unmatched end-comment delimiter ']'")
-                i += 1
-                continue
-
-        if depth == 0:
-            out.append(ch)
-
-        i += 1
-
-    if depth != 0:
-        raise TreeError("Unmatched start-comment delimiter '['")
-
-    return "".join(out)
+    return text
 
 ####################################################################################
 

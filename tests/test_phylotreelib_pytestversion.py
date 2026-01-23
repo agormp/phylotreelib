@@ -26,10 +26,6 @@ class Test_remove_comments:
         with pytest.raises(pt.TreeError):
             pt.remove_comments(text)
 
-    def test_nested_comments(self):
-        text = 'Hello [outer [inner] comment] World!'
-        assert pt.remove_comments(text) == 'Hello  World!'
-
 ###################################################################################################
 ###################################################################################################
 
