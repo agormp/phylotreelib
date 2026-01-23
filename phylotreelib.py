@@ -876,7 +876,6 @@ class Tree:
         self._pathdist_as_ndarray = None
         self._pathdist_as_ndarray_unroot = None
         self.path_dict = None
-        self.interner = None
         self._sorted_intnodes_deep = None
         self._sorted_intnodes_shallow = None
         self._rootdist = None
@@ -6650,20 +6649,13 @@ class CADepthEstimator():
 ###################################################################################################
 ###################################################################################################
 
-
 class TreefileBase():
     """Abstract base-class for representing tree file objects."""
 
     # Classes for specific formats inherit from this class and add extra stuff as needed.
     # NOTE: i am opening files in "read text" with encoding UTF-8. Will this work across platforms?
-    # Python note: interner is used to store leaves and intnodes during reading multiple trees
-    # from one treefile. If any tree is changed during reading (e.g. read and then reroot)
-    # then the interned value is changed, and the next read tree will no longer match the
-    # interned version (there is one more internal node for instance). This can lead to subtle
-    # crashes. I think only defense is to not use interning when planning to change trees online
 
-
-    def __init__(self, filename, filecontent, interner):
+    def __init__(self, filename, filecontent, strip_comments=True):
 
         num_args = (filename is not None) + (filecontent is not None)
         if num_args != 1:
@@ -6673,9 +6665,9 @@ class TreefileBase():
         else:
             self.treefile = open(filename, mode="rt", encoding="UTF-8")
 
-        self.interner = interner
         self.buffer = ""                # Used for keeping leftovers after reading whole line
         self.below_root = None
+        self.strip_comments = strip_comments
 
     ###############################################################################################
 
@@ -6780,8 +6772,8 @@ class TreefileBase():
 class Newicktreefile(TreefileBase):
     """Class representing Newick tree file. Iteration returns tree-objects"""
 
-    def __init__(self, filename=None, filecontent=None, interner=None):
-        TreefileBase.__init__(self, filename, filecontent, interner)
+    def __init__(self, filename=None, filecontent=None, strip_comments=True):
+        TreefileBase.__init__(self, filename, filecontent, strip_comments)
         # HACK!!! Minimal file format check:
         # Read first three lines in file, check whether any of them contains "#NEXUS".
         # If so then this is presumably NOT a Newick file (but a nexus file...) => exit.
@@ -6808,26 +6800,27 @@ class Newicktreefile(TreefileBase):
             self.treefile.close()
             raise StopIteration
         else:
-            treestring = remove_comments(treestring)
+            if self.strip_comments:                  
+                treestring = remove_comments(treestring)
             if returntree:
                 tree = Tree.from_string(treestring)
                 tree.below_root = self.below_root
                 return tree
+            else:
+                return treestring
 
 ###################################################################################################
 ###################################################################################################
-###################################################################################################
-
 
 class Nexustreefile(TreefileBase):
     """Class representing Nexus tree file. Iteration returns tree object or None"""
 
     ###############################################################################################
 
-    def __init__(self, filename=None, filecontent=None, interner=None):
+    def __init__(self, filename=None, filecontent=None, strip_comments=True):
         """Read past NEXUS file header, parse translate block if present"""
 
-        TreefileBase.__init__(self, filename, filecontent, interner)
+        TreefileBase.__init__(self, filename, filecontent, strip_comments)
 
         ###########################################################################################
 
@@ -6947,10 +6940,11 @@ class Nexustreefile(TreefileBase):
             self.treefile.close()
             raise StopIteration
 
-        # remove comments in brackets if present
+        # remove comments in brackets if requested
         # remove leading "tree NAME =" (compiled regexp "tree_header_pattern")
-        # Implementation note: does not deal with figtree comments!
-        treestring = remove_comments(treestring)
+        # Implementation note: does not parse figtree comments!
+        if self.strip_comments:                       # NEW
+            treestring = remove_comments(treestring)  # existing
         treestring = self.tree_header_pattern.sub("", treestring)
 
         # If "end;" statement has been reached: terminate for loop, do NOT return tree object
@@ -6968,12 +6962,11 @@ class Nexustreefile(TreefileBase):
 
 ###################################################################################################
 ###################################################################################################
-###################################################################################################
 
 class Treefile:
     """Factory for making Newick or Nexus treefile objects. Autodetects fileformat"""
 
-    def __new__(klass, filename, interner=None):
+    def __new__(klass, filename, strip_comments=True):
 
         def read_until_non_comment(filename):
             with open(filename, 'r') as file:
@@ -7002,9 +6995,9 @@ class Treefile:
 
         headertext = read_until_non_comment(filename)
         if "#nexus" in headertext.lower():
-            return Nexustreefile(filename, interner=interner)
+            return Nexustreefile(filename=filename, strip_comments=strip_comments)
         else:
-            return Newicktreefile(filename, interner=interner)
+            return Newicktreefile(filename=filename, strip_comments=strip_comments)
 
 ###################################################################################################
 ###################################################################################################
