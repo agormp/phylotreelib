@@ -2958,12 +2958,13 @@ class Tree:
 
     ###############################################################################################
 
-    def iter_cladeinfo(self, node2clade=None, keep_remchild_dict=False):
+    def iter_cladeinfo(self, node2clade=None, keep_remchild_dict=False, include_depth=True):
         """
         Stream clade info for each node.
 
         Yields:
             (node, clade, depth, nleaves)
+            depth=None if include_depth=False
 
         Side effects:
             If node2clade is a dict, fills node2clade[node] = clade.
@@ -2978,24 +2979,26 @@ class Tree:
             object_cache = {}
             Clade._class_cache[frozenset_leaves] = object_cache
 
-        # Local binds for speed
         remkid_items = self.remotechildren_mask_dict.items
         from_mask = Clade.from_mask
-        nodedepthdict = self.nodedepthdict
-        
-        if node2clade is None:
+
+        if include_depth:
+            nodedepthdict = self.nodedepthdict
             for node, remkids_mask in remkid_items():
                 clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
+                if node2clade is not None:
+                    node2clade[node] = clade
                 yield node, clade, nodedepthdict[node], remkids_mask.bit_count()
         else:
-            # fill node2clade
+            # depth is never computed
             for node, remkids_mask in remkid_items():
                 clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
-                node2clade[node] = clade
-                yield node, clade, nodedepthdict[node], remkids_mask.bit_count()
+                if node2clade is not None:
+                    node2clade[node] = clade
+                yield node, clade, None, remkids_mask.bit_count()
 
         if not keep_remchild_dict:
-            self._remotechildren_mask_dict = None
+            self._remotechildren_mask_dict = None        
 
     ###############################################################################################
 
@@ -5465,7 +5468,8 @@ class TreeSummary():
         cladeset = set() if tracktopo else None
 
         # Stream clades: update summary + (optionally) fill node2clade + collect topology
-        for node, clade, depth, nleaves in curtree.iter_cladeinfo(node2clade=node2clade):
+        for node, clade, depth, nleaves in curtree.iter_cladeinfo(node2clade=node2clade,
+                                                                  include_depth=trackdepth):
             if cladeset is not None:
                 cladeset.add(clade)
             s = cladesummary.get(clade)
