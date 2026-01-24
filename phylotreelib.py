@@ -2972,8 +2972,7 @@ class Tree:
         """
 
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
-        from_mask = Clade.from_mask
-
+        
         object_cache = Clade._class_cache.get(frozenset_leaves)
         if object_cache is None:
             object_cache = {}
@@ -2981,18 +2980,19 @@ class Tree:
 
         # Local binds for speed
         remkid_items = self.remotechildren_mask_dict.items
-        nodedepth = self.nodedepth
-
+        from_mask = Clade.from_mask
+        nodedepthdict = self.nodedepthdict
+        
         if node2clade is None:
             for node, remkids_mask in remkid_items():
                 clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
-                yield node, clade, nodedepth(node), remkids_mask.bit_count()
+                yield node, clade, nodedepthdict[node], remkids_mask.bit_count()
         else:
             # fill node2clade
             for node, remkids_mask in remkid_items():
                 clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
                 node2clade[node] = clade
-                yield node, clade, nodedepth(node), remkids_mask.bit_count()
+                yield node, clade, nodedepthdict[node], remkids_mask.bit_count()
 
         if not keep_remchild_dict:
             self._remotechildren_mask_dict = None
