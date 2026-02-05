@@ -5065,12 +5065,39 @@ class RootBipStruct:
 
 class QuantileAccumulator:
     """
-    Approximate quantiles using log-scaled buckets. Mergeable, one-pass.
+    Approximate quantiles via a mergeable log-bucket histogram (one pass).
     Used by TreeSummary objects when tracking credible intervals for branch lengths or 
     node depths.
     
-    - b uses (k+1) bits via direct multiplication: b = int(m * 2^(k+1))
-    - bucket key = (e << (k+1)) | b : Puts b into the lower k+1 bits, and e in higher bits
+    Idea is based on "log-bucket" histograms: based on input value compute integer that is
+    dictionary key for bin in histogram, and keep track of counts in each bin.
+    Multiple histograms can be merged by simply accumulating counts in same buckets
+    
+    Bucketing (positive x):
+      - Find m, e (mantissa, exponent) such that x = m * 2^e, 
+        m in [0.5, 1), e in integers
+      - b = int(m * 2**(k+1)) discretizes the mantissa into 2**k sub-bins per exponent
+        (since real m in [0.5,1) maps to integer b in [2**k, 2**(k+1)-1]).
+      - The bucket key is key = (e << (k+1)) | b, i.e. b stored in the low (k+1) bits
+        and e in the high bits, so sorting keys follows numeric order.
+
+    Representative value for a bucket:
+      - Decode e, b from the key and return the midpoint of the mantissa sub-bin:
+            m_hat = (b + 0.5) / 2**(k+1)
+            x_hat = m_hat * 2**e
+      - For any x in that bucket (x > 0), x is within half a mantissa sub-bin of x_hat,
+        giving a worst-case relative error bound:
+            |x_hat - x| / x <= 2**(-(k+1))   (worst case at m = 0.5)
+
+    Quantile definition used here:
+      - For probability p in [0,1], define rank j = 1 if p == 0 else j = ceil(p*n)
+        with ranks 1..n.
+      - quantile(p) returns the representative value of the bucket containing the
+        j-th order statistic (i.e., the first bucket where the cumulative count >= j).
+
+    Special handling:
+      - Non-finite or non-positive inputs are mapped to a single sentinel bucket and
+        have representative value 0.0.
     """
 
     __slots__ = ("k", "shift", "scale", "mask", "neg_bucket", "counts", "n")
