@@ -5119,13 +5119,13 @@ class QuantileAccumulator:
         return (e << self.shift) | b
         
     def _bucket_value(self, bkey):
-            """Representative value for a bucket key."""
-            if bkey == self.neg_bucket:
-                return 0.0
-            e = bkey >> self.shift
-            b = bkey & self.mask
-            mant = (b + 0.5) / self.scale
-            return math.ldexp(mant, e)      # mant * 2**e
+        """Representative value for a bucket key."""
+        if bkey == self.neg_bucket:
+            return 0.0
+        e = bkey >> self.shift
+        b = bkey & self.mask
+        mant = (b + 0.5) / self.scale
+        return math.ldexp(mant, e)      # mant * 2**e
 
     def add(self, x):
         bkey = self._bucket(x)
