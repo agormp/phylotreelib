@@ -5160,7 +5160,10 @@ class QuantileAccumulator:
         for p_idx,p in enumerate(probs):
             if not (0.00 <= p <= 1.0):
                 raise TreeError(f"quantile prob has to be in range 0-1: {p}")
-            rank = 1.0 + p * (n - 1)   # in [1..n]
+            if p == 0.0:
+                rank = 1.0
+            else:
+                rank = math.ceil(p * n)  # integer            
             targets.append((rank, p_idx))
         targets.sort(key=lambda x: x[0])
         
