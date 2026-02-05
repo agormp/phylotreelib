@@ -1,11 +1,11 @@
 import phylotreelib as pt
 import copy
 import math
+import numpy as np
 import pytest
 import random
 import textwrap
 from string import ascii_lowercase, digits
-
 
 ###################################################################################################
 ###################################################################################################
@@ -863,4 +863,372 @@ class Test_compute_sumtree:
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
     
 ###################################################################################################
-    
+###################################################################################################
+# Tests for QuantileAccumulator
+###################################################################################################
+###################################################################################################
+
+class Test_init_QuantileAccumulator:
+
+    def test_defaults(self):
+        qa = pt.QuantileAccumulator()
+        assert qa.k == 7
+        assert qa.shift == qa.k + 1
+        assert qa.scale == (1 << qa.shift)
+        assert qa.mask == qa.scale - 1
+        assert isinstance(qa.counts, dict) or "defaultdict" in type(qa.counts).__name__.lower()
+        assert qa.n == 0
+        assert isinstance(qa.neg_bucket, int)
+
+    def test_custom_k(self):
+        qa = pt.QuantileAccumulator(k=3)
+        assert qa.k == 3
+        assert qa.shift == 4
+        assert qa.scale == 16
+        assert qa.mask == 15
+
+###################################################################################################
+
+class Test__bucket_QuantileAccumulator:
+
+    def test_bucket_sentinel_for_nonpositive(self):
+        qa = pt.QuantileAccumulator()
+        assert qa._bucket(0.0) == qa.neg_bucket
+        assert qa._bucket(-1.0) == qa.neg_bucket
+
+    def test_bucket_sentinel_for_nonfinite(self):
+        qa = pt.QuantileAccumulator()
+        assert qa._bucket(float("nan")) == qa.neg_bucket
+        assert qa._bucket(float("inf")) == qa.neg_bucket
+        assert qa._bucket(float("-inf")) == qa.neg_bucket
+
+    def test_bucket_key_encodes_exponent_and_mantissa_bucket(self):
+        qa = pt.QuantileAccumulator(k=7)
+        x = 3.141592653589793
+        bkey = qa._bucket(x)
+        assert bkey != qa.neg_bucket
+
+        # decode
+        e = bkey >> qa.shift
+        b = bkey & qa.mask
+
+        # re-derive via frexp
+        m, e2 = math.frexp(x)
+        b2 = int(m * qa.scale)
+
+        assert e == e2
+        assert b == b2
+
+    def test_bucket_interval_contains_x(self):
+        """
+        For x>0 finite, bucket should correspond to interval:
+            mant in [b/scale, (b+1)/scale)
+            value in [ldexp(b/scale, e), ldexp((b+1)/scale, e))
+        and x should be in that interval.
+        """
+        qa = pt.QuantileAccumulator(k=10)
+        for x in [1e-12, 1e-6, 0.1, 1.0, 2.0, 10.0, 1e6, 1e12]:
+            bkey = qa._bucket(x)
+            e = bkey >> qa.shift
+            b = bkey & qa.mask
+
+            lo = math.ldexp(b / qa.scale, e)
+            hi = math.ldexp((b + 1) / qa.scale, e)
+
+            assert lo <= x
+            assert x < hi
+
+
+###################################################################################################
+
+class Test__bucket_value_QuantileAccumulator:
+
+    def test_bucket_value_for_sentinel_is_zero(self):
+        qa = pt.QuantileAccumulator()
+        assert qa._bucket_value(qa.neg_bucket) == 0.0
+
+    def test_bucket_value_within_bucket_interval(self):
+        qa = pt.QuantileAccumulator(k=8)
+        xs = [0.1, 0.5, 0.999, 1.0, 1.2345, 2.0, 12345.6]
+        for x in xs:
+            bkey = qa._bucket(x)
+            e = bkey >> qa.shift
+            b = bkey & qa.mask
+
+            lo = math.ldexp(b / qa.scale, e)
+            hi = math.ldexp((b + 1) / qa.scale, e)
+
+            v = qa._bucket_value(bkey)
+            assert lo <= v
+            assert v < hi
+
+###################################################################################################
+
+class Test_add_QuantileAccumulator:
+
+    def test_add_increments_n_and_bucket_count(self):
+        qa = pt.QuantileAccumulator(k=7)
+        assert qa.n == 0
+        x = 1.0
+        bkey = qa._bucket(x)
+
+        qa.add(x)
+        assert qa.n == 1
+        assert qa.counts[bkey] == 1
+
+        qa.add(x)
+        assert qa.n == 2
+        assert qa.counts[bkey] == 2
+
+    def test_add_sentinel_bucket_is_counted(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(0.0)
+        qa.add(-5.0)
+        assert qa.n == 2
+        assert qa.counts[qa.neg_bucket] == 2
+
+
+###################################################################################################
+
+class Test_merge_QuantileAccumulator:
+
+    def test_merge_combines_counts_and_n(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=7)
+
+        for x in [1.0, 2.0, 3.0]:
+            a.add(x)
+        for x in [2.0, 4.0]:
+            b.add(x)
+
+        a.merge(b)
+        assert a.n == 5
+        # Check some bucket counts explicitly
+        assert a.counts[a._bucket(2.0)] == 2
+
+    def test_merge_incompatible_shift_raises(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=6)  # different shift
+        with pytest.raises(ValueError):
+            a.merge(b)
+
+    def test_merge_incompatible_neg_bucket_raises(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=7)
+        b.neg_bucket = -123  # force incompatibility
+        with pytest.raises(ValueError):
+            a.merge(b)
+
+    def test_merge_equivalent_to_single_stream(self):
+        """
+        If you split data across accumulators and merge, the resulting quantiles
+        should match building one accumulator on all points (same bucket scheme).
+        """
+        data = [random.lognormvariate(0.0, 1.0) for _ in range(500)]
+        probs = [0.0, 0.1, 0.5, 0.9, 1.0]
+
+        all_in_one = pt.QuantileAccumulator(k=10)
+        for x in data:
+            all_in_one.add(x)
+
+        left = pt.QuantileAccumulator(k=10)
+        right = pt.QuantileAccumulator(k=10)
+        for x in data[:250]:
+            left.add(x)
+        for x in data[250:]:
+            right.add(x)
+
+        left.merge(right)
+
+        assert left.n == all_in_one.n
+        assert left.quantiles(probs) == all_in_one.quantiles(probs)
+
+
+###################################################################################################
+
+class Test_quantiles_QuantileAccumulator:
+
+    def test_quantiles_empty_raises(self):
+        qa = pt.QuantileAccumulator()
+        with pytest.raises(pt.TreeError):
+            qa.quantiles([0.5])
+
+    def test_quantiles_prob_out_of_range_raises(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(1.0)
+        with pytest.raises(pt.TreeError):
+            qa.quantiles([-0.01])
+        with pytest.raises(pt.TreeError):
+            qa.quantiles([1.01])
+
+    def test_quantiles_returns_same_length_and_order_as_input_probs(self):
+        qa = pt.QuantileAccumulator(k=12)
+        for x in [1.0, 2.0, 3.0, 4.0, 5.0]:
+            qa.add(x)
+
+        probs = [0.9, 0.1, 0.5, 0.0, 1.0]
+        out = qa.quantiles(probs)
+
+        assert len(out) == len(probs)
+
+        # Same call but reordered probs; compare by matching probabilities
+        # (not by assuming numeric values are "true quantiles")
+        out2 = qa.quantiles(sorted(probs))
+        mapping = dict(zip(sorted(probs), out2))
+        assert out == [mapping[p] for p in probs]
+
+    def test_quantiles_monotone_for_sorted_probs(self):
+        qa = pt.QuantileAccumulator(k=10)
+        data = [random.random() + 1e-9 for _ in range(200)]
+        for x in data:
+            qa.add(x)
+
+        probs = [0.0, 0.25, 0.5, 0.75, 1.0]
+        out = qa.quantiles(probs)
+        assert out == sorted(out)
+
+    def test_quantiles_bounds_reasonable(self):
+        qa = pt.QuantileAccumulator(k=10)
+        data = [random.lognormvariate(0.0, 1.0) for _ in range(500)]
+        for x in data:
+            qa.add(x)
+
+        bkeys = sorted(qa.counts)
+        vmin = qa._bucket_value(bkeys[0])
+        vmax = qa._bucket_value(bkeys[-1])
+
+        q0, q50, q1 = qa.quantiles([0.0, 0.5, 1.0])
+
+        assert q0 == vmin
+        assert q1 == vmax
+        assert q0 <= q50 <= q1
+        
+    def test_quantiles_p0_returns_min_bucket_value(self):
+        qa = pt.QuantileAccumulator(k=10)
+        for x in [0.8, 1.2, 2.5]:
+            qa.add(x)
+        bmin = qa._bucket_value(min(qa.counts))
+        assert qa.quantile(0.0) == bmin
+
+###################################################################################################
+
+class Test_quantile_QuantileAccumulator:
+
+    def test_quantile_calls_quantiles_singleton(self):
+        qa = pt.QuantileAccumulator(k=12)
+        for x in [1.0, 10.0, 100.0]:
+            qa.add(x)
+
+        q1 = qa.quantile(0.5)
+        q2 = qa.quantiles([0.5])[0]
+        assert q1 == q2
+
+    def test_quantile_empty_raises(self):
+        qa = pt.QuantileAccumulator()
+        with pytest.raises(pt.TreeError):
+            qa.quantile(0.5)
+
+    def test_quantile_prob_out_of_range_raises(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(1.0)
+        with pytest.raises(pt.TreeError):
+            qa.quantile(-0.1)
+        with pytest.raises(pt.TreeError):
+            qa.quantile(1.1)
+
+###################################################################################################
+
+class Test_precision_quantiles_vs_exact_order_statistic:
+
+    def ceil_rank(self, p, n):
+        """Your convention: rank j in {1..n}."""
+        if p == 0.0:
+            return 1
+        return int(math.ceil(p * n))
+
+
+    def test_quantile_matches_bucket_of_target_order_statistic(self):
+        """
+        For your definition (rank j = ceil(p*n), p=0 -> j=1),
+        qa.quantile(p) should equal the representative value of the bucket
+        that contains x_(j).
+        """
+        rng = random.Random()
+        data = [rng.lognormvariate(0.0, 1.0) for _ in range(4000)]  # all > 0
+        data_sorted = sorted(data)
+        probs = [0.0, 0.01, 0.05, 0.1, 0.5, 0.9, 0.95, 0.99, 1.0]
+
+        for k in [4, 7, 10, 12]:
+            qa = pt.QuantileAccumulator(k=k)
+            for x in data:
+                qa.add(x)
+
+            for p in probs:
+                j = self.ceil_rank(p, len(data_sorted))
+                xj = data_sorted[j - 1]
+
+                # The bucket that contains the target order statistic
+                bkey = qa._bucket(xj)
+                expected = qa._bucket_value(bkey)
+
+                got = qa.quantile(p)
+                assert got == expected, f"k={k}, p={p}, j={j}, xj={xj}, bkey={bkey}"
+
+    def test_quantile_within_relative_error_bound_of_target_order_statistic(self):
+        """
+        With positive finite data, bucket midpoint representation guarantees
+        relative error <= 2^(-(k+1)) with respect to any value in that bucket.
+        In particular, the returned value should be within this distance from the target order statistic x_(j).
+        """
+        rng = random.Random()
+        data = [rng.lognormvariate(0.0, 1.0) for _ in range(4000)]
+        data_sorted = sorted(data)
+        probs = [0.0, 0.01, 0.05, 0.1, 0.5, 0.9, 0.95, 0.99, 1.0]
+
+        for k in [4, 7, 10, 12]:
+            qa = pt.QuantileAccumulator(k=k)
+            for x in data:
+                qa.add(x)
+
+            eps = 2 ** (-(k + 1))       # worst-case relative error bound
+            tol = eps + 5e-15           # small slack for floating point
+
+            for p in probs:
+                j = self.ceil_rank(p, len(data_sorted))
+                xj = data_sorted[j - 1]         # exact quantile, given my rank definition
+                q_approx = qa.quantile(p)
+
+                lo = (1.0 - tol) * xj
+                hi = (1.0 + tol) * xj
+
+                assert lo <= q_approx <= hi, (
+                    f"k={k}, p={p}, j={j}, xj={xj}, q_approx={q_approx}, "
+                    f"band=[{lo},{hi}]"
+                )
+
+    def test_error_bound_monotone_in_k_against_target_order_statistic(self):
+        """
+        Stronger + stable than comparing to numpy: compare to the target order statistic x_(j)
+        under your definition. The worst-case bound shrinks as k increases.
+        Observed relative error should typically not increase when k increases.
+        """
+        rng = random.Random()
+        data = [rng.lognormvariate(0.0, 1.0) for _ in range(8000)]
+        data_sorted = sorted(data)
+        p = 0.99
+        j = self.ceil_rank(p, len(data_sorted))
+        xj = data_sorted[j - 1]
+
+        def relerr_for_k(k):
+            qa = pt.QuantileAccumulator(k=k)
+            for x in data:
+                qa.add(x)
+            q_approx = qa.quantile(p)
+            return abs(q_approx - xj) / xj
+
+        err_k4  = relerr_for_k(4)
+        err_k10 = relerr_for_k(10)
+        err_k14 = relerr_for_k(14)
+
+        assert err_k10 <= err_k4 + 1e-15
+        assert err_k14 <= err_k10 + 1e-15
