@@ -6389,7 +6389,7 @@ class TreePostProcessor():
         """
         Annotate sumtree nodes/branches with whatever TreeSummary tracked.
         """
-        
+                
         # Python note: a bit messy, and i suspect i am roundtripping some of these 
         # attributes unnecessarily.
         
