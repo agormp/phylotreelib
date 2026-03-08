@@ -6227,8 +6227,8 @@ class TreePostProcessor():
     ###############################################################################################
     
     def __init__(self, treesummary):
-        """Takes populated TreeSummary object as input, preparing this class to construct
-        summary tree from that class' attributes"""
+        """Takes populated TreeSummary object as input, preparing this class to annotate
+        provided target tree from that class' attributes"""
         
         self.treesum = treesummary
         if getattr(treesummary, "tree_count", 0) == 0:
