@@ -5,16 +5,17 @@
 import copy
 import functools
 import itertools
-from itertools import (takewhile,repeat)
 import math
 import random
 import re
 import statistics
 import sys
-from io import StringIO
-from operator import itemgetter
 from collections import Counter
 from collections import defaultdict
+from dataclasses import dataclass
+from io import StringIO
+from itertools import (takewhile,repeat)
+from operator import itemgetter
 import numpy as np
 #from line_profiler import profile
 
@@ -836,6 +837,20 @@ class NewickStringParser:
 ###################################################################################################
 ###################################################################################################
 
+@dataclass(frozen=True)
+class PrintSpec:
+    node_attrs = None
+    branch_attrs = None
+    ci_labels = None
+    labelfield = "label"
+    precision = 6
+    printdist = True
+    printlabels = True
+    print_meta = False
+
+###################################################################################################
+###################################################################################################
+
 class Tree:
     """Class representing basic phylogenetic tree object."""
 
@@ -857,7 +872,7 @@ class Tree:
     # Cache achieves interning (one copy per treetype of the variables in the tuple)
     # and also avoiding repeated construction of the variables
     _class_cache = {}
-
+    
     def __init__(self):
         self.child_dict = {}
         self._nodedict = None
@@ -883,6 +898,7 @@ class Tree:
         self._topology_bipart = None
         self._topology_clade = None
         self._cached_attributes = None
+        self._print_spec = None
 
     ###############################################################################################
 
@@ -2750,24 +2766,47 @@ class Tree:
 
     ###############################################################################################
 
+    def set_print_spec(self, node_attrs=None, branch_attrs=None,
+                       ci_labels=None, labelfield=None,
+                       precision=None, printdist=None,
+                       printlabels=None, print_meta=None):
+        cur = getattr(self, "_print_spec", PrintSpec())
+        self._print_spec = PrintSpec(
+            node_attrs=tuple(node_attrs) if node_attrs is not None else cur.node_attrs,
+            branch_attrs=tuple(branch_attrs) if branch_attrs is not None else cur.branch_attrs,
+            ci_labels=tuple(ci_labels) if ci_labels is not None else cur.ci_labels,
+            labelfield=labelfield if labelfield is not None else cur.labelfield,
+            precision=int(precision) if precision is not None else cur.precision,
+            printdist=bool(printdist) if printdist is not None else cur.printdist,
+            printlabels=bool(printlabels) if printlabels is not None else cur.printlabels,
+            print_meta=bool(print_meta) if print_meta is not None else cur.print_meta,
+        )
+        return self
+
+    ###############################################################################################
+
+    def get_print_spec(self):
+        if self._print_spec is None:
+            self._print_spec = PrintSpec()
+        return self._print_spec
+
+    ###############################################################################################
+
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6,
                transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
                print_meta=False):
         """Returns Newick format tree string representation of tree object, with optional metacomments"""
-               
-        if node_attributes is None:
-            node_attributes = getattr(self, "_print_node_attributes", None)
-        if branch_attributes is None:
-            branch_attributes = getattr(self, "_print_branch_attributes", None)
-        if ci_labels is None:
-            ci_labels = getattr(self, "_ci_labels", None)
-            
-        # If meta printing is disabled, suppress all meta-related output
-        if not print_meta:
-            node_attributes = None
-            branch_attributes = None
-            ci_labels = None        
-
+        
+        spec = self.get_print_spec()
+        if precision is None: precision = spec.precision
+        if labelfield is None: labelfield = spec.labelfield
+        if node_attributes is None: node_attributes = spec.node_attrs
+        if branch_attributes is None: branch_attributes = spec.branch_attrs
+        if ci_labels is None: ci_labels = spec.ci_labels
+        if printdist is None: printdist = spec.printdist
+        if printlabels is None: printlabels = spec.printlabels
+        if print_meta is None: print_meta = spec.print_meta
+        
         def create_metacomment(struct, attributes, ci_labels, ci_prefix=None):
             """Helper function to create metacomment strings based on attributes of a structure
             - skips missing attributes
