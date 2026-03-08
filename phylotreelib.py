@@ -6637,12 +6637,16 @@ class CADepthEstimator():
 
         return CAPlan(queries=queries, leaves=sorted_leaf_tup)
     
+    ###############################################################################################
+    
     @staticmethod
     def _online_update(s, x: float):
         s.n += 1
         delta = x - s.mean
         s.mean += delta / s.n
         s.M2 += delta * (x - s.mean)
+
+    ###############################################################################################
 
     @staticmethod
     def _merge_online(a, b):
@@ -6653,6 +6657,8 @@ class CADepthEstimator():
         a.M2 = a.M2 + b.M2 + delta * delta * (a.n * b.n / ntot)
         a.n = ntot
 
+    ###############################################################################################
+
     @staticmethod
     def _finalize(s):
         if s.n == 0:
@@ -6661,6 +6667,8 @@ class CADepthEstimator():
             return (s.mean, None)
         var = s.M2 / (s.n - 1)
         return (s.mean, math.sqrt(var))
+
+    ###############################################################################################
 
     def add_tree(self, input_tree):
         nodedepth = input_tree.nodedepthdict
@@ -6687,6 +6695,8 @@ class CADepthEstimator():
             if trackci:
                 s.quantiles.add(depth)
     
+    ###############################################################################################
+
     def merge(self, other):
         if self.trackci != other.trackci or self.plan.probs != other.plan.probs:
             raise TreeError("Incompatible CADepthEstimator merge (CI config differs)")
@@ -6700,6 +6710,8 @@ class CADepthEstimator():
                 if self.trackci:
                     s_self.quantiles.merge(s_other.quantiles)
     
+    ###############################################################################################
+
     def write_into(self, sumtree):
         probs = self.plan.probs
         ci_labels = self.plan.ci_labels
