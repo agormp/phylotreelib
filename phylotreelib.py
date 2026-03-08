@@ -10,6 +10,7 @@ import random
 import re
 import statistics
 import sys
+import warnings
 from collections import Counter
 from collections import defaultdict
 from dataclasses import dataclass
@@ -2770,7 +2771,7 @@ class Tree:
                        ci_labels=None, labelfield=None,
                        precision=None, printdist=None,
                        printlabels=None, print_meta=None):
-        cur = getattr(self, "_print_spec", PrintSpec())
+        cur = self.get_print_spec()
         self._print_spec = PrintSpec(
             node_attrs=tuple(node_attrs) if node_attrs is not None else cur.node_attrs,
             branch_attrs=tuple(branch_attrs) if branch_attrs is not None else cur.branch_attrs,
@@ -2792,20 +2793,49 @@ class Tree:
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6,
+    def newick(self, printdist=None, printlabels=None, labelfield=None, precision=None,
                transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
-               print_meta=False):
+               print_meta=None):
         """Returns Newick format tree string representation of tree object, with optional metacomments"""
-        
+
         spec = self.get_print_spec()
-        if precision is None: precision = spec.precision
-        if labelfield is None: labelfield = spec.labelfield
-        if node_attributes is None: node_attributes = spec.node_attrs
-        if branch_attributes is None: branch_attributes = spec.branch_attrs
-        if ci_labels is None: ci_labels = spec.ci_labels
-        if printdist is None: printdist = spec.printdist
+
+        # 1) Use PrintSpec when args are omitted
+        if precision is None:   precision   = spec.precision
+        if labelfield is None:  labelfield  = spec.labelfield
+        if printdist is None:   printdist   = spec.printdist
         if printlabels is None: printlabels = spec.printlabels
-        if print_meta is None: print_meta = spec.print_meta
+        if print_meta is None:  print_meta  = spec.print_meta
+
+        if node_attributes is None:
+            node_attributes = spec.node_attrs
+            if node_attributes is None and hasattr(self, "_print_node_attributes"):
+                warnings.warn(
+                    "Tree._print_node_attributes is deprecated; use Tree.set_print_spec(node_attrs=...).",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                node_attributes = getattr(self, "_print_node_attributes", None)
+
+        if branch_attributes is None:
+            branch_attributes = spec.branch_attrs
+            if branch_attributes is None and hasattr(self, "_print_branch_attributes"):
+                warnings.warn(
+                    "Tree._print_branch_attributes is deprecated; use Tree.set_print_spec(branch_attrs=...).",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                branch_attributes = getattr(self, "_print_branch_attributes", None)
+
+        if ci_labels is None:
+            ci_labels = spec.ci_labels
+            if ci_labels is None and hasattr(self, "_ci_labels"):
+                warnings.warn(
+                    "Tree._ci_labels is deprecated; use Tree.set_print_spec(ci_labels=...).",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                ci_labels = getattr(self, "_ci_labels", None)
         
         def create_metacomment(struct, attributes, ci_labels, ci_prefix=None):
             """Helper function to create metacomment strings based on attributes of a structure
@@ -2894,20 +2924,12 @@ class Tree:
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6,
-              translateblock=False,  node_attributes=None, branch_attributes=None,
+    def nexus(self, printdist=None, printlabels=None, labelfield=None, precision=None,
+              translateblock=False, node_attributes=None, branch_attributes=None,
               colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
-              print_meta=False):
+              print_meta=None):
+          
         """Returns nexus format tree as a string"""
-
-        # If these are not passed to the function: Check if tree object itself has them as attributes
-        # (eg: TreeSummary.compute_sumtree adds them in this way)
-        if node_attributes is None:
-            node_attributes = getattr(self, "_print_node_attributes", None)
-        if branch_attributes is None:
-            branch_attributes = getattr(self, "_print_branch_attributes", None)
-        if ci_labels is None:
-            ci_labels = getattr(self, "_ci_labels", None)
 
         # Construct header
         if colorlist:
@@ -6007,9 +6029,11 @@ class TreeSummary():
                 node_attrs.update({"depth_median", "ci"})
 
         # attach for printing
-        sumtree._print_node_attributes = tuple(sorted(node_attrs))
-        sumtree._print_branch_attributes = tuple(sorted(branch_attrs))
-        sumtree._ci_labels = self.ci_labels   
+        sumtree.set_print_spec(
+            node_attrs=tuple(sorted(node_attrs)),
+            branch_attrs=tuple(sorted(branch_attrs)),
+            ci_labels=self.ci_labels,
+        )
         
         return sumtree
 
