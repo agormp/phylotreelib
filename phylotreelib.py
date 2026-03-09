@@ -5952,95 +5952,133 @@ class TreeSummary():
                 self._cladetoposummary[cladetopology]=other._cladetoposummary[cladetopology]
 
     ###############################################################################################
+    # Deprecated wrappers -> SummaryTreeBuilder
     ###############################################################################################
-    
-    # Temporary wrappers for methods originally in TreeSummary but now in SummaryTreeBuilder
-    # Remove when tests and client scripts are updated (after period with deprecation warning)
-    
+
     def contree(self, cutoff=0.5, allcompat=False):
+        warnings.warn(
+            "TreeSummary.contree() is deprecated and will be removed in a future release. "
+            "Use SummaryTreeBuilder(treesummary).contree(cutoff=..., allcompat=...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         stb = SummaryTreeBuilder(self)
-        return stb.contree(cutoff, allcompat)
-     
+        return stb.contree(cutoff=cutoff, allcompat=allcompat)
+
     def max_bipart_cred_tree(self):
+        warnings.warn(
+            "TreeSummary.max_bipart_cred_tree() is deprecated and will be removed in a future release. "
+            "Use SummaryTreeBuilder(treesummary).max_bipart_cred_tree() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         stb = SummaryTreeBuilder(self)
         return stb.max_bipart_cred_tree()
-        
+
     def max_clade_cred_tree(self):
+        warnings.warn(
+            "TreeSummary.max_clade_cred_tree() is deprecated and will be removed in a future release. "
+            "Use SummaryTreeBuilder(treesummary).max_clade_cred_tree() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         stb = SummaryTreeBuilder(self)
         return stb.max_clade_cred_tree()
-        
+
     def hipstr_tree(self, majrule=False):
+        warnings.warn(
+            "TreeSummary.hipstr_tree() is deprecated and will be removed in a future release. "
+            "Use SummaryTreeBuilder(treesummary).hipstr_tree(majrule=...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         stb = SummaryTreeBuilder(self)
-        return stb.hipstr_tree(majrule)
-      
+        return stb.hipstr_tree(majrule=majrule)
+
     def log_bipart_credibility(self, biptopology):
+        warnings.warn(
+            "TreeSummary.log_bipart_credibility() is deprecated and will be removed in a future release. "
+            "Use SummaryTreeBuilder(treesummary).log_bipart_credibility(biptopology) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         stb = SummaryTreeBuilder(self)
         return stb.log_bipart_credibility(biptopology)
-        
+
     def log_clade_credibility(self, cladetopology):
+        warnings.warn(
+            "TreeSummary.log_clade_credibility() is deprecated and will be removed in a future release. "
+            "Use SummaryTreeBuilder(treesummary).log_clade_credibility(cladetopology) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         stb = SummaryTreeBuilder(self)
         return stb.log_clade_credibility(cladetopology)
-    
+
     ###############################################################################################
+    # Deprecated wrappers -> TreePostProcessor
     ###############################################################################################
-    
-    # Temporary wrappers for methods originally in TreeSummary but now in TreePostProcessor
-    # Remove when tests and client scripts are updated (after period with deprecation warning)
 
     def root_maxfreq(self, sumtree):
+        warnings.warn(
+            "TreeSummary.root_maxfreq() is deprecated and will be removed in a future release. "
+            "Use TreePostProcessor(treesummary).root_maxfreq(sumtree) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         tpp = TreePostProcessor(self)
         return tpp.root_maxfreq(sumtree)
 
     def set_rootcredibility(self, sumtree, precision=6):
+        warnings.warn(
+            "TreeSummary.set_rootcredibility() is deprecated and will be removed in a future release. "
+            "Use TreePostProcessor(treesummary).set_rootcredibility(sumtree, precision=...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         tpp = TreePostProcessor(self)
-        return tpp.set_rootcredibility(sumtree, precision=6)
+        return tpp.set_rootcredibility(sumtree, precision=precision)
 
     def set_mean_node_depths(self, sumtree):
+        warnings.warn(
+            "TreeSummary.set_mean_node_depths() is deprecated and will be removed in a future release. "
+            "Use TreePostProcessor(treesummary).set_mean_node_depths(sumtree) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         tpp = TreePostProcessor(self)
         return tpp.set_mean_node_depths(sumtree)
 
     def set_biplen_on_existing_tree(self, sumtree):
+        warnings.warn(
+            "TreeSummary.set_biplen_on_existing_tree() is deprecated and will be removed in a future release. "
+            "Use TreePostProcessor(treesummary).set_biplen_on_existing_tree(sumtree) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         tpp = TreePostProcessor(self)
         return tpp.set_biplen_on_existing_tree(sumtree)
 
     def annotate_sumtree(self, sumtree):
+        warnings.warn(
+            "TreeSummary.annotate_sumtree() is deprecated and will be removed in a future release. "
+            "Use TreePostProcessor(treesummary).annotate_sumtree(sumtree) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         tpp = TreePostProcessor(self)
         return tpp.annotate_sumtree(sumtree)
 
     def set_clade_credibility(self, tree, precision=6):
-        tpp = TreePostProcessor(self)
-        return tpp.set_clade_credibility(tree, precision=6)
-
-    ###############################################################################################
-    ###############################################################################################
-
-    # Temporary wrapper for set_ca_node_depts method, which is now handled by CADepthEstimator
-    # Remove when tests and client scripts are updated (after period with deprecation warning)
-
-    def set_ca_node_depths(self, sumtree, count_burnin_filename_list):
-        """
-        Backwards-compatible wrapper:
-        - builds CA plan from sumtree
-        - streams input trees from files (serial)
-        - writes depth/depth_sd (+ optional CI/median) into sumtree
-        """
-        plan = CADepthEstimator.build_plan(
-            sumtree,
-            trackci=self.trackci and bool(self.ci_probs),
-            ci_probs=self.ci_probs,
+        warnings.warn(
+            "TreeSummary.set_clade_credibility() is deprecated and will be removed in a future release. "
+            "Use TreePostProcessor(treesummary).set_clade_credibility(tree, precision=...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        est = CADepthEstimator(plan, trackci=self.trackci and bool(self.ci_probs))
-
-        for count, burnin, filename in count_burnin_filename_list:
-            with Treefile(filename) as tf:     # or pt.Treefile if you prefer
-                for _ in range(burnin):
-                    tf.readtree(returntree=False)
-                for _ in range(burnin, count):
-                    t = tf.readtree(returntree=True)
-                    est.add_tree(t)
-
-        return est.write_into(sumtree)
-
+        tpp = TreePostProcessor(self)
+        return tpp.set_clade_credibility(tree, precision=precision)
+        
     ###############################################################################################
     ###############################################################################################
     
