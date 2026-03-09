@@ -1363,66 +1363,103 @@ class Tree:
         return obj
 
     ###############################################################################################
-
+        
     @classmethod
     def from_branchinfo(cls, parentlist, childlist, lenlist=None, **attrlists):
-        """Constructor: Tree object from information about all branches in tree
+        """Constructor: Tree object from information about all branches in tree.
 
-        Information about one branch is conceptually given as:
-            parentnodeID, childnodeID, [length], [other named attributes...]
+        Information about one branch is conceptually:
+            parent, child, [length], [other named branch attributes...]
 
-        The function takes as input 2 or more separate lists containing:
-            IDs of parents (internal nodes, integer or string)
-            IDs of children (internal or leaf nodes, integer or string)
-            Length of branches (optional)
-            Any number of additional attributes given as <keyword=list>
+        Parameters
+        ----------
+        parentlist, childlist : sequence
+            Parallel lists of parent IDs and child IDs for each branch.
+            Parent IDs are internal nodes; child IDs can be internal or leaves.
+        lenlist : sequence[float] or None
+            Parallel list of branch lengths. If None, all lengths default to 0.0.
+        **attrlists :
+            Additional parallel lists of per-branch attributes, keyed by attribute name.
+            Each list must have the same length as parentlist.
 
-        The lists are assumed to have same length and be in same order (so index n in
-        each list corresponds to same branch).
+            Special case:
+              - 'label' is supported and will be stored in Branchstruct.label.
 
-        Note: most IDs appear multiple times in lists
-        Note 2: can be used as workaround so user can specify IDs for internal nodes"""
+            All other attribute names must be valid Branchstruct attributes (i.e. present
+            in Branchstruct.__slots__). Unknown attribute names raise TreeError.
+
+        Notes
+        -----
+        - This constructor sets obj.leaves and obj.root based on the branch table.
+        - This method does not configure printing; use tree.set_print_spec(...) if desired.
+        """
 
         nbranches = len(parentlist)
         if len(childlist) != nbranches:
-            raise TreeError(f"List 'childlist' does not have same length as parentlist: {len(childlist)} != {len(parentlist)}")
+            msg = f"List 'childlist' does not have same length as parentlist: {len(childlist)} != {nbranches}"
+            raise TreeError(msg)
+
         if lenlist is None:
-            lenlist = [0.0]*nbranches
+            lenlist = [0.0] * nbranches
         elif len(lenlist) != nbranches:
-            raise TreeError(f"List 'childlist' does not have same length as parentlist: {len(lenlist)} != {len(parentlist)}")
+            msg = f"List 'lenlist' does not have same length as parentlist: {len(lenlist)} != {nbranches}"
+            raise TreeError(msg)
+
+        # Validate attrlists lengths
         for attrname, attrlist in attrlists.items():
             if len(attrlist) != nbranches:
-                raise TreeError(f"List '{attrname}' does not have same length as parentlist: {len(attrlist)} != {len(parentlist)}")
-        obj = cls()                    # Ensures class will be correct also for subclasses of Tree
+                msg = f"List '{attrname}' does not have same length as parentlist: {len(attrlist)} != {nbranches}"
+                raise TreeError(msg)
+
+        # Disallow conflicts / nonsense
+        if "length" in attrlists:
+            msg = "from_branchinfo: do not pass 'length' via attrlists; use lenlist for branch lengths."
+            raise TreeError(msg)
+
+        allowed_branch_attrs = set(Branchstruct.__slots__)
+        allowed_branch_attrs.discard("length")  # handled via lenlist
+        # 'label' is allowed and handled specially via ctor, but keep it in allowed set.
+
+        # Fail fast on unknown attrs (typos etc.)
+        unknown = [a for a in attrlists.keys() if a not in allowed_branch_attrs]
+        if unknown:
+            msg = "from_branchinfo: unknown Branchstruct attribute name(s): {unknown}. Allowed: {sorted(allowed_branch_attrs)}"
+            raise TreeError(msg)
+
+        obj = cls()  # ensures subclass type
 
         for i in range(nbranches):
-            parent = parentlist[i]     # Perhaps check types are OK?
+            parent = parentlist[i]
             child = childlist[i]
-            blen = lenlist[i]
-            if attrlists:
-                attrdict = {name: value[i] for name,value in attrlists.items()}
-            else:
-                attrdict = dict()
-            branch = Branchstruct(blen, **attrdict)
-            if parent in obj.child_dict:
-                obj.child_dict[parent][child] = branch
-            else:
-                obj.child_dict[parent] = { child:branch }
+            blen = float(lenlist[i])
 
-        # Leaves are the childnodes that are not in parentlist
+            # Create branch with length + optional label
+            label = attrlists["label"][i] if "label" in attrlists else ""
+            branch = Branchstruct(length=blen, label=label)
+
+            # Set any remaining attributes (excluding label, already done)
+            for attrname, attrlist in attrlists.items():
+                if attrname == "label":
+                    continue
+                setattr(branch, attrname, attrlist[i])
+
+            obj.child_dict.setdefault(parent, {})[child] = branch
+
+        # Leaves are children that never appear as parents
         obj.leaves = set(childlist) - set(parentlist)
 
-        # Root node is the parent node that is not also in childlist
-        diffset = set(parentlist) - set(childlist)
-        obj.root = diffset.pop()
+        # Root is the parent that never appears as a child
+        roots = set(parentlist) - set(childlist)
+        if len(roots) != 1:
+            msg = f"from_branchinfo: expected exactly 1 root, found {len(roots)}: {sorted(roots)}"
+            raise TreeError(msg)
+        obj.root = next(iter(roots))
 
-        # Sanity check: are there any non-root, internal nodes that have no parent?
-        # This would mean that sub-tree is not linked to rest of tree structure (missing branches)
-        nonroot_intnodes = obj.intnodes - set([obj.root])
+        # Sanity check: non-root internal nodes must appear as a child at least once
+        nonroot_intnodes = obj.intnodes - {obj.root}
         orphans = nonroot_intnodes - set(childlist)
         if orphans:
-            msg = (f"Missing branch-information: these (non-root) internal nodes have no parent: "
-                   f"{list(orphans)}")
+            msg = "Missing branch-information: these (non-root) internal nodes have no parent: {sorted(orphans)}"
             raise TreeError(msg)
 
         return obj
