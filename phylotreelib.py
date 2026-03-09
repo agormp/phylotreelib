@@ -854,12 +854,93 @@ class PrintSpec:
 ###################################################################################################
 ###################################################################################################
 
+def configure_basic_printing(tree, precision=6, print_meta=False, printlabels=True,
+                             printdist=True, labelfield="label",
+                             node_attrs=None, branch_attrs=None, ci_labels=None):
+    """
+    Configure default printing for an arbitrary Tree via its PrintSpec.
+
+    This is a lightweight helper that only affects presentation (Tree.newick / Tree.nexus).
+    It does NOT modify the tree topology, branch lengths, or annotations stored on
+    Branchstruct / Nodestruct objects.
+
+    Parameters
+    ----------
+    tree : Tree
+        The tree to configure.
+    precision : int, default 6
+        Number formatting precision used by Tree.newick / Tree.nexus (general format 'g').
+    print_meta : bool, default False
+        Whether to emit BEAST/FigTree-style meta-comments (`[&key=value,...]`).
+        If False, all meta output is suppressed even if node_attrs/branch_attrs/ci_labels
+        are provided.
+    printlabels : bool, default True
+        Whether to print internal node labels (the token after ')' in Newick).
+        Labels are taken from the branch attribute named by `labelfield`.
+    printdist : bool, default True
+        Whether to print branch lengths (`:length`).
+    labelfield : str, default "label"
+        Name of the Branchstruct attribute to use for internal node labels
+        (e.g. "label", "bipartition_cred", "rootcred", ...).
+    node_attrs : sequence[str] or None, default None
+        Node attributes to emit as meta-comments on nodes (from Nodestruct on each node).
+        Example: ("clade_cred", "depth", "depth_sd").
+    branch_attrs : sequence[str] or None, default None
+        Branch attributes to emit as meta-comments on branches (from Branchstruct).
+        Example: ("bipartition_cred", "length_sd", "rootcred").
+    ci_labels : sequence[str] or None, default None
+        If provided and the struct has a `.ci` dict, emit CI ranges as meta-comments.
+        This is interpreted by Tree.newick's metacomment helper:
+          - for each label in ci_labels, prints something like:
+              "<prefix>_<label>={lo,hi}"
+          - where prefix is "depth" for node comments and "length" for branch comments.
+
+    Returns
+    -------
+    Tree
+        The same tree (mutated in-place), returned for convenience/chaining.
+
+    Examples
+    --------
+    # Plain Newick, no meta:
+    configure_basic_printing(tree, print_meta=False)
+
+    # Print support values as internal labels:
+    configure_basic_printing(tree, labelfield="bipartition_cred", printlabels=True)
+
+    # Emit meta-comments for a few attributes:
+    configure_basic_printing(
+        tree,
+        print_meta=True,
+        node_attrs=("clade_cred",),
+        branch_attrs=("bipartition_cred", "length_sd"),
+        ci_labels=("95%_CI",),
+        precision=7,
+    )
+    """
+    tree.set_print_spec(
+        node_attrs=tuple(node_attrs) if node_attrs is not None else None,
+        branch_attrs=tuple(branch_attrs) if branch_attrs is not None else None,
+        ci_labels=tuple(ci_labels) if ci_labels is not None else None,
+        labelfield=labelfield,
+        precision=precision,
+        print_meta=print_meta,
+        printlabels=printlabels,
+        printdist=printdist,
+    )
+    return tree
+    
+###################################################################################################
+
 def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=None,
                                precision=7, print_meta=True, printlabels=True,
                                printdist=True):
     """
     Set Tree.print_spec based on common summary-tree conventions.
     Does not modify computed values; only presentation.
+    This helper chooses a conventional `labelfield` depending on summary tree type
+    (e.g. bipartition support for consensus trees).
+    For non-summary trees, use configure_basic_printing() or Tree.set_print_spec().
     """
     node_attrs = set()
     branch_attrs = set()
