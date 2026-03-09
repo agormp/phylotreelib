@@ -3036,6 +3036,16 @@ class Tree:
                        ci_labels=None, labelfield=None,
                        precision=None, printdist=None,
                        printlabels=None, print_meta=None):
+        """
+        Set default printing options (PrintSpec) for this Tree.
+
+        The PrintSpec controls the defaults used by Tree.newick() and Tree.nexus()
+        when those methods are called without explicit arguments.
+
+        Any argument passed as None leaves the existing PrintSpec value unchanged.
+        Returns self for convenience.
+        """
+                       
         cur = self.get_print_spec()
         self._print_spec = PrintSpec(
             node_attrs=tuple(node_attrs) if node_attrs is not None else cur.node_attrs,
@@ -3052,6 +3062,13 @@ class Tree:
     ###############################################################################################
 
     def get_print_spec(self):
+        """
+        Return the Tree's PrintSpec (creating a default one if missing).
+
+        The PrintSpec stores default formatting/annotation choices used by
+        Tree.newick() and Tree.nexus() when called without explicit arguments.
+        """
+        
         if self._print_spec is None:
             self._print_spec = PrintSpec()
         return self._print_spec
@@ -3061,7 +3078,29 @@ class Tree:
     def newick(self, printdist=None, printlabels=None, labelfield=None, precision=None,
                transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
                print_meta=None):
-        """Returns Newick format tree string representation of tree object, with optional metacomments"""
+        """
+        Return a Newick string for this tree.
+
+        Parameters are optional. Any parameter left as None falls back to the tree's
+        current PrintSpec (see Tree.set_print_spec / Tree.get_print_spec).
+
+        Printing conventions
+        --------------------
+        - Branch lengths are printed as ':<length>' if printdist is True.
+        - Internal node labels (the token after ')') are printed if printlabels is True.
+          Labels are taken from the incoming Branchstruct attribute named by `labelfield`
+          (default: 'label').
+        - Meta-comments use BEAST/FigTree style: '[&key=value,...]'.
+          Meta output is produced only when print_meta is True. When enabled:
+            * `node_attributes` selects Nodestruct attributes to include at each node.
+            * `branch_attributes` selects Branchstruct attributes to include on each branch.
+            * If ci_labels is provided and struct.ci exists, CI ranges are emitted as
+              '<prefix>_<label>={lo,hi}' where prefix is 'depth' or 'length'.
+
+        Notes
+        -----
+        Tip labels are the leaf names (or transdict values if provided).
+        """
 
         spec = self.get_print_spec()
 
@@ -3173,8 +3212,23 @@ class Tree:
               colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
               print_meta=None):
               
-        """Returns nexus format tree as a string"""
+        """
+        Return a NEXUS 'begin trees;' block containing this tree.
 
+        This method wraps Tree.newick() for the actual tree string; all printing options
+        (lengths, labels, meta-comments, precision, etc.) follow the same rules as
+        Tree.newick(): explicit arguments override values stored in the tree's PrintSpec.
+
+        Parameters
+        ----------
+        translateblock : bool, default False
+            If True, include a NEXUS translate block and use numeric tip labels in the tree
+            string. This can improve compatibility with some NEXUS consumers.
+
+        colorlist, colorfg, colorbg :
+            Optional FigTree-style color annotations for taxa.
+        """
+              
         # Construct header
         if colorlist:
             header = "#NEXUS\nbegin taxa\n\tdimensions ntax={};\n".format(len(self.leaflist()))
@@ -6202,6 +6256,15 @@ class TreeSummary():
     def compute_sumtree(self, treetype="con", blen="biplen", rooting=None, og=None, 
                         count_burnin_filename_list=None):
         """Convenience wrapper around phylotreelib.build_sumtree() for interactive use."""
+        """
+        Compute + annotate a summary tree from this TreeSummary.
+
+        This method builds the tree topology, roots it (optional), sets branch lengths/node depths,
+        and writes summary annotations onto the returned Tree.
+
+        Printing is not configured here. Use configure_sumtree_printing(sumtree, ...) or
+        sumtree.set_print_spec(...) before calling sumtree.newick()/sumtree.nexus().
+        """
                         
         return build_sumtree(self, treetype=treetype, blen=blen, rooting=rooting, og=og,
                              count_burnin_filename_list=count_burnin_filename_list)
