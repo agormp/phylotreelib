@@ -567,7 +567,8 @@ class TreeOutput(TreeTestBase):
         for i in range(10):
             tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
             treesummary.add_tree(tree)
-        contree = treesummary.contree()
+        stb = pt.SummaryTreeBuilder(treesummary)
+        contree = stb.contree()
         nexus_string = contree.nexus()
         nexusfile = pt.Nexustreefile(filecontent=nexus_string)
         mytree = next(nexusfile)
@@ -622,7 +623,8 @@ class Treesummarytests(TreeTestBase):
         tf2 = pt.Nexustreefile(self.t2_fname)
         for t in tf2:
             ts.add_tree(t)
-        own_contree = ts.contree()
+        stb = pt.SummaryTreeBuilder(ts)
+        own_contree = stb.contree()
         own_bipdict = own_contree.bipdict()
         mb_bipdict = self.mb_contree.bipdict()
 
@@ -654,7 +656,8 @@ class Treesummarytests(TreeTestBase):
             ts2.add_tree(t)
         tf2.close()
         ts1.update(ts2)
-        own_contree = ts1.contree()
+        stb = pt.SummaryTreeBuilder(ts1)
+        own_contree = stb.contree()
         own_bipdict = own_contree.bipdict()
         mb_bipdict = self.mb_contree.bipdict()
 
