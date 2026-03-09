@@ -840,9 +840,8 @@ class NewickStringParser:
 
 class PrintSpec:
     
-    def __init__(self, node_attrs=None, branch_attrs = None, ci_labels = None, 
-                labelfield = "label", precision = 6,
-                printdist = True, printlabels = True, print_meta = False):
+    def __init__(self, node_attrs=None, branch_attrs=None, ci_labels=None, labelfield="label", 
+                 precision=7, printdist=True, printlabels=True, print_meta=False):
         self.node_attrs = node_attrs
         self.branch_attrs = branch_attrs
         self.ci_labels = ci_labels
