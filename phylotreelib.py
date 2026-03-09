@@ -855,6 +855,56 @@ class PrintSpec:
 ###################################################################################################
 ###################################################################################################
 
+def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=None,
+                               precision=7, print_meta=True, printlabels=True,
+                               printdist=True):
+    """
+    Set Tree.print_spec based on common summary-tree conventions.
+    Does not modify computed values; only presentation.
+    """
+    node_attrs = set()
+    branch_attrs = set()
+
+    # support is always useful as meta
+    if treetype in ("mcc", "hip", "mrhip"):
+        node_attrs.add("clade_cred")
+        # for Newick internal node labels, you’ll typically want clade_cred
+        labelfield = "label"   # because annotate_sumtree sets br.label to clade_cred preferentially
+    else:
+        branch_attrs.add("bipartition_cred")
+        labelfield = "bipartition_cred"  # direct printing without relying on br.label
+
+    # branch length / depth attributes
+    if blen == "biplen":
+        branch_attrs.update({"length", "length_sd"})
+    elif blen in ("meandepth", "cadepth"):
+        node_attrs.update({"depth", "depth_sd"})
+        branch_attrs.add("length")
+    elif blen in ("none", "input"):
+        branch_attrs.add("length")
+
+    if trackci and ci_labels:
+        # attach CI info where it exists
+        if blen == "biplen":
+            branch_attrs.update({"ci", "length_median"})
+        elif blen in ("meandepth", "cadepth"):
+            node_attrs.update({"ci", "depth_median"})
+
+    tree.set_print_spec(
+        node_attrs=tuple(sorted(node_attrs)) or None,
+        branch_attrs=tuple(sorted(branch_attrs)) or None,
+        ci_labels=tuple(ci_labels) if ci_labels else None,
+        labelfield=labelfield,
+        precision=precision,
+        print_meta=print_meta,
+        printlabels=printlabels,
+        printdist=printdist,
+    )
+    return tree
+
+###################################################################################################
+###################################################################################################
+
 class Tree:
     """Class representing basic phylogenetic tree object."""
 
@@ -5992,52 +6042,7 @@ class TreeSummary():
             raise TreeError(f"Unknown branch-length method: {blen}")
 
         # Annotate tree with relevant, available attributes
-        sumtree = self.annotate_sumtree(sumtree)
-
-        # Decide what meta-comments to print
-        node_attrs = set()
-        branch_attrs = set()
-
-        if self.trackclades:
-            node_attrs.add("clade_cred")
-        if self.trackbips:
-            branch_attrs.add("bipartition_cred")
-
-        if blen in ("meandepth", "cadepth"):
-            node_attrs.update({"depth", "depth_sd"})
-
-        if blen == "biplen":
-            branch_attrs.add("length")
-            if self.trackblen:
-                branch_attrs.update({"length_sd"})
-
-        elif blen in ("meandepth", "cadepth"):
-            branch_attrs.add("length")
-
-        elif blen == "none":
-            branch_attrs.add("length")
-
-        elif blen == "input":
-            branch_attrs.add("length")
-
-        if self.trackroot:
-            branch_attrs.add("rootcred")
-            
-        if self.trackci:
-            if blen == "biplen" and self.trackblen:
-                branch_attrs.update({"length_median", "ci"})
-            if blen == "meandepth" and self.trackdepth:
-                node_attrs.update({"depth_median", "ci"})
-            if blen == "cadepth":
-                node_attrs.update({"depth_median", "ci"})
-
-        # attach for printing
-        sumtree.set_print_spec(
-            node_attrs=tuple(sorted(node_attrs)),
-            branch_attrs=tuple(sorted(branch_attrs)),
-            ci_labels=self.ci_labels,
-        )
-        
+        sumtree = self.annotate_sumtree(sumtree)        
         return sumtree
 
 ###################################################################################################
