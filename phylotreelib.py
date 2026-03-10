@@ -3231,14 +3231,14 @@ class Tree:
               
         # Construct header
         if colorlist:
-            header = "#NEXUS\nbegin taxa\n\tdimensions ntax={};\n".format(len(self.leaflist()))
-            header += "\ttaxlabels\n\t"
+            header = f"#NEXUS\nbegin taxa\n\tdimensions ntax={len(self.leaflist())};\n"
+            header += "\ttaxlabels\n"
             stringlist = [header]
             for leaf in self.leaflist():
-                stringlist.append("\t{}".format(leaf))
+                stringlist.append("\t\t{}".format(leaf))
                 col = colorfg if leaf in colorlist else colorbg  #
                 stringlist.append(f"[&!color={col}]\n")
-            stringlist.append(";\nend;\n")
+            stringlist.append("\t;\nend;\n\nbegin trees;\n")
         else:
             stringlist = ["#NEXUS\n\nbegin trees;\n"]
 
