@@ -5011,7 +5011,7 @@ class Tree:
 
         # Python note: could return preprocessed subtree and treecopy to save computation
         # but this is pretty fast and interface would be less clear.
-        # But in case of bottleneclk: also return subtree and treecopy perhaps
+        # But in case of bottleneck: also return subtree and treecopy perhaps
 
         treecopy = self.copy_treeobject()
         subtree = treecopy.subtree(prune_node)
