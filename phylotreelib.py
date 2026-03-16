@@ -4269,7 +4269,7 @@ class Tree:
             del self.child_dict[parent][leaf]
             del self._parent_dict[leaf]
 
-        # Remove leaf entry from global leaflist. Update intnodeslist
+        # Remove leaf entry from global leaflist
         self.leaves.remove(leaf)
 
         # Clean up nodedict if present
@@ -5086,7 +5086,11 @@ class Tree:
     ###############################################################################################
 
     def possible_spr_prune_nodes(self):
-        """Utililty function when using spr function: where is it possible to prune"""
+        """Return nodes that are valid `prune_node` choices for SPR (excluding the root).
+
+        In the special case where the root is a bifurcation with one leaf child, the
+        internal child is excluded (pruning there would create an invalid structure).
+        """
 
         possible_prune_nodes = self.nodes - {self.root}
         rootkids = list(self.children(self.root))
@@ -5659,10 +5663,10 @@ class TreeSummary():
     """Class summarizing requested attributes (bipartitions, clades, root location, branch lengths,
        node depths, topologies) from many trees"""
 
-    def __init__(self, trackbips=False, trackclades=False, trackroot=False, 
+    def __init__(self, trackbips=False, trackclades=False, trackroot=False,
                        trackblen=False, trackdepth=False, trackrootblen=False,
-                       tracktopo=False, track_subcladepairs=False, 
-                       store_trees=False, 
+                       tracktopo=False, track_subcladepairs=False,
+                       store_trees=False,
                        trackci=False, ci_probs=None):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.leaves = None
