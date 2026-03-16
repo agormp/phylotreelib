@@ -4036,26 +4036,92 @@ class Tree:
             msg = f"Node {parent} does not exist"
             raise TreeError(msg)
 
-        # Local copies for faster access
-        tree = self.child_dict
-
-        # Account for fact that some or all intnodes may be strings (e.g., transmission trees)
-        if all(isinstance(intnode, str) for intnode in self.intnodes):
-            newnode = 0
-        else:
-            newnode = max(x for x in self.intnodes if isinstance(x, int)) + 1
-        tree[newnode] = {}
-
         # Add new internal node as child of "parent"
-        tree[parent][newnode] = branchstruct
+        newnode = self.next_internal_node_id()
+        child_dict = self.child_dict
+        child_dict[parent][newnode] = branchstruct
 
         # Move childnodes from previous parent to new node
+        child_dict[newnode] = {}
         for child in childnodes:
-            tree[newnode][child] = tree[parent][child]
-            del tree[parent][child]
+            child_dict[newnode][child] = child_dict[parent][child]
+            del child_dict[parent][child]
 
         self.clear_caches()
+        return newnode
 
+    ###############################################################################################
+
+    def add_node_on_branch(self, parent, child, dist_from_parent=None, frac_from_parent=None,
+                           upper_branchstruct=None, copy_attrs="lower"):
+        """
+        Insert a new internal node on an existing branch between `parent` and `child`.
+        This subdivides the branch into:
+            parent -> newnode  (upper segment)
+            newnode -> child   (lower segment)
+
+        Branch length splitting:
+            * If dist_from_parent is not None:          upper_len = dist_from_parent
+            * Else if frac_from_parent is not None:     upper_len = frac_from_parent * original_length
+            * Else: pick a random frac in (0,1)
+
+        Branchstruct handling (copy_attrs):
+          - "lower" (default): lower keeps a copy of the original Branchstruct (including annotations);
+            upper uses a fresh Branchstruct (or `upper_branchstruct` if provided).
+          - "both": both segments get copies of the original Branchstruct (annotations duplicated).
+          - "none": both segments get fresh Branchstructs (no annotations copied).
+
+        Parameters
+        ----------
+        upper_branchstruct : Branchstruct or None
+            Optional Branchstruct to use for the *new* upper segment. If provided, its `.length`
+            is overwritten with upper_len.
+
+        Returns: The ID of the inserted internal node.
+        """
+        if not self.is_parent_child_pair(parent, child):
+            raise TreeError(f"({parent}, {child}) is not an existing parent→child branch")
+
+        orig = self.child_dict[parent][child]
+        origlen = orig.length
+        if dist_from_parent is None and frac_from_parent is None:
+            frac_from_parent = random.random()
+        if dist_from_parent is not None:
+            if not (0.0 < dist_from_parent < origlen):
+                raise TreeError("dist_from_parent must satisfy 0.0 < dist_from_parent < original_length")
+            upper_len = float(dist_from_parent)
+        else:
+            if not (0.0 < frac_from_parent < 1.0):
+                raise TreeError("frac_from_parent must satisfy 0.0 < frac_from_parent < 1.0")
+            upper_len = origlen * float(frac_from_parent)
+
+        lower_len = origlen - upper_len
+
+        # build Branchstructs for the two new segments
+        if copy_attrs == "both":
+            upper_bs = orig.copy()
+            lower_bs = orig.copy()
+        elif copy_attrs == "none":
+            upper_bs = Branchstruct()
+            lower_bs = Branchstruct()
+        elif copy_attrs == "lower":
+            upper_bs = Branchstruct()
+            lower_bs = orig.copy()
+        else:
+            raise TreeError("copy_attrs must be one of: 'lower', 'both', 'none'")
+        if upper_branchstruct is not None:
+            upper_bs = upper_branchstruct
+        upper_bs.length = upper_len
+        lower_bs.length = lower_len
+
+        # Select nodeID for new internal node, and update tree structure
+        newnode = self.next_internal_node_id()
+        self.child_dict[newnode] = {}
+        self.child_dict[parent][newnode] = upper_bs
+        self.child_dict[newnode][child] = lower_bs
+        del self.child_dict[parent][child]
+
+        self.clear_caches()
         return newnode
 
     ###############################################################################################
