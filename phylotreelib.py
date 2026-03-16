@@ -1270,7 +1270,7 @@ class Tree:
                 # Add new internal node and move relevant children to this.
                 # Attach Branchstruct to newly created branch
                 # Note: this method calls clear_caches
-                obj.insert_node(insertpoint, movelist, branchstruct)
+                obj.split_off_children(insertpoint, movelist, branchstruct)
 
         return obj
 
@@ -1328,7 +1328,7 @@ class Tree:
 
                 # Add new internal node and move relevant children to this.
                 # Attach empty Branchstruct to newly created branch (no blen info in topology)
-                obj.insert_node(insertpoint, movelist, Branchstruct())
+                obj.split_off_children(insertpoint, movelist, Branchstruct())
 
         return obj
 
@@ -1354,7 +1354,7 @@ class Tree:
                 for child in obj.children(mrca):
                     if (child in clade_leaves) or (obj.remotechildren_dict[child] <= clade_leaves):
                         movelist.append(child)
-                newnode = obj.insert_node(mrca, movelist, Branchstruct())
+                newnode = obj.split_off_children(mrca, movelist, Branchstruct())
                 obj.nodedict[newnode] = nodestruct
 
                 # Reset obj caches which are now obsolete
@@ -3493,7 +3493,7 @@ class Tree:
         is_compatible:
             True if bipartition is compatible with tree. "is_present" can be True or False
         insert_tuple:
-            If is_compatible: Tuple of (parentnode, childmovelist) parameters for insert_node
+            If is_compatible: Tuple of (parentnode, childmovelist) parameters for split_off_children
             If not is_compatible: None
         """
         bip1, bip2 = bipart
@@ -3636,12 +3636,12 @@ class Tree:
             #   if more than 2 members: also add intnode2 to list of unresolved nodes
             # After this, intnode1 is resolved (two branches emanating from it)
             if subset1_size > 1:
-                intnode2 = self.insert_node(intnode1, subset1, Branchstruct())
+                intnode2 = self.split_off_children(intnode1, subset1, Branchstruct())
                 if subset1_size > 2:
                     unresolved_nodes.append(intnode2)
 
             if subset2_size > 1:
-                intnode2 = self.insert_node(intnode1, subset2, Branchstruct())
+                intnode2 = self.split_off_children(intnode1, subset2, Branchstruct())
                 if subset2_size > 2:
                     unresolved_nodes.append(intnode2)
 
@@ -3996,13 +3996,18 @@ class Tree:
     ###############################################################################################
 
     def insert_node(self, parent, childnodes, branchstruct):
-        """Inserts an extra node between parent and children listed in childnodes list
-        (so childnodes are now attached to newnode instead of parent).
-        The branchstruct will be attached to the branch between parent and newnode.
-        Branches to childnodes retain their original branchstructs.
-        The node number of the new node is returned"""
+        # deprecated alias
+        return self.split_off_children(parent, childnodes, branchstruct)
 
-        self._parent_dict = None
+    ###############################################################################################
+
+    def split_off_children(self, parent, childnodes, branchstruct):
+        """Create a new internal node below `parent` by moving the specified `childnodes`
+           (a subset of parent's current children) under the new node.
+
+           This adds a new branch (parent -> newnode) with the provided `branchstruct`.
+           The moved child branches keep their original Branchstruct objects unchanged.
+           Returns the new internal node ID."""
 
         if parent not in self.nodes:
             msg = f"Node {parent} does not exist"
@@ -4053,8 +4058,8 @@ class Tree:
             branchstruct1.length = branchstruct.length / 2
             branchstruct2 = branchstruct.copy()
             branchstruct2.length = branchstruct.length / 2
-            self.insert_node(self.root, part1, branchstruct1)
-            self.insert_node(self.root, part2, branchstruct2)
+            self.split_off_children(self.root, part1, branchstruct1)
+            self.split_off_children(self.root, part2, branchstruct2)
 
         # In all other cases: one part of bipartition will necessarily have root as its MRCA
         #       (because its members are present on both sides of root).
@@ -4080,7 +4085,7 @@ class Tree:
                     movelist.append(child)
 
             # Add branch at determined position
-            self.insert_node(insertpoint, movelist, branchstruct)
+            self.split_off_children(insertpoint, movelist, branchstruct)
 
         # Clear lru_caches (which cannot be edited manually)
         # self.remote_children.cache_clear()
@@ -6342,7 +6347,7 @@ class SummaryTreeBuilder():
                 is_present, is_compatible, insert_tuple = contree.check_bip_compatibility(bip)
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
-                    contree.insert_node(parentnode, childnodes, branch)
+                    contree.split_off_children(parentnode, childnodes, branch)
 
         logcred = self.log_bipart_credibility(contree.topology())
         contree.logcred = logcred
@@ -7567,7 +7572,7 @@ class Distmatrix(object):
             udist_1 = udist[i1]
             udist_2 = udist[i2]
             branchstruct = Branchstruct()
-            newnode = njtree.insert_node(rootnode, [nb1, nb2], branchstruct)
+            newnode = njtree.split_off_children(rootnode, [nb1, nb2], branchstruct)
             dist1 = 0.5 * dist_12 + 0.5 * (udist_1 - udist_2) / (n - 2)
             dist2 = 0.5 * dist_12 + 0.5 * (udist_2 - udist_1) / (n - 2)
             njtree.setlength(newnode, nb1, dist1)
@@ -7630,7 +7635,7 @@ class Distmatrix(object):
 
             # Connect two nearest nodes on tree (insert new node below them)
             branchstruct = Branchstruct()
-            newnode = upgmatree.insert_node(rootnode, [n1, n2], branchstruct)
+            newnode = upgmatree.split_off_children(rootnode, [n1, n2], branchstruct)
             depth_12 = dmat[i1,i2]/2
             dist_new1 = depth_12 - depth[i1]
             dist_new2 = depth_12 - depth[i2]
