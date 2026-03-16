@@ -1531,7 +1531,7 @@ class Tree:
                     raise StopIteration
                 self.i += 1
                 basenode = self.basenodes[self.i - 1]
-                (subtree, basalbranch) = self.fulltree.subtree(basenode, return_basalbranch=True)
+                subtree, basalbranch = self.fulltree.subtree(basenode)
                 subtree.basalbranch = basalbranch
                 return subtree
 
@@ -2612,7 +2612,7 @@ class Tree:
         # Then find the leaf that has approximately the same distance to these two
         # (interpreted as being in a sense halfway between them...)
         basenode = self.find_mrca(leaflist)
-        sub = self.subtree(basenode)
+        sub, basalbranch = self.subtree(basenode)
         (dist, leaf1, leaf2) = sub.diameter(return_leaves=True)
         smallest_diff = dist       # Pick value certain to be larger than all dist differences
         for leaf in leaflist:
@@ -3767,11 +3767,12 @@ class Tree:
 
     ###############################################################################################
 
-    def subtree(self, basenode, return_basalbranch=False):
-        """Returns subtree rooted at basenode as Tree object"""
+    def subtree(self, basenode):
+        """Return (subtree, basal_branch) for the subtree rooted at `basenode`.
 
-        # Note: rooting matters!
-        # Note 2: basenode may be leaf!
+        - `basenode` must not be the root (there is no basal branch below the root).
+        - If `basenode` is a leaf: `subtree` is the leaf name (str).
+        - Otherwise: `subtree` is a new Tree whose root is `basenode`.
 
         if return_basalbranch:
             if basenode == self.root:
@@ -3812,12 +3813,7 @@ class Tree:
             for node in other.nodes:
                 other.nodedict[node] = self.nodedict[node]
 
-        # Python note: possibly bad idea to have different possible returnvalues.
-        # Simplify and deal with it at consumer end
-        if return_basalbranch:
-            return (other, basalbranchcopy)
-        else:
-            return other
+        return (other, basalbranch_copy)
 
     ###############################################################################################
 
