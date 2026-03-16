@@ -5125,51 +5125,87 @@ class Tree:
 
     ###############################################################################################
 
-    def spr(self, prune_node=None, regraft_node=None):
-        """Subtree Pruning and Regrafting.
+    def spr(self, prune_node=None, regraft_node=None, dist_from_parent=None, frac_from_parent=None):
+        """Perform one Subtree Pruning and Regrafting (SPR) move in-place.
 
-        prune_node: basenode of subtree that will be pruned.
-        regraft_node: node in remaining treestump below which subtree will be grafted
+        Steps:
+          1) Detach the subtree rooted at `prune_node`.
+          2) Insert a graft point on the incoming edge to `regraft_node`.
+          3) Attach the detached subtree below that graft point.
 
-        If no parameters are specified (both are None): perform random SPR
-        If only prune_node is specified: choose random regraft_node
+        Node selection:
+          - If `prune_node` is None: choose a random valid prune node.
+          - If `regraft_node` is None: choose a random valid regraft node.
 
-        Must specify either both parameters, no parameters, or only prune_node
+        Placement on the regraft edge:
+          - use `dist_from_parent` if given
+          - else use `frac_from_parent` if given
+          - else choose a random fraction in (0, 1)
+
+        Branch lengths:
+          - The regraft edge length is preserved (split into two segments).
+          - The pruned basal branch length is reused as the new connecting branch length.
+
+        Returns (prune_node, regraft_node).
         """
 
-        # Sanity check: can't perfom SPR on tree with only two leaves
         if len(self.leaves) == 2:
-            raise TreeError("Can not perform SPR on tree with only 2 leaves")
+            raise TreeError("Cannot perform SPR on a tree with only 2 leaves")
 
-        # Invalid argument check
+        # Invalid argument pattern
         if prune_node is None and regraft_node is not None:
-            msg = ("You only specified regraft_node. "
-                   "Must specify either both parameters, no parameters, or only prune_node")
-            raise TreeError(msg)
+            raise TreeError(
+                "You only specified regraft_node. "
+                "Must specify either both parameters, no parameters, or only prune_node."
+            )
 
-        # Select random prune_node or check the one provided
+        # Choose / validate prune_node
         possible_prune_nodes = self.possible_spr_prune_nodes()
-        if prune_node == None:
-            prune_node = random.choice(list(possible_prune_nodes))
-        else:
-            if prune_node not in possible_prune_nodes:
-                raise TreeError(f"Can not prune below {prune_node}")
+        if prune_node is None:
+            prune_node = random.choice(tuple(possible_prune_nodes))
+        elif prune_node not in possible_prune_nodes:
+            raise TreeError(f"Cannot prune below {prune_node}")
 
-        # Select random regraft_node or check the one provided
+        # Choose / validate regraft_node
         possible_regraft_nodes = self.possible_spr_regraft_nodes(prune_node)
         if regraft_node is None:
-            regraft_node = random.choice(list(possible_regraft_nodes))
+            regraft_node = random.choice(tuple(possible_regraft_nodes))
         elif regraft_node not in possible_regraft_nodes:
-            msg = f"Specified regraft_node {regraft_node} is not compatible with prune_node"
-            raise TreeError(msg)
+            raise TreeError(f"Specified regraft_node {regraft_node} is not compatible with prune_node")
+        elif regraft_node == self.root:
+            raise TreeError("Cannot regraft at the root node")
 
-        # Pruning: Remove subtree
-        isleaf = prune_node in self.leaves      # Has to be set before pruning!
-        subtree = self.prune_subtree(prune_node)
+        # Special case: pruning is on branch from root, and root is at bifurcation
+        # Keep track of length of other basal branch also (or it will get lost)
+        sibling_len = 0.0
+        prune_parent = self.parent(prune_node)
+        old_root = self.root
+        rootkids = list(self.children(old_root))
+        if prune_parent == old_root and len(rootkids) == 2:
+            sibling = rootkids[0] if rootkids[1] == prune_node else rootkids[1]
+            sibling_len = self.child_dict[old_root][sibling].length
 
-        # Regraft: Add subtree back onto remaining tree
-        # Special treatment when pruning single leaf (to avoid superfluous internal node)
-        self.graft(subtree, regraft_node, graft_with_other_root=isleaf)
+        # Prune subtree, keep track of length of basal branch
+        subtree, basalbranch = self.prune_subtree(prune_node)
+        basal_len = basalbranch.length
+
+        # Identify the regraft edge (incoming edge to regraft_node)
+        regraft_parent = self.parent(regraft_node)
+
+        # Decide placement on the regraft edge
+        if dist_from_parent is None and frac_from_parent is None:
+            frac_from_parent = random.random()
+
+        # Regraft subtree:
+        # - insert graftpoint on (regraft_parent -> regraft_node)
+        # - connect_length uses basal_len + sibling_len (preserves overall length)
+        connect_len = basal_len + sibling_len
+        self.graft(subtree, parent=regraft_parent, child=regraft_node,
+                   dist_from_parent=dist_from_parent, frac_from_parent=frac_from_parent,
+                   connect_length=connect_len, connect_branchstruct=None,
+                   graftlabel=None)
+
+        return prune_node, regraft_node
 
     ###############################################################################################
 
