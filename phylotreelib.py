@@ -4905,7 +4905,7 @@ class Tree:
             dist_from_parent = dist_from_node1 if node1_is_parent else (origlen - dist_from_node1)
 
             # Insert new root on the branch. Duplicate original branch annotations onto both halves.
-            newroot = self.add_node_on_branch(parent, child, dist_from_parent=parent_to_root_dist,
+            newroot = self.add_node_on_branch(parent, child, dist_from_parent=dist_from_parent,
                                               copy_attrs="both")
 
         # Things that were already downstream of newroot do not need to be moved, but things that
