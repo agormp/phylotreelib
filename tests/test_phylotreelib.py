@@ -353,7 +353,7 @@ class Match_nodes(TreeTestBase):
         parent = random.choice(tuple(t2.intnodes))
         kid = next(iter(t2.children(parent)))
         blen = t2.nodedist(parent,kid)
-        t2.reroot(parent,kid,node1dist=blen/2)
+        t2.reroot(parent,kid,dist_from_node1=blen/2)
         t1origroot = t1.root
         t2origroot = t2.root
         intnode1to2,unmatched_root1,unmatched_root2 = t1.match_nodes(t2)
