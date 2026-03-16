@@ -257,7 +257,7 @@ class OutGroupRooting(TreeTestBase):
                 rootremkids2 = tc.remote_children(rootkid2)
                 self.assertTrue(ig in [rootremkids1, rootremkids2])
                 self.assertTrue(og in [rootremkids1, rootremkids2])
-                
+
 ########################################################################################
 ########################################################################################
 

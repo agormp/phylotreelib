@@ -65,9 +65,9 @@ _COMMENT_NONNESTED_RE = re.compile(r"\[[^\[\]]*\]")
 
 def remove_comments(text):
     """Fast removal of non-nested [ ... ] comments (BEAST/figtree-style).
-    Does NOT support nesting; 
+    Does NOT support nesting;
     """
-        
+
     if "[" in text:
         if text.count("[") != text.count("]"):
             raise TreeError("Unbalanced comment brackets")
@@ -195,7 +195,7 @@ class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
 
     __slots__ = ("length", "label",
-                 "mean", "M2", "n", 
+                 "mean", "M2", "n",
                  "quantiles", "ci", "length_median", "length_sd",
                  "posterior", "freq", "bipartition_cred", "rootcred",
                  "parent_height", "kid_height")
@@ -315,7 +315,7 @@ class Nodestruct:
     """Class that emulates a struct. Keeps node-related info"""
 
     __slots__ = ("depth", "nleaves", "subcladepairs", "best_pair",
-                 "mean", "M2", "n", 
+                 "mean", "M2", "n",
                  "quantiles", "ci", "depth_median",
                  "clade_cred", "posterior", "freq", "depth_sd",
                  "clade_score")
@@ -474,12 +474,12 @@ class Bipartition:
         side1 = frozenset(sorted_leaf_tup[i] for i in range(ntips) if (self._mask >> i) & 1)
         side2 = frozenset(sorted_leaf_tup) - side1
         return side1, side2
-        
+
     def get_canonical_clade(self):
         """Returns a frozenset of leaves included in canonical mask (= side1 from get_bipartitions)"""
         side1,side2 = self.get_bipartitions()
         return side1
-        
+
     def __iter__(self):
         return iter(self.get_bipartitions())
 
@@ -538,7 +538,7 @@ class Clade:
             object_cache = {}
             cls._class_cache[frozenset_leaves] = object_cache
         return cls.from_mask(mask, object_cache, sorted_leaf_tup)
-    
+
     @classmethod
     def from_leafset(cls, leafset, tree):
         """Convenience constructor for tests and interactive use where clade is given as
@@ -578,7 +578,7 @@ class Clade:
         sorted_leaf_tup = self._sorted_leaf_tup
         ntips = len(sorted_leaf_tup)
         leafnames = frozenset(sorted_leaf_tup[i] for i in range(ntips) if (self._mask >> i) & 1)
-        return leafnames        
+        return leafnames
 
     # Python note: this allows unpacking as if the class was a tuple: c1 = myclade
     # 1-tuple; comma is important
@@ -757,7 +757,7 @@ class NewickStringParser:
                    f"Token-value:      {token_value}\n"
                    f"Tree-string:      {treestring}\n"
                    f"Tree-parts list:  {tree_parts_list}\n")
-                   
+
             raise TreeError(msg)
 
     ###############################################################################################
@@ -839,8 +839,8 @@ class NewickStringParser:
 ###################################################################################################
 
 class PrintSpec:
-    
-    def __init__(self, node_attrs=None, branch_attrs=None, ci_labels=None, labelfield="label", 
+
+    def __init__(self, node_attrs=None, branch_attrs=None, ci_labels=None, labelfield="label",
                  precision=7, printdist=True, printlabels=True, print_meta=False):
         self.node_attrs = node_attrs
         self.branch_attrs = branch_attrs
@@ -929,7 +929,7 @@ def configure_basic_printing(tree, precision=6, print_meta=False, printlabels=Tr
         printdist=printdist,
     )
     return tree
-    
+
 ###################################################################################################
 
 def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=None,
@@ -981,10 +981,10 @@ def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=No
         printdist=printdist,
     )
     return tree
-    
+
 ###################################################################################################
 ###################################################################################################
-    
+
 def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=None,
                   count_burnin_filename_list=None):
     """
@@ -1101,7 +1101,7 @@ class Tree:
     # Cache achieves interning (one copy per treetype of the variables in the tuple)
     # and also avoiding repeated construction of the variables
     _class_cache = {}
-    
+
     def __init__(self):
         self.child_dict = {}
         self._nodedict = None
@@ -1363,7 +1363,7 @@ class Tree:
         return obj
 
     ###############################################################################################
-        
+
     @classmethod
     def from_branchinfo(cls, parentlist, childlist, lenlist=None, **attrlists):
         """Constructor: Tree object from information about all branches in tree.
@@ -3045,7 +3045,7 @@ class Tree:
         Any argument passed as None leaves the existing PrintSpec value unchanged.
         Returns self for convenience.
         """
-                       
+
         cur = self.get_print_spec()
         self._print_spec = PrintSpec(
             node_attrs=tuple(node_attrs) if node_attrs is not None else cur.node_attrs,
@@ -3068,7 +3068,7 @@ class Tree:
         The PrintSpec stores default formatting/annotation choices used by
         Tree.newick() and Tree.nexus() when called without explicit arguments.
         """
-        
+
         if self._print_spec is None:
             self._print_spec = PrintSpec()
         return self._print_spec
@@ -3113,20 +3113,20 @@ class Tree:
         if node_attributes is None:     node_attributes = spec.node_attrs
         if branch_attributes is None:   branch_attributes = spec.branch_attrs
         if ci_labels is None:           ci_labels = spec.ci_labels
-        
+
         # If meta printing is disabled, suppress all meta-related output
         if not print_meta:
             node_attributes = None
             branch_attributes = None
             ci_labels = None
-        
+
         def create_metacomment(struct, attributes, ci_labels, ci_prefix=None):
             """Helper function to create metacomment strings based on attributes of a structure
             - skips missing attributes
-            - skips None 
+            - skips None
             - collapses *_ci_lo/_ci_hi into <prefix>_<ci_label>={lo,hi}
               if ci_label is provided"""
-            
+
             def fmt(value):
                 if value is None:
                     return None
@@ -3137,7 +3137,7 @@ class Tree:
             parts = []
             requested = set(attributes)
 
-            # 1) regular attributes 
+            # 1) regular attributes
             for attr in attributes:
                 if attr == "ci":
                     continue
@@ -3156,7 +3156,7 @@ class Tree:
             if not parts:
                 return ""
             return f"[&{','.join(parts)}]"
-                
+
 
         def append_children(parentnode):
             """Recursive function that has main responsibility for building Newick tree string"""
@@ -3211,7 +3211,7 @@ class Tree:
               translateblock=False, node_attributes=None, branch_attributes=None,
               colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
               print_meta=None):
-              
+
         """
         Return a NEXUS 'begin trees;' block containing this tree.
 
@@ -3228,7 +3228,7 @@ class Tree:
         colorlist, colorfg, colorbg :
             Optional FigTree-style color annotations for taxa.
         """
-              
+
         # Construct header
         if colorlist:
             header = f"#NEXUS\nbegin taxa\n\tdimensions ntax={len(self.leaflist())};\n"
@@ -3261,7 +3261,7 @@ class Tree:
             ci_labels=ci_labels,
             print_meta=print_meta,
         ))
-        
+
         # Add footer
         stringlist.append("\nend;\n")
 
@@ -3339,7 +3339,7 @@ class Tree:
         """
 
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
-        
+
         object_cache = Clade._class_cache.get(frozenset_leaves)
         if object_cache is None:
             object_cache = {}
@@ -3364,7 +3364,7 @@ class Tree:
                 yield node, clade, None, remkids_mask.bit_count()
 
         if not keep_remchild_dict:
-            self._remotechildren_mask_dict = None        
+            self._remotechildren_mask_dict = None
 
     ###############################################################################################
 
@@ -3425,13 +3425,13 @@ class Tree:
 
     def _rootbip_core(self, trackrootblen=False):
         """Helper method for rootbip and rootbip_with_frac.
-        
-        Returns 
+
+        Returns
             rootbip, root-kid1, root-kid2, halfmask
-        
+
         where halfmask is the canonical halfmask for root bipartition
         """
-        
+
         root = self.root
         rootkids = self.child_dict[root]
         if len(rootkids) != 2:
@@ -3440,22 +3440,22 @@ class Tree:
 
         kid1, kid2 = rootkids.keys()
         halfmask = self.remotechildren_mask_dict[kid1]
-        
+
         frozenset_leaves, sorted_leaf_tup, leaf2index, leaf2mask, ntips, alltips_mask = self.cached_attributes
         object_cache = Bipartition._class_cache.get(frozenset_leaves)
         if object_cache is None:
             object_cache = {}
-            Bipartition._class_cache[frozenset_leaves] = object_cache        
+            Bipartition._class_cache[frozenset_leaves] = object_cache
         rootbip = Bipartition.from_halfmask(halfmask, alltips_mask, object_cache, sorted_leaf_tup)
 
         return rootbip, kid1, kid2, halfmask
-            
+
     ###############################################################################################
 
     def rootbip(self):
-        """For a tree rooted at a bifurcation: returns Bipartition object corresponding to 
+        """For a tree rooted at a bifurcation: returns Bipartition object corresponding to
         bipartition present at root"""
-        
+
         rootbip, kid1, kid2, halfmask = self._rootbip_core()
         return rootbip
 
@@ -3467,7 +3467,7 @@ class Tree:
         frac_to_canon = blen_canonical / (blen1 + blen2)
         where "canonical" means the side whose mask equals rootbip._mask
         """
-        
+
         rootbip, kid1, kid2, halfmask = self._rootbip_core()
 
         root_child_edges = self.child_dict[self.root]
@@ -5401,9 +5401,9 @@ class TreeSet():
 ###################################################################################################
 
 class RootBipStruct:
-    
+
     __slots__ = ("n", "freq", "sum_frac_canon")
-    
+
     def __init__(self, frac_to_canon=None):
         self.n = 1
         self.freq = None
@@ -5425,22 +5425,22 @@ class RootBipStruct:
         if self.sum_frac_canon is None:
             raise RuntimeError("Root branch-length fractions were not tracked")
         return self.sum_frac_canon / self.n
-                
+
 ###################################################################################################
 ###################################################################################################
 
 class QuantileAccumulator:
     """
     Approximate quantiles via a mergeable log-bucket histogram (one pass).
-    Used by TreeSummary objects when tracking credible intervals for branch lengths or 
+    Used by TreeSummary objects when tracking credible intervals for branch lengths or
     node depths.
-    
+
     Idea is based on "log-bucket" histograms: based on input value compute integer that is
     dictionary key for bin in histogram, and keep track of counts in each bin.
     Multiple histograms can be merged by simply accumulating counts in same buckets
-    
+
     Bucketing (positive x):
-      - Find m, e (mantissa, exponent) such that x = m * 2^e, 
+      - Find m, e (mantissa, exponent) such that x = m * 2^e,
         m in [0.5, 1), e in integers
       - b = int(m * 2**(k+1)) discretizes the mantissa into 2**k sub-bins per exponent
         (since real m in [0.5,1) maps to integer b in [2**k, 2**(k+1)-1]).
@@ -5483,7 +5483,7 @@ class QuantileAccumulator:
         m, e = math.frexp(x)                 # x = m * 2^e, m in [0.5, 1)
         b = int(m * self.scale)              # b in [2^k, 2^(k+1)-1]
         return (e << self.shift) | b
-        
+
     def _bucket_value(self, bkey):
         """Representative value for a bucket key."""
         if bkey == self.neg_bucket:
@@ -5514,7 +5514,7 @@ class QuantileAccumulator:
 
     def quantiles(self, probs):
         """
-        Multiple quantiles in one pass. 
+        Multiple quantiles in one pass.
         probs: list of probabilities
         Returns a list of quantiles, in the same order as probs
         """
@@ -5529,10 +5529,10 @@ class QuantileAccumulator:
             if p == 0.0:
                 rank = 1.0
             else:
-                rank = math.ceil(p * n)  # integer            
+                rank = math.ceil(p * n)  # integer
             targets.append((rank, p_idx))
         targets.sort(key=lambda x: x[0])
-        
+
         # One cumulative pass over buckets
         n_probs = len(probs)
         results = [0.0] * n_probs
@@ -5540,14 +5540,14 @@ class QuantileAccumulator:
         cum = 0
         t_idx = 0
         n_targets = len(targets)
-        
+
         for bkey in sorted(self.counts):
             cum += self.counts[bkey]
             value = self._bucket_value(bkey)
 
             # Assign this bucket value to all quantiles whose rank has been reached.
             while t_idx < n_targets:
-                rank, p_idx = targets[t_idx]   
+                rank, p_idx = targets[t_idx]
                 if cum < rank:
                     break
                 results[p_idx] = value
@@ -5557,7 +5557,7 @@ class QuantileAccumulator:
                 break
 
         return results
-        
+
 ###################################################################################################
 ###################################################################################################
 
@@ -5590,7 +5590,7 @@ class TreeSummary():
             self.ci_labels = tuple(f"{int(round(p*100))}%_CI" for p in self.ci_probs)
         else:
             self.ci_labels = ()
-            
+
         self.store_trees = store_trees
 
         self._bipartsummary = {}        # Dict: {bipartition:branchstruct}
@@ -5658,10 +5658,10 @@ class TreeSummary():
                 br.bipartition_cred = br.posterior = br.freq = br.n / self.tree_count
                 if self.trackblen:
                     br.length, br.length_sd = self.finalize_online(br)
-            
-            # Also finalize computation of selected quantiles if requested 
+
+            # Also finalize computation of selected quantiles if requested
             if self.trackci and self.ci_probs and self.trackblen:
-                
+
                 # Create list of [lo_p1, hi_p1, lo_p2, hi_p2, ..., 0.5]
                 # for calling quantiles method (last prob is for median)
                 # Order of lo,hi pairs is same as self.ci_probs and self.ci_labels
@@ -5677,7 +5677,7 @@ class TreeSummary():
                     br.ci = {}
                     for i,lab in enumerate(self.ci_labels):
                         lo_idx = i * 2
-                        hi_idx = lo_idx + 1   
+                        hi_idx = lo_idx + 1
                         br.ci[lab] = (qvals[lo_idx], qvals[hi_idx])
                     br.length_median = qvals[-1]
 
@@ -5697,7 +5697,7 @@ class TreeSummary():
                 if self.trackdepth:
                     nd.depth, nd.depth_sd = self.finalize_online(nd)
 
-            # Also finalize computation of selected quantiles if requested 
+            # Also finalize computation of selected quantiles if requested
             if self.trackci and self.ci_probs and self.trackdepth:
                 probs = []
                 for p in self.ci_probs:
@@ -5710,10 +5710,10 @@ class TreeSummary():
                     nd.ci = {}
                     for i,lab in enumerate(self.ci_labels):
                         lo_idx = i * 2
-                        hi_idx = lo_idx + 1   
+                        hi_idx = lo_idx + 1
                         nd.ci[lab] = (qvals[lo_idx], qvals[hi_idx])
                     nd.depth_median = qvals[-1]
-                        
+
             self._cladesummary_processed = True
         return self._cladesummary
 
@@ -5845,7 +5845,7 @@ class TreeSummary():
             self._rootbip_summary[rootbip] = RootBipStruct(frac)
         else:
             s.add_rootbip(frac)
-        
+
     ###############################################################################################
 
     def _add_clades(self, curtree):
@@ -5871,7 +5871,7 @@ class TreeSummary():
             s = cladesummary.get(clade)
             if s is None:
                 s = Nodestruct(depth, nleaves)
-                cladesummary[clade] = s          
+                cladesummary[clade] = s
                 if do_ci:
                     s.quantiles = QuantileAccumulator()
             if trackdepth:
@@ -5939,7 +5939,7 @@ class TreeSummary():
                 s = branchstruct
                 bipartsummary[bipart] = s
                 if do_ci:
-                    s.quantiles = QuantileAccumulator()                
+                    s.quantiles = QuantileAccumulator()
             if trackblen:
                 online_update(s, length)
                 if do_ci:
@@ -6021,7 +6021,7 @@ class TreeSummary():
 
         if self.tracktopo:
             self._updatetopo(other)
-            
+
     ###############################################################################################
 
     def _merge_online_accumulators(self, a, b):
@@ -6032,7 +6032,7 @@ class TreeSummary():
         a.mean = a.mean + delta * (b.n / ntot)
         a.M2 = a.M2 + b.M2 + delta * delta * (a.n * b.n / ntot)
         a.n = ntot
-                    
+
     ###############################################################################################
 
     def _updatebip(self, other):
@@ -6054,7 +6054,7 @@ class TreeSummary():
                         br_self.quantiles.merge(br_other.quantiles)
                 else:
                     br_self.n += br_other.n
-                
+
         self._bipartsummary_processed = False
         self._sorted_biplist = None
 
@@ -6082,7 +6082,7 @@ class TreeSummary():
                     nd_self.n += nd_other.n
                 if trackpairs:
                     nd_self.subcladepairs.update(nd_other.subcladepairs)
-                
+
         self._cladesummary_processed = False
         self._sorted_biplist = None
 
@@ -6249,11 +6249,11 @@ class TreeSummary():
         )
         tpp = TreePostProcessor(self)
         return tpp.set_clade_credibility(tree, precision=precision)
-        
+
     ###############################################################################################
     ###############################################################################################
-    
-    def compute_sumtree(self, treetype="con", blen="biplen", rooting=None, og=None, 
+
+    def compute_sumtree(self, treetype="con", blen="biplen", rooting=None, og=None,
                         count_burnin_filename_list=None):
         """Convenience wrapper around phylotreelib.build_sumtree() for interactive use."""
         """
@@ -6265,7 +6265,7 @@ class TreeSummary():
         Printing is not configured here. Use configure_sumtree_printing(sumtree, ...) or
         sumtree.set_print_spec(...) before calling sumtree.newick()/sumtree.nexus().
         """
-                        
+
         return build_sumtree(self, treetype=treetype, blen=blen, rooting=rooting, og=og,
                              count_burnin_filename_list=count_burnin_filename_list)
 
@@ -6273,15 +6273,15 @@ class TreeSummary():
 ###################################################################################################
 
 class SummaryTreeBuilder():
-    """Class handling construction of summary tree topology. 
+    """Class handling construction of summary tree topology.
     Input: TreeSummary object with accumulated stats"""
 
     ###################################################################################################
-    
+
     def __init__(self, treesummary):
         """Takes populated TreeSummary object as input, preparing this class to construct
         summary tree from that class' attributes"""
-        
+
         self.treesum = treesummary
         if getattr(treesummary, "tree_count", 0) == 0:
             msg = "TreeSummary is empty (tree_count == 0). Add trees to it before using for building a summary tree."
@@ -6289,7 +6289,7 @@ class SummaryTreeBuilder():
         if getattr(treesummary, "leaves", None) is None:
             msg = "TreeSummary has no leaf universe (leaves is None)."
             raise TreeError(msg)
-        
+
     ###############################################################################################
 
     def log_bipart_credibility(self, biptopology):
@@ -6472,20 +6472,20 @@ class SummaryTreeBuilder():
         hipstr_tree.cred_type = "hipstr"
 
         return hipstr_tree
-    
+
 ###################################################################################################
 ###################################################################################################
 
 class TreePostProcessor():
-    """Class handling annotation of tree (setting of branch lenghts, node depths, 
+    """Class handling annotation of tree (setting of branch lenghts, node depths,
     clade frequencies, etc). Takes TreeSummary and Tree objects as input"""
-    
+
     ###############################################################################################
-    
+
     def __init__(self, treesummary):
         """Takes populated TreeSummary object as input, preparing this class to annotate
         provided target tree from that class' attributes"""
-        
+
         self.treesum = treesummary
         if getattr(treesummary, "tree_count", 0) == 0:
             msg = "TreeSummary is empty (tree_count == 0). Add trees to it before using for building a summary tree."
@@ -6546,7 +6546,7 @@ class TreePostProcessor():
         rootcred = fraction of trees in input set where the root was on this branch (bipartition)
         If root was never on a branch: assign the value 0.0
         Added as attribute .rootcred to Branchstruct for branches on sumtree
-        Also sets tree-attributes: 
+        Also sets tree-attributes:
             rootcred: the rootcred of the actually used root bipartition
             cumrootcred: sum of rootcred for all branches (bipartitions) included on tree
         """
@@ -6640,8 +6640,8 @@ class TreePostProcessor():
         """Only to be used when goal is to set bipartition-based branch-length stats
         on sumtree, and those were not already set during construction.
         This happens when treetype is MCC
-        
-        NOTE: requires rooting and rootblen to be tracked in order to properly split branch 
+
+        NOTE: requires rooting and rootblen to be tracked in order to properly split branch
               length on root bipartition"""
 
         if not self.treesum.trackrootblen:
@@ -6663,7 +6663,7 @@ class TreePostProcessor():
         rootbip = sumtree.rootbip()
         rootbiplen = self.treesum.bipartsummary[rootbip].length
         kid1,kid2 = sumtree.child_dict[sumtree_root]
-        
+
         summary_rootbipstruct = self.treesum._rootbip_summary[rootbip]
         frac_to_canon = summary_rootbipstruct.mean_frac_to_canon()
 
@@ -6684,10 +6684,10 @@ class TreePostProcessor():
         """
         Annotate sumtree nodes/branches with whatever TreeSummary tracked.
         """
-                
-        # Python note: a bit messy, and i suspect i am roundtripping some of these 
+
+        # Python note: a bit messy, and i suspect i am roundtripping some of these
         # attributes unnecessarily.
-        
+
         # Keep track of which attributes can be printed
         node_attrs = set()
         branch_attrs = set()
@@ -6763,7 +6763,7 @@ class TreePostProcessor():
                 else:
                     # Optional: set empty label (or leave unchanged)
                     br.label = ""
-                    
+
         # Root annotations
         if self.treesum.trackroot:
             self.treesum.set_rootcredibility(sumtree)
@@ -6792,7 +6792,7 @@ class TreePostProcessor():
                             + "observed among input trees: check rooting of tree."
                             + f"\n{e.args[0]}")
         return tree
-   
+
 
 ###################################################################################################
 ###################################################################################################
@@ -6828,9 +6828,9 @@ class CADepthEstimator():
       - add_tree(tree): update online mean/M2 (+ optional quantiles)
       - merge(other): merge partial estimators (for multiprocessing)
       - write_into(sumtree): write depth, depth_sd (+ optional CI) onto sumtree"""
-    
+
     __slots__ = ("plan", "trackci", "acc")
-    
+
     ###############################################################################################
 
     def __init__(self, plan, trackci = False):
@@ -6856,14 +6856,14 @@ class CADepthEstimator():
             acc[leaf] = make_acc()
 
     ###############################################################################################
-    
+
     @classmethod
     def build_plan(cls, sumtree, trackci=False, ci_probs=None):
         """Build a CAPlan from the target summary tree."""
-        
+
         # IMPORTANT: query_mask must be in the same leaf universe ordering as input trees.
         # This holds if all trees share the same tipset and Tree.cached_attributes uses that.
-        
+
         # Ensure these exist
         remmask = sumtree.remotechildren_mask_dict
         _, sorted_leaf_tup, *_ = sumtree.cached_attributes  # sorted, deterministic
@@ -6892,9 +6892,9 @@ class CADepthEstimator():
             return CAPlan(queries=queries, leaves=sorted_leaf_tup, probs=tuple(probs), ci_labels=ci_labels)
 
         return CAPlan(queries=queries, leaves=sorted_leaf_tup)
-    
+
     ###############################################################################################
-    
+
     @staticmethod
     def _online_update(s, x: float):
         s.n += 1
@@ -6950,7 +6950,7 @@ class CADepthEstimator():
             self._online_update(s, depth)
             if trackci:
                 s.quantiles.add(depth)
-    
+
     ###############################################################################################
 
     def merge(self, other):
@@ -6965,7 +6965,7 @@ class CADepthEstimator():
                 self._merge_online(s_self, s_other)
                 if self.trackci:
                     s_self.quantiles.merge(s_other.quantiles)
-    
+
     ###############################################################################################
 
     def write_into(self, sumtree):
@@ -7141,7 +7141,7 @@ class Newicktreefile(TreefileBase):
             self.treefile.close()
             raise StopIteration
         else:
-            if self.strip_comments:                  
+            if self.strip_comments:
                 treestring = remove_comments(treestring)
             if returntree:
                 tree = Tree.from_string(treestring)
