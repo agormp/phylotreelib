@@ -2460,10 +2460,10 @@ class Tree:
             # Keep track of original roots if bifurcations
             if self.is_bifurcation(self.root):
                 unmatched_root1 = self.root
-                self.deroot()
+                self.collapse_bifurcating_root()
             if other.is_bifurcation(other.root):
                 unmatched_root2 = other.root
-                other.deroot()
+                other.collapse_bifurcating_root()
 
             # Pick arbitrary internal node to root two trees on.
             arbitrarykid = random.choice(tuple(self.leaves))
@@ -4830,28 +4830,44 @@ class Tree:
     ###############################################################################################
 
     def deroot(self):
-        """If root is at bifurcation: remove root node, connect adjacent nodes"""
-        root = self.root
-        rootkids = self.children(root)
-        if len(rootkids) == 2:      # If root is at bifurcation
-            kid1, kid2 = rootkids
-            branch1 = self.child_dict[root][kid1]
-            branch2 = self.child_dict[root][kid2]
-            branch_merged = branch1.merge(branch2, check_compat=True)   # Sums up branch lengths, merges attributes
-            if kid1 in self.intnodes:
-                self.child_dict[kid1][kid2] = branch_merged
-                self.root = kid1
-            elif kid2 in self.intnodes:
-                self.child_dict[kid2][kid1] = branch_merged
-                self.root = kid2
-            else:
-                raise TreeError("Cannot deroot tree: only leaves are present")
+        """Deprecated"""
+        self.collapse_bifurcating_root()
 
-            # remove previous root
-            del self.child_dict[root]
+    ###############################################################################################
 
-            # clear caches, which are now unreliable
-            self.clear_caches()
+    def collapse_bifurcating_root(self):
+        """
+        If the current root has exactly two children, remove the root node and connect the two
+        children directly, merging the two root branches.
+        One of the kids (that is an internal node) will be chosen the new root.
+        If the root is not a bifurcation: do nothing
+
+        The merged branch length is the sum of the two root branch lengths;
+        non-length attributes are merged via Branchstruct.merge(check_compat=True).
+        """
+
+        oldroot = self.root
+        rootkids = self.children(oldroot)
+
+        if len(rootkids) != 2:
+            return
+
+        kid1, kid2 = rootkids
+        branch1 = self.child_dict[oldroot][kid1]
+        branch2 = self.child_dict[oldroot][kid2]
+        branch_merged = branch1.merge(branch2, check_compat=True)   # Sums up branch lengths, merges attributes
+
+        if kid1 in self.intnodes:
+            newroot, other = kid1, kid2
+        elif kid2 in self.intnodes:
+            newroot, other = kid2, kid1
+        else:
+            raise TreeError("Cannot collapse bifurcating root: only leaves are present")
+        self.root = newroot
+        self.child_dict[newroot][other] = branch_merged
+
+        del self.child_dict[oldroot]
+        self.clear_caches()
 
     ###############################################################################################
 
