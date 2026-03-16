@@ -85,7 +85,7 @@ class Test_create_Topostruct:
         ts.posterior = 0.97
         ts.n = 23
         # Note: main test here is to see if class accepts (only) attribues named in __slots__
-        # Assertion is done implicitly: if exception is raised above then test fails        
+        # Assertion is done implicitly: if exception is raised above then test fails
         with pytest.raises(AttributeError):
             ts.notanatt = "not supposed to be an attribute"
 
@@ -452,7 +452,7 @@ class Test_copy_treeobject:
     def test_blen_lab(self, treedata):
         for treestring in treedata.values():
             t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=True, copyattr=True)            
+            t2 = t1.copy_treeobject(copylengths=True, copyattr=True)
             assert t1 == t2
             assert t1.root == t2.root
             assert t1.has_same_root(t2)
@@ -746,7 +746,7 @@ class TestSPR:
             assert tree.leaves == original_leaves
 
     def test_random_spr_all_possible_params(self):
-        """Test all possible combinations of prune and regraft nodes for range of random trees 
+        """Test all possible combinations of prune and regraft nodes for range of random trees
         of different size. No exceptions should be raised"""
         for ntips in range(3,9):
             origtree = pt.Tree.randtree(ntips=ntips, randomlen=True)
@@ -771,7 +771,7 @@ class TestSPR:
         tree = pt.Tree.randtree(ntips=8, randomlen=True)
         possible_prune_nodes = tree.possible_spr_prune_nodes()
         prune_node = next(iter(possible_prune_nodes))
-        # Choose an invalid regraft node. 
+        # Choose an invalid regraft node.
         possible_regraft_nodes = tree.possible_spr_regraft_nodes(prune_node)
         impossible_regraft_nodes = tree.nodes - possible_regraft_nodes
         invalid_regraft_node = next(iter(impossible_regraft_nodes))
@@ -781,87 +781,87 @@ class TestSPR:
 ###################################################################################################
 
 class Test_compute_sumtree:
-    """Compare pre-computed summary trees (treeannotator) to own computations. 
+    """Compare pre-computed summary trees (treeannotator) to own computations.
     Check various combinations of summary tree type, blen-setting, and rooting"""
-    
+
     # Python note: surely this can be done with fewer lines of code, but how then
     # to get individual test PASSED messages?
-    
+
     def test_hipstr_meandepth(self, data_dir):
         """HIPSTR tree with mean node depths and rooting at best HIPSTR resolution of root clade"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
         tsum = pt.TreeSummary(trackclades=True, trackdepth=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="hip", blen="meandepth")
-        
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_hipstr_mean")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
-    
+
     def test_mrhipstr_meandepth(self, data_dir):
         """mrHIPSTR tree with mean node depths and rooting at best HIPSTR resolution of root clade"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
         tsum = pt.TreeSummary(trackclades=True, trackdepth=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mrhip", blen="meandepth")
-        
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mrhipstr_mean")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
-    
+
     def test_mcc_meandepth(self, data_dir):
         """MCC tree with mean node depths and rooting at best tree's original root"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True, 
+        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mcc", blen="meandepth")
-        
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_mean")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
 
     def test_mcc_cadepth(self, data_dir):
         """MCC tree with CA node depths and rooting at best tree's original root"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True, 
+        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mcc", blen="cadepth",
                                     count_burnin_filename_list=[(1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
-        
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_ca")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
-    
+
 ###################################################################################################
 ###################################################################################################
 # Tests for QuantileAccumulator
@@ -1102,7 +1102,7 @@ class Test_quantiles_QuantileAccumulator:
         assert q0 == vmin
         assert q1 == vmax
         assert q0 <= q50 <= q1
-        
+
     def test_quantiles_p0_returns_min_bucket_value(self):
         qa = pt.QuantileAccumulator(k=10)
         for x in [0.8, 1.2, 2.5]:
