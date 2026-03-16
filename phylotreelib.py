@@ -2492,6 +2492,22 @@ class Tree:
 
     ###############################################################################################
 
+    def next_internal_node_id(self):
+        """
+        Return a fresh internal node ID that does not collide with any existing node ID.
+
+        If the tree already has integer internal node IDs, returns max(int_ids) + 1.
+            Otherwise returns 0.
+        """
+        int_ids = [x for x in self.intnodes if isinstance(x, int)]
+        if int_ids:
+            new_id = max(int_ids) + 1
+        else:
+            new_id = 0
+        return new_id
+
+    ###############################################################################################
+
     def rename_intnodes_to_match(self, other):
         """Takes as input a tree (other) with the same topology as self, but with potentially
         different internal nodeIDs. Renames the internal nodeIDs in self so they are the
