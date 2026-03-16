@@ -5210,12 +5210,16 @@ class Tree:
     ###############################################################################################
 
     def prune_subtree(self, basenode):
-        """Prune subtree rooted at basenode from self. Returns pruned subtree"""
+        """Remove the subtree rooted at `basenode` from this tree.
 
-        subtree = self.subtree(basenode)
+        Returns (subtree, basal_branch) as in `subtree()`, where `basal_branch.length`
+        is the length of the edge that was removed when detaching the subtree.
+        """
+
+        subtree, basalbranch = self.subtree(basenode)
         for leaf in self.remote_children(basenode):
             self.remove_leaf(leaf)
-        return subtree
+        return (subtree, basalbranch)
 
     ###############################################################################################
 
