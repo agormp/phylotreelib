@@ -4930,9 +4930,6 @@ class Tree:
         if self.length() == 0.0:
             raise TreeError("All branch lengths are zero - midpoint rooting not possible")
 
-        # Remove previous root if present at bifurcation
-        self.deroot()
-
         # Find the two leaves having the largest pairwise distance.
         (maxdist, leaf1, leaf2) = self.diameter(return_leaves = True)
         midway = maxdist/2.0
@@ -5036,8 +5033,7 @@ class Tree:
         # If minparent is not root:
         # remove old root and reroot using the minparent and minpardist already found:
         if minparent != self.root:
-            self.deroot()
-            self.reroot(node1=minparent, node2=minchild, node1dist=minpardist)
+            self.reroot(node1=minparent, node2=minchild, dist_from_node1=minpardist)
 
         # If minparent IS root:
         # remove old root and reroot using the minparent and minpardist already found:
@@ -5054,13 +5050,12 @@ class Tree:
                     rootkids = rootkids - {minchild}
                     minparent = rootkids.pop()    # Chose one of root's other children as minparent
                     minpardist = minpardist + self.dist_dict[self.root][minparent]
-                    self.deroot()
-                    self.reroot(node1=minparent, node2=minchild, node1dist=minpardist)
+                    self.reroot(node1=minparent, node2=minchild, dist_from_node1=minpardist)
                     return
 
                 # Multifurcation: old root will not be removed. Do not need to find new minparent
                 else:
-                    self.reroot(node1=minparent, node2=minchild, node1dist=minpardist)
+                    self.reroot(node1=minparent, node2=minchild, dist_from_node1=minpardist)
                     return
 
 
@@ -5068,9 +5063,6 @@ class Tree:
 
     def rootout(self,outgroup, polytomy=False):
         """Roots tree on outgroup"""
-
-        # Remove previous root if present at bifurcation
-        self.deroot()
 
         # Find pair of internal nodes corresponding to ingroup:outgroup bipartition
         if isinstance(outgroup, str):
@@ -5082,7 +5074,7 @@ class Tree:
 
         # If outgroup should form basal polytomy with ingroup: root on outbase
         if polytomy:
-            self.reroot(outbase, inbase, polytomy=True)
+            self.reroot(outbase, polytomy=True)
 
         # If tree does not have branch lengths: skip computation of lengths
         elif self.length() == 0.0:
@@ -5091,7 +5083,7 @@ class Tree:
         # Else: place root in the middle between inbase and outbase
         else:
             half_dist = self.nodedist(outbase, inbase) / 2
-            self.reroot(outbase, inbase, node1dist=half_dist)
+            self.reroot(outbase, inbase, dist_from_node1=half_dist)
 
     ###############################################################################################
 
@@ -6627,9 +6619,6 @@ class TreePostProcessor():
                 # Only reroot if tree not already rooted correctly
                 if (cur_rootbip is None) or (bip != cur_rootbip):
                     parent,child = sumtree.find_bipart_nodes(bip)
-                    sumtree.deroot()  # Python note: necessary?
-                                      # reroot seems to assume not rooted at birfurcation
-                                      # rethink reroot function and others depending on it!
                     sumtree.reroot(child, parent)
 
                 # If branch lengths or node depths have been tracked:
