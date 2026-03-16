@@ -4337,7 +4337,7 @@ class Tree:
         # Find namestarts (up to first occurrence of sep) that occur more than once among leaves
         seen = set()
         dups = set()
-        for name in self.leaflist():
+        for name in self.leaves:
             if not keep_pattern or keep_pattern not in name:
                 namestart = name.split(sep)[0]
                 if namestart in seen:
