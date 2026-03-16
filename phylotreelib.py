@@ -1634,6 +1634,11 @@ class Tree:
             tabstring += "|\n"
         tabstring += border_line
 
+        # Add total tree length if different from zero
+        treelen = self.length()
+        if not math.isclose(treelen, 0.0):
+            tabstring += f"Tree length: {treelen}\n"
+
         # Add list of leaves
         sorted_leaflist = sorted([str(leaf) for leaf in self.leaves])
         leaf_width = max(len(leaf) for leaf in sorted_leaflist)
