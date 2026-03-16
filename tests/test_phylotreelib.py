@@ -344,8 +344,8 @@ class Match_nodes(TreeTestBase):
 
     def test_unmatchedroots(self):
         """Test that unmatched roots are reported correctly"""
-        t1 = pt.Tree.randtree(ntips=50)
-        t2 = t1.copy_treeobject(False,False)
+        t1 = pt.Tree.randtree(ntips=50, randomlen=True)
+        t2 = t1.copy_treeobject(copylengths=True)
         delta_id = 35 + max(t1.intnodes)
         for i,id in enumerate(t1.intnodes):
             t2.rename_intnode(id, id+delta_id)
