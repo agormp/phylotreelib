@@ -4855,61 +4855,71 @@ class Tree:
 
     ###############################################################################################
 
-    def reroot(self, node1, node2=None, polytomy=False, node1dist=0.0):
-        """Places new root on branch between node1 and node2, node1dist from node1"""
+    def reroot(self, node1, node2=None, polytomy=False,
+               dist_from_node1=None, frac_from_node1=0.5):
+        """
+        Place a new root on branch or at existing node.
+        Removes previous root node if present at bifurcation.
 
-        # If tree is to be rooted at basal polytomy, then node1 (base of outgroup) is the new root
+        If polytomy=True:
+           The root is moved to the existing node `node1` (no new node inserted).
+
+        If polytomy=False:
+           The root is placed on the branch between node1 and node2, at distance `dist_from_node1`
+           from node1 along that branch (if given - otherwise frac_from_node1).
+           This inserts a new internal node on that branch and then reverses parent→child
+           direction along the path back to the old root.
+        """
+
+        # Remove previous root if present at bifurcation
+        self.deroot()
+
+        # Choose / create the new root node
         if polytomy:
             newroot = node1
-
-        # If polytomy not requested: new root must be inserted on branch between node1 and node2:
-        # Determine which node is parent of other, determine branchlength and label for branch
-        # between nodes 1 and 2, figure out what the new branch lengths will be after splitting
-        # the branch, and finally insert new node. Bail out if the nodes are not neighbors
         else:
             if node2 is None:
-                msg = "Need to specify node2 to reroot() method when not rooting at polytomy"
-                raise TreeError(msg)
-            if node1dist > self.nodedist(node1,node2):
-                msg = ("Parameter node1dist too large:\n"
-                       + f"    node1dist = {node1dist} > dist(node1, node2) = {self.nodedist(node1,node2)}")
-                raise TreeError(msg)
-            if node1 == self.parent(node2):
-                parent = node1
-                child = node2
-                parent_to_root_dist = node1dist
-                root_to_child_dist = self.nodedist(node1,node2) - node1dist
-            elif node2 == self.parent(node1):
-                parent = node2
-                child = node1
-                parent_to_root_dist = self.nodedist(node1,node2) - node1dist
-                root_to_child_dist = node1dist
-            else:
-                msg = "Node {} and {} are not neighbors in tree".format(node1, node2)
-                raise TreeError(msg)
+                raise TreeError("Need to specify node2 when polytomy=False")
 
-            # New branch (from parent to newroot) will inherit all attributes from original branch
-            # (from parent to child), except for length, which is split between the two branches
-            newbranch = self.child_dict[parent][child].copy()
-            newbranch.length = parent_to_root_dist
-            newroot = self.insert_node(parent, [child], newbranch)
-            self.child_dict[newroot][child].length = root_to_child_dist
+            # Determine directed edge parent->child (must be neighbors)
+            if node1 == self.parent(node2):
+                parent, child = node1, node2
+                node1_is_parent = True
+            elif node2 == self.parent(node1):
+                parent, child = node2, node1
+                node1_is_parent = False
+            else:
+                raise TreeError(f"Nodes {node1} and {node2} are not neighbors in tree")
+
+            # Determine dist_from_node1
+            origlen = self.child_dict[parent][child].length
+            if dist_from_node1 is None:
+                if not (0.0 < frac_from_node1 < 1.0):
+                    msg = f"frac_from_node1 should be in [0, 1], but is: {frac_from_node1}"
+                    raise TreeError(msg)
+                dist_from_node1 = frac_from_node1 * origlen
+            else:
+                if not (0.0 < dist_from_node1 < origlen):
+                    msg = f"dist_from_node1 should be in [0, {origlen}], but is: {dist_from_node1}"
+                    raise TreeError(msg)
+            dist_from_parent = dist_from_node1 if node1_is_parent else (origlen - dist_from_node1)
+
+            # Insert new root on the branch. Duplicate original branch annotations onto both halves.
+            newroot = self.add_node_on_branch(parent, child, dist_from_parent=parent_to_root_dist,
+                                              copy_attrs="both")
 
         # Things that were already downstream of newroot do not need to be moved, but things that
         # were previously upstream need to be moved downstream, which is done by reversing the
         # links on the direct path going back from newroot to oldroot
         oldroot = self.root
-        path_to_old = self.nodepath(newroot, oldroot)
-        for i in range( len(path_to_old) - 1 ):
-            newparent, oldparent = path_to_old[i], path_to_old[i+1]
+        path_new_to_old = self.nodepath(newroot, oldroot)
+        for i in range(len(path_new_to_old) - 1):
+            newparent, oldparent = path_new_to_old[i], path_new_to_old[i+1]
             self.child_dict[newparent][oldparent] = self.child_dict[oldparent][newparent]
             del self.child_dict[oldparent][newparent]
-            # self.parent_dict[oldparent] = newparent
 
-        self.clear_caches()
-
-        # Update root info:
         self.root = newroot
+        self.clear_caches()
 
     ###############################################################################################
 
