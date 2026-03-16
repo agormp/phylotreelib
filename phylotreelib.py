@@ -3835,69 +3835,78 @@ class Tree:
 
     ###############################################################################################
 
-    def graft(self, other, node1, node2=None, blen1=0, blen2=0, graftlabel=None,
-                graft_with_other_root=False):
-        """Graft other tree to self
+    def graft(self, other, parent, child, dist_from_parent=None, frac_from_parent=None,
+              connect_length=0.0, connect_branchstruct=None, graftlabel=None):
+        """Attach `other` below a new graft point inserted on edge (parent -> child).
 
-        tree2 (other) intnodes will be renamed if names clash with those in tree1.
-        node1: node in tree1 (self) below which tree2 (other) will be grafted. Cannot be root1
-        node2: node in tree2 (other) below which tree2 will be attached (default is root of tree2)
-        blen1: length of branch added to tree1 below graftpoint (lower of two newly created branches)
-        blen2: length of branch above graft point and below tree2 (upper of two newly created branches)
-        graftlabel: prepend value of "label" to leaf names on t2 (e.g: "graft_s1")
-        graft_with_other_root: use root of other as graftpoint (i.e., do not add extra basal
-                               branch between other.root and self.graftpoint)"""
+        - Inserts a new internal node on the existing edge (parent -> child).
+        - Adds a new connecting branch from the graft point to:
+            * `other` (if `other` is a Tree: attaches `other.root`), or
+            * a new leaf name (if `other` is a str).
 
-        # Check that node1 is not root in tree1 (self)
-        if node1 == self.root:
-            raise TreeError("It is not possible to graft other tree below root-node: {}".format(node1))
+        Placement on (parent -> child):
+          - use `dist_from_parent` if given
+          - else use `frac_from_parent` if given
+          - else choose a random fraction in (0, 1)
 
-        # Add new intnode on branch in tree1 where tree2 is to be grafted
-        parent1 = self.parent(node1)
-        branchstruct = Branchstruct(length=blen1)
-        graftpoint = self.insert_node(parent1, [node1], branchstruct)
+        `connect_branchstruct` overrides `connect_length` if provided.
+        If `graftlabel` is given, it is prefixed to leaf names in `other` (mutates `other`).
 
-        # If node2 is not given: set to root node of tree2
-        if node2 is None:
-            node2 = other.root
+        Returns the graft point node ID.
+        """
 
-        # If node2 is not root of tree2 (or child of root2) then re-root on branch below node2.
-        # After this, grafting can happen below root2
-        elif (node2 != other.root) and (node2 not in other.children(other.root)):
-            other.deroot()
-            node2parent = other.parent(node2)
-            other.reroot(node2parent, node2)
+        # sanity check: branch exists
+        if not self.is_parent_child_pair(parent, child):
+            raise TreeError(f"No branch {parent}->{child} exists in this tree")
 
-        # Rename other's internal nodes if names clash with self's
+        # decide placement on the regraft edge
+        if dist_from_parent is None and frac_from_parent is None:
+            frac_from_parent = random.random()
+
+        # insert graftpoint on branch
+        graftpoint = self.add_node_on_branch(parent, child,
+                                             dist_from_parent=dist_from_parent,
+                                             frac_from_parent=frac_from_parent)
+
+        # prepare connecting branchstruct
+        if connect_branchstruct is None:
+            connect_branchstruct = Branchstruct(length=connect_length)
+
+        # handle other = single leaf name
+        if isinstance(other, str):
+            leaf = f"{graftlabel}{other}" if graftlabel else other
+            if leaf in self.nodes:
+                raise TreeError(f"Cannot graft leaf '{leaf}': name already exists in target tree")
+            self.child_dict[graftpoint][leaf] = connect_branchstruct
+            self.leaves.add(leaf)
+            self.clear_caches()
+            return graftpoint
+
+        # if we are here, then other must be Tree
+        if not isinstance(other, Tree):
+            raise TreeError("other must be a Tree or a leaf name (str)")
+
+        # Rename internal nodes of other if they clash with self
         renameset = self.intnodes & other.intnodes
         if renameset:
-            newnum = max(self.intnodes | other.intnodes)
-            for oldnum in renameset:
-                newnum += 1
-                other.rename_intnode(oldnum, newnum)
+            newid = max(self.next_internal_node_id(), other.next_internal_node_id())
+            for old in renameset:
+                other.rename_intnode(old, newid)
+                newid += 1
 
-        # prepend label to leaf names on grafted subtree if requested
+        # Prefix leaf names if requested (mutates other)
         if graftlabel is not None:
             for oldname in other.leaflist():
-                newname = "{}{}".format(graftlabel, oldname)
-                other.rename_leaf(oldname, newname)
+                other.rename_leaf(oldname, f"{graftlabel}{oldname}")
 
-        # Update main data structure (self.child_dict dictionary) by merging with dict from other
+        # Merge the subtree dicts and connect other.root under graftpoint
         self.child_dict.update(other.child_dict)
-        # Link subtree to graftpoint in self.child_dict
-        self.child_dict[graftpoint][other.root] = Branchstruct(length=blen2)
+        self.child_dict[graftpoint][other.root] = connect_branchstruct
 
-        # Update set of leaves
-        self.leaves.update( other.leaves )
-
-        # If requested: use other.root as graftpoint
-        # (remove branch between graftpoint and other.root)
-        # This is particularly useful if other consists of only root and single leaf
-        if graft_with_other_root:
-            self.remove_branch(graftpoint, other.root)
-
-        # Reset caches and lists
+        # Update leaves and clear caches
+        self.leaves.update(other.leaves)
         self.clear_caches()
+        return graftpoint
 
     ###############################################################################################
 
