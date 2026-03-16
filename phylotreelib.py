@@ -5104,16 +5104,19 @@ class Tree:
     ###############################################################################################
 
     def possible_spr_regraft_nodes(self, prune_node):
-        """Utility function when using spr function: where is it possible to regraft
-        prune_node: the node below which pruning will take place (before regrafting)"""
+        """Return nodes that are valid `regraft_node` choices given `prune_node`.
+
+        This is computed by pruning `prune_node` on a copy of the tree and returning
+        all remaining non-root nodes in the pruned tree.
+        """
 
         # Python note: could return preprocessed subtree and treecopy to save computation
         # but this is pretty fast and interface would be less clear.
         # But in case of bottleneck: also return subtree and treecopy perhaps
 
         treecopy = self.copy_treeobject()
-        subtree = treecopy.subtree(prune_node)
-        for leaf in subtree.leaves:
+        leafset = treecopy.remote_children(prune_node)
+        for leaf in leafset:
             treecopy.remove_leaf(leaf)
         possible_regraft_nodes = treecopy.nodes - {treecopy.root}
         return possible_regraft_nodes
