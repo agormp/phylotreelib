@@ -419,9 +419,9 @@ class RelationShipMethods(TreeTestBase):
                     other_half = mytree.leaves - remotekids
                     if len(basal_siblings) == 1:
                         sib = next(iter(basal_siblings))
-                        self.assertEqual(sib, mytree.findbasenode(other_half)) 
+                        self.assertEqual(sib, mytree.findbasenode(other_half))
                     else:
-                        self.assertEqual(mytree.root, mytree.findbasenode(other_half))                                        
+                        self.assertEqual(mytree.root, mytree.findbasenode(other_half))
             for leaf in mytree.leaves:
                 self.assertEqual({leaf}, mytree.remote_children(leaf))
         treestring = self.treedata["simplestring"]
