@@ -3791,19 +3791,19 @@ class Tree:
     def subtree(self, basenode):
         """Return (subtree, basal_branch) for the subtree rooted at `basenode`.
 
-        - `basenode` must not be the root (there is no basal branch below the root).
+        - If `basenode` is root: return None for basal_branch
         - If `basenode` is a leaf: `subtree` is the leaf name (str).
         - Otherwise: `subtree` is a new Tree whose root is `basenode`.
 
         `basal_branch` is a copy of the Branchstruct on the incoming edge to `basenode`
-        in the original tree.
+        in the original tree. (or None if basenode=root)
         """
 
         if basenode == self.root:
-            msg = "basenode is root of tree; subtree() can't return entire tree + branch below root"
-            raise TreeError(msg)
-        parent = self.parent(basenode)
-        basalbranch_copy = self.child_dict[parent][basenode].copy()
+            basalbranch_copy = None
+        else:
+            parent = self.parent(basenode)
+            basalbranch_copy = self.child_dict[parent][basenode].copy()
 
         # Special case: basenode is leaf => return leafname (string) + basal branch
         if basenode in self.leaves:
