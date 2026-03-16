@@ -4946,6 +4946,9 @@ class Tree:
         if self.length() == 0.0:
             raise TreeError("All branch lengths are zero - midpoint rooting not possible")
 
+        # Remove previous root if present at bifurcation
+        self.collapse_bifurcating_root()
+
         # Find the two leaves having the largest pairwise distance.
         (maxdist, leaf1, leaf2) = self.diameter(return_leaves = True)
         midway = maxdist/2.0
@@ -5049,6 +5052,7 @@ class Tree:
         # If minparent is not root:
         # remove old root and reroot using the minparent and minpardist already found:
         if minparent != self.root:
+            self.collapse_bifurcating_root()
             self.reroot(node1=minparent, node2=minchild, dist_from_node1=minpardist)
 
         # If minparent IS root:
