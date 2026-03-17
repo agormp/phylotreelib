@@ -1,11 +1,12 @@
 import phylotreelib as pt
 import copy
+import itertools
 import math
+import numpy as np
 import pytest
 import random
 import textwrap
 from string import ascii_lowercase, digits
-
 
 ###################################################################################################
 ###################################################################################################
@@ -25,10 +26,6 @@ class Test_remove_comments:
         text = 'Hello [comment World!\n[newline'
         with pytest.raises(pt.TreeError):
             pt.remove_comments(text)
-
-    def test_nested_comments(self):
-        text = 'Hello [outer [inner] comment] World!'
-        assert pt.remove_comments(text) == 'Hello  World!'
 
 ###################################################################################################
 ###################################################################################################
@@ -85,17 +82,13 @@ class Test_create_Topostruct:
 
     def test_attributes(self):
         ts = pt.Topostruct()
-        w = 0.345
-        t = "(A,(B,(C,D)));"  # not actually a tree but fine for testing...
-        f = 0.97
-        x = "not supposed to be an attribute"
+        ts.tree = "(A,(B,(C,D)));"  # not actually a tree but fine for testing...
+        ts.posterior = 0.97
+        ts.n = 23
         # Note: main test here is to see if class accepts (only) attribues named in __slots__
-        # Assertion is done implicitly: if exception is raised here then test fails
-        ts.weight = w
-        ts.tree = t
-        ts.posterior = f
+        # Assertion is done implicitly: if exception is raised above then test fails
         with pytest.raises(AttributeError):
-            ts.notanatt = x
+            ts.notanatt = "not supposed to be an attribute"
 
 ###################################################################################################
 ###################################################################################################
@@ -374,6 +367,7 @@ class Test_str:
                                 "|       1  |      C  |          1  |         |",
                                 "|       1  |      D  |          1  |         |",
                                 "+--------------------------------------------+",
+                                "Tree length: 7.0",
                                 "",
                                 "4 Leaves:",
                                 "-",
@@ -460,7 +454,7 @@ class Test_copy_treeobject:
     def test_blen_lab(self, treedata):
         for treestring in treedata.values():
             t1 = pt.Tree.from_string(treestring)
-            t2 = t1.copy_treeobject(copylengths=True, copyattr=True)            
+            t2 = t1.copy_treeobject(copylengths=True, copyattr=True)
             assert t1 == t2
             assert t1.root == t2.root
             assert t1.has_same_root(t2)
@@ -754,7 +748,7 @@ class TestSPR:
             assert tree.leaves == original_leaves
 
     def test_random_spr_all_possible_params(self):
-        """Test all possible combinations of prune and regraft nodes for range of random trees 
+        """Test all possible combinations of prune and regraft nodes for range of random trees
         of different size. No exceptions should be raised"""
         for ntips in range(3,9):
             origtree = pt.Tree.randtree(ntips=ntips, randomlen=True)
@@ -779,96 +773,715 @@ class TestSPR:
         tree = pt.Tree.randtree(ntips=8, randomlen=True)
         possible_prune_nodes = tree.possible_spr_prune_nodes()
         prune_node = next(iter(possible_prune_nodes))
-        # Choose an invalid regraft node. 
+        # Choose an invalid regraft node.
         possible_regraft_nodes = tree.possible_spr_regraft_nodes(prune_node)
         impossible_regraft_nodes = tree.nodes - possible_regraft_nodes
         invalid_regraft_node = next(iter(impossible_regraft_nodes))
         with pytest.raises(pt.TreeError):
             tree.spr(prune_node=prune_node, regraft_node=invalid_regraft_node)
 
+    def test_spr_preserves_total_length_general_case(self):
+        random.seed(0)
+        tree = pt.Tree.randtree(ntips=15, randomlen=True)
+        base_len = tree.length()
+        for _ in range(50):
+            tree.spr()
+            assert tree.length() == pytest.approx(base_len)
+
+    def test_spr_rejects_tree_with_two_leaves(self):
+        tree = pt.Tree.from_string("(A:1,B:1);")
+        with pytest.raises(pt.TreeError):
+            tree.spr()
+
+    def test_spr_rejects_regraft_at_root(self):
+        tree = pt.Tree.randtree(ntips=10, randomlen=True)
+        prune_node = random.choice(tuple(tree.possible_spr_prune_nodes()))
+        with pytest.raises(pt.TreeError):
+            tree.spr(prune_node=prune_node, regraft_node=tree.root)
+
+
+###################################################################################################
+
+class TestGraft:
+    def test_graft_leaf_on_edge_preserves_edge_length_and_adds_connecting_branch(self):
+        tree = pt.Tree.from_string("(A:1,B:2,C:3);")
+        total_len_before = tree.length()
+
+        parent = tree.root
+        child = "A"
+        connect_len = 0.7
+
+        graftpoint = tree.graft(
+            other="X",
+            parent=parent,
+            child=child,
+            frac_from_parent=0.4,
+            connect_length=connect_len,
+        )
+
+        # new leaf exists
+        assert "X" in tree.leaves
+        assert tree.is_parent_child_pair(graftpoint, "X")
+        assert tree.child_dict[graftpoint]["X"].length == pytest.approx(connect_len)
+
+        # edge (parent->child) length is preserved by splitting
+        new_child_path_len = tree.child_dict[parent][graftpoint].length + tree.child_dict[graftpoint][child].length
+        assert new_child_path_len == pytest.approx(1.0)
+
+        # total length increased by connect_len (since we attached new leaf)
+        assert tree.length() == pytest.approx(total_len_before + connect_len)
+
+    def test_graft_tree_renames_internal_nodes_to_avoid_collision(self):
+        t1 = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        t2 = pt.Tree.from_string("(D:1,(E:1,F:1):1);")
+        # Force an ID collision by renaming t2 internal node(s) to overlap t1
+        # (pick a non-root internal node in t2)
+        t1_int = sorted([n for n in t1.intnodes if isinstance(n, int)])
+        t2_int = sorted([n for n in t2.intnodes if isinstance(n, int)])
+        assert t1_int and t2_int
+        collide = t1_int[0]
+        if collide in t2_int:
+            # already colliding; keep it
+            pass
+        else:
+            t2.rename_intnode(t2_int[0], collide)
+
+        parent = t1.root
+        child = "A"
+        graftpoint = t1.graft(t2, parent=parent, child=child, frac_from_parent=0.5, connect_length=0.0)
+
+        # All leaves from both trees present
+        assert set(t1.leaves) == {"A", "B", "C", "D", "E", "F"}
+        # Internal IDs should be unique
+        ints = [n for n in t1.intnodes if isinstance(n, int)]
+        assert len(ints) == len(set(ints))
+        assert graftpoint in t1.intnodes
+
+###################################################################################################
+
+class TestPrune:
+    """Tests for pruning related methods in Tree object"""
+
+    def test_prune_maxlen(self):
+        """Brute force: prune_maxlen finds the maximum-length subtree with nkeep leaves."""
+        random.seed(0)  # keep this test deterministic
+        for _ in range(100):
+            ntips = random.randint(5, 11)          # combinatorial explosion beyond this
+            nkeep = random.randint(3, ntips - 1)
+
+            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+
+            lengths = []
+            for discardset in itertools.combinations(t1.leaves, ntips - nkeep):
+                t2 = t1.copy_treeobject()
+                t2.remove_leaves(discardset)
+                lengths.append(t2.length())
+
+            t1.prune_maxlen(nkeep=nkeep)
+            assert t1.length() == pytest.approx(max(lengths))
+
+    def test_prune_maxlen_with_keeplist(self):
+        """Brute force: prune_maxlen respects keeplist and still maximizes length."""
+        random.seed(1)  # keep deterministic, but different sequence than test above
+        for _ in range(100):
+            ntips = random.randint(5, 11)
+            nkeep = random.randint(3, ntips - 1)
+            nkeeplist = random.randint(1, nkeep)
+
+            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            keeplist = random.sample(list(t1.leaves), nkeeplist)
+
+            potential_to_remove = t1.leaves - set(keeplist)
+            lengths = []
+            for discardset in itertools.combinations(potential_to_remove, ntips - nkeep):
+                t2 = t1.copy_treeobject()
+                t2.remove_leaves(discardset)
+                lengths.append(t2.length())
+
+            t1.prune_maxlen(nkeep=nkeep, keeplist=keeplist)
+            assert t1.length() == pytest.approx(max(lengths))
+
+    def test_find_common_leaf(self, treedata):
+        """find_common_leaf returns the leaf with minimal sum of distances to all leaves in the set."""
+        for ts in treedata.values():
+            t = pt.Tree.from_string(ts)
+            leafset = t.leaves
+
+            best_leaf = None
+            best_sum = float("inf")
+            for leaf1 in leafset:
+                blensum = 0.0
+                for leaf2 in leafset:
+                    blensum += t.nodedist(leaf1, leaf2)
+                if blensum < best_sum:
+                    best_sum = blensum
+                    best_leaf = leaf1
+
+            common_function = t.find_common_leaf(leafset)
+            assert common_function == best_leaf
+
+    def test_find_central_leaf(self):
+        """find_central_leaf returns the leaf closest to the tree center for this known tree."""
+        t = pt.Tree.from_string("(((A:1,B:1):9,C:9):1,(D:1,E:1):9);")
+        central = t.find_central_leaf(t.leaves)
+        assert central == "C"
+
+###################################################################################################
+
+class TestSubtreeAndPruneSubtree:
+    def test_subtree_leaf_returns_str_and_basalbranch(self):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4);")
+        # pick a leaf that is not root
+        leaf = "A"
+        sub, basal = tree.subtree(leaf)
+        assert isinstance(sub, str)
+        assert sub == leaf
+        assert basal.length == pytest.approx(1.0)
+
+    def test_subtree_internal_returns_tree_and_basalbranch(self):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4);")
+        # internal node is the one above B,C
+        root = tree.root
+        # find internal child of root
+        internal = next(n for n in tree.children(root) if n in tree.intnodes)
+
+        sub, basal = tree.subtree(internal)
+        assert isinstance(sub, pt.Tree)
+        assert sub.root == internal
+        assert set(sub.leaves) == {"B", "C"}
+        assert basal.length == pytest.approx(4.0)
+
+    def test_prune_subtree_removes_leaves_and_returns_basalbranch(self):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4,D:5);")
+        root = tree.root
+        internal = next(n for n in tree.children(root) if n in tree.intnodes)
+        leaves_before = set(tree.leaves)
+        total_len_before = tree.length()
+
+        sub, basal = tree.prune_subtree(internal)
+        assert isinstance(sub, pt.Tree)
+        assert basal.length == pytest.approx(4.0)
+
+        # B and C should be gone from the main tree
+        assert set(tree.leaves) == leaves_before - {"B", "C"}
+        # Tree length should decrease by (basal branch + internal subtree length)
+        assert tree.length() == pytest.approx(total_len_before - (4.0 + 2.0 + 3.0))
+
+###################################################################################################
+
+class TestAddNodeOnBranch:
+    def test_add_node_on_branch_splits_length_by_dist(self):
+        tree = pt.Tree.from_string("(A:2,B:2);")
+        # root has children A and B; pick edge root->A
+        root = tree.root
+        newnode = tree.add_node_on_branch(root, "A", dist_from_parent=0.5, copy_attrs="both")
+
+        assert tree.is_parent_child_pair(root, newnode)
+        assert tree.is_parent_child_pair(newnode, "A")
+
+        upper = tree.child_dict[root][newnode].length
+        lower = tree.child_dict[newnode]["A"].length
+        assert upper == pytest.approx(0.5)
+        assert lower == pytest.approx(1.5)
+
+    def test_add_node_on_branch_splits_length_by_frac(self):
+        tree = pt.Tree.from_string("(A:2,B:2);")
+        root = tree.root
+        newnode = tree.add_node_on_branch(root, "A", frac_from_parent=0.25, copy_attrs="both")
+
+        upper = tree.child_dict[root][newnode].length
+        lower = tree.child_dict[newnode]["A"].length
+        assert upper == pytest.approx(0.5)
+        assert lower == pytest.approx(1.5)
+
+    def test_add_node_on_branch_random_when_no_dist_or_frac(self):
+        random.seed(123)
+        tree = pt.Tree.from_string("(A:2,B:2);")
+        root = tree.root
+        newnode = tree.add_node_on_branch(root, "A", dist_from_parent=None, frac_from_parent=None)
+
+        upper = tree.child_dict[root][newnode].length
+        lower = tree.child_dict[newnode]["A"].length
+        assert 0.0 < upper < 2.0
+        assert upper + lower == pytest.approx(2.0)
+
+    def test_add_node_on_branch_rejects_non_edge(self):
+        tree = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        # A is not parent of C
+        with pytest.raises(pt.TreeError):
+            tree.add_node_on_branch("A", "C", frac_from_parent=0.5)
+
+###################################################################################################
+
+class TestNextInternalNodeId:
+    def test_next_internal_node_id_int_tree(self):
+        tree = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        # internal nodes are integers; root is typically 0
+        nid = tree.next_internal_node_id()
+        assert isinstance(nid, int)
+        assert nid not in tree.nodes
+
+    def test_next_internal_node_id_string_intnodes_tree(self):
+        # transmission-tree-like: internal nodes can be strings
+        parentlist = ["r", "r", "x", "x"]
+        childlist = ["x", "y", "A", "B"]
+        lenlist = [1.0, 1.0, 2.0, 3.0]
+        tree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist)
+        nid = tree.next_internal_node_id()
+        assert isinstance(nid, int)
+        assert nid not in tree.nodes
+
 ###################################################################################################
 
 class Test_compute_sumtree:
-    """Compare pre-computed summary trees (treeannotator) to own computations. 
+    """Compare pre-computed summary trees (treeannotator) to own computations.
     Check various combinations of summary tree type, blen-setting, and rooting"""
-    
+
     # Python note: surely this can be done with fewer lines of code, but how then
     # to get individual test PASSED messages?
-    
+
     def test_hipstr_meandepth(self, data_dir):
         """HIPSTR tree with mean node depths and rooting at best HIPSTR resolution of root clade"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
         tsum = pt.TreeSummary(trackclades=True, trackdepth=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="hip", blen="meandepth")
-        
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_hipstr_mean")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
-    
+
     def test_mrhipstr_meandepth(self, data_dir):
         """mrHIPSTR tree with mean node depths and rooting at best HIPSTR resolution of root clade"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
         tsum = pt.TreeSummary(trackclades=True, trackdepth=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mrhip", blen="meandepth")
-        
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mrhipstr_mean")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
-    
+
     def test_mcc_meandepth(self, data_dir):
         """MCC tree with mean node depths and rooting at best tree's original root"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True, 
+        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mcc", blen="meandepth")
-        
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_mean")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
 
     def test_mcc_cadepth(self, data_dir):
         """MCC tree with CA node depths and rooting at best tree's original root"""
-        
+
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True, 
+        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mcc", blen="cadepth",
-                                    wt_count_burnin_filename_list=[(1, 1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
-        
+                                    count_burnin_filename_list=[(1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
+
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_ca")
         tgold = tf.readtree()
-        
+
         # Comparisons
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
-    
+
 ###################################################################################################
-    
+###################################################################################################
+# Tests for QuantileAccumulator
+###################################################################################################
+###################################################################################################
+
+class Test_init_QuantileAccumulator:
+
+    def test_defaults(self):
+        qa = pt.QuantileAccumulator()
+        assert qa.k == 7
+        assert qa.shift == qa.k + 1
+        assert qa.scale == (1 << qa.shift)
+        assert qa.mask == qa.scale - 1
+        assert isinstance(qa.counts, dict) or "defaultdict" in type(qa.counts).__name__.lower()
+        assert qa.n == 0
+        assert isinstance(qa.neg_bucket, int)
+
+    def test_custom_k(self):
+        qa = pt.QuantileAccumulator(k=3)
+        assert qa.k == 3
+        assert qa.shift == 4
+        assert qa.scale == 16
+        assert qa.mask == 15
+
+###################################################################################################
+
+class Test__bucket_QuantileAccumulator:
+
+    def test_bucket_sentinel_for_nonpositive(self):
+        qa = pt.QuantileAccumulator()
+        assert qa._bucket(0.0) == qa.neg_bucket
+        assert qa._bucket(-1.0) == qa.neg_bucket
+
+    def test_bucket_sentinel_for_nonfinite(self):
+        qa = pt.QuantileAccumulator()
+        assert qa._bucket(float("nan")) == qa.neg_bucket
+        assert qa._bucket(float("inf")) == qa.neg_bucket
+        assert qa._bucket(float("-inf")) == qa.neg_bucket
+
+    def test_bucket_key_encodes_exponent_and_mantissa_bucket(self):
+        qa = pt.QuantileAccumulator(k=7)
+        x = 3.141592653589793
+        bkey = qa._bucket(x)
+        assert bkey != qa.neg_bucket
+
+        # decode
+        e = bkey >> qa.shift
+        b = bkey & qa.mask
+
+        # re-derive via frexp
+        m, e2 = math.frexp(x)
+        b2 = int(m * qa.scale)
+
+        assert e == e2
+        assert b == b2
+
+    def test_bucket_interval_contains_x(self):
+        """
+        For x>0 finite, bucket should correspond to interval:
+            mant in [b/scale, (b+1)/scale)
+            value in [ldexp(b/scale, e), ldexp((b+1)/scale, e))
+        and x should be in that interval.
+        """
+        qa = pt.QuantileAccumulator(k=10)
+        for x in [1e-12, 1e-6, 0.1, 1.0, 2.0, 10.0, 1e6, 1e12]:
+            bkey = qa._bucket(x)
+            e = bkey >> qa.shift
+            b = bkey & qa.mask
+
+            lo = math.ldexp(b / qa.scale, e)
+            hi = math.ldexp((b + 1) / qa.scale, e)
+
+            assert lo <= x
+            assert x < hi
+
+
+###################################################################################################
+
+class Test__bucket_value_QuantileAccumulator:
+
+    def test_bucket_value_for_sentinel_is_zero(self):
+        qa = pt.QuantileAccumulator()
+        assert qa._bucket_value(qa.neg_bucket) == 0.0
+
+    def test_bucket_value_within_bucket_interval(self):
+        qa = pt.QuantileAccumulator(k=8)
+        xs = [0.1, 0.5, 0.999, 1.0, 1.2345, 2.0, 12345.6]
+        for x in xs:
+            bkey = qa._bucket(x)
+            e = bkey >> qa.shift
+            b = bkey & qa.mask
+
+            lo = math.ldexp(b / qa.scale, e)
+            hi = math.ldexp((b + 1) / qa.scale, e)
+
+            v = qa._bucket_value(bkey)
+            assert lo <= v
+            assert v < hi
+
+###################################################################################################
+
+class Test_add_QuantileAccumulator:
+
+    def test_add_increments_n_and_bucket_count(self):
+        qa = pt.QuantileAccumulator(k=7)
+        assert qa.n == 0
+        x = 1.0
+        bkey = qa._bucket(x)
+
+        qa.add(x)
+        assert qa.n == 1
+        assert qa.counts[bkey] == 1
+
+        qa.add(x)
+        assert qa.n == 2
+        assert qa.counts[bkey] == 2
+
+    def test_add_sentinel_bucket_is_counted(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(0.0)
+        qa.add(-5.0)
+        assert qa.n == 2
+        assert qa.counts[qa.neg_bucket] == 2
+
+
+###################################################################################################
+
+class Test_merge_QuantileAccumulator:
+
+    def test_merge_combines_counts_and_n(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=7)
+
+        for x in [1.0, 2.0, 3.0]:
+            a.add(x)
+        for x in [2.0, 4.0]:
+            b.add(x)
+
+        a.merge(b)
+        assert a.n == 5
+        # Check some bucket counts explicitly
+        assert a.counts[a._bucket(2.0)] == 2
+
+    def test_merge_incompatible_shift_raises(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=6)  # different shift
+        with pytest.raises(ValueError):
+            a.merge(b)
+
+    def test_merge_incompatible_neg_bucket_raises(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=7)
+        b.neg_bucket = -123  # force incompatibility
+        with pytest.raises(ValueError):
+            a.merge(b)
+
+    def test_merge_equivalent_to_single_stream(self):
+        """
+        If you split data across accumulators and merge, the resulting quantiles
+        should match building one accumulator on all points (same bucket scheme).
+        """
+        data = [random.lognormvariate(0.0, 1.0) for _ in range(500)]
+        probs = [0.0, 0.1, 0.5, 0.9, 1.0]
+
+        all_in_one = pt.QuantileAccumulator(k=10)
+        for x in data:
+            all_in_one.add(x)
+
+        left = pt.QuantileAccumulator(k=10)
+        right = pt.QuantileAccumulator(k=10)
+        for x in data[:250]:
+            left.add(x)
+        for x in data[250:]:
+            right.add(x)
+
+        left.merge(right)
+
+        assert left.n == all_in_one.n
+        assert left.quantiles(probs) == all_in_one.quantiles(probs)
+
+
+###################################################################################################
+
+class Test_quantiles_QuantileAccumulator:
+
+    def test_quantiles_empty_raises(self):
+        qa = pt.QuantileAccumulator()
+        with pytest.raises(pt.TreeError):
+            qa.quantiles([0.5])
+
+    def test_quantiles_prob_out_of_range_raises(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(1.0)
+        with pytest.raises(pt.TreeError):
+            qa.quantiles([-0.01])
+        with pytest.raises(pt.TreeError):
+            qa.quantiles([1.01])
+
+    def test_quantiles_returns_same_length_and_order_as_input_probs(self):
+        qa = pt.QuantileAccumulator(k=12)
+        for x in [1.0, 2.0, 3.0, 4.0, 5.0]:
+            qa.add(x)
+
+        probs = [0.9, 0.1, 0.5, 0.0, 1.0]
+        out = qa.quantiles(probs)
+
+        assert len(out) == len(probs)
+
+        # Same call but reordered probs; compare by matching probabilities
+        # (not by assuming numeric values are "true quantiles")
+        out2 = qa.quantiles(sorted(probs))
+        mapping = dict(zip(sorted(probs), out2))
+        assert out == [mapping[p] for p in probs]
+
+    def test_quantiles_monotone_for_sorted_probs(self):
+        qa = pt.QuantileAccumulator(k=10)
+        data = [random.random() + 1e-9 for _ in range(200)]
+        for x in data:
+            qa.add(x)
+
+        probs = [0.0, 0.25, 0.5, 0.75, 1.0]
+        out = qa.quantiles(probs)
+        assert out == sorted(out)
+
+    def test_quantiles_bounds_reasonable(self):
+        qa = pt.QuantileAccumulator(k=10)
+        data = [random.lognormvariate(0.0, 1.0) for _ in range(500)]
+        for x in data:
+            qa.add(x)
+
+        bkeys = sorted(qa.counts)
+        vmin = qa._bucket_value(bkeys[0])
+        vmax = qa._bucket_value(bkeys[-1])
+
+        q0, q50, q1 = qa.quantiles([0.0, 0.5, 1.0])
+
+        assert q0 == vmin
+        assert q1 == vmax
+        assert q0 <= q50 <= q1
+
+    def test_quantiles_p0_returns_min_bucket_value(self):
+        qa = pt.QuantileAccumulator(k=10)
+        for x in [0.8, 1.2, 2.5]:
+            qa.add(x)
+        bmin = qa._bucket_value(min(qa.counts))
+        assert qa.quantile(0.0) == bmin
+
+###################################################################################################
+
+class Test_quantile_QuantileAccumulator:
+
+    def test_quantile_calls_quantiles_singleton(self):
+        qa = pt.QuantileAccumulator(k=12)
+        for x in [1.0, 10.0, 100.0]:
+            qa.add(x)
+
+        q1 = qa.quantile(0.5)
+        q2 = qa.quantiles([0.5])[0]
+        assert q1 == q2
+
+    def test_quantile_empty_raises(self):
+        qa = pt.QuantileAccumulator()
+        with pytest.raises(pt.TreeError):
+            qa.quantile(0.5)
+
+    def test_quantile_prob_out_of_range_raises(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(1.0)
+        with pytest.raises(pt.TreeError):
+            qa.quantile(-0.1)
+        with pytest.raises(pt.TreeError):
+            qa.quantile(1.1)
+
+###################################################################################################
+
+class Test_precision_quantiles_vs_exact_order_statistic:
+
+    def ceil_rank(self, p, n):
+        """Your convention: rank j in {1..n}."""
+        if p == 0.0:
+            return 1
+        return int(math.ceil(p * n))
+
+
+    def test_quantile_matches_bucket_of_target_order_statistic(self):
+        """
+        For your definition (rank j = ceil(p*n), p=0 -> j=1),
+        qa.quantile(p) should equal the representative value of the bucket
+        that contains x_(j).
+        """
+        rng = random.Random()
+        data = [rng.lognormvariate(0.0, 1.0) for _ in range(4000)]  # all > 0
+        data_sorted = sorted(data)
+        probs = [0.0, 0.01, 0.05, 0.1, 0.5, 0.9, 0.95, 0.99, 1.0]
+
+        for k in [4, 7, 10, 12]:
+            qa = pt.QuantileAccumulator(k=k)
+            for x in data:
+                qa.add(x)
+
+            for p in probs:
+                j = self.ceil_rank(p, len(data_sorted))
+                xj = data_sorted[j - 1]
+
+                # The bucket that contains the target order statistic
+                bkey = qa._bucket(xj)
+                expected = qa._bucket_value(bkey)
+
+                got = qa.quantile(p)
+                assert got == expected, f"k={k}, p={p}, j={j}, xj={xj}, bkey={bkey}"
+
+    def test_quantile_within_relative_error_bound_of_target_order_statistic(self):
+        """
+        With positive finite data, bucket midpoint representation guarantees
+        relative error <= 2^(-(k+1)) with respect to any value in that bucket.
+        In particular, the returned value should be within this distance from the target order statistic x_(j).
+        """
+        rng = random.Random()
+        data = [rng.lognormvariate(0.0, 1.0) for _ in range(4000)]
+        data_sorted = sorted(data)
+        probs = [0.0, 0.01, 0.05, 0.1, 0.5, 0.9, 0.95, 0.99, 1.0]
+
+        for k in [4, 7, 10, 12]:
+            qa = pt.QuantileAccumulator(k=k)
+            for x in data:
+                qa.add(x)
+
+            eps = 2 ** (-(k + 1))       # worst-case relative error bound
+            tol = eps + 5e-15           # small slack for floating point
+
+            for p in probs:
+                j = self.ceil_rank(p, len(data_sorted))
+                xj = data_sorted[j - 1]         # exact quantile, given my rank definition
+                q_approx = qa.quantile(p)
+
+                lo = (1.0 - tol) * xj
+                hi = (1.0 + tol) * xj
+
+                assert lo <= q_approx <= hi, (
+                    f"k={k}, p={p}, j={j}, xj={xj}, q_approx={q_approx}, "
+                    f"band=[{lo},{hi}]"
+                )
+
+    def test_error_bound_monotone_in_k_against_target_order_statistic(self):
+        """
+        Stronger + stable than comparing to numpy: compare to the target order statistic x_(j)
+        under your definition. The worst-case bound shrinks as k increases.
+        Observed relative error should typically not increase when k increases.
+        """
+        rng = random.Random()
+        data = [rng.lognormvariate(0.0, 1.0) for _ in range(8000)]
+        data_sorted = sorted(data)
+        p = 0.99
+        j = self.ceil_rank(p, len(data_sorted))
+        xj = data_sorted[j - 1]
+
+        def relerr_for_k(k):
+            qa = pt.QuantileAccumulator(k=k)
+            for x in data:
+                qa.add(x)
+            q_approx = qa.quantile(p)
+            return abs(q_approx - xj) / xj
+
+        err_k4  = relerr_for_k(4)
+        err_k10 = relerr_for_k(10)
+        err_k14 = relerr_for_k(14)
+
+        assert err_k10 <= err_k4 + 1e-15
+        assert err_k14 <= err_k10 + 1e-15

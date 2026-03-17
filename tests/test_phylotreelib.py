@@ -257,7 +257,7 @@ class OutGroupRooting(TreeTestBase):
                 rootremkids2 = tc.remote_children(rootkid2)
                 self.assertTrue(ig in [rootremkids1, rootremkids2])
                 self.assertTrue(og in [rootremkids1, rootremkids2])
-                
+
 ########################################################################################
 ########################################################################################
 
@@ -344,8 +344,8 @@ class Match_nodes(TreeTestBase):
 
     def test_unmatchedroots(self):
         """Test that unmatched roots are reported correctly"""
-        t1 = pt.Tree.randtree(ntips=50)
-        t2 = t1.copy_treeobject(False,False)
+        t1 = pt.Tree.randtree(ntips=50, randomlen=True)
+        t2 = t1.copy_treeobject(copylengths=True)
         delta_id = 35 + max(t1.intnodes)
         for i,id in enumerate(t1.intnodes):
             t2.rename_intnode(id, id+delta_id)
@@ -353,7 +353,7 @@ class Match_nodes(TreeTestBase):
         parent = random.choice(tuple(t2.intnodes))
         kid = next(iter(t2.children(parent)))
         blen = t2.nodedist(parent,kid)
-        t2.reroot(parent,kid,node1dist=blen/2)
+        t2.reroot(parent,kid,dist_from_node1=blen/2)
         t1origroot = t1.root
         t2origroot = t2.root
         intnode1to2,unmatched_root1,unmatched_root2 = t1.match_nodes(t2)
@@ -419,9 +419,9 @@ class RelationShipMethods(TreeTestBase):
                     other_half = mytree.leaves - remotekids
                     if len(basal_siblings) == 1:
                         sib = next(iter(basal_siblings))
-                        self.assertEqual(sib, mytree.findbasenode(other_half)) 
+                        self.assertEqual(sib, mytree.findbasenode(other_half))
                     else:
-                        self.assertEqual(mytree.root, mytree.findbasenode(other_half))                                        
+                        self.assertEqual(mytree.root, mytree.findbasenode(other_half))
             for leaf in mytree.leaves:
                 self.assertEqual({leaf}, mytree.remote_children(leaf))
         treestring = self.treedata["simplestring"]
@@ -567,7 +567,8 @@ class TreeOutput(TreeTestBase):
         for i in range(10):
             tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
             treesummary.add_tree(tree)
-        contree = treesummary.contree()
+        stb = pt.SummaryTreeBuilder(treesummary)
+        contree = stb.contree()
         nexus_string = contree.nexus()
         nexusfile = pt.Nexustreefile(filecontent=nexus_string)
         mytree = next(nexusfile)
@@ -605,7 +606,6 @@ class Treesummarytests(TreeTestBase):
         for line in mbresults:
             names1, names2, meanvar = line.strip().split("|")
             bip1 = names1.strip().split()
-            bip2 = names2.strip().split()
             bipart = pt.Bipartition.from_leafset(frozenset(bip1), mocktree)
             vals = meanvar.strip().split()
             mean = float(vals[0])
@@ -623,7 +623,8 @@ class Treesummarytests(TreeTestBase):
         tf2 = pt.Nexustreefile(self.t2_fname)
         for t in tf2:
             ts.add_tree(t)
-        own_contree = ts.contree()
+        stb = pt.SummaryTreeBuilder(ts)
+        own_contree = stb.contree()
         own_bipdict = own_contree.bipdict()
         mb_bipdict = self.mb_contree.bipdict()
 
@@ -655,7 +656,8 @@ class Treesummarytests(TreeTestBase):
             ts2.add_tree(t)
         tf2.close()
         ts1.update(ts2)
-        own_contree = ts1.contree()
+        stb = pt.SummaryTreeBuilder(ts1)
+        own_contree = stb.contree()
         own_bipdict = own_contree.bipdict()
         mb_bipdict = self.mb_contree.bipdict()
 
@@ -1046,69 +1048,6 @@ class RootTester(TreeTestBase):
 
         t1.rootminvar()
         self.assertEqual(t1, t2)
-
-########################################################################################
-########################################################################################
-
-class PruneTester(TreeTestBase):
-    """Tests for pruning related methods in Tree object"""
-
-    def test_prune_maxlen(self):
-        """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves"""
-        for i in range(100):
-            ntips = random.randint(5,11)   # Note: combinatorial explosion means execution time rapidly increases
-            nkeep = random.randint(3,ntips-1)
-            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
-            lengths = []
-            for discardset in itertools.combinations(t1.leaves, (ntips - nkeep)):
-                t2 = t1.copy_treeobject()
-                t2.remove_leaves(discardset)
-                lengths.append(t2.length())
-            t1.prune_maxlen(nkeep = nkeep)
-            self.assertAlmostEqual( t1.length(), max(lengths))
-
-    def test_prune_maxlen_with_keeplist(self):
-        """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves
-        include keeplist that must be retained"""
-        for i in range(100):
-            ntips = random.randint(5,11)   # Note: combinatorial explosion means execution time rapidly increases
-            nkeep = random.randint(3,ntips-1)
-            nkeeplist = random.randint(1,nkeep)
-            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
-            keeplist = random.sample(list(t1.leaves), nkeeplist)
-            potential_to_remove = t1.leaves - set(keeplist)
-            lengths = []
-            for discardset in itertools.combinations(potential_to_remove, (ntips - nkeep)):
-                t2 = t1.copy_treeobject()
-                t2.remove_leaves(discardset)
-                lengths.append(t2.length())
-            t1.prune_maxlen(nkeep = nkeep, keeplist=keeplist)
-            self.assertAlmostEqual( t1.length(), max(lengths))
-
-    def test_find_common_leaf(self):
-        """Test that find_common_leaf() function returns the typical leaf from clade"""
-        # Loop over all treestrings in treedata, and for each check consistency
-        for ts in self.treedata.values():
-            t = pt.Tree.from_string(ts)
-            leaflist = t.leaves
-            minsum = t.length() * len(leaflist)  # A value that is larger than any blensum
-            # This is really just an independent way of doing what function does. Maybe change test
-            for leaf1 in leaflist:
-                blensum = 0.0
-                for leaf2 in leaflist:
-                    blensum += t.nodedist(leaf1, leaf2)
-                if blensum < minsum:
-                    common_test = leaf1
-                    minsum = blensum
-            common_function = t.find_common_leaf(leaflist)
-            self.assertEqual(common_function, common_test)
-
-    def test_find_central_leaf(self):
-        """Test that find_central_leaf() function returns leaf closest to center in clade"""
-        t = pt.Tree.from_string("(((A:1,B:1):9,C:9):1,(D:1,E:1):9);")
-        central = t.find_central_leaf(t.leaves)
-        self.assertEqual( central, "C" )
-
 
 ########################################################################################
 ########################################################################################
