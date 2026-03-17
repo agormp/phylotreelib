@@ -42,6 +42,18 @@ This repository uses three main documentation files:
 
 The README gives examples of the most common workflows. More specialized details, and the theory behind some of the summary-tree machinery, are in the `docs/` files.
 
+## Terminology note: “depth” vs “height” (tree orientation)
+
+In **phylotreelib**, trees are mostly treated as *rooted at the bottom and having leaves at the top*.
+Accordingly, it uses:
+
+- **depth(node)** = distance from the **tips (leaves)** to the node (i.e., “time before most recent leaf”)
+
+Similarly terms like above/below and upper/lower are based on the same perceived orientation of the tree.
+
+However, for reasons clear only to computer scientists, in many programming libraries and APIs, trees are often treated as rooted at the top, and the same concept is referred to as **height**. I am in the process of changing the phylotreelib names and documentation to follow that standard practice. The deprecated depth-names will stay functional for one major release cycle after changing them (in the upcoming phylotreelib version 2.0).
+
+
 ---
 
 ## Quick start
