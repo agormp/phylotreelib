@@ -20,6 +20,16 @@ Main capabilities include:
 - library has been optimized for high speed and low memory consumption
 - NOTE: labels are interpreted as belonging to branches (bipartitions), not to internal nodes, and this association is maintained after re-rooting etc.
 
+
+## Version 2.0.0
+
+Version 2 has recently been released, and contains a number of changes to the API compared to version 1.x.x.
+
+- See the **Quick start** below for updated examples.
+- For details on API changes and how to update existing scripts, see **[Upgrading from 1.x to 2.x](#upgrading-from-1x-to-2x)**.
+- For a feature overview, see **[Changelog (2.0.0)](#changelog-200)**.
+
+
 ## Installation
 
 ```bash
@@ -32,6 +42,7 @@ Upgrade to the latest version:
 python3 -m pip install --upgrade phylotreelib
 ```
 
+
 ## Documentation
 
 This repository uses three main documentation files:
@@ -42,7 +53,12 @@ This repository uses three main documentation files:
 
 The README gives examples of the most common workflows. More specialized details, and the theory behind some of the summary-tree machinery, are in the `docs/` files.
 
-## Terminology note: “depth” vs “height” (tree orientation)
+
+---
+
+## Quick start
+
+### Terminology note: “depth” vs “height” (tree orientation)
 
 In **phylotreelib**, trees are mostly treated as *rooted at the bottom and having leaves at the top*.
 Accordingly, it uses:
@@ -51,12 +67,8 @@ Accordingly, it uses:
 
 Similarly terms like above/below and upper/lower are based on the same perceived orientation of the tree.
 
-However, for reasons clear only to computer scientists, in many programming libraries and APIs, trees are often treated as rooted at the top, and the same concept is referred to as **height**. I am in the process of changing the phylotreelib names and documentation to follow that standard practice. The deprecated depth-names will stay functional for one major release cycle after changing them (in the upcoming phylotreelib version 2.0).
+However, for reasons clear only to computer scientists, in many programming libraries and APIs, trees are often treated as rooted at the top, and the same concept is referred to as **height**. I am in the process of changing the phylotreelib names and documentation to follow that standard practice. The deprecated depth-names will stay functional for one major release cycle after changing them (for the duration of version 2).
 
-
----
-
-## Quick start
 
 ### Construct a tree from a Newick string, print tabular representation
 
@@ -301,6 +313,7 @@ Available classes:
 - `TreeSet` stores multiple trees with the same leaves.
 - `TreeSummary` accumulates summary statistics across trees and constructs summary trees such as consensus, MCC, MBC, and HIPSTR.
 
+
 ---
 
 ## Where to go next
@@ -312,3 +325,249 @@ Available classes:
 ### Related tools
 
 - [`sumt`](https://github.com/agormp/sumt) — command-line interface for summary-tree workflows built on `phylotreelib`
+
+
+---
+
+## Changelog (2.0.0)
+
+### Added
+
+- **Explicit summary-tree pipeline** via `SummaryTreeBuilder` and `TreePostProcessor` (with optional `CADepthEstimator` for CA-depths and credible intervals).
+- **Credible interval support** via `QuantileAccumulator` and `trackci` / `ci_probs` in `TreeSummary`.
+- **PrintSpec** plus helpers `configure_basic_printing(...)` and `configure_sumtree_printing(...)` for consistent Newick/NEXUS output.
+
+### Changed
+
+- `Tree.graft(...)` now grafts onto a specified edge `(parent -> child)` and uses `connect_length` / `connect_branchstruct` for the connecting branch.
+- `Tree.spr(...)` updated to match the new grafting model and (by default) preserve total tree length.
+- `Tree.subtree(...)` / `Tree.prune_subtree(...)` now return `(subtree, basal_branch)`; leaf subtrees return the leaf name as `str`.
+- `Tree.reroot(...)` signature updated to use the same distance/fraction placement convention as other editing methods.
+- `Tree.newick(...)` / `Tree.nexus(...)` now treat `None` as “use PrintSpec defaults”.
+
+### Deprecated
+
+- `Tree.deroot()` → use `Tree.collapse_bifurcating_root()`.
+
+### Fixed / improved
+
+- Multiple refactorings leading to performance improvements (speed and memory) and bug fixes.
+
+
+---
+
+## Upgrading from 1.x to 2.x
+
+phylotreelib 2.0 introduces a few intentional API breaks to make tree editing, summary trees, and printing more explicit and less “magic”.
+
+If you maintain scripts that call phylotreelib directly, the sections below show the key signature/return changes and how to update call sites.
+
+### Summary trees
+
+`TreeSummary.compute_sumtree(...)` is still available as a convenience wrapper (so many 1.x workflows continue to work), but the preferred style is now the explicit pipeline:
+
+- `TreeSummary` --> `SummaryTreeBuilder` --> `TreePostProcessor` (+ optional `CADepthEstimator`) --> `PrintSpec`
+
+See the “Summarize posterior tree samples” quick-start example above, and the worked examples in `docs/recipes.md`.
+
+### Tree.graft: signature change
+
+**Old (1.x):**
+
+```python
+Tree.graft(self, other, node1, node2=None, blen1=0, blen2=0,
+           graftlabel=None, graft_with_other_root=False)
+```
+
+Meaning (1.x): attach `other` below `node1` (possibly re-rooting `other` around `node2`), by inserting a new internal node above `node1` with length `blen1`, and connecting `other` above that with length `blen2` (or optionally skip the extra basal branch).
+
+**New (2.x):**
+
+```python
+Tree.graft(self, other, parent, child,
+           dist_from_parent=None, frac_from_parent=None,
+           connect_length=0.0, connect_branchstruct=None, graftlabel=None)
+```
+
+Meaning (2.x): insert the graft point on an *existing edge* `(parent -> child)` and then attach `other` (or a single leaf name) below that graft point via a *separate connecting branch*.
+
+**How to convert typical 1.x calls**
+
+1) **Grafting “below node1” (typical old usage)**
+
+Old:
+
+```python
+tree.graft(other, node1=X, blen1=blen1, blen2=blen2)
+```
+
+New (equivalent intent):
+
+```python
+parent = tree.parent(X)
+tree.graft(
+    other,
+    parent=parent, child=X,
+    # place graftpoint on the incoming edge to X:
+    dist_from_parent=blen1,           # if you want a specific distance
+    # or frac_from_parent=0.5,        # if you just want “midway”
+    connect_length=blen2,
+)
+```
+
+2) **Old `graft_with_other_root=True`**
+
+In 2.x, the caller should explicitly decide what `other` is before calling `graft(...)`:
+- If you want to attach a *single leaf*, pass a string `other="TaxonName"` (and skip the “extra basal branch” complexity entirely).
+- If you want to attach a Tree with a specific root, re-root `other` first (e.g. `other.reroot(...)`) and then call `graft(...)`.
+
+### Tree.spr: signature change (and length preservation)
+
+**Old (1.x):**
+
+```python
+Tree.spr(self, prune_node=None, regraft_node=None)
+```
+
+**New (2.x):**
+
+```python
+Tree.spr(self, prune_node=None, regraft_node=None,
+         dist_from_parent=None, frac_from_parent=None)
+```
+
+New behaviour highlights:
+
+- Regrafting happens by inserting a graft point on the incoming edge to `regraft_node`.
+- If `dist_from_parent` and `frac_from_parent` are both `None`, the placement is randomized (uniform frac in (0,1)).
+- Total tree length is preserved by default (the regraft edge is split; the pruned basal branch length is reused as the connecting branch length).
+
+**How to convert**
+
+Old:
+
+```python
+tree.spr(prune_node=P, regraft_node=R)
+```
+
+New (same defaults):
+
+```python
+tree.spr(prune_node=P, regraft_node=R)
+```
+
+New (explicit placement on incoming edge to `regraft_node`):
+
+```python
+parent = tree.parent(R)
+tree.spr(prune_node=P, regraft_node=R, frac_from_parent=0.25)
+# (places the graftpoint 25% down the edge parent->R)
+```
+
+### Tree.subtree / Tree.prune_subtree: return value change
+
+**Old (1.x):**
+
+```python
+Tree.subtree(self, basenode, return_basalbranch=False) -> Tree
+Tree.prune_subtree(self, basenode) -> Tree
+```
+
+**New (2.x):**
+
+```python
+Tree.subtree(self, basenode) -> (subtree, basal_branch)
+Tree.prune_subtree(self, basenode) -> (subtree, basal_branch)
+```
+
+Notes (2.x):
+
+- `basal_branch` is a **copy** of the Branchstruct on the incoming edge to `basenode`.
+- If `basenode` is a leaf: `subtree` is the **leaf name** (`str`), not a mini tree.
+
+**How to convert**
+
+Old:
+
+```python
+sub = tree.subtree(node)
+```
+
+New:
+
+```python
+sub, basal = tree.subtree(node)
+```
+
+Old:
+
+```python
+sub = tree.prune_subtree(node)
+```
+
+New:
+
+```python
+sub, basal = tree.prune_subtree(node)
+# basal.length is the length removed when detaching the subtree
+```
+
+### Tree.reroot: signature change
+
+**Old (1.x):**
+
+```python
+Tree.reroot(self, node1, node2=None, polytomy=False, node1dist=0.0)
+```
+
+**New (2.x):**
+
+```python
+Tree.reroot(self, node1, node2=None, polytomy=False,
+            dist_from_node1=None, frac_from_node1=0.5)
+```
+
+Conversion:
+
+- If you previously used `node1dist`, rename it to `dist_from_node1`.
+- If you previously relied on the default placement, you can now do that via `frac_from_node1` (default 0.5).
+
+### Root-collapsing helper rename
+
+**Old (1.x):**
+
+```python
+Tree.deroot(self)
+```
+
+**New (2.x):**
+
+```python
+Tree.collapse_bifurcating_root(self)
+```
+
+(And `Tree.deroot()` is kept as a deprecated alias.)
+
+### Printing: PrintSpec defaults
+
+**Old (1.x):**
+
+```python
+Tree.newick(self, printdist=True, printlabels=True, labelfield='label', precision=6, ...)
+Tree.nexus(self, printdist=True, printlabels=True, labelfield='label', precision=6, ...)
+```
+
+**New (2.x):**
+
+```python
+Tree.newick(self, printdist=None, printlabels=None, labelfield=None, precision=None, ..., print_meta=None)
+Tree.nexus(self,  printdist=None, printlabels=None, labelfield=None, precision=None, ..., print_meta=None)
+```
+
+In 2.x, passing `None` means “use the Tree’s current PrintSpec default”. This makes it easy to configure printing once:
+
+```python
+pt.configure_basic_printing(tree, precision=7, print_meta=True, branch_attrs=("posterior",))
+print(tree.newick())          # uses PrintSpec
+print(tree.nexus())           # uses PrintSpec
+```
