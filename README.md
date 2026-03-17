@@ -181,11 +181,16 @@ If you are working with posterior tree samples (e.g. from BEAST/MrBayes), you ca
 For command-line use, the separate tool [`sumt`](https://github.com/agormp/sumt) wraps these steps in a single command.
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
 
 # 1) Accumulate bipartition frequencies + mean branch lengths
 ts = pt.TreeSummary(trackbips=True, trackblen=True)
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
 
@@ -206,6 +211,11 @@ print(sumtree.newick())
 ### Compute and export a summary tree in one step
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
 ts = pt.TreeSummary(
     trackbips=True,
@@ -218,7 +228,7 @@ ts = pt.TreeSummary(
     trackci=True,
 )
 
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
 sumtree = pt.build_sumtree(ts, treetype="mcc", blen="meandepth", rooting=None,)

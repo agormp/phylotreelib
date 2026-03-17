@@ -46,18 +46,29 @@ with pt.Treefile("example.tree") as tf:
 #### Iterate over all trees in a file without storing them all in memory
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         # do something with one tree at a time
-        pass
+        print(f"n_tips={len(tree.leaves):>3d}  length={tree.length():.6g}")
+        break  # remove if you want to iterate over all trees
 ```
 
 #### Read all trees into a TreeSet
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     treeset = tf.readtrees()
 print(len(treeset))
 ```
@@ -454,10 +465,19 @@ for _ in range(10):
 #### Keep leaves that maximize retained tree length
 
 ```python
+# Download a large example tree (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/large_njtree.txt"
+urllib.request.urlretrieve(URL, "large_njtree.txt")
+
 import phylotreelib as pt
-with pt.Nexustreefile("big.tree") as tf:
-    tree = tf.readtree()
+
+# large_njtree.txt contains a single Newick tree (many tips)
+with open("large_njtree.txt") as fh:
+    tree = pt.Tree.from_string(fh.read().strip())
+
 tree.prune_maxlen(nkeep=50)
+print(f"n_leaves={len(tree.leaves)}  length={tree.length():.6g}")
 ```
 
 #### Keep leaves that maximize retained tree length while forcing some leaves to remain
@@ -578,12 +598,17 @@ More detailed discussion of summary tree methods is in `docs/api.md`.
 #### Build a majority-rule consensus tree
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
 
 # 1) Accumulate bipartition frequencies + mean branch lengths
 ts = pt.TreeSummary(trackbips=True, trackblen=True)
 
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
 
@@ -604,11 +629,16 @@ print(contree.newick())
 #### Build a majority-rule consensus tree with all compatible bipartitions added
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
 
 ts = pt.TreeSummary(trackbips=True, trackblen=True)
 
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
 
@@ -626,12 +656,17 @@ print(contree.newick())
 #### Build an MCC tree with "common ancestor depths"
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
 
 # Pass 1: collect clade frequencies + observed topologies (needed for MCC selection)
 ts = pt.TreeSummary(trackclades=True, tracktopo=True)
 
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
 
@@ -642,7 +677,7 @@ mcctree = stb.max_clade_cred_tree()
 plan = pt.CADepthEstimator.build_plan(mcctree, trackci=False)
 est = pt.CADepthEstimator(plan, trackci=False)
 
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         est.add_tree(tree)
 
@@ -661,12 +696,17 @@ print(mcctree.newick())
 #### Build an MBC tree and mid-point root it
 
 ```python
+# Download an example tree-sample file (run these 3 lines only once)
+import urllib.request
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
+
 import phylotreelib as pt
 
 # Need to keep track of bipartitions + observed topologies to construct MBC
 ts = pt.TreeSummary(trackbips=True, tracktopo=True)
 
-with pt.Nexustreefile("posterior.trees") as tf:
+with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
 
@@ -791,4 +831,3 @@ except pt.TreeError as err:
 ```
 
 ---
-
