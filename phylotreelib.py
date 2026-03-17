@@ -4887,9 +4887,6 @@ class Tree:
            direction along the path back to the old root.
         """
 
-        # Remove previous root if present at bifurcation
-        self.deroot()
-
         # Choose / create the new root node
         if polytomy:
             newroot = node1
@@ -5070,6 +5067,7 @@ class Tree:
                     rootkids = rootkids - {minchild}
                     minparent = rootkids.pop()    # Chose one of root's other children as minparent
                     minpardist = minpardist + self.dist_dict[self.root][minparent]
+                    self.collapse_bifurcating_root()
                     self.reroot(node1=minparent, node2=minchild, dist_from_node1=minpardist)
                     return
 
@@ -5083,6 +5081,9 @@ class Tree:
 
     def rootout(self,outgroup, polytomy=False):
         """Roots tree on outgroup"""
+
+        # Remove previous root if present at bifurcation
+        self.collapse_bifurcating_root()
 
         # Find pair of internal nodes corresponding to ingroup:outgroup bipartition
         if isinstance(outgroup, str):
@@ -6679,6 +6680,7 @@ class TreePostProcessor():
                 # Only reroot if tree not already rooted correctly
                 if (cur_rootbip is None) or (bip != cur_rootbip):
                     parent,child = sumtree.find_bipart_nodes(bip)
+                    sumtree.collapse_bifurcating_root()
                     sumtree.reroot(child, parent)
 
                 # If branch lengths or node depths have been tracked:
