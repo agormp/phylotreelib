@@ -1,5 +1,6 @@
 import phylotreelib as pt
 import copy
+import itertools
 import math
 import numpy as np
 import pytest
@@ -778,6 +779,257 @@ class TestSPR:
         invalid_regraft_node = next(iter(impossible_regraft_nodes))
         with pytest.raises(pt.TreeError):
             tree.spr(prune_node=prune_node, regraft_node=invalid_regraft_node)
+
+    def test_spr_preserves_total_length_general_case(self):
+        random.seed(0)
+        tree = pt.Tree.randtree(ntips=15, randomlen=True)
+        base_len = tree.length()
+        for _ in range(50):
+            tree.spr()
+            assert tree.length() == pytest.approx(base_len)
+
+    def test_spr_rejects_tree_with_two_leaves(self):
+        tree = pt.Tree.from_string("(A:1,B:1);")
+        with pytest.raises(pt.TreeError):
+            tree.spr()
+
+    def test_spr_rejects_regraft_at_root(self):
+        tree = pt.Tree.randtree(ntips=10, randomlen=True)
+        prune_node = random.choice(tuple(tree.possible_spr_prune_nodes()))
+        with pytest.raises(pt.TreeError):
+            tree.spr(prune_node=prune_node, regraft_node=tree.root)
+
+
+###################################################################################################
+
+class TestGraft:
+    def test_graft_leaf_on_edge_preserves_edge_length_and_adds_connecting_branch(self):
+        tree = pt.Tree.from_string("(A:1,B:2,C:3);")
+        total_len_before = tree.length()
+
+        parent = tree.root
+        child = "A"
+        connect_len = 0.7
+
+        graftpoint = tree.graft(
+            other="X",
+            parent=parent,
+            child=child,
+            frac_from_parent=0.4,
+            connect_length=connect_len,
+        )
+
+        # new leaf exists
+        assert "X" in tree.leaves
+        assert tree.is_parent_child_pair(graftpoint, "X")
+        assert tree.child_dict[graftpoint]["X"].length == pytest.approx(connect_len)
+
+        # edge (parent->child) length is preserved by splitting
+        new_child_path_len = tree.child_dict[parent][graftpoint].length + tree.child_dict[graftpoint][child].length
+        assert new_child_path_len == pytest.approx(1.0)
+
+        # total length increased by connect_len (since we attached new leaf)
+        assert tree.length() == pytest.approx(total_len_before + connect_len)
+
+    def test_graft_tree_renames_internal_nodes_to_avoid_collision(self):
+        t1 = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        t2 = pt.Tree.from_string("(D:1,(E:1,F:1):1);")
+        # Force an ID collision by renaming t2 internal node(s) to overlap t1
+        # (pick a non-root internal node in t2)
+        t1_int = sorted([n for n in t1.intnodes if isinstance(n, int)])
+        t2_int = sorted([n for n in t2.intnodes if isinstance(n, int)])
+        assert t1_int and t2_int
+        collide = t1_int[0]
+        if collide in t2_int:
+            # already colliding; keep it
+            pass
+        else:
+            t2.rename_intnode(t2_int[0], collide)
+
+        parent = t1.root
+        child = "A"
+        graftpoint = t1.graft(t2, parent=parent, child=child, frac_from_parent=0.5, connect_length=0.0)
+
+        # All leaves from both trees present
+        assert set(t1.leaves) == {"A", "B", "C", "D", "E", "F"}
+        # Internal IDs should be unique
+        ints = [n for n in t1.intnodes if isinstance(n, int)]
+        assert len(ints) == len(set(ints))
+        assert graftpoint in t1.intnodes
+
+###################################################################################################
+
+class TestPrune:
+    """Tests for pruning related methods in Tree object"""
+
+    def test_prune_maxlen(self):
+        """Brute force: prune_maxlen finds the maximum-length subtree with nkeep leaves."""
+        random.seed(0)  # keep this test deterministic
+        for _ in range(100):
+            ntips = random.randint(5, 11)          # combinatorial explosion beyond this
+            nkeep = random.randint(3, ntips - 1)
+
+            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+
+            lengths = []
+            for discardset in itertools.combinations(t1.leaves, ntips - nkeep):
+                t2 = t1.copy_treeobject()
+                t2.remove_leaves(discardset)
+                lengths.append(t2.length())
+
+            t1.prune_maxlen(nkeep=nkeep)
+            assert t1.length() == pytest.approx(max(lengths))
+
+    def test_prune_maxlen_with_keeplist(self):
+        """Brute force: prune_maxlen respects keeplist and still maximizes length."""
+        random.seed(1)  # keep deterministic, but different sequence than test above
+        for _ in range(100):
+            ntips = random.randint(5, 11)
+            nkeep = random.randint(3, ntips - 1)
+            nkeeplist = random.randint(1, nkeep)
+
+            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            keeplist = random.sample(list(t1.leaves), nkeeplist)
+
+            potential_to_remove = t1.leaves - set(keeplist)
+            lengths = []
+            for discardset in itertools.combinations(potential_to_remove, ntips - nkeep):
+                t2 = t1.copy_treeobject()
+                t2.remove_leaves(discardset)
+                lengths.append(t2.length())
+
+            t1.prune_maxlen(nkeep=nkeep, keeplist=keeplist)
+            assert t1.length() == pytest.approx(max(lengths))
+
+    def test_find_common_leaf(self, treedata):
+        """find_common_leaf returns the leaf with minimal sum of distances to all leaves in the set."""
+        for ts in treedata.values():
+            t = pt.Tree.from_string(ts)
+            leafset = t.leaves
+
+            best_leaf = None
+            best_sum = float("inf")
+            for leaf1 in leafset:
+                blensum = 0.0
+                for leaf2 in leafset:
+                    blensum += t.nodedist(leaf1, leaf2)
+                if blensum < best_sum:
+                    best_sum = blensum
+                    best_leaf = leaf1
+
+            common_function = t.find_common_leaf(leafset)
+            assert common_function == best_leaf
+
+    def test_find_central_leaf(self):
+        """find_central_leaf returns the leaf closest to the tree center for this known tree."""
+        t = pt.Tree.from_string("(((A:1,B:1):9,C:9):1,(D:1,E:1):9);")
+        central = t.find_central_leaf(t.leaves)
+        assert central == "C"
+
+###################################################################################################
+
+class TestSubtreeAndPruneSubtree:
+    def test_subtree_leaf_returns_str_and_basalbranch(self):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4);")
+        # pick a leaf that is not root
+        leaf = "A"
+        sub, basal = tree.subtree(leaf)
+        assert isinstance(sub, str)
+        assert sub == leaf
+        assert basal.length == pytest.approx(1.0)
+
+    def test_subtree_internal_returns_tree_and_basalbranch(self):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4);")
+        # internal node is the one above B,C
+        root = tree.root
+        # find internal child of root
+        internal = next(n for n in tree.children(root) if n in tree.intnodes)
+
+        sub, basal = tree.subtree(internal)
+        assert isinstance(sub, pt.Tree)
+        assert sub.root == internal
+        assert set(sub.leaves) == {"B", "C"}
+        assert basal.length == pytest.approx(4.0)
+
+    def test_prune_subtree_removes_leaves_and_returns_basalbranch(self):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4,D:5);")
+        root = tree.root
+        internal = next(n for n in tree.children(root) if n in tree.intnodes)
+        leaves_before = set(tree.leaves)
+        total_len_before = tree.length()
+
+        sub, basal = tree.prune_subtree(internal)
+        assert isinstance(sub, pt.Tree)
+        assert basal.length == pytest.approx(4.0)
+
+        # B and C should be gone from the main tree
+        assert set(tree.leaves) == leaves_before - {"B", "C"}
+        # Tree length should decrease by (basal branch + internal subtree length)
+        assert tree.length() == pytest.approx(total_len_before - (4.0 + 2.0 + 3.0))
+
+###################################################################################################
+
+class TestAddNodeOnBranch:
+    def test_add_node_on_branch_splits_length_by_dist(self):
+        tree = pt.Tree.from_string("(A:2,B:2);")
+        # root has children A and B; pick edge root->A
+        root = tree.root
+        newnode = tree.add_node_on_branch(root, "A", dist_from_parent=0.5, copy_attrs="both")
+
+        assert tree.is_parent_child_pair(root, newnode)
+        assert tree.is_parent_child_pair(newnode, "A")
+
+        upper = tree.child_dict[root][newnode].length
+        lower = tree.child_dict[newnode]["A"].length
+        assert upper == pytest.approx(0.5)
+        assert lower == pytest.approx(1.5)
+
+    def test_add_node_on_branch_splits_length_by_frac(self):
+        tree = pt.Tree.from_string("(A:2,B:2);")
+        root = tree.root
+        newnode = tree.add_node_on_branch(root, "A", frac_from_parent=0.25, copy_attrs="both")
+
+        upper = tree.child_dict[root][newnode].length
+        lower = tree.child_dict[newnode]["A"].length
+        assert upper == pytest.approx(0.5)
+        assert lower == pytest.approx(1.5)
+
+    def test_add_node_on_branch_random_when_no_dist_or_frac(self):
+        random.seed(123)
+        tree = pt.Tree.from_string("(A:2,B:2);")
+        root = tree.root
+        newnode = tree.add_node_on_branch(root, "A", dist_from_parent=None, frac_from_parent=None)
+
+        upper = tree.child_dict[root][newnode].length
+        lower = tree.child_dict[newnode]["A"].length
+        assert 0.0 < upper < 2.0
+        assert upper + lower == pytest.approx(2.0)
+
+    def test_add_node_on_branch_rejects_non_edge(self):
+        tree = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        # A is not parent of C
+        with pytest.raises(pt.TreeError):
+            tree.add_node_on_branch("A", "C", frac_from_parent=0.5)
+
+###################################################################################################
+
+class TestNextInternalNodeId:
+    def test_next_internal_node_id_int_tree(self):
+        tree = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        # internal nodes are integers; root is typically 0
+        nid = tree.next_internal_node_id()
+        assert isinstance(nid, int)
+        assert nid not in tree.nodes
+
+    def test_next_internal_node_id_string_intnodes_tree(self):
+        # transmission-tree-like: internal nodes can be strings
+        parentlist = ["r", "r", "x", "x"]
+        childlist = ["x", "y", "A", "B"]
+        lenlist = [1.0, 1.0, 2.0, 3.0]
+        tree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist)
+        nid = tree.next_internal_node_id()
+        assert isinstance(nid, int)
+        assert nid not in tree.nodes
 
 ###################################################################################################
 

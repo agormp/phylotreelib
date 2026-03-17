@@ -1052,69 +1052,6 @@ class RootTester(TreeTestBase):
 ########################################################################################
 ########################################################################################
 
-class PruneTester(TreeTestBase):
-    """Tests for pruning related methods in Tree object"""
-
-    def test_prune_maxlen(self):
-        """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves"""
-        for i in range(100):
-            ntips = random.randint(5,11)   # Note: combinatorial explosion means execution time rapidly increases
-            nkeep = random.randint(3,ntips-1)
-            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
-            lengths = []
-            for discardset in itertools.combinations(t1.leaves, (ntips - nkeep)):
-                t2 = t1.copy_treeobject()
-                t2.remove_leaves(discardset)
-                lengths.append(t2.length())
-            t1.prune_maxlen(nkeep = nkeep)
-            self.assertAlmostEqual( t1.length(), max(lengths))
-
-    def test_prune_maxlen_with_keeplist(self):
-        """Use brute force to test that prune_maxlen finds the longest tree with given number of leaves
-        include keeplist that must be retained"""
-        for i in range(100):
-            ntips = random.randint(5,11)   # Note: combinatorial explosion means execution time rapidly increases
-            nkeep = random.randint(3,ntips-1)
-            nkeeplist = random.randint(1,nkeep)
-            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
-            keeplist = random.sample(list(t1.leaves), nkeeplist)
-            potential_to_remove = t1.leaves - set(keeplist)
-            lengths = []
-            for discardset in itertools.combinations(potential_to_remove, (ntips - nkeep)):
-                t2 = t1.copy_treeobject()
-                t2.remove_leaves(discardset)
-                lengths.append(t2.length())
-            t1.prune_maxlen(nkeep = nkeep, keeplist=keeplist)
-            self.assertAlmostEqual( t1.length(), max(lengths))
-
-    def test_find_common_leaf(self):
-        """Test that find_common_leaf() function returns the typical leaf from clade"""
-        # Loop over all treestrings in treedata, and for each check consistency
-        for ts in self.treedata.values():
-            t = pt.Tree.from_string(ts)
-            leaflist = t.leaves
-            minsum = t.length() * len(leaflist)  # A value that is larger than any blensum
-            # This is really just an independent way of doing what function does. Maybe change test
-            for leaf1 in leaflist:
-                blensum = 0.0
-                for leaf2 in leaflist:
-                    blensum += t.nodedist(leaf1, leaf2)
-                if blensum < minsum:
-                    common_test = leaf1
-                    minsum = blensum
-            common_function = t.find_common_leaf(leaflist)
-            self.assertEqual(common_function, common_test)
-
-    def test_find_central_leaf(self):
-        """Test that find_central_leaf() function returns leaf closest to center in clade"""
-        t = pt.Tree.from_string("(((A:1,B:1):9,C:9):1,(D:1,E:1):9);")
-        central = t.find_central_leaf(t.leaves)
-        self.assertEqual( central, "C" )
-
-
-########################################################################################
-########################################################################################
-
 class dist_tree_construction(TreeTestBase):
     """Tests methods for constructing trees from distance matrix"""
 
