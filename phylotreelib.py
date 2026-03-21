@@ -1051,8 +1051,11 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
             trackci=treesummary.trackci and bool(treesummary.ci_probs),
             ci_probs=treesummary.ci_probs,
         )
-        est = CADepthEstimator(plan, trackci=treesummary.trackci and bool(treesummary.ci_probs))
-
+        est = CADepthEstimator(
+            plan,
+            trackci=treesummary.trackci and bool(treesummary.ci_probs),
+            quantile_k=treesummary.quantile_k
+        )
         for count, burnin, filename in count_burnin_filename_list:
             with Treefile(filename) as tf:
                 for _ in range(burnin):
@@ -5663,6 +5666,8 @@ class QuantileAccumulator:
         self.n += 1
 
     def merge(self, other: "QuantileAccumulator"):
+        if self.k != other.k:
+            raise ValueError(f"Incompatible accumulators: k {self.k} vs {other.k}")
         if self.shift != other.shift:
             raise ValueError(f"Incompatible accumulators: shift {self.shift} vs {other.shift}")
         if self.neg_bucket != other.neg_bucket:
@@ -5733,7 +5738,7 @@ class TreeSummary():
                        trackblen=False, trackdepth=False, trackrootblen=False,
                        tracktopo=False, track_subcladepairs=False,
                        store_trees=False,
-                       trackci=False, ci_probs=None):
+                       trackci=False, ci_probs=None, quantile_k=7):
         """TreeSummary constructor. Initializes relevant data structures"""
         self.leaves = None
         self.transdict = None
@@ -5754,6 +5759,7 @@ class TreeSummary():
             self.ci_labels = tuple(f"{int(round(p*100))}%_CI" for p in self.ci_probs)
         else:
             self.ci_labels = ()
+        self.quantile_k = quantile_k
 
         self.store_trees = store_trees
 
@@ -6037,7 +6043,7 @@ class TreeSummary():
                 s = Nodestruct(depth, nleaves)
                 cladesummary[clade] = s
                 if do_ci:
-                    s.quantiles = QuantileAccumulator()
+                    s.quantiles = QuantileAccumulator(k=self.quantile_k)
             if trackdepth:
                 online_update(s, depth)
                 if do_ci:
@@ -6103,7 +6109,7 @@ class TreeSummary():
                 s = branchstruct
                 bipartsummary[bipart] = s
                 if do_ci:
-                    s.quantiles = QuantileAccumulator()
+                    s.quantiles = QuantileAccumulator(k=self.quantile_k)
             if trackblen:
                 online_update(s, length)
                 if do_ci:
@@ -6170,6 +6176,14 @@ class TreeSummary():
                 raise TreeError("Cannot update from an empty TreeSummary")
             if self.leaves != other.leaves:
                 raise TreeError("Not all trees have same set of leaves.")
+
+        # If CI is being tracked by self: check that other does, and quantile_k agree
+        if not (self.trackci == other.trackci):
+            raise TreeError("Cannot merge TreeSummary objects: one tracks CIs, the other doesn't")
+        if self.trackci and (self.quantile_k != other.quantile_k):
+            msg = ("Cannot merge TreeSummary objects with different quantile_k "
+                   "({self.quantile_k} vs {other.quantile_k}).")
+            raise TreeError(msg)
 
         # Update treecount
         self.tree_count += other.tree_count
@@ -6972,7 +6986,12 @@ class CAQuery:
 ###################################################################################################
 
 class CAPlan:
-    """Helper class for CADepthEstimator: contains tuple of CAQueries, ci_probs, and ci_labels"""
+    """Helper class for CADepthEstimator: contains tuple of CAQueries, ci_probs, and ci_labels
+
+    Main idea is that this stores pre-computed remotechildren for each internal node in sumtree
+    (in the form of binary query mask) so this can be reused for all input trees.
+
+    Also potentially contains tuple of which quantiles to estimate (derived from CIs)"""
     __slots__ = ("queries", "leaves", "probs", "ci_labels")
 
     def __init__(self, queries, leaves, probs=(), ci_labels=()):
@@ -6991,17 +7010,18 @@ class CADepthEstimator():
       - merge(other): merge partial estimators (for multiprocessing)
       - write_into(sumtree): write depth, depth_sd (+ optional CI) onto sumtree"""
 
-    __slots__ = ("plan", "trackci", "acc")
+    __slots__ = ("plan", "trackci", "acc", "quantile_k")
 
     ###############################################################################################
 
-    def __init__(self, plan, trackci = False):
+    def __init__(self, plan, trackci = False, quantile_k=7):
         self.plan = plan                                # CAPlan object with tuple of MRCA queries
         self.trackci = bool(trackci and plan.probs)
 
         # {node:Nodestruct} dict for accumulating depth info from input trees
         acc = {}
         self.acc = acc
+        self.quantile_k = quantile_k
 
         def make_acc():
             s = Nodestruct()
@@ -7009,7 +7029,7 @@ class CADepthEstimator():
             s.mean = 0.0
             s.M2 = 0.0
             if self.trackci:
-                s.quantiles = QuantileAccumulator()
+                s.quantiles = QuantileAccumulator(k=self.quantile_k)
             return s
 
         for q in plan.queries:
