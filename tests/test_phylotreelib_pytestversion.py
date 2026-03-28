@@ -1115,6 +1115,7 @@ class Test_compute_sumtree:
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
 
+
 ###################################################################################################
 ###################################################################################################
 # Tests for QuantileAccumulator

@@ -635,7 +635,7 @@ class Treesummarytests(TreeTestBase):
         for bip, own_branch in own_bipdict.items():
             mb_mean,mb_var = self.mbresdict[bip]
             self.assertAlmostEqual(mb_mean, own_branch.length)
-            # self.assertAlmostEqual(mb_var, own_branch.var) #implement when changed contree to one-pass version
+            self.assertAlmostEqual(mb_var, own_branch.length_sd**2)
 
             bip1, bip2 = bip
             if len(bip1)!=1 and len(bip2)!=1:
@@ -668,7 +668,7 @@ class Treesummarytests(TreeTestBase):
         for bip, own_branch in own_bipdict.items():
             mb_mean,mb_var = self.mbresdict[bip]
             self.assertAlmostEqual(mb_mean, own_branch.length)
-            # self.assertAlmostEqual(mb_var, own_branch.var) #implement when changed contree to one-pass version
+            self.assertAlmostEqual(mb_var, own_branch.length_sd**2)
 
             bip1, bip2 = bip
             if len(bip1)!=1 and len(bip2)!=1:
