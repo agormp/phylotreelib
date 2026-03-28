@@ -314,14 +314,14 @@ class Branchstruct:
 class Nodestruct:
     """Class that emulates a struct. Keeps node-related info"""
 
-    __slots__ = ("depth", "nleaves", "subcladepairs", "best_pair",
+    __slots__ = ("height", "nleaves", "subcladepairs", "best_pair",
                  "mean", "M2", "n",
-                 "quantiles", "ci", "depth_median",
-                 "clade_cred", "posterior", "freq", "depth_sd",
+                 "quantiles", "ci", "height_median",
+                 "clade_cred", "posterior", "freq", "height_sd",
                  "clade_score")
 
-    def __init__(self, depth=0.0, nleaves=None):
-        self.depth = depth
+    def __init__(self, height=0.0, nleaves=None):
+        self.height = height
         self.nleaves = nleaves
         self.subcladepairs = set()
         self.best_pair = None
@@ -330,11 +330,11 @@ class Nodestruct:
         self.n = 0
         self.quantiles = None
         self.ci = None             # dict of {label: (lo, hi)}, where e.g. label = "90%_CI"
-        self.depth_median = None
+        self.height_median = None
         self.clade_cred = None
         self.posterior = None
         self.freq = None
-        self.depth_sd = None
+        self.height_sd = None
         self.clade_score = None
 
     def __str__(self):
@@ -884,7 +884,7 @@ def configure_basic_printing(tree, precision=6, print_meta=False, printlabels=Tr
         (e.g. "label", "bipartition_cred", "rootcred", ...).
     node_attrs : sequence[str] or None, default None
         Node attributes to emit as meta-comments on nodes (from Nodestruct on each node).
-        Example: ("clade_cred", "depth", "depth_sd").
+        Example: ("clade_cred", "height", "height_sd").
     branch_attrs : sequence[str] or None, default None
         Branch attributes to emit as meta-comments on branches (from Branchstruct).
         Example: ("bipartition_cred", "length_sd", "rootcred").
@@ -893,7 +893,7 @@ def configure_basic_printing(tree, precision=6, print_meta=False, printlabels=Tr
         This is interpreted by Tree.newick's metacomment helper:
           - for each label in ci_labels, prints something like:
               "<prefix>_<label>={lo,hi}"
-          - where prefix is "depth" for node comments and "length" for branch comments.
+          - where prefix is "height" for node comments and "length" for branch comments.
 
     Returns
     -------
@@ -954,11 +954,11 @@ def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=No
         branch_attrs.add("bipartition_cred")
         labelfield = "bipartition_cred"  # direct printing without relying on br.label
 
-    # branch length / depth attributes
+    # branch length / height attributes
     if blen == "biplen":
         branch_attrs.update({"length", "length_sd"})
-    elif blen in ("cladedepth", "cadepth"):
-        node_attrs.update({"depth", "depth_sd"})
+    elif blen in ("cladeheight", "caheight"):
+        node_attrs.update({"height", "height_sd"})
         branch_attrs.add("length")
     elif blen in ("none", "input"):
         branch_attrs.add("length")
@@ -967,8 +967,8 @@ def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=No
         # attach CI info where it exists
         if blen == "biplen":
             branch_attrs.update({"ci", "length_median"})
-        elif blen in ("cladedepth", "cadepth"):
-            node_attrs.update({"ci", "depth_median"})
+        elif blen in ("cladeheight", "caheight"):
+            node_attrs.update({"ci", "height_median"})
 
     tree.set_print_spec(
         node_attrs=tuple(sorted(node_attrs)) or None,
@@ -993,16 +993,16 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
     This is the canonical orchestration entry point:
       - chooses topology (SummaryTreeBuilder)
       - roots (Tree methods)
-      - sets branch lengths / node depths (TreePostProcessor + optional CADepthEstimator)
-      - annotates support + length/depth stats (TreePostProcessor)
+      - sets branch lengths / node heights (TreePostProcessor + optional CADepthEstimator)
+      - annotates support + length/height stats (TreePostProcessor)
 
     Printing is NOT configured here (use configure_sumtree_printing / Tree.set_print_spec).
     """
 
     if (rooting == "og") and (not og):
         raise TreeError("Outgroup rooting requested, but no og parameter provided")
-    if (blen == "cadepth") and (not count_burnin_filename_list):
-        raise TreeError("Requested cadepth but no count_burnin_filename_list provided")
+    if (blen == "caheight") and (not count_burnin_filename_list):
+        raise TreeError("Requested caheight but no count_burnin_filename_list provided")
 
     stb = SummaryTreeBuilder(treesummary)
     tpp = TreePostProcessor(treesummary)
@@ -1031,7 +1031,7 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
     else:
         raise TreeError(f"Unknown rooting method: {rooting}")
 
-    # --- 3) Lengths / depths ---
+    # --- 3) Lengths / heights ---
     if blen == "none":
         for p in sumtree.intnodes:
             for c in sumtree.children(p):
@@ -1040,12 +1040,12 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
     elif blen == "input":
         pass
 
-    elif blen == "cladedepth":
-        sumtree = tpp.set_mean_node_depths(sumtree)
-        sumtree.set_blens_from_depths()
+    elif blen == "cladeheight":
+        sumtree = tpp.set_mean_node_heights(sumtree)
+        sumtree.set_blens_from_heights()
 
-    elif blen == "cadepth":
-        # serial CA-depth pass (library-level convenience)
+    elif blen == "caheight":
+        # serial CA-height pass (library-level convenience)
         plan = CADepthEstimator.build_plan(
             sumtree,
             trackci=treesummary.trackci and bool(treesummary.ci_probs),
@@ -1065,7 +1065,7 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
                     est.add_tree(t)
 
         est.write_into(sumtree)
-        sumtree.set_blens_from_depths()
+        sumtree.set_blens_from_heights()
 
     elif blen == "biplen":
         # only needed for MCC, since consensus/mbc already uses Branchstructs from bipdict
@@ -1126,7 +1126,7 @@ class Tree:
         self._sorted_intnodes_deep = None
         self._sorted_intnodes_shallow = None
         self._rootdist = None
-        self._nodedepthdict = None
+        self._nodeheightdict = None
         self._topology_bipart = None
         self._topology_clade = None
         self._cached_attributes = None
@@ -1158,7 +1158,7 @@ class Tree:
         """Clear only length-related caches - leave topology related caches alone"""
 
         for attr in {
-            "dist_dict", "_rootdist", "_nodedepthdict", "_pathdist_dict",
+            "dist_dict", "_rootdist", "_nodeheightdict", "_pathdist_dict",
             "_pathdist_dict_unroot", "_pathdist_as_ndarray", "_pathdist_as_ndarray_unroot",
         }:
             setattr(self, attr, None)
@@ -1932,19 +1932,19 @@ class Tree:
     ###############################################################################################
 
     @property
-    def nodedepthdict(self):
-        if self._nodedepthdict is None:
-            nd = self._nodedepthdict = {}
+    def nodeheightdict(self):
+        if self._nodeheightdict is None:
+            nd = self._nodeheightdict = {}
             rootdist = self.rootdist
             maxdist = 0
             for leaf in self.leaves:
                 dist_root_leaf = rootdist[leaf]
                 if dist_root_leaf > maxdist:
                     maxdist = dist_root_leaf
-            rootdepth = nd[self.root] = maxdist
+            rootheight = nd[self.root] = maxdist
             for node in self.nodes - {self.root}:
-                nd[node] = rootdepth - rootdist[node]
-        return self._nodedepthdict
+                nd[node] = rootheight - rootdist[node]
+        return self._nodeheightdict
 
     ###############################################################################################
 
@@ -2785,10 +2785,10 @@ class Tree:
 
     ###############################################################################################
 
-    def nodedepth(self,node):
-        """Returns depth of node: distance from furthest leaf-level to node"""
+    def nodeheight(self,node):
+        """Returns height of node: distance from furthest leaf-level to node"""
 
-        return self.nodedepthdict[node]
+        return self.nodeheightdict[node]
 
     ###############################################################################################
 
@@ -3119,7 +3119,7 @@ class Tree:
             * `node_attributes` selects Nodestruct attributes to include at each node.
             * `branch_attributes` selects Branchstruct attributes to include on each branch.
             * If ci_labels is provided and struct.ci exists, CI ranges are emitted as
-              '<prefix>_<label>={lo,hi}' where prefix is 'depth' or 'length'.
+              '<prefix>_<label>={lo,hi}' where prefix is 'height' or 'length'.
 
         Notes
         -----
@@ -3202,7 +3202,7 @@ class Tree:
                             treelist.append(f"{label}")
                 if node_attributes:
                     metacomment_node = create_metacomment(self.nodedict[child], node_attributes,
-                                                          ci_labels, ci_prefix="depth")
+                                                          ci_labels, ci_prefix="height")
                     treelist.append(metacomment_node)
                 if printdist:
                     treelist.append(f":{dist:.{precision}g}")
@@ -3222,7 +3222,7 @@ class Tree:
         append_children(root)
         if node_attributes:
             metacomment_node = create_metacomment(self.nodedict[root], node_attributes,
-                                                  ci_labels, ci_prefix="depth")
+                                                  ci_labels, ci_prefix="height")
             treelist.append(f"){metacomment_node};")
         else:
             treelist.append(");")
@@ -3348,13 +3348,13 @@ class Tree:
 
     ###############################################################################################
 
-    def iter_cladeinfo(self, node2clade=None, keep_remchild_dict=False, include_depth=True):
+    def iter_cladeinfo(self, node2clade=None, keep_remchild_dict=False, include_height=True):
         """
         Stream clade info for each node.
 
         Yields:
-            (node, clade, depth, nleaves)
-            depth=None if include_depth=False
+            (node, clade, height, nleaves)
+            height=None if include_height=False
 
         Side effects:
             If node2clade is a dict, fills node2clade[node] = clade.
@@ -3372,15 +3372,15 @@ class Tree:
         remkid_items = self.remotechildren_mask_dict.items
         from_mask = Clade.from_mask
 
-        if include_depth:
-            nodedepthdict = self.nodedepthdict
+        if include_height:
+            nodeheightdict = self.nodeheightdict
             for node, remkids_mask in remkid_items():
                 clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
                 if node2clade is not None:
                     node2clade[node] = clade
-                yield node, clade, nodedepthdict[node], remkids_mask.bit_count()
+                yield node, clade, nodeheightdict[node], remkids_mask.bit_count()
         else:
-            # depth is never computed
+            # height is never computed
             for node, remkids_mask in remkid_items():
                 clade = from_mask(remkids_mask, object_cache, sorted_leaf_tup)
                 if node2clade is not None:
@@ -3398,7 +3398,7 @@ class Tree:
         This function only to maintain backwards-compatible materialization of dict
 
         Returns tree in the form of a "clade dictionary": {clade: nodestruct}
-        Nodestructs get the .depth and ntips attributes set during construction.
+        Nodestructs get the .height and ntips attributes set during construction.
         If requested: Nodestructs also sets .subcladepairs attribute (set)
         """
         cladedict = {}
@@ -3406,8 +3406,8 @@ class Tree:
         it = self.iter_cladeinfo(node2clade=node2clade, keep_remchild_dict=keep_remchild_dict)
 
         Nodestruct_ = Nodestruct  # local bind
-        for node, clade, depth, nleaves in it:
-            cladedict[clade] = Nodestruct_(depth, nleaves)
+        for node, clade, height, nleaves in it:
+            cladedict[clade] = Nodestruct_(height, nleaves)
 
         if track_subcladepairs:
             # Second pass: attach observed child clade pairs to the per-tree nodestructs
@@ -3691,7 +3691,7 @@ class Tree:
 
     def set_node_attribute(self, node, attrname, attrvalue):
         """Set attribute for the specified node.
-        attrname: Name of attribute (e.g., "depth")
+        attrname: Name of attribute (e.g., "height")
         attrvalue: Value of attribute (e.g. 0.153)"""
 
         setattr(self.nodedict[node], attrname, attrvalue)
@@ -3769,24 +3769,24 @@ class Tree:
 
     ###############################################################################################
 
-    def set_blens_from_depths(self):
-        """Set all branch lengths based on node depths: blen = depth_parent - depth_child"""
+    def set_blens_from_heights(self):
+        """Set all branch lengths based on node heights: blen = height_parent - height_child"""
 
-        # Ensure presence of nodedict and that depth attribute exists for all nodes
+        # Ensure presence of nodedict and that height attribute exists for all nodes
         if self._nodedict is None:
-            raise TreeError("Tree does not have nodedict, so depth information not available")
-        missing = [n for n in self.nodes if not hasattr(self.nodedict[n], "depth")]
+            raise TreeError("Tree does not have nodedict, so height information not available")
+        missing = [n for n in self.nodes if not hasattr(self.nodedict[n], "height")]
         if missing:
-            msg = (f"No information about node depths on this tree "
-                   f"(missing 'depth' attribute for {len(missing)} nodes; e.g. {missing[:5]})")
+            msg = (f"No information about node heights on this tree "
+                   f"(missing 'height' attribute for {len(missing)} nodes; e.g. {missing[:5]})")
             raise TreeError(msg)
 
-        # Set lengths from the stored depths
+        # Set lengths from the stored heights
         for parent in self.sorted_intnodes(deepfirst=True):
-            p_depth = self.nodedict[parent].depth
+            p_height = self.nodedict[parent].height
             for child in self.children(parent):
-                c_depth = self.nodedict[child].depth
-                self.child_dict[parent][child].length = (p_depth - c_depth)
+                c_height = self.nodedict[child].height
+                self.child_dict[parent][child].length = (p_height - c_height)
         self.clear_length_caches()
 
     ###############################################################################################
@@ -5600,7 +5600,7 @@ class QuantileAccumulator:
     """
     Approximate quantiles via a mergeable log-bucket histogram (one pass).
     Used by TreeSummary objects when tracking credible intervals for branch lengths or
-    node depths.
+    node heights.
 
     Idea is based on "log-bucket" histograms: based on input value compute integer that is
     dictionary key for bin in histogram, and keep track of counts in each bin.
@@ -5732,10 +5732,10 @@ class QuantileAccumulator:
 
 class TreeSummary():
     """Class summarizing requested attributes (bipartitions, clades, root location, branch lengths,
-       node depths, topologies) from many trees"""
+       node heights, topologies) from many trees"""
 
     def __init__(self, trackbips=False, trackclades=False, trackroot=False,
-                       trackblen=False, trackdepth=False, trackrootblen=False,
+                       trackblen=False, trackheight=False, trackrootblen=False,
                        tracktopo=False, track_subcladepairs=False,
                        store_trees=False,
                        trackci=False, ci_probs=None, quantile_k=7):
@@ -5749,7 +5749,7 @@ class TreeSummary():
         self.trackbips = trackbips
         self.trackclades = trackclades
         self.trackblen = trackblen
-        self.trackdepth = trackdepth
+        self.trackheight = trackheight
         self.trackrootblen = trackrootblen
         self.tracktopo = tracktopo
         self.track_subcladepairs = track_subcladepairs
@@ -5787,7 +5787,7 @@ class TreeSummary():
     def online_update_mean_sd(self, struct, x):
         """
         Online update of mean + M2 (sum of squared deviations).
-            x: value whose mean and variance will be computed (e.g. branch length or node depth)
+            x: value whose mean and variance will be computed (e.g. branch length or node height)
 
         Assumes struct has attributes: mean, M2, n
         """
@@ -5864,11 +5864,11 @@ class TreeSummary():
             for nodestruct in self._cladesummary.values():
                 nd = nodestruct
                 nd.clade_cred = nd.posterior = nd.freq = nd.n / self.tree_count
-                if self.trackdepth:
-                    nd.depth, nd.depth_sd = self.finalize_online(nd)
+                if self.trackheight:
+                    nd.height, nd.height_sd = self.finalize_online(nd)
 
             # Also finalize computation of selected quantiles if requested
-            if self.trackci and self.ci_probs and self.trackdepth:
+            if self.trackci and self.ci_probs and self.trackheight:
                 probs = []
                 for p in self.ci_probs:
                     a = (1.0 - p) / 2.0
@@ -5882,7 +5882,7 @@ class TreeSummary():
                         lo_idx = i * 2
                         hi_idx = lo_idx + 1
                         nd.ci[lab] = (qvals[lo_idx], qvals[hi_idx])
-                    nd.depth_median = qvals[-1]
+                    nd.height_median = qvals[-1]
 
             self._cladesummary_processed = True
         return self._cladesummary
@@ -6023,9 +6023,9 @@ class TreeSummary():
 
         self._cladesummary_processed = False
         cladesummary = self._cladesummary
-        trackdepth = self.trackdepth
+        trackheight = self.trackheight
         trackpairs = self.track_subcladepairs
-        do_ci = self.trackci and trackdepth
+        do_ci = self.trackci and trackheight
         tracktopo = self.tracktopo
         online_update = self.online_update_mean_sd
 
@@ -6034,20 +6034,20 @@ class TreeSummary():
         cladeset = set() if tracktopo else None
 
         # Stream clades: update summary + (optionally) fill node2clade + collect topology
-        for node, clade, depth, nleaves in curtree.iter_cladeinfo(node2clade=node2clade,
-                                                                  include_depth=trackdepth):
+        for node, clade, height, nleaves in curtree.iter_cladeinfo(node2clade=node2clade,
+                                                                  include_height=trackheight):
             if cladeset is not None:
                 cladeset.add(clade)
             s = cladesummary.get(clade)
             if s is None:
-                s = Nodestruct(depth, nleaves)
+                s = Nodestruct(height, nleaves)
                 cladesummary[clade] = s
                 if do_ci:
                     s.quantiles = QuantileAccumulator(k=self.quantile_k)
-            if trackdepth:
-                online_update(s, depth)
+            if trackheight:
+                online_update(s, height)
                 if do_ci:
-                    s.quantiles.add(depth)
+                    s.quantiles.add(height)
             else:
                 s.n += 1
 
@@ -6243,16 +6243,16 @@ class TreeSummary():
         # Merge "treesummary.cladesummary" with "self.cladesummary"
         self_cladesum = self._cladesummary
         other_cladesum = other._cladesummary
-        trackdepth = self.trackdepth
+        trackheight = self.trackheight
         trackpairs = self.track_subcladepairs
-        do_ci = self.trackci and trackdepth
+        do_ci = self.trackci and trackheight
 
         for clade, nd_other in other_cladesum.items():
             nd_self = self_cladesum.get(clade)
             if nd_self is None:
                 self_cladesum[clade] = nd_other
             else:
-                if trackdepth:
+                if trackheight:
                     self._merge_online_accumulators(nd_self, nd_other)
                     if do_ci:
                         nd_self.quantiles.merge(nd_other.quantiles)
@@ -6388,15 +6388,15 @@ class TreeSummary():
         tpp = TreePostProcessor(self)
         return tpp.set_rootcredibility(sumtree, precision=precision)
 
-    def set_mean_node_depths(self, sumtree):
+    def set_mean_node_heights(self, sumtree):
         warnings.warn(
-            "TreeSummary.set_mean_node_depths() is deprecated and will be removed in a future release. "
-            "Use TreePostProcessor(treesummary).set_mean_node_depths(sumtree) instead.",
+            "TreeSummary.set_mean_node_heights() is deprecated and will be removed in a future release. "
+            "Use TreePostProcessor(treesummary).set_mean_node_heights(sumtree) instead.",
             DeprecationWarning,
             stacklevel=2,
         )
         tpp = TreePostProcessor(self)
-        return tpp.set_mean_node_depths(sumtree)
+        return tpp.set_mean_node_heights(sumtree)
 
     def set_biplen_on_existing_tree(self, sumtree):
         warnings.warn(
@@ -6437,7 +6437,7 @@ class TreeSummary():
         """
         Compute + annotate a summary tree from this TreeSummary.
 
-        This method builds the tree topology, roots it (optional), sets branch lengths/node depths,
+        This method builds the tree topology, roots it (optional), sets branch lengths/node heights,
         and writes summary annotations onto the returned Tree.
 
         Printing is not configured here. Use configure_sumtree_printing(sumtree, ...) or
@@ -6655,7 +6655,7 @@ class SummaryTreeBuilder():
 ###################################################################################################
 
 class TreePostProcessor():
-    """Class handling annotation of tree (setting of branch lenghts, node depths,
+    """Class handling annotation of tree (setting of branch lenghts, node heights,
     clade frequencies, etc). Takes TreeSummary and Tree objects as input"""
 
     ###############################################################################################
@@ -6697,10 +6697,10 @@ class TreePostProcessor():
                     sumtree.collapse_bifurcating_root()
                     sumtree.reroot(child, parent)
 
-                # If branch lengths or node depths have been tracked:
+                # If branch lengths or node heights have been tracked:
                 # Divide branch lengths for two rootkids according to fractions
                 # seen for this rootbip across trees in ._rootbip_summary
-                # if self.treesum.trackblen or self.treesum.trackdepth:
+                # if self.treesum.trackblen or self.treesum.trackheight:
                 #     kid1,kid2 = sumtree.children(sumtree.root)
                 #     biplen = sumtree.nodedist(kid1, kid2)
                 #     kid1_remkids = sumtree.remotechildren_dict[kid1]
@@ -6776,21 +6776,21 @@ class TreePostProcessor():
 
     ###############################################################################################
 
-    def set_mean_node_depths(self, sumtree):
-        """Set node depths on summary tree based on mean node depths for clades.
-        Also set info about depth variation (sd and sem).
+    def set_mean_node_heights(self, sumtree):
+        """Set node heights on summary tree based on mean node heights for clades.
+        Also set info about height variation (sd and sem).
         All information obtained from TreeSummary.cladesummary
 
         NOTE 1: only meaningful if input trees are based on a clock model.
         NOTE 2: only works if all clades in sumtree have been observed at least once. The option
                 will therefore not work with all rootings, and may also fail for majority rule
                 consensus trees
-        NOTE 3: only uses node depths from monophyletic clades (so some values may be set
+        NOTE 3: only uses node heights from monophyletic clades (so some values may be set
                 based on very few input trees)
 
-        Node-depths of leaves will be the mean value observed across input trees.
-        This only matters for leaves whose depth is being estimated (all other nodes
-        will have constant depth across input trees).
+        Node-heights of leaves will be the mean value observed across input trees.
+        This only matters for leaves whose height is being estimated (all other nodes
+        will have constant height across input trees).
         """
 
         try:
@@ -6799,10 +6799,10 @@ class TreePostProcessor():
                 mask = remmask[node]
                 clade = Clade.from_mask_unknown_leafuniverse(mask, sumtree)
                 nodestruct = self.treesum.cladesummary[clade]
-                sumtree.set_node_attribute(node, "depth", nodestruct.depth)
-                sumtree.set_node_attribute(node, "depth_sd", nodestruct.depth_sd)
+                sumtree.set_node_attribute(node, "height", nodestruct.height)
+                sumtree.set_node_attribute(node, "height_sd", nodestruct.height_sd)
         except KeyError as e:
-            raise TreeError("Problem while setting mean node depths on summary tree: "
+            raise TreeError("Problem while setting mean node heights on summary tree: "
                             + "the following clade has not been observed among input trees. "
                             + "Summary tree is probably rooted differently from input trees - "
                             + "consider changing rooting option.\n"
@@ -6886,13 +6886,13 @@ class TreePostProcessor():
                     # consensus clade WAS observed
                     sumtree.set_node_attribute(node, "clade_cred", getattr(nd, "clade_cred", nd.freq))
                     node_attrs.add("clade_cred")
-                    if self.treesum.trackdepth:
-                        sumtree.set_node_attribute(node, "depth", nd.depth)
-                        sumtree.set_node_attribute(node, "depth_sd", nd.depth_sd)
-                        node_attrs.update({"depth", "depth_sd"})
+                    if self.treesum.trackheight:
+                        sumtree.set_node_attribute(node, "height", nd.height)
+                        sumtree.set_node_attribute(node, "height_sd", nd.height_sd)
+                        node_attrs.update({"height", "height_sd"})
                         if self.treesum.trackci:
                             # these attributes may or may not exist; set if present
-                            for attr in ("ci", "depth_median"):
+                            for attr in ("ci", "height_median"):
                                 if hasattr(nd, attr):
                                     sumtree.set_node_attribute(node, attr, getattr(nd, attr))
                                     node_attrs.add(attr)
@@ -7005,10 +7005,10 @@ class CAPlan:
 ###################################################################################################
 
 class CADepthEstimator():
-    """Class for accumulating Common Ancestor node depths from set of input trees,
+    """Class for accumulating Common Ancestor node heights from set of input trees,
       - add_tree(tree): update online mean/M2 (+ optional quantiles)
       - merge(other): merge partial estimators (for multiprocessing)
-      - write_into(sumtree): write depth, depth_sd (+ optional CI) onto sumtree"""
+      - write_into(sumtree): write height, height_sd (+ optional CI) onto sumtree"""
 
     __slots__ = ("plan", "trackci", "acc", "quantile_k")
 
@@ -7018,7 +7018,7 @@ class CADepthEstimator():
         self.plan = plan                                # CAPlan object with tuple of MRCA queries
         self.trackci = bool(trackci and plan.probs)
 
-        # {node:Nodestruct} dict for accumulating depth info from input trees
+        # {node:Nodestruct} dict for accumulating height info from input trees
         acc = {}
         self.acc = acc
         self.quantile_k = quantile_k
@@ -7100,7 +7100,7 @@ class CADepthEstimator():
     @staticmethod
     def _finalize(s):
         if s.n == 0:
-            raise TreeError("CA depth accumulator has 0 observations")
+            raise TreeError("CA height accumulator has 0 observations")
         if s.n == 1:
             return (s.mean, None)
         var = s.M2 / (s.n - 1)
@@ -7109,29 +7109,29 @@ class CADepthEstimator():
     ###############################################################################################
 
     def add_tree(self, input_tree):
-        nodedepth = input_tree.nodedepthdict
+        nodeheight = input_tree.nodeheightdict
         _ = input_tree.remotechildren_mask_dict  # ensure remmask exists for MRCA climb
         find_mrca_mask = input_tree.find_mrca_mask
 
         acc = self.acc
         trackci = self.trackci
 
-        # Internal nodes: MRCA depth for each query
+        # Internal nodes: MRCA height for each query
         for q in self.plan.queries:
             mrca = find_mrca_mask(q.qmask, q.start_leaf)
-            depth = nodedepth[mrca]
+            height = nodeheight[mrca]
             s = acc[q.node]
-            self._online_update(s, depth)
+            self._online_update(s, height)
             if trackci:
-                s.quantiles.add(depth)
+                s.quantiles.add(height)
 
-        # Leaves: singleton depth
+        # Leaves: singleton height
         for leaf in self.plan.leaves:
-            depth = nodedepth[leaf]
+            height = nodeheight[leaf]
             s = acc[leaf]
-            self._online_update(s, depth)
+            self._online_update(s, height)
             if trackci:
-                s.quantiles.add(depth)
+                s.quantiles.add(height)
 
     ###############################################################################################
 
@@ -7156,8 +7156,8 @@ class CADepthEstimator():
 
         for node, s in self.acc.items():
             mean, sd = self._finalize(s)
-            sumtree.set_node_attribute(node, "depth", mean)
-            sumtree.set_node_attribute(node, "depth_sd", sd)
+            sumtree.set_node_attribute(node, "height", mean)
+            sumtree.set_node_attribute(node, "height_sd", sd)
 
             if self.trackci:
                 qvals = s.quantiles.quantiles(probs)
@@ -7165,7 +7165,7 @@ class CADepthEstimator():
                 for i, lab in enumerate(ci_labels):
                     ci[lab] = (qvals[2*i], qvals[2*i + 1])
                 sumtree.set_node_attribute(node, "ci", ci)
-                sumtree.set_node_attribute(node, "depth_median", qvals[-1])
+                sumtree.set_node_attribute(node, "height_median", qvals[-1])
 
         return sumtree
 
@@ -7791,9 +7791,9 @@ class Distmatrix(object):
         ix2name = self.index2name.copy()
         n = len(remaining_nodes)
 
-        # Dicts keeping track of node depths and cluster sizes
+        # Dicts keeping track of node heights and cluster sizes
         clus_size = dict.fromkeys(range(n), 1)      # Number of leaves in cluster (initially 1)
-        depth = dict.fromkeys(range(n), 0.0)        # Depth of node (leaves = 0)
+        height = dict.fromkeys(range(n), 0.0)        # Depth of node (leaves = 0)
 
         # List keeping track of minimum value (and its index) in each row
         # Should lead to O(n^2) instead of O(n^3) time complexity (see Felsenstein)
@@ -7813,9 +7813,9 @@ class Distmatrix(object):
             # Connect two nearest nodes on tree (insert new node below them)
             branchstruct = Branchstruct()
             newnode = upgmatree.split_off_children(rootnode, [n1, n2], branchstruct)
-            depth_12 = dmat[i1,i2]/2
-            dist_new1 = depth_12 - depth[i1]
-            dist_new2 = depth_12 - depth[i2]
+            height_12 = dmat[i1,i2]/2
+            dist_new1 = height_12 - height[i1]
+            dist_new2 = height_12 - height[i2]
             upgmatree.setlength(newnode, n1, dist_new1)
             upgmatree.setlength(newnode, n2, dist_new2)
 
@@ -7855,16 +7855,16 @@ class Distmatrix(object):
             name2ix[newnode] = i1
             clus_size[i1] = clus_size[i1] + clus_size[i2]
             del clus_size[i2]
-            depth[i1] = depth_12
-            del depth[i2]
+            height[i1] = height_12
+            del height[i2]
 
         # After loop. Set length of branch conecting final two nodes
         n1, n2 = remaining_nodes[0], remaining_nodes[1]
         i1 = name2ix[n1]
         i2 = name2ix[n2]
-        depth_12 = dmat[i1,i2]/2
-        dist_new1 = depth_12 - depth[i1]
-        dist_new2 = depth_12 - depth[i2]
+        height_12 = dmat[i1,i2]/2
+        dist_new1 = height_12 - height[i1]
+        dist_new2 = height_12 - height[i2]
         upgmatree.setlength(rootnode, n1, dist_new1)
         upgmatree.setlength(rootnode, n2, dist_new2)
 
