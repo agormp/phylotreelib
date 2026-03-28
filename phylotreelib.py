@@ -957,7 +957,7 @@ def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=No
     # branch length / depth attributes
     if blen == "biplen":
         branch_attrs.update({"length", "length_sd"})
-    elif blen in ("meandepth", "cadepth"):
+    elif blen in ("cladedepth", "cadepth"):
         node_attrs.update({"depth", "depth_sd"})
         branch_attrs.add("length")
     elif blen in ("none", "input"):
@@ -967,7 +967,7 @@ def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=No
         # attach CI info where it exists
         if blen == "biplen":
             branch_attrs.update({"ci", "length_median"})
-        elif blen in ("meandepth", "cadepth"):
+        elif blen in ("cladedepth", "cadepth"):
             node_attrs.update({"ci", "depth_median"})
 
     tree.set_print_spec(
@@ -1040,7 +1040,7 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
     elif blen == "input":
         pass
 
-    elif blen == "meandepth":
+    elif blen == "cladedepth":
         sumtree = tpp.set_mean_node_depths(sumtree)
         sumtree.set_blens_from_depths()
 
