@@ -1040,15 +1040,15 @@ class Test_compute_sumtree:
     # Python note: surely this can be done with fewer lines of code, but how then
     # to get individual test PASSED messages?
 
-    def test_hipstr_meandepth(self, data_dir):
-        """HIPSTR tree with mean node depths and rooting at best HIPSTR resolution of root clade"""
+    def test_hipstr_cladeheight(self, data_dir):
+        """HIPSTR tree with mean node heights and rooting at best HIPSTR resolution of root clade"""
 
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, track_subcladepairs=True)
+        tsum = pt.TreeSummary(trackclades=True, trackheight=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
-        town = tsum.compute_sumtree(treetype="hip", blen="meandepth")
+        town = tsum.compute_sumtree(treetype="hip", blen="cladeheight")
 
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_hipstr_mean")
@@ -1058,15 +1058,15 @@ class Test_compute_sumtree:
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
 
-    def test_mrhipstr_meandepth(self, data_dir):
-        """mrHIPSTR tree with mean node depths and rooting at best HIPSTR resolution of root clade"""
+    def test_mrhipstr_cladeheight(self, data_dir):
+        """mrHIPSTR tree with mean node heights and rooting at best HIPSTR resolution of root clade"""
 
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, track_subcladepairs=True)
+        tsum = pt.TreeSummary(trackclades=True, trackheight=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
-        town = tsum.compute_sumtree(treetype="mrhip", blen="meandepth")
+        town = tsum.compute_sumtree(treetype="mrhip", blen="cladeheight")
 
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mrhipstr_mean")
@@ -1076,16 +1076,16 @@ class Test_compute_sumtree:
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
 
-    def test_mcc_meandepth(self, data_dir):
-        """MCC tree with mean node depths and rooting at best tree's original root"""
+    def test_mcc_cladeheight(self, data_dir):
+        """MCC tree with mean node heights and rooting at best tree's original root"""
 
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True,
+        tsum = pt.TreeSummary(trackclades=True, trackheight=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
-        town = tsum.compute_sumtree(treetype="mcc", blen="meandepth")
+        town = tsum.compute_sumtree(treetype="mcc", blen="cladeheight")
 
         # Gold standard computed by treeannotator
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_mean")
@@ -1095,16 +1095,16 @@ class Test_compute_sumtree:
         assert town.topology_clade == tgold.topology_clade # To get separate error message
         assert town.equals(tgold, rooted=True)  # Checks rooted topology again, and blens
 
-    def test_mcc_cadepth(self, data_dir):
-        """MCC tree with CA node depths and rooting at best tree's original root"""
+    def test_mcc_caheight(self, data_dir):
+        """MCC tree with CA node heights and rooting at best tree's original root"""
 
         # Own computation
         tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
-        tsum = pt.TreeSummary(trackclades=True, trackdepth=True, tracktopo=True,
+        tsum = pt.TreeSummary(trackclades=True, trackheight=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
-        town = tsum.compute_sumtree(treetype="mcc", blen="cadepth",
+        town = tsum.compute_sumtree(treetype="mcc", blen="caheight",
                                     count_burnin_filename_list=[(1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
 
         # Gold standard computed by treeannotator
