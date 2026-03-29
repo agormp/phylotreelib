@@ -58,17 +58,15 @@ The README gives examples of the most common workflows. More specialized details
 
 ## Quick start
 
-### Terminology note: “depth” vs “height” (tree orientation)
+### Terminology note: tree orientation and "height" vs "depth"
 
-In **phylotreelib**, trees are mostly treated as *rooted at the bottom and having leaves at the top*.
+**Note for users upgrading from version 1:** In **phylotreelib** v. 2, trees are now treated as *having the root at the top and leaves at the bottom* — matching the standard convention in most phylogeny software and computer science.
+
 Accordingly, it uses:
 
-- **depth(node)** = distance from the **tips (leaves)** to the node (i.e., “time before most recent leaf”)
+- **height(node)** = distance from the **tips (leaves)** to the node (i.e., "time before most recent leaf")
 
-Similarly terms like above/below and upper/lower are based on the same perceived orientation of the tree.
-
-However, for reasons clear only to computer scientists, in many programming libraries and APIs, trees are often treated as rooted at the top, and the same concept is referred to as **height**. I am in the process of changing the phylotreelib names and documentation to follow that standard practice. The deprecated depth-names will stay functional for one major release cycle after changing them (for the duration of version 2).
-
+In v1.x, this concept was called **depth**. All depth-based names were renamed to height-based names in v2.0.0. See [Upgrading from 1.x to 2.x](#upgrading-from-1x-to-2x) for the full rename table.
 
 ### Construct a tree from a Newick string, print tabular representation
 
@@ -173,7 +171,7 @@ for _ in range(3):
 
 If you are working with posterior tree samples (e.g. from BEAST/MrBayes), you can build a summary tree in a few explicit steps:
 
-1) **TreeSummary** accumulates frequencies and (optionally) branch-length/node-depth statistics
+1) **TreeSummary** accumulates frequencies and (optionally) branch-length/node-height statistics
 2) **SummaryTreeBuilder** constructs a summary-tree topology
 3) **TreePostProcessor** adds attributes to the tree annotating it with e.g. support values / branch-length stats
 4) **PrintSpec** controls what attributes are written as branch labels and/or Nexus meta-comments
@@ -222,7 +220,7 @@ ts = pt.TreeSummary(
     trackclades=True,
     trackroot=True,
     trackblen=True,
-    trackdepth=True,
+    trackheight=True,
     trackrootblen=True,
     tracktopo=True,
     trackci=True,
@@ -231,12 +229,12 @@ ts = pt.TreeSummary(
 with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
-sumtree = pt.build_sumtree(ts, treetype="mcc", blen="meandepth", rooting=None,)
+sumtree = pt.build_sumtree(ts, treetype="mcc", blen="cladeheight", rooting=None,)
 
 pt.configure_sumtree_printing(
 	sumtree,
 	treetype="mcc",
-	blen="meandepth",
+	blen="cladeheight",
 	trackci=True,
 	print_meta=True
 )
@@ -277,7 +275,7 @@ mink_mrca = tree.find_mrca({"Mink_A", "Mink_B"})
 color_me = sorted(tree.remote_children(mink_mrca))
 with open("colored.nexus", "w") as outfile:
     outfile.write(tree.nexus(translateblock=False, colorlist=color_me,
-							 colorfg="#FF0000", colorbg="#000000"))
+					 colorfg="#FF0000", colorbg="#000000"))
 ```
 
 
@@ -343,7 +341,7 @@ Available classes:
 
 ### Added
 
-- **Explicit summary-tree pipeline** via `SummaryTreeBuilder` and `TreePostProcessor` (with optional `CADepthEstimator` for CA-depths and credible intervals).
+- **Explicit summary-tree pipeline** via `SummaryTreeBuilder` and `TreePostProcessor` (with optional `CADepthEstimator` for CA-heights and credible intervals).
 - **Credible interval support** via `QuantileAccumulator` and `trackci` / `ci_probs` in `TreeSummary`.
 - **PrintSpec** plus helpers `configure_basic_printing(...)` and `configure_sumtree_printing(...)` for consistent Newick/NEXUS output.
 
@@ -353,7 +351,23 @@ Available classes:
 - `Tree.spr(...)` updated to match the new grafting model and (by default) preserve total tree length.
 - `Tree.subtree(...)` / `Tree.prune_subtree(...)` now return `(subtree, basal_branch)`; leaf subtrees return the leaf name as `str`.
 - `Tree.reroot(...)` signature updated to use the same distance/fraction placement convention as other editing methods.
-- `Tree.newick(...)` / `Tree.nexus(...)` now treat `None` as “use PrintSpec defaults”.
+- `Tree.newick(...)` / `Tree.nexus(...)` now treat `None` as "use PrintSpec defaults".
+
+### Renamed (terminology: `depth` → `height`)
+
+All names relating to node heights — the distance from the tips to an internal node, i.e. "time before the most recent leaf" — have been renamed from `depth`-based to `height`-based. This aligns with the convention used in most phylogenetic software and programming libraries. **This is a breaking change; the old names are no longer available.**
+
+| v1.x name | v2.x name |
+|---|---|
+| `TreeSummary(..., trackdepth=True, ...)` | `TreeSummary(..., trackheight=True, ...)` |
+| `Tree.nodedepth(node)` | `Tree.nodeheight(node)` |
+| `Tree.set_blens_from_depths()` | `Tree.set_blens_from_heights()` |
+| `TreePostProcessor.set_mean_node_depths(tree)` | `TreePostProcessor.set_mean_node_heights(tree)` |
+| `build_sumtree(..., blen="cladedepth", ...)` | `build_sumtree(..., blen="cladeheight", ...)` |
+| `build_sumtree(..., blen="cadepth", ...)` | `build_sumtree(..., blen="caheight", ...)` |
+| Node attribute `depth` | Node attribute `height` |
+| Node attribute `depth_sd` | Node attribute `height_sd` |
+| Node attribute `depth_median` | Node attribute `height_median` |
 
 ### Deprecated
 
@@ -368,9 +382,20 @@ Available classes:
 
 ## Upgrading from 1.x to 2.x
 
-phylotreelib 2.0 introduces a few intentional API breaks to make tree editing, summary trees, and printing more explicit and less “magic”.
+phylotreelib 2.0 introduces a few intentional API breaks to make tree editing, summary trees, and printing more explicit and less "magic".
 
 If you maintain scripts that call phylotreelib directly, the sections below show the key signature/return changes and how to update call sites.
+
+### Terminology rename: `depth` → `height`
+
+In v1.x, the distance from the tips to an internal node was called **depth**. In v2.0.0 this has been renamed to **height** throughout the library. The rename is purely mechanical: a search-and-replace across your scripts using the table in the [Changelog](#changelog-200) above is sufficient.
+
+The affected call sites are:
+
+- `TreeSummary` constructor: `trackdepth=` → `trackheight=`
+- `build_sumtree` and `configure_sumtree_printing`: `blen="cladedepth"` → `"cladeheight"`, `blen="cadepth"` → `"caheight"`
+- `Tree` methods: `nodedepth()` → `nodeheight()`, `set_blens_from_depths()` → `set_blens_from_heights()`
+- Node attributes on summary trees: `depth` / `depth_sd` / `depth_median` → `height` / `height_sd` / `height_median`
 
 ### Summary trees
 
@@ -378,7 +403,7 @@ If you maintain scripts that call phylotreelib directly, the sections below show
 
 - `TreeSummary` --> `SummaryTreeBuilder` --> `TreePostProcessor` (+ optional `CADepthEstimator`) --> `PrintSpec`
 
-See the “Summarize posterior tree samples” quick-start example above, and the worked examples in `docs/recipes.md`.
+See the "Summarize posterior tree samples" quick-start example above, and the worked examples in `docs/recipes.md`.
 
 ### Tree.graft: signature change
 
@@ -389,7 +414,7 @@ Tree.graft(self, other, node1, node2=None, blen1=0, blen2=0,
            graftlabel=None, graft_with_other_root=False)
 ```
 
-Meaning (1.x): attach `other` below `node1` (possibly re-rooting `other` around `node2`), by inserting a new internal node above `node1` with length `blen1`, and connecting `other` above that with length `blen2` (or optionally skip the extra basal branch).
+Meaning (1.x): attach `other` on incoming branch to `node1` (possibly re-rooting `other` around `node2`): insert a new internal node on the incoming branch to `node1` with length `blen1`, and connect `other` below that (meaning closer to the tips) with length `blen2` (or optionally skip the extra basal branch).
 
 **New (2.x):**
 
@@ -403,7 +428,7 @@ Meaning (2.x): insert the graft point on an *existing edge* `(parent -> child)` 
 
 **How to convert typical 1.x calls**
 
-1) **Grafting “below node1” (typical old usage)**
+1) **Grafting "below node1" (typical old usage)**
 
 Old:
 
@@ -420,7 +445,7 @@ tree.graft(
     parent=parent, child=X,
     # place graftpoint on the incoming edge to X:
     dist_from_parent=blen1,           # if you want a specific distance
-    # or frac_from_parent=0.5,        # if you just want “midway”
+    # or frac_from_parent=0.5,        # if you just want "midway"
     connect_length=blen2,
 )
 ```
@@ -428,7 +453,7 @@ tree.graft(
 2) **Old `graft_with_other_root=True`**
 
 In 2.x, the caller should explicitly decide what `other` is before calling `graft(...)`:
-- If you want to attach a *single leaf*, pass a string `other="TaxonName"` (and skip the “extra basal branch” complexity entirely).
+- If you want to attach a *single leaf*, pass a string `other="TaxonName"` (and skip the "extra basal branch" complexity entirely).
 - If you want to attach a Tree with a specific root, re-root `other` first (e.g. `other.reroot(...)`) and then call `graft(...)`.
 
 ### Tree.spr: signature change (and length preservation)
@@ -574,7 +599,7 @@ Tree.newick(self, printdist=None, printlabels=None, labelfield=None, precision=N
 Tree.nexus(self,  printdist=None, printlabels=None, labelfield=None, precision=None, ..., print_meta=None)
 ```
 
-In 2.x, passing `None` means “use the Tree’s current PrintSpec default”. This makes it easy to configure printing once:
+In 2.x, passing `None` means "use the Tree's current PrintSpec default". This makes it easy to configure printing once:
 
 ```python
 pt.configure_basic_printing(tree, precision=7, print_meta=True, branch_attrs=("posterior",))
