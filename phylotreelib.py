@@ -1640,7 +1640,7 @@ class Tree:
         # Add total tree length if different from zero
         treelen = self.length()
         if not math.isclose(treelen, 0.0):
-            tabstring += f"Tree length: {treelen}\n"
+            tabstring += f"Tree length: {treelen:.6G}\n"
 
         # Add list of leaves
         sorted_leaflist = sorted([str(leaf) for leaf in self.leaves])
