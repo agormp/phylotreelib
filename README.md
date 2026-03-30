@@ -1,6 +1,6 @@
 # phylotreelib
 
-[![PyPI version](https://img.shields.io/pypi/v/phylotreelib)](https://pypi.org/project/phylotreelib/)
+[![PyPI version](https://img.shields.io/pypi/v/phylotreelib?cacheBust=1)](https://pypi.org/project/phylotreelib/)
 [![PyPI downloads](https://static.pepy.tech/personalized-badge/phylotreelib?period=total&units=none&left_color=black&right_color=blue&left_text=PyPI%20downloads&service=github)](https://pepy.tech/project/phylotreelib)
 
 `phylotreelib` is a Python library for reading, writing, analyzing, manipulating, comparing, and summarizing phylogenetic trees, and is designed to be used in scripts or interactively in notebooks.
