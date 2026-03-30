@@ -345,7 +345,7 @@ Available classes:
 
 ### Added
 
-- **Explicit summary-tree pipeline** via `SummaryTreeBuilder` and `TreePostProcessor` (with optional `CADepthEstimator` for CA-heights and credible intervals).
+- **Explicit summary-tree pipeline** via `SummaryTreeBuilder` and `TreePostProcessor` (with optional `CAHeightEstimator` for CA-heights and credible intervals).
 - **Credible interval support** via `QuantileAccumulator` and `trackci` / `ci_probs` in `TreeSummary`.
 - **PrintSpec** plus helpers `configure_basic_printing(...)` and `configure_sumtree_printing(...)` for consistent Newick/NEXUS output.
 
@@ -367,6 +367,7 @@ All names relating to node heights — the distance from the tips to an internal
 | `Tree.nodedepth(node)` | `Tree.nodeheight(node)` |
 | `Tree.set_blens_from_depths()` | `Tree.set_blens_from_heights()` |
 | `TreePostProcessor.set_mean_node_depths(tree)` | `TreePostProcessor.set_mean_node_heights(tree)` |
+| `CADepthEstimator` | `CAHeightEstimator` |
 | `build_sumtree(..., blen="meandepth", ...)` | `build_sumtree(..., blen="cladeheight", ...)` |
 | `build_sumtree(..., blen="cadepth", ...)` | `build_sumtree(..., blen="caheight", ...)` |
 | Node attribute `depth` | Node attribute `height` |
@@ -405,7 +406,7 @@ The affected call sites are:
 
 `TreeSummary.compute_sumtree(...)` is still available as a convenience wrapper (so many 1.x workflows continue to work), but the preferred style is now the explicit pipeline:
 
-- `TreeSummary` --> `SummaryTreeBuilder` --> `TreePostProcessor` (+ optional `CADepthEstimator`) --> `PrintSpec`
+- `TreeSummary` --> `SummaryTreeBuilder` --> `TreePostProcessor` (+ optional `CAHeightEstimator`) --> `PrintSpec`
 
 See the "Summarize posterior tree samples" quick-start example above, and the worked examples in `docs/recipes.md`.
 
