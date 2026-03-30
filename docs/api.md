@@ -20,7 +20,7 @@ The main public entry points are:
 - `configure_basic_printing`
 - `configure_sumtree_printing`
 
-Helper classes such as `Bipartition`, `Clade`, `Branchstruct`, `Nodestruct`, `PrintSpec`, `SummaryTreeBuilder`, `TreePostProcessor`, `CADepthEstimator`, and `QuantileAccumulator` are also part of the module, but most users do not need them for ordinary scripting.
+Helper classes such as `Bipartition`, `Clade`, `Branchstruct`, `Nodestruct`, `PrintSpec`, `SummaryTreeBuilder`, `TreePostProcessor`, `CAHeightEstimator`, and `QuantileAccumulator` are also part of the module, but most users do not need them for ordinary scripting.
 
 ---
 
@@ -40,9 +40,9 @@ Class representing a Newick tree file.
 
 The summary-tree machinery is split into three roles:
 
-- **TreeSummary**: accumulates frequencies and (optionally) branch length / node depth statistics from many trees.
+- **TreeSummary**: accumulates frequencies and (optionally) branch length / node height statistics from many trees.
 - **SummaryTreeBuilder**: chooses a *summary topology* (consensus, MCC, MBC, HIPSTR).
-- **TreePostProcessor**: annotates a chosen tree with support values, length/depth statistics, and (optionally) root credibility.
+- **TreePostProcessor**: annotates a chosen tree with support values, length/height statistics, and (optionally) root credibility.
 
 For most users, the recommended entry point is the top-level helper:
 
@@ -57,7 +57,7 @@ with pt.Nexustreefile("posterior.trees") as tf:
     for tree in tf:
         ts.add_tree(tree)
 
-# 2) Build + annotate the summary tree (topology + rooting + lengths/depths + support)
+# 2) Build + annotate the summary tree (topology + rooting + lengths/heights + support)
 sumtree = pt.build_sumtree(ts, treetype="con", blen="biplen", rooting="mid")
 
 # 3) Configure output (optional)
@@ -68,15 +68,17 @@ print(sumtree.newick())
 
 Parameters
 - `treetype`: `"con"`, `"all"`, `"mcc"`, `"mbc"`, `"hip"`, `"mrhip"`
-- `blen`: `"biplen"`, `"meandepth"`, `"cadepth"`, `"input"`, `"none"`
+- `blen`: `"biplen"`, `"cladeheight"`, `"caheight"`, `"input"`, `"none"`
 - `rooting`: `"mid"`, `"minvar"`, `"og"`, or `None` (meaning: keep as-is / leave unrooted)
 
 Notes
-- `"cadepth"` needs access to the original tree sample again. Pass `count_burnin_filename_list`
+- `"caheight"` needs access to the original tree sample again. Pass `count_burnin_filename_list`
   (the same structure used by `sumt`: tuples of `(count, burnin, filename)`), or do a second pass
-  yourself with `CADepthEstimator`.
+  yourself with `CAHeightEstimator`.
 - Printing is intentionally **not** configured by `build_sumtree`; use `Tree.set_print_spec()`,
   `configure_sumtree_printing()`, or `configure_basic_printing()`.
+
+**v2.0.0 note:** The `blen` values `"meandepth"` and `"cadepth"` from v1.x have been renamed to `"cladeheight"` and `"caheight"` respectively.
 
 #### Lower-level building blocks
 
@@ -88,7 +90,7 @@ tpp = pt.TreePostProcessor(ts)
 
 tree = stb.contree(cutoff=0.5, allcompat=False)   # topology
 tree.rootmid()                                    # rooting (Tree method)
-tree = tpp.annotate_sumtree(tree)                 # support + length/depth stats
+tree = tpp.annotate_sumtree(tree)                 # support + length/height stats
 ```
 
 #### Backwards-compatible wrappers on `TreeSummary`
@@ -141,7 +143,7 @@ Conceptually, this function:
 
 1. chooses a summary-tree topology
 2. roots it if requested
-3. assigns branch lengths and/or node depths
+3. assigns branch lengths and/or node heights
 4. annotates support and associated statistics
 
 #### `configure_basic_printing(...)`
@@ -227,7 +229,7 @@ This allows:
 
 This is useful when the posterior distribution contains uncertainty about root placement.
 
-#### 9.5 Branch lengths versus node depths
+#### 9.5 Branch lengths versus node heights
 
 Summary trees can be annotated using different conventions.
 
@@ -235,18 +237,18 @@ Summary trees can be annotated using different conventions.
 
 A branch in the summary tree corresponds to a bipartition, and branch length is summarized directly across all sampled trees where that bipartition occurred.
 
-This is natural for consensus trees.
+This is natural for consensus trees. Use `blen="biplen"` and `trackblen=True` in `TreeSummary`.
 
-##### Node-depth-based heights
+##### Node-height-based branch lengths
 
-For rooted clock trees, one often wants node heights or node depths rather than direct bipartition branch lengths.
+For rooted clock trees, one often wants node heights rather than direct bipartition branch lengths. Node height is the distance from the tips to the node — i.e., "time before most recent leaf".
 
 Two closely related conventions appear in the package:
 
-- mean node depths from the actually observed clades
-- common-ancestor depths, where the depth of a clade on the summary tree is estimated from the MRCA of those leaves in every sampled tree, even when the clade is not monophyletic in a particular sample
+- **Mean clade heights** (`blen="cladeheight"`, requires `trackheight=True`): branch lengths are derived from the mean height of each clade, computed across all sampled trees where that clade was monophyletic.
+- **Common-ancestor heights** (`blen="caheight"`): the height of a clade on the summary tree is estimated from the MRCA of those leaves in *every* sampled tree, even when the clade is not monophyletic in a particular sample. This corresponds to the common-ancestor-height convention used by BEAST's tree annotation workflows.
 
-The latter corresponds to the common-ancestor-height convention used by BEAST's tree annotation workflows.
+**v2.0.0 note:** These options were called `blen="meandepth"` and `blen="cadepth"` in v1.x. The parameter in `TreeSummary` that enables node-height tracking was called `trackdepth`; it is now `trackheight`.
 
 #### 9.6  Branch labels are treated as branch attributes
 
@@ -257,13 +259,13 @@ Tree objects created from string representations (newick or nexus) will interpre
 
 ## 10. Advanced notes: quantile tracking and the QuantileAccumulator
 
-When `trackci=True`, `TreeSummary` tracks approximate quantiles for branch lengths and/or node depths.
+When `trackci=True`, `TreeSummary` tracks approximate quantiles for branch lengths and/or node heights.
 
 This is done using the `QuantileAccumulator` class.
 
 ### 10.1 Why an approximate quantile accumulator?
 
-For large posterior tree samples, storing every observed branch length or node depth for every summary feature can become expensive in both memory and merge cost.
+For large posterior tree samples, storing every observed branch length or node height for every summary feature can become expensive in both memory and merge cost.
 
 The package instead uses a mergeable approximate summary so that it can:
 
@@ -288,7 +290,7 @@ Because the bucket keys are ordered in the same way as the underlying values, on
 
 Logarithmic bucketing gives approximately constant **relative** resolution across scales.
 
-That is often a good fit for branch lengths and node depths, which may span multiple orders of magnitude.
+That is often a good fit for branch lengths and node heights, which may span multiple orders of magnitude.
 
 ### 10.4 Mergeability
 
@@ -307,7 +309,7 @@ If exact quantiles are needed for a particular analysis, they should be computed
 Quantile summaries are typically used to populate metadata such as:
 
 - branch-length credible intervals
-- node-depth credible intervals
+- node-height credible intervals
 - medians and related robust summaries
 
 These can then be printed into Newick/NEXUS metadata comments via `configure_basic_printing()` or `configure_sumtree_printing()`.
