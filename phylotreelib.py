@@ -993,7 +993,7 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
     This is the canonical orchestration entry point:
       - chooses topology (SummaryTreeBuilder)
       - roots (Tree methods)
-      - sets branch lengths / node heights (TreePostProcessor + optional CADepthEstimator)
+      - sets branch lengths / node heights (TreePostProcessor + optional CAHeightEstimator)
       - annotates support + length/height stats (TreePostProcessor)
 
     Printing is NOT configured here (use configure_sumtree_printing / Tree.set_print_spec).
@@ -1046,12 +1046,12 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
 
     elif blen == "caheight":
         # serial CA-height pass (library-level convenience)
-        plan = CADepthEstimator.build_plan(
+        plan = CAHeightEstimator.build_plan(
             sumtree,
             trackci=treesummary.trackci and bool(treesummary.ci_probs),
             ci_probs=treesummary.ci_probs,
         )
-        est = CADepthEstimator(
+        est = CAHeightEstimator(
             plan,
             trackci=treesummary.trackci and bool(treesummary.ci_probs),
             quantile_k=treesummary.quantile_k
@@ -6974,7 +6974,7 @@ class TreePostProcessor():
 ###################################################################################################
 
 class CAQuery:
-    """Helper class for CADepthEstimator: contains info for one MRCA query for input tree"""
+    """Helper class for CAHeightEstimator: contains info for one MRCA query for input tree"""
     __slots__ = ("node", "qmask", "start_leaf")
 
     def __init__(self, node, qmask: int, start_leaf: str):
@@ -6986,7 +6986,7 @@ class CAQuery:
 ###################################################################################################
 
 class CAPlan:
-    """Helper class for CADepthEstimator: contains tuple of CAQueries, ci_probs, and ci_labels
+    """Helper class for CAHeightEstimator: contains tuple of CAQueries, ci_probs, and ci_labels
 
     Main idea is that this stores pre-computed remotechildren for each internal node in sumtree
     (in the form of binary query mask) so this can be reused for all input trees.
@@ -7004,7 +7004,7 @@ class CAPlan:
 ###################################################################################################
 ###################################################################################################
 
-class CADepthEstimator():
+class CAHeightEstimator():
     """Class for accumulating Common Ancestor node heights from set of input trees,
       - add_tree(tree): update online mean/M2 (+ optional quantiles)
       - merge(other): merge partial estimators (for multiprocessing)
@@ -7137,7 +7137,7 @@ class CADepthEstimator():
 
     def merge(self, other):
         if self.trackci != other.trackci or self.plan.probs != other.plan.probs:
-            raise TreeError("Incompatible CADepthEstimator merge (CI config differs)")
+            raise TreeError("Incompatible CAHeightEstimator merge (CI config differs)")
 
         for node, s_other in other.acc.items():
             s_self = self.acc.get(node)
@@ -7793,7 +7793,7 @@ class Distmatrix(object):
 
         # Dicts keeping track of node heights and cluster sizes
         clus_size = dict.fromkeys(range(n), 1)      # Number of leaves in cluster (initially 1)
-        height = dict.fromkeys(range(n), 0.0)        # Depth of node (leaves = 0)
+        height = dict.fromkeys(range(n), 0.0)       # Height of node (leaves = 0)
 
         # List keeping track of minimum value (and its index) in each row
         # Should lead to O(n^2) instead of O(n^3) time complexity (see Felsenstein)
