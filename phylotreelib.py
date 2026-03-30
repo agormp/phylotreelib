@@ -3255,14 +3255,14 @@ class Tree:
 
         # Construct header
         if colorlist:
-            header = f"#NEXUS\nbegin taxa\n\tdimensions ntax={len(self.leaflist())};\n"
-            header += "\ttaxlabels\n"
+            header = f"#NEXUS\nbegin taxa\n    dimensions ntax={len(self.leaflist())};\n"
+            header += "    taxlabels\n"
             stringlist = [header]
             for leaf in self.leaflist():
-                stringlist.append("\t\t{}".format(leaf))
+                stringlist.append("        {}".format(leaf))
                 col = colorfg if leaf in colorlist else colorbg  #
                 stringlist.append(f"[&!color={col}]\n")
-            stringlist.append("\t;\nend;\n\nbegin trees;\n")
+            stringlist.append("    ;\nend;\n\nbegin trees;\n")
         else:
             stringlist = ["#NEXUS\n\nbegin trees;\n"]
 
@@ -3273,7 +3273,7 @@ class Tree:
             stringlist.append(self.translateblock(transdict))
 
         # Add newick tree string with optional meta-comments for figtree format
-        stringlist.append("\ttree nexus_tree = ")
+        stringlist.append("    tree nexus_tree = ")
         stringlist.append(self.newick(
             printdist=printdist,
             printlabels=printlabels,
