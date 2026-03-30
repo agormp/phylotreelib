@@ -4,16 +4,15 @@ This file contains task-oriented examples for common `phylotreelib` workflows.
 
 The recipes are intentionally practical and somewhat redundant. The goal is to provide blocks of code that can be copied and easily adapted for related tasks.
 
-## Terminology note: “depth” vs “height” (tree orientation)
+### Terminology note: tree orientation and "height" vs "depth"
 
-In **phylotreelib**, trees are mostly treated as *rooted at the bottom and having leaves at the top*.
+**Note for users upgrading from version 1:** In **phylotreelib** v. 2, trees are now treated as *having the root at the top and leaves at the bottom* — matching the standard convention in most phylogeny software and computer science.
+
 Accordingly, it uses:
 
-- **depth(node)** = distance from the **tips (leaves)** to the node (i.e., “time before most recent leaf”)
+- **height(node)** = distance from the **tips (leaves)** to the node (i.e., "time before most recent leaf")
 
-Similarly terms like above/below and upper/lower are based on the same perceived orientation of the tree.
-
-However, for reasons clear only to computer scientists, in many programming libraries and APIs, trees are often treated as rooted at the top, and the same concept is referred to as **height**. I am in the process of changing the phylotreelib names and documentation to follow that standard practice. The deprecated depth-names will stay functional for one major release cycle after changing them (in the upcoming phylotreelib version 2.0).
+In v1.x, this concept was called **depth**. All depth-based names were renamed to height-based names in v2.0.0. See [Upgrading from 1.x to 2.x](#upgrading-from-1x-to-2x) for the full rename table.
 
 ---
 
@@ -653,7 +652,7 @@ pt.configure_sumtree_printing(contree, treetype="all", blen="biplen", print_meta
 print(contree.newick())
 ```
 
-#### Build an MCC tree with "common ancestor depths"
+#### Build an MCC tree with common-ancestor heights
 
 ```python
 # Download an example tree-sample file (run these 3 lines only once)
@@ -673,22 +672,22 @@ with pt.Nexustreefile("primate-mtDNA.trees") as tf:
 stb = pt.SummaryTreeBuilder(ts)
 mcctree = stb.max_clade_cred_tree()
 
-# Pass 2: compute common-ancestor depths (CA-depth) for nodes on the chosen topology
-plan = pt.CADepthEstimator.build_plan(mcctree, trackci=False)
-est = pt.CADepthEstimator(plan, trackci=False)
+# Pass 2: compute common-ancestor heights (CA-height) for nodes on the chosen topology
+plan = pt.CAHeightEstimator.build_plan(mcctree, trackci=False)
+est = pt.CAHeightEstimator(plan, trackci=False)
 
 with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
         est.add_tree(tree)
 
 est.write_into(mcctree)
-mcctree.set_blens_from_depths()
+mcctree.set_blens_from_heights()
 
-# Annotate support etc from TreeSummary (does not change depths you just wrote)
+# Annotate support etc from TreeSummary (does not change heights you just wrote)
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(mcctree)
 
-pt.configure_sumtree_printing(mcctree, treetype="mcc", blen="cadepth", print_meta=True, precision=7)
+pt.configure_sumtree_printing(mcctree, treetype="mcc", blen="caheight", print_meta=True, precision=7)
 
 print(mcctree.newick())
 ```
