@@ -91,6 +91,7 @@ Output:
 |       3  |      Bonobo  |          1  |
 |       3  |  Chimpanzee  |          1  |
 +---------------------------------------+
+Tree length: 14.0
 
 5 Leaves:
 ----------
@@ -159,12 +160,15 @@ print(tree.newick())
 ```python
 import phylotreelib as pt
 tree = pt.Tree.randtree(ntips=12, randomlen=True)
+print(tree.newick(printdist=False))
 # semi-random: choose prune node, randomize regraft point
-prune_node = next(iter(tree.intnodes))
+prune_node = next(iter(tree.possible_spr_prune_nodes()))
 tree.spr(prune_node=prune_node)
+print(tree.newick(printdist=False))
 # fully random
-for _ in range(3):
+for _ in range(10):
     tree.spr()
+    print(tree.newick(printdist=False))
 ```
 
 ### Summarize posterior tree samples
@@ -273,8 +277,7 @@ import phylotreelib as pt
 tree = pt.Tree.from_string("((Human_A:1,Human_B:1):1,(Mink_A:1,Mink_B:1):1,(Bat_A:1,Bat_B:1):1);")
 mink_mrca = tree.find_mrca({"Mink_A", "Mink_B"})
 color_me = sorted(tree.remote_children(mink_mrca))
-with open("colored.nexus", "w") as outfile:
-    outfile.write(tree.nexus(translateblock=False, colorlist=color_me,
+print(tree.nexus(translateblock=False, colorlist=color_me,
 					 colorfg="#FF0000", colorbg="#000000"))
 ```
 
@@ -319,8 +322,9 @@ Available classes:
 ### Tree sets and tree summaries
 
 - `TreeSet` stores multiple trees with the same leaves.
-- `TreeSummary` accumulates summary statistics across trees and constructs summary trees such as consensus, MCC, MBC, and HIPSTR.
-
+- `TreeSummary` accumulates summary statistics across trees.
+- `SummaryTreeBuilder` constructs summary trees such as consensus, MCC, MBC, and HIPSTR.
+- `TreePostProcessor` adds attributes to the tree annotating it with e.g. support values / branch-length stats.
 
 ---
 
@@ -363,7 +367,7 @@ All names relating to node heights — the distance from the tips to an internal
 | `Tree.nodedepth(node)` | `Tree.nodeheight(node)` |
 | `Tree.set_blens_from_depths()` | `Tree.set_blens_from_heights()` |
 | `TreePostProcessor.set_mean_node_depths(tree)` | `TreePostProcessor.set_mean_node_heights(tree)` |
-| `build_sumtree(..., blen="cladedepth", ...)` | `build_sumtree(..., blen="cladeheight", ...)` |
+| `build_sumtree(..., blen="meandepth", ...)` | `build_sumtree(..., blen="cladeheight", ...)` |
 | `build_sumtree(..., blen="cadepth", ...)` | `build_sumtree(..., blen="caheight", ...)` |
 | Node attribute `depth` | Node attribute `height` |
 | Node attribute `depth_sd` | Node attribute `height_sd` |
@@ -428,7 +432,7 @@ Meaning (2.x): insert the graft point on an *existing edge* `(parent -> child)` 
 
 **How to convert typical 1.x calls**
 
-1) **Grafting "below node1" (typical old usage)**
+1) **Grafting on incoming edge to node1 (typical old usage)**
 
 Old:
 
@@ -453,7 +457,7 @@ tree.graft(
 2) **Old `graft_with_other_root=True`**
 
 In 2.x, the caller should explicitly decide what `other` is before calling `graft(...)`:
-- If you want to attach a *single leaf*, pass a string `other="TaxonName"` (and skip the "extra basal branch" complexity entirely).
+- If you want to attach a *single leaf*, pass a string `other="TaxonName"`.
 - If you want to attach a Tree with a specific root, re-root `other` first (e.g. `other.reroot(...)`) and then call `graft(...)`.
 
 ### Tree.spr: signature change (and length preservation)
@@ -475,7 +479,7 @@ New behaviour highlights:
 
 - Regrafting happens by inserting a graft point on the incoming edge to `regraft_node`.
 - If `dist_from_parent` and `frac_from_parent` are both `None`, the placement is randomized (uniform frac in (0,1)).
-- Total tree length is preserved by default (the regraft edge is split; the pruned basal branch length is reused as the connecting branch length).
+- Total tree length is preserved by default (the regraft edge is split according to `dist_from_parent` or `frac_from_parent`; the length of the incoming basal branch to the prune_node is reused as the connecting branch length).
 
 **How to convert**
 
@@ -494,7 +498,7 @@ tree.spr(prune_node=P, regraft_node=R)
 New (explicit placement on incoming edge to `regraft_node`):
 
 ```python
-parent = tree.parent(R)
+# parent = tree.parent(R)
 tree.spr(prune_node=P, regraft_node=R, frac_from_parent=0.25)
 # (places the graftpoint 25% down the edge parent->R)
 ```
