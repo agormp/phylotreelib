@@ -1513,6 +1513,87 @@ class Tree:
 
     ###############################################################################################
 
+    @classmethod
+    def randtree(cls, ntips=None, model="yule", tree_height=10, rate_sd=0.0):
+
+        """Create random tree, with ntips leaves, simulated according to the specified model:
+
+           model:
+               "yule":          constant birth rate lambda
+               "coalescent":    constant effective population size n_eff
+
+           tree_height:
+               desired tree-height = distance from root to farthest tip
+               the yule lambda or coalescent n_eff is computed from the desired tree_height
+
+           rate_sd:
+                  0.0: tree is ultrametric (all tips contemporaneous)
+                > 0.0: simulated branch lengths are multiplied by random factor X drawn
+                       from lognormal with E[X]=1 and sd(X)=rate_sd so tree not ultrametric
+           """
+
+        if ntips is None:
+            raise TreeError("Must specify number of tips on random tree, ntips")
+        ndigits = len(str(ntips))          # Number of digits required to write max taxon number
+        namelist = [f"tax{i:0{ndigits}d}" for i in range(ntips)]
+        tree = cls.from_leaves(namelist)   # Star tree with given number of leaves
+
+        if model == "yule":
+            harmonic = sum(1/k for k in range(2, ntips+1))
+            lambda_yule = harmonic / tree_height        # Expected height = (1/lambda) * (1/2 + 1/3 + ... + 1/n)
+        elif model == "coalescent":
+            N_eff = tree_height / (2 * (1 - 1/ntips))   # Expected height = N_eff * 2 * (1 - 1/n)
+
+        # Simulate tree by iteratively choosing random pair to coalesce
+        # Wait time is from Yule or coalescent model
+        active_nodes = namelist
+        current_time = 0.0
+        while(k := len(active_nodes)) > 1:
+            if model == "yule":
+                rate = k * lambda_yule
+            elif model == "coalescent":
+                rate = (k*(k-1)/2) / N_eff        # = (k choose 2) / N_eff
+            wait = random.expovariate(rate)
+            current_time += wait
+
+            chosen_pair = random.sample(active_nodes, 2)
+            # Special handling of root: inelegant: should be handled at while level, but then one too many or few iterations...
+            if k > 2:
+                newnode = tree.split_off_children(tree.root, chosen_pair, Branchstruct())
+            else:
+                newnode = tree.root
+            tree.set_node_attribute(newnode, "height", current_time)
+
+            for node in chosen_pair:
+                active_nodes.remove(node)
+            active_nodes.append(newnode)
+        tree.set_blens_from_heights()
+
+        # Rescale simulated tree so it gets exactly desired length
+        actual_height = current_time
+        multiplier = tree_height / actual_height
+        for p in tree.intnodes:
+            for c in tree.children(p):
+                tree.child_dict[p][c].length *= multiplier
+
+        # Optionally break ultrametricity
+        # lognormal parameterised so E[X]=1, sd(X)=rate_sd
+        # => underlying normal has:
+        #      sigma^2 = log(1 + rate_sd^2)
+        #      mu     = -sigma^2/2
+        if rate_sd > 0:
+            sigma_sq = math.log(1 + rate_sd**2)
+            sigma = math.sqrt(sigma_sq)
+            mu = -sigma_sq / 2
+            for p in tree.intnodes:
+                for c in tree.children(p):
+                    multiplier = random.lognormvariate(mu, sigma)
+                    tree.child_dict[p][c].length *= multiplier
+
+        return tree
+
+    ###############################################################################################
+
     def __iter__(self):
         """Returns iterator object for Tree object. Yields subtrees with .basalbranch attribute"""
 
