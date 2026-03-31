@@ -1536,7 +1536,6 @@ class Tree:
             raise TreeError("Must specify number of tips on random tree, ntips")
         ndigits = len(str(ntips))          # Number of digits required to write max taxon number
         namelist = [f"tax{i:0{ndigits}d}" for i in range(ntips)]
-        tree = cls.from_leaves(namelist)   # Star tree with given number of leaves
 
         if model == "yule":
             harmonic = sum(1/k for k in range(2, ntips+1))
@@ -1544,10 +1543,11 @@ class Tree:
         elif model == "coalescent":
             N_eff = tree_height / (2 * (1 - 1/ntips))   # Expected height = N_eff * 2 * (1 - 1/n)
 
-        # Simulate tree by iteratively choosing random pair to coalesce
-        # Wait time is from Yule or coalescent model
+        parents, children, lengths = [], [], []
         active_nodes = namelist
+        node_time = {leaf: 0.0 for leaf in active_nodes}
         current_time = 0.0
+        next_id = 0
         while(k := len(active_nodes)) > 1:
             if model == "yule":
                 rate = k * lambda_yule
@@ -1555,40 +1555,28 @@ class Tree:
                 rate = (k*(k-1)/2) / N_eff        # = (k choose 2) / N_eff
             wait = random.expovariate(rate)
             current_time += wait
+            c1,c2 = random.sample(active_nodes, 2)
+            parents  += [next_id, next_id]
+            children += [c1, c2]
+            lengths  += [current_time - node_time[c1], current_time - node_time[c2]]
+            node_time[next_id] = current_time
+            active_nodes.remove(c1)
+            active_nodes.remove(c2)
+            active_nodes.append(next_id)
+            next_id += 1
 
-            chosen_pair = random.sample(active_nodes, 2)
-            # Special handling of root: inelegant: should be handled at while level, but then one too many or few iterations...
-            if k > 2:
-                newnode = tree.split_off_children(tree.root, chosen_pair, Branchstruct())
-            else:
-                newnode = tree.root
-            tree.set_node_attribute(newnode, "height", current_time)
-
-            for node in chosen_pair:
-                active_nodes.remove(node)
-            active_nodes.append(newnode)
-        tree.set_blens_from_heights()
-
-        # Rescale simulated tree so it gets exactly desired length
-        actual_height = current_time
-        multiplier = tree_height / actual_height
-        for p in tree.intnodes:
-            for c in tree.children(p):
-                tree.child_dict[p][c].length *= multiplier
+        # Rescale so tree height is exactly as requested
+        scale = tree_height / current_time
+        lengths = [l * scale for l in lengths]
 
         # Optionally break ultrametricity
-        # lognormal parameterised so E[X]=1, sd(X)=rate_sd
-        # => underlying normal has:
-        #      sigma^2 = log(1 + rate_sd^2)
-        #      mu     = -sigma^2/2
         if rate_sd > 0:
             sigma_sq = math.log(1 + rate_sd**2)
-            sigma = math.sqrt(sigma_sq)
             mu = -sigma_sq / 2
-            for p in tree.intnodes:
-                for c in tree.children(p):
-                    multiplier = random.lognormvariate(mu, sigma)
-                    tree.child_dict[p][c].length *= multiplier
+            sigma = math.sqrt(sigma_sq)
+            lengths = [l * random.lognormvariate(mu, sigma) for l in lengths]
+
+        tree = cls.from_branchinfo(parents, children, lengths)
 
         return tree
 
