@@ -2643,3 +2643,173 @@ def test_consensus_topology_matches_reference_majority_set(data_dir):
     # In a majority-rule consensus, internal splits should be exactly the majority set.
     # (Leaves are always present but excluded here by construction.)
     assert sumtree_splits == majority
+
+
+class TestParsimony:
+    def _build_tree_with_states(self, treestring, leaf_states=None, internal_states=None):
+        tree = pt.Tree.from_string(treestring)
+        ndict = tree.nodedict
+
+        if leaf_states:
+            for leaf, state in leaf_states.items():
+                ndict[leaf].state = state
+
+        if internal_states:
+            for node, state in internal_states.items():
+                ndict[node].state = state
+
+        return tree
+
+    def _all_nodes_fit_within_optimal_set(self, fitted_tree, possible_tree):
+        fitted_ndict = fitted_tree.nodedict
+        possible_ndict = possible_tree.nodedict
+        for node in fitted_tree.nodes:
+            assert fitted_ndict[node].fit in possible_ndict[node].optimal_set
+
+    def test_parsimony_score_all_same_state(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "X", "C": "X", "D": "X"},
+        )
+
+        possible = tree.parsimony_possible_states()
+        pscore, countdict = tree.parsimony_count_changes(fitpref="X")
+        fitted = tree.parsimony_assign_fits(fitpref="X")
+
+        assert possible is not tree
+        assert pscore == 0
+        assert dict(countdict) == {}
+
+        for node in possible.nodes:
+            assert possible.nodedict[node].optimal_set == {"X"}
+            assert fitted.nodedict[node].fit == "X"
+            assert fitted.nodedict[node].wasambig is False
+
+    def test_parsimony_score_clean_two_state_split(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
+        )
+
+        ab_node = tree.find_mrca({"A", "B"})
+        cd_node = tree.find_mrca({"C", "D"})
+        possible = tree.parsimony_possible_states()
+        pscore, countdict = tree.parsimony_count_changes(fitpref="X")
+
+        assert pscore == 1
+        assert sum(countdict.values()) == pscore
+        assert possible.nodedict[tree.root].optimal_set == {"X", "Y"}
+        assert possible.nodedict[ab_node].optimal_set == {"X"}
+        assert possible.nodedict[cd_node].optimal_set == {"Y"}
+        assert set(countdict) <= {("X", "Y"), ("Y", "X")}
+
+    def test_parsimony_score_two_states_not_matching_topology(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "Y", "C": "X", "D": "Y"},
+        )
+
+        pscore, countdict = tree.parsimony_count_changes(fitpref="X")
+
+        assert pscore == 2
+        assert sum(countdict.values()) == pscore
+
+    def test_parsimony_score_three_states(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1,E:1);",
+            leaf_states={"A": "X", "B": "Y", "C": "X", "D": "Z", "E": "X"},
+        )
+
+        pscore, countdict = tree.parsimony_count_changes(fitpref="X")
+
+        assert pscore == 2
+        assert sum(countdict.values()) == pscore
+
+    def test_parsimony_score_multifurcation_star_tree(self):
+        tree = self._build_tree_with_states(
+            "(A:1,B:1,C:1,D:1);",
+            leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
+        )
+
+        possible = tree.parsimony_possible_states()
+        pscore, countdict = tree.parsimony_count_changes(fitpref="X")
+
+        assert possible.nodedict[tree.root].optimal_set == {"X", "Y"}
+        assert pscore == 2
+        assert sum(countdict.values()) == pscore
+
+    def test_parsimony_internal_observed_state_controls_fit(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
+        )
+        ab_node = tree.find_mrca({"A", "B"})
+        tree.nodedict[ab_node].state = "X"
+
+        fitted = tree.parsimony_assign_fits(fitpref="Y")
+
+        assert fitted.nodedict[ab_node].fit == "X"
+        assert fitted.nodedict[ab_node].wasambig is False
+
+    def test_parsimony_fitpref_steers_ambiguous_root(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
+        )
+
+        fitted_x = tree.parsimony_assign_fits(fitpref="X")
+        fitted_y = tree.parsimony_assign_fits(fitpref="Y")
+        pscore_x, countdict_x = tree.parsimony_count_changes(fitpref="X")
+        pscore_y, countdict_y = tree.parsimony_count_changes(fitpref="Y")
+
+        assert fitted_x.nodedict[fitted_x.root].fit == "X"
+        assert fitted_y.nodedict[fitted_y.root].fit == "Y"
+        assert pscore_x == 1
+        assert pscore_y == 1
+        assert sum(countdict_x.values()) == pscore_x
+        assert sum(countdict_y.values()) == pscore_y
+
+    def test_parsimony_leaf_fits_always_equal_leaf_state(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
+        )
+
+        fitted = tree.parsimony_assign_fits(fitpref="X")
+
+        for leaf in fitted.leaves:
+            assert fitted.nodedict[leaf].fit == fitted.nodedict[leaf].state
+
+    def test_parsimony_all_fits_within_optimal_sets(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
+        )
+
+        possible = tree.parsimony_possible_states()
+        fitted = tree.parsimony_assign_fits(fitpref="Y")
+
+        self._all_nodes_fit_within_optimal_set(fitted, possible)
+
+    def test_parsimony_possible_states_returns_copy(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": "X", "C": "X", "D": "X"},
+        )
+
+        possible = tree.parsimony_possible_states()
+
+        assert possible is not tree
+
+    def test_parsimony_possible_states_errors_without_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+
+        with pytest.raises(pt.TreeError):
+            tree.parsimony_possible_states()
+
+    def test_parsimony_possible_states_errors_without_any_states(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        _ = tree.nodedict
+
+        with pytest.raises(pt.TreeError):
+            tree.parsimony_possible_states()
