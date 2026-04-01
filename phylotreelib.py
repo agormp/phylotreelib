@@ -1492,7 +1492,7 @@ class Tree:
         if ntips is None:
             raise TreeError("Must specify number of tips on random tree, ntips")
         ndigits = len(str(ntips))          # Number of digits required to write max taxon number
-        namelist = [f"tax{i:0{ndigits}d}" for i in range(ntips)]
+        leaflist = [f"tax{i:0{ndigits}d}" for i in range(ntips)]
 
         if model == "yule":
             harmonic = sum(1/k for k in range(2, ntips+1))
@@ -1501,8 +1501,8 @@ class Tree:
             N_eff = tree_height / (2 * (1 - 1/ntips))   # Expected height = N_eff * 2 * (1 - 1/n)
 
         parents, children, lengths = [], [], []
-        active_nodes = namelist
-        node_time = {leaf: 0.0 for leaf in active_nodes}
+        active_nodes = leaflist
+        node_time = {leaf: 0.0 for leaf in leaflist}
         current_time = 0.0
         next_id = 0
         while(k := len(active_nodes)) > 1:
