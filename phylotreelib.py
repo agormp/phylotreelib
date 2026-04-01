@@ -1506,7 +1506,7 @@ class Tree:
         active_nodes = leaflist
         node_time = {leaf: 0.0 for leaf in leaflist}
         current_time = 0.0
-        next_id = 0
+        next_intnode_id = 0
         while(k := len(active_nodes)) > 1:
             if model == "yule":
                 rate = k * lambda_yule
@@ -1515,14 +1515,14 @@ class Tree:
             wait = random.expovariate(rate)
             current_time += wait
             c1,c2 = random.sample(active_nodes, 2)
-            parents  += [next_id, next_id]
+            parents  += [next_intnode_id, next_intnode_id]
             children += [c1, c2]
             lengths  += [current_time - node_time[c1], current_time - node_time[c2]]
-            node_time[next_id] = current_time
+            node_time[next_intnode_id] = current_time
             active_nodes.remove(c1)
             active_nodes.remove(c2)
-            active_nodes.append(next_id)
-            next_id += 1
+            active_nodes.append(next_intnode_id)
+            next_intnode_id += 1
 
         # Rescale so tree height is exactly as requested
         scale = tree_height / current_time
