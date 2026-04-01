@@ -4071,7 +4071,6 @@ class Tree:
         newnode = self.next_internal_node_id()
         child_dict = self.child_dict
         child_dict[parent][newnode] = branchstruct
-        self.nodedict[newnode] = Nodestruct()
 
         # Move childnodes from previous parent to new node
         child_dict[newnode] = {}
@@ -4152,7 +4151,6 @@ class Tree:
         self.child_dict[parent][newnode] = upper_bs
         self.child_dict[newnode][child] = lower_bs
         del self.child_dict[parent][child]
-        self.nodedict[newnode] = Nodestruct()
 
         self.clear_caches()
         return newnode
@@ -4248,7 +4246,6 @@ class Tree:
         # Delete "child" node and link from parent to child.
         del self.child_dict[child]
         del self.child_dict[parent][child]
-        del self.nodedict[child]
 
         self.clear_caches()
 
@@ -4324,7 +4321,6 @@ class Tree:
         if newleafname in self.leaves:
             raise TreeError(f"Leaf already exists: {newleafname}")
         self.child_dict[parent][newleafname] = branchstruct
-        self.nodedict[newleafname] = Nodestruct()
         self.nodes.add(newleafname)
         self.leaves.add(newleafname)
 
