@@ -1499,6 +1499,8 @@ class Tree:
             lambda_yule = harmonic / tree_height        # Expected height = (1/lambda) * (1/2 + 1/3 + ... + 1/n)
         elif model == "coalescent":
             N_eff = tree_height / (2 * (1 - 1/ntips))   # Expected height = N_eff * 2 * (1 - 1/n)
+        else:
+            raise TreeError("randtree: 'model' must be 'yule' or 'coalescent'")
 
         parents, children, lengths = [], [], []
         active_nodes = leaflist
