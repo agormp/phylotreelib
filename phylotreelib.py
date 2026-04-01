@@ -1470,51 +1470,7 @@ class Tree:
     ###############################################################################################
 
     @classmethod
-    def randtree(cls, leaflist=None, ntips=None, randomlen=False, name_prefix="s"):
-        """Constructor: tree with random topology from list of leaf names OR number of tips"""
-
-        # Implementation note: random trees are constructed by randomly resolving star-tree
-        # Should perhaps use actual bifurcating process to generate random trees instead?
-        # At least when adding branch lengths (otherwise distribution of brlens on tree will
-        # be quite different from real trees, thus biasing statistical inference
-
-        if leaflist is None and ntips is None:
-            msg = "Must specify either list of leafnames or number of tips to create random tree"
-            raise TreeError(msg)
-        if leaflist is not None and ntips is not None:
-            msg = "Only specify either list of leafnames or number of tips to create random tree"\
-                  " (not both)"
-            raise TreeError(msg)
-
-        # If leaflist given:
-        #   construct startree using names, then resolve to random bifurcating topology
-        if leaflist is not None and ntips is None:
-            tree = cls.from_leaves(leaflist)
-
-        # If ntips given:
-        #   construct list of zeropadded, numbered, names,
-        #   then construct startree using names, finally resolve to random topology
-        else:
-            ndigits = len(str(ntips))          # Number of digits required to write max taxon number
-            namelist = []
-            for i in range(ntips):
-                name = "{prefix}{num:0{width}d}".format(prefix=name_prefix, num=i, width=ndigits)
-                namelist.append( name )
-            tree = cls.from_leaves(namelist)   # Star tree with given number of leaves
-
-        tree.resolve()                         # Randomly resolve to bifurcating tree
-
-        if randomlen:
-            for parent in tree.intnodes:
-                for child in tree.child_dict[parent]:
-                    tree.child_dict[parent][child].length = random.lognormvariate(math.log(0.2), 0.3)
-
-        return tree
-
-    ###############################################################################################
-
-    @classmethod
-    def randtree(cls, ntips=None, model="yule", tree_height=10, rate_sd=0.0):
+    def randtree(cls, ntips=20, model="coalescent", tree_height=10, rate_sd=0.1):
 
         """Create random tree, with ntips leaves, simulated according to the specified model:
 
