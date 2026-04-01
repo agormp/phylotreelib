@@ -318,7 +318,9 @@ class Nodestruct:
                  "mean", "M2", "n",
                  "quantiles", "ci", "height_median",
                  "clade_cred", "posterior", "freq", "height_sd",
-                 "clade_score")
+                 "clade_score",
+                 "state", "primary_set", "secondary_set", "optimal_set",
+                 "fit", "wasambig")
 
     def __init__(self, height=0.0, nleaves=None):
         self.height = height
@@ -336,6 +338,12 @@ class Nodestruct:
         self.freq = None
         self.height_sd = None
         self.clade_score = None
+        self.state = ""            # empty string = unlabelled node
+        self.primary_set = None
+        self.secondary_set = None
+        self.optimal_set = None
+        self.fit = None
+        self.wasambig = None
 
     def __str__(self):
         lines = []
@@ -2115,7 +2123,8 @@ class Tree:
             newdict = {}
             for key,orignode in origdict.items():
                 newnode = Nodestruct()
-                for attrname, origvalue in orignode.__dict__.items():
+                for attrname in orignode.__slots__:
+                    origvalue = getattr(orignode, attrname)
                     if isinstance(origvalue, set):
                         newvalue = origvalue.copy()
                     else:
