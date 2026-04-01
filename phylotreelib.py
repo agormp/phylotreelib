@@ -1481,6 +1481,7 @@ class Tree:
            tree_height:
                desired tree-height = distance from root to farthest tip
                the yule lambda or coalescent n_eff is computed from the desired tree_height
+               simulated ultrametric tree is scaled to have exactly this height
 
            rate_sd:
                   0.0: tree is ultrametric (all tips contemporaneous)
