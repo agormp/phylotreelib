@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,11 +9,14 @@ description = "Analyze and manipulate phylogenetic trees"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = ["numpy"]
-authors = [{name = "Anders Gorm Pedersen", email = "agpe@dtu.dk"}]
+authors = [
+    {name = "Anders Gorm Pedersen", email = "agpe@dtu.dk"}
+]
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 classifiers = [
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
 ]
 
 [project.urls]
