@@ -7,7 +7,7 @@ name = "phylotreelib"
 version = "2.2.0"
 description = "Analyze and manipulate phylogenetic trees"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 dependencies = ["numpy"]
 authors = [{name = "Anders Gorm Pedersen", email = "agpe@dtu.dk"}]
 classifiers = [
