@@ -344,7 +344,7 @@ class Match_nodes(TreeTestBase):
 
     def test_unmatchedroots(self):
         """Test that unmatched roots are reported correctly"""
-        t1 = pt.Tree.randtree(ntips=50, randomlen=True)
+        t1 = pt.Tree.randtree(ntips=50)
         t2 = t1.copy_treeobject(copylengths=True)
         delta_id = 35 + max(t1.intnodes)
         for i,id in enumerate(t1.intnodes):
@@ -565,7 +565,7 @@ class TreeOutput(TreeTestBase):
         # This function only checks that nexus string can be parsed, not that contree is correct
         treesummary = pt.TreeSummary(trackbips = True, trackblen = True)
         for i in range(10):
-            tree = pt.Tree.randtree(ntips=50, randomlen=True, name_prefix="test_")
+            tree = pt.Tree.randtree(ntips=50)
             treesummary.add_tree(tree)
         stb = pt.SummaryTreeBuilder(treesummary)
         contree = stb.contree()

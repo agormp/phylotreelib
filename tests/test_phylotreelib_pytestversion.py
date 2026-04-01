@@ -241,15 +241,6 @@ class Test_from_branchinfo:
 
 class Test_randtree:
 
-    def test_randtree_leaflist(self):
-        """Does Tree.randtree() work correctly when leaflist is provided?"""
-        leaflist = ['leaf1', 'leaf2', 'leaf3', 'leaf4', 'leaf5']
-        mytree = pt.Tree.randtree(leaflist=leaflist)
-
-        assert isinstance(mytree, pt.Tree)
-        assert set(mytree.leaves) == set(leaflist)
-        assert mytree.is_resolved()
-
     def test_randtree_ntips(self):
         """Does Tree.randtree() work correctly when ntips is provided?"""
         ntips = 5
@@ -258,13 +249,6 @@ class Test_randtree:
         assert isinstance(mytree, pt.Tree)
         assert len(mytree.leaves) == ntips
         assert mytree.is_resolved()
-
-    def test_randtree_randomlen(self):
-        """Does Tree.randtree() correctly assign random lengths when randomlen is True?"""
-        ntips = 5
-        mytree = pt.Tree.randtree(ntips=ntips, randomlen=True)
-
-        assert isinstance(mytree, pt.Tree)
         for parent in mytree.intnodes:
             for child in mytree.child_dict[parent]:
                 length = mytree.child_dict[parent][child].length
@@ -668,7 +652,7 @@ class Test_leaflist:
     def test_leaflist_sorted(self):
         chars = ascii_lowercase + digits
         namelist = [''.join(random.choices(chars, k=6)) for _ in range(25)]
-        t = pt.Tree.randtree(leaflist=namelist)
+        t = pt.Tree.from_leaves(leaflist=namelist)
         leafnames = t.leaflist()
         assert leafnames == sorted(namelist)
 
@@ -742,7 +726,7 @@ class TestSPR:
         """Without parameters, spr() should perform a random SPR while preserving leaf set.
         No exceptions should be raised"""
         for ntips in range(3,9):
-            tree = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            tree = pt.Tree.randtree(ntips=ntips)
             original_leaves = tree.leaves.copy()
             tree.spr()
             assert tree.leaves == original_leaves
@@ -751,7 +735,7 @@ class TestSPR:
         """Test all possible combinations of prune and regraft nodes for range of random trees
         of different size. No exceptions should be raised"""
         for ntips in range(3,9):
-            origtree = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            origtree = pt.Tree.randtree(ntips=ntips)
             original_leaves = origtree.leaves.copy()
             for prune_node in origtree.possible_spr_prune_nodes():
                 for regraft_node in origtree.possible_spr_regraft_nodes(prune_node):
@@ -761,7 +745,7 @@ class TestSPR:
 
     def test_spr_with_prune_only(self):
         """When only a prune_node is given, spr() should choose a valid regraft node."""
-        tree = pt.Tree.randtree(ntips=7, randomlen=True)
+        tree = pt.Tree.randtree(ntips=7)
         possible_prune_nodes = tree.possible_spr_prune_nodes()
         prune_node = next(iter(possible_prune_nodes))
         original_leaves = tree.leaves.copy()
@@ -770,7 +754,7 @@ class TestSPR:
 
     def test_spr_with_invalid_regraft_node(self):
         """Supplying a regraft_node that is not allowed should raise an error."""
-        tree = pt.Tree.randtree(ntips=8, randomlen=True)
+        tree = pt.Tree.randtree(ntips=8)
         possible_prune_nodes = tree.possible_spr_prune_nodes()
         prune_node = next(iter(possible_prune_nodes))
         # Choose an invalid regraft node.
@@ -782,7 +766,7 @@ class TestSPR:
 
     def test_spr_preserves_total_length_general_case(self):
         random.seed(0)
-        tree = pt.Tree.randtree(ntips=15, randomlen=True)
+        tree = pt.Tree.randtree(ntips=15)
         base_len = tree.length()
         for _ in range(50):
             tree.spr()
@@ -794,7 +778,7 @@ class TestSPR:
             tree.spr()
 
     def test_spr_rejects_regraft_at_root(self):
-        tree = pt.Tree.randtree(ntips=10, randomlen=True)
+        tree = pt.Tree.randtree(ntips=10)
         prune_node = random.choice(tuple(tree.possible_spr_prune_nodes()))
         with pytest.raises(pt.TreeError):
             tree.spr(prune_node=prune_node, regraft_node=tree.root)
@@ -869,7 +853,7 @@ class TestPrune:
             ntips = random.randint(5, 11)          # combinatorial explosion beyond this
             nkeep = random.randint(3, ntips - 1)
 
-            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            t1 = pt.Tree.randtree(ntips=ntips)
 
             lengths = []
             for discardset in itertools.combinations(t1.leaves, ntips - nkeep):
@@ -888,7 +872,7 @@ class TestPrune:
             nkeep = random.randint(3, ntips - 1)
             nkeeplist = random.randint(1, nkeep)
 
-            t1 = pt.Tree.randtree(ntips=ntips, randomlen=True)
+            t1 = pt.Tree.randtree(ntips=ntips)
             keeplist = random.sample(list(t1.leaves), nkeeplist)
 
             potential_to_remove = t1.leaves - set(keeplist)
