@@ -1,20 +1,978 @@
-import phylotreelib as pt
 import copy
+import csv
 import itertools
 import math
-import numpy as np
-import pytest
 import random
 import textwrap
+from dataclasses import dataclass
 from string import ascii_lowercase, digits
+from types import SimpleNamespace
+from typing import Dict
 
-###################################################################################################
-###################################################################################################
+import numpy as np
+import phylotreelib as pt
+import pytest
 
-# Tests for loose functions
 
-###################################################################################################
-###################################################################################################
+def approx_places(value, places=7):
+    return pytest.approx(value, abs=10 ** (-places))
+
+
+@pytest.fixture(autouse=True)
+def _inject_treedata(request, treedata):
+    if request.instance is not None:
+        request.instance.treedata = treedata
+
+
+# Combined from test_phylotreelib_migrated.py
+
+class TestTreeRead:
+    """Tests methods for reading (not iterating) trees from treefiles"""
+
+    def test_readtree_newick(self, tmp_path):
+        """Test that readtree returns correct trees and None when Newickfile exhausted"""
+
+        filename = tmp_path / "trees.newick"
+        treelist = []
+        trees = pt.TreeSet()
+        for treestring in self.treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            treelist.append(mytree)
+            trees.addtree(mytree)
+        filename.write_text(trees.newick(), encoding="utf-8")
+
+        ntrees = len(treelist)
+        treefile = pt.Newicktreefile(filename)
+        for i in range(ntrees):
+            tree = treefile.readtree()
+            assert tree == treelist[i]
+
+        value = treefile.readtree()
+        assert value is None
+
+    def test_readtree_nexus(self, tmp_path):
+        """Test that readtree returns correct trees and None when Nexusfile exhausted"""
+
+        filename = tmp_path / "trees.nexus"
+        treelist = []
+        with filename.open("w", encoding="utf-8") as filehandle:
+            for treestring in self.treedata.values():
+                mytree = pt.Tree.from_string(treestring)
+                treelist.append(mytree)
+                filehandle.write(mytree.nexus())
+
+        treefile = pt.Nexustreefile(filename)
+        for i, tree in enumerate(treefile):
+            assert tree == treelist[i]
+
+    def test_readtrees_newick(self, tmp_path):
+        """Test that readtrees (plural) returns correct trees from Newickfile"""
+
+        filename = tmp_path / "trees.newick"
+        treelist = []
+        trees = pt.TreeSet()
+        for treestring in self.treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            treelist.append(mytree)
+            trees.addtree(mytree)
+        filename.write_text(trees.newick(), encoding="utf-8")
+
+        treefile = pt.Newicktreefile(filename)
+        treeset_from_file = treefile.readtrees()
+        for origtree, readtree in zip(treelist, treeset_from_file):
+            assert origtree == readtree
+
+    def test_readtrees_nexus(self, tmp_path):
+        """Test that readtrees (plural) returns correct trees from Nexusfile"""
+
+        filename = tmp_path / "trees.nexus"
+        treelist = []
+        with filename.open("w", encoding="utf-8") as filehandle:
+            for treestring in self.treedata.values():
+                mytree = pt.Tree.from_string(treestring)
+                treelist.append(mytree)
+                filehandle.write(mytree.nexus())
+
+        treefile = pt.Nexustreefile(filename)
+        newlyreadtrees = []
+        for tree in treefile:
+            newlyreadtrees.append(tree)
+        for origtree, readtree in zip(treelist, newlyreadtrees):
+            assert origtree == readtree
+
+
+class TestOutGroupRooting:
+    """Tests for rootout function"""
+
+    def test_ogroot_treestrings(self):
+        for treestring in self.treedata.values():
+            t = pt.Tree.from_string(treestring)
+            for node in t.intnodes - {t.root}:
+                tc = t.copy_treeobject()
+                ig = tc.remote_children(node)
+                og = tc.leaves - ig
+                tc.rootout(og)
+                rootkid1, rootkid2 = tc.children(tc.root)
+                rootremkids1 = tc.remote_children(rootkid1)
+                rootremkids2 = tc.remote_children(rootkid2)
+                assert ig in [rootremkids1, rootremkids2]
+                assert og in [rootremkids1, rootremkids2]
+
+
+class TestHas_same_root:
+    """Tests for has_same_root function"""
+
+    def test_sameroot_sameintnodenumbers(self):
+        """Check returns True: two identical trees"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            assert t1.has_same_root(t2)
+
+    def test_sameroot_diffintnodenumbers(self):
+        """Check returns True: two trees with same rooted topology, different nodeids"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            delta_id = 35 + max(t1.intnodes)
+            for _, node_id in enumerate(t1.intnodes):
+                t2.rename_intnode(node_id, node_id + delta_id)
+            assert t1.has_same_root(t2)
+
+    def test_diffroot_sameintnodenumbers(self):
+        """Check returns False: two trees with same unrooted topology, different roots"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            newroot = random.choice(tuple(t1.intnodes - {t1.root}))
+            t2.deroot()
+            t2.reroot(newroot, polytomy=True)
+            assert not t1.has_same_root(t2)
+
+
+class TestMatch_nodes:
+    """Tests for match_nodes function"""
+
+    def test_sametop_sameroot(self):
+        """Test correct output from well formed examples"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            delta_id = 35 + max(t1.intnodes)
+            for _, node_id in enumerate(t1.intnodes):
+                t2.rename_intnode(node_id, node_id + delta_id)
+            intnode1to2, unmatched_root1, unmatched_root2 = t1.match_nodes(t2)
+            for id1 in intnode1to2:
+                if type(id1) == int:
+                    assert id1 + delta_id == intnode1to2[id1]
+                else:
+                    assert id1 == intnode1to2[id1]
+            assert unmatched_root1 is None
+            assert unmatched_root2 is None
+
+    def test_sametop_difroot(self):
+        """Test correct output from well formed examples with different root"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            if len(t1.intnodes) > 2:
+                root1, root2 = random.sample(tuple(t1.intnodes - {t1.root}), 2)
+                t1.reroot(root1, polytomy=True)
+                t2.reroot(root2, polytomy=True)
+                delta_id = 35 + max(t1.intnodes)
+                for _, node_id in enumerate(t1.intnodes):
+                    t2.rename_intnode(node_id, node_id + delta_id)
+                intnode1to2, unmatched_root1, unmatched_root2 = t1.match_nodes(t2)
+                for id1 in intnode1to2:
+                    if type(id1) == int:
+                        assert id1 + delta_id == intnode1to2[id1]
+                    else:
+                        assert id1 == intnode1to2[id1]
+                assert unmatched_root1 is None
+                assert unmatched_root2 is None
+
+    def test_unmatchedroots(self):
+        """Test that unmatched roots are reported correctly"""
+        t1 = pt.Tree.randtree(ntips=50)
+        t2 = t1.copy_treeobject(copylengths=True)
+        delta_id = 35 + max(t1.intnodes)
+        for _, node_id in enumerate(t1.intnodes):
+            t2.rename_intnode(node_id, node_id + delta_id)
+        t2.deroot()
+        parent = random.choice(tuple(t2.intnodes))
+        kid = next(iter(t2.children(parent)))
+        blen = t2.nodedist(parent, kid)
+        t2.reroot(parent, kid, dist_from_node1=blen / 2)
+        t1origroot = t1.root
+        t2origroot = t2.root
+        intnode1to2, unmatched_root1, unmatched_root2 = t1.match_nodes(t2)
+        for id1 in intnode1to2:
+            if type(id1) == int:
+                assert id1 + delta_id == intnode1to2[id1]
+            else:
+                assert id1 == intnode1to2[id1]
+        assert unmatched_root1 == t1origroot
+        assert unmatched_root2 == t2origroot
+
+    def test_difleaves(self):
+        """Test error raised when leaves differ"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            randleaf = random.choice(tuple(t1.leaves))
+            t1.remove_leaf(randleaf)
+            with pytest.raises(pt.TreeError):
+                t1.match_nodes(t2)
+
+    def test_sameleaves_diftop(self):
+        """Test error raised when leaves same but topologies differ"""
+        for treestring in self.treedata.values():
+            t1 = pt.Tree.from_string(treestring)
+            t2 = pt.Tree.from_string(treestring)
+            while t1.topology() == t2.topology():
+                t2.shuffle_leaf_names()
+            with pytest.raises(pt.TreeError):
+                t1.match_nodes(t2)
+
+
+class TestRelationShipMethods:
+    """Tests methods for determining children, parents, remote children, MRCAs, and basenode"""
+
+    def test_adjacent(self):
+        """Consistency and function of .children() and .parent() methods"""
+        for treestring in self.treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            for parent in mytree.intnodes:
+                children = mytree.children(parent)
+                for child in children:
+                    result = mytree.parent(child)
+                    assert result == parent
+
+    def test_remote(self):
+        """Consistency and function of remote_children, find_mrca, findbasenode"""
+        for treestring in self.treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            assert mytree.remote_children(mytree.root) == mytree.leaves
+            for basalnode in mytree.intnodes:
+                remotekids = mytree.remote_children(basalnode)
+                assert basalnode == mytree.find_mrca(remotekids)
+                assert basalnode == mytree.findbasenode(remotekids)
+                if basalnode != mytree.root and basalnode not in mytree.children(mytree.root):
+                    basal_parent = mytree.parent(basalnode)
+                    other_half = mytree.leaves - remotekids
+                    assert basal_parent == mytree.findbasenode(other_half)
+                if basalnode in mytree.children(mytree.root):
+                    basal_siblings = mytree.children(mytree.root) - {basalnode}
+                    other_half = mytree.leaves - remotekids
+                    if len(basal_siblings) == 1:
+                        sib = next(iter(basal_siblings))
+                        assert sib == mytree.findbasenode(other_half)
+                    else:
+                        assert mytree.root == mytree.findbasenode(other_half)
+            for leaf in mytree.leaves:
+                assert {leaf} == mytree.remote_children(leaf)
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        assert {"s1", "s2", "s3"} == mytree.remote_children(1)
+
+
+class TestPathMethods:
+    """Tests methods for determining nodepath, nodedist, and treelength"""
+
+    def test_nodedist(self):
+        """Does nodedist() report correct patristic distance?"""
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+
+        assert mytree.nodedist("s1", "s2") == approx_places(0.25)
+        assert mytree.nodedist("s1", "s3") == approx_places(0.5)
+        assert mytree.nodedist("s1", "s4") == approx_places(0.625)
+        assert mytree.nodedist("s1", "s5") == approx_places(0.625)
+        assert mytree.nodedist("s2", "s3") == approx_places(mytree.nodedist("s1", "s3"))
+        assert mytree.nodedist("s2", "s4") == approx_places(mytree.nodedist("s1", "s4"))
+        assert mytree.nodedist("s2", "s5") == approx_places(mytree.nodedist("s1", "s5"))
+        assert mytree.nodedist("s3", "s4") == approx_places(0.375)
+        assert mytree.nodedist("s3", "s5") == approx_places(0.375)
+        assert mytree.nodedist("s4", "s5") == approx_places(0.25)
+
+        treestring = self.treedata["HIVtree"]
+        mytree = pt.Tree.from_string(treestring)
+
+        expecteddist = (
+            0.008 + 0.03629 + 0.1025 + 0.16576 + 0.16576 + 0.00771 + 0.00386
+            + 0.06371 + 0.00584 + 0.00555 + 0.00063 + 0.00616 + 0.04414 + 0.05684
+        )
+        assert mytree.nodedist("SIVMK", "HV1H3") == approx_places(expecteddist)
+
+        expecteddist = 0.01652 + 0.16576 + 0.16576 + 0.19506
+        anc1 = mytree.find_mrca(
+            {"HV2BE", "HV2D1", "HV2SB", "HV2S2", "HV2ST", "HV2G1", "HV2RO", "HV2CA", "HV2NZ"}
+        )
+        assert mytree.nodedist("SIVCZ", anc1) == approx_places(expecteddist)
+
+        expecteddist = 0.01652 + 0.16576 + 0.16576 + 0.05684 + 0.03899 + 0.02325
+        anc2 = mytree.find_mrca({"HV1EL", "HV1Z2"})
+        assert mytree.nodedist(anc1, anc2) == approx_places(expecteddist)
+
+    def test_treelength(self):
+        """Does treelength() return correct value?"""
+
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        expectedlength = 0.125 + 0.125 + 0.25 + 0.125 + 0.125 + 0.125 + 0.125
+        assert mytree.length() == approx_places(expectedlength)
+
+        treestring = self.treedata["string_with_label"]
+        mytree = pt.Tree.from_string(treestring)
+        expectedlength = 0.101408 + 0.071355 + 0.124263 + 0.009364 + 0.014955
+        assert mytree.length() == approx_places(expectedlength)
+
+    def test_nodepath_sanity(self):
+        """Sanity check: nodepath(A,B) = reverse of nodepath(B,A)?"""
+        for treestring in self.treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            leaves = mytree.leaves
+            intnodes = mytree.intnodes
+            for node1 in leaves:
+                for node2 in leaves:
+                    path12 = mytree.nodepath(node1, node2)
+                    path21 = mytree.nodepath(node2, node1)
+                    path21.reverse()
+                    assert path12 == path21
+
+            for node1 in intnodes:
+                for node2 in intnodes:
+                    path12 = mytree.nodepath(node1, node2)
+                    path21 = mytree.nodepath(node2, node1)
+                    path21.reverse()
+                    assert path12 == path21
+
+            for node1 in leaves:
+                for node2 in intnodes:
+                    path12 = mytree.nodepath(node1, node2)
+                    path21 = mytree.nodepath(node2, node1)
+                    path21.reverse()
+                    assert path12 == path21
+
+    def test_nodepath_details(self):
+        """Checking parent-child relationships on nodepath from root to leaves"""
+        for treestring in self.treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            leaves = mytree.leaves
+            root = mytree.root
+            for leaf in leaves:
+                path = mytree.nodepath(root, leaf)
+                for i in range(len(path) - 1):
+                    parent = path[i]
+                    child = path[i + 1]
+                    assert child in mytree.children(parent)
+                    assert parent == mytree.parent(child)
+
+
+class TestTreeOutput:
+    """Tests of string output"""
+
+    def test_newick_output(self):
+        """Sanity check: output from newick() can be parsed by Tree.from_string()"""
+        for instring in self.treedata.values():
+            mytree = pt.Tree.from_string(instring)
+            outstring = mytree.newick()
+            mytree2 = pt.Tree.from_string(outstring)
+            assert mytree == mytree2
+
+    def test_nexus_output(self):
+        """Check that output from nexus() can be parsed by Nexustreefile()"""
+        for instring in self.treedata.values():
+            mytree = pt.Tree.from_string(instring)
+            nexus_string = mytree.nexus()
+            nexusfile = pt.Nexustreefile(filecontent=nexus_string)
+            mytree2 = next(nexusfile)
+            assert mytree == mytree2
+
+    def test_contree_nexus_output(self):
+        """Check that nexus output from contree result can be parsed by Nexustreefile"""
+        treesummary = pt.TreeSummary(trackbips=True, trackblen=True)
+        for _ in range(10):
+            tree = pt.Tree.randtree(ntips=50)
+            treesummary.add_tree(tree)
+        stb = pt.SummaryTreeBuilder(treesummary)
+        contree = stb.contree()
+        nexus_string = contree.nexus()
+        nexusfile = pt.Nexustreefile(filecontent=nexus_string)
+        mytree = next(nexusfile)
+        assert contree == mytree
+
+
+class TestTreesummarytests:
+    @pytest.fixture(autouse=True)
+    def _setup(self, data_dir):
+        self.t1_fname = data_dir / "mrbayes" / "contest.postburnin.1.t"
+        self.t2_fname = data_dir / "mrbayes" / "contest.postburnin.2.t"
+        con_fname = data_dir / "mrbayes" / "contest.nexus.con.tre"
+        mbres_fname = data_dir / "bip_mean_var.txt"
+        mb_trprobs_fname = data_dir / "mrbayes" / "contest.nexus.trprobs"
+        cfile = pt.Nexustreefile(con_fname)
+        self.mb_contree = cfile.readtree()
+        cfile.close()
+        with mbres_fname.open(encoding="utf-8") as mbfile:
+            mbresults = mbfile.readlines()
+        self.mbresdict = {}
+        names1, names2, meanvar = mbresults[0].strip().split("|")
+        bip1 = names1.strip().split()
+        bip2 = names2.strip().split()
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(bip1 + bip2)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        leaf2index = {leaf: i for i, leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf: (1 << i) for leaf, i in leaf2index.items()}
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        mocktree.cached_attributes = (
+            frozenset_leaves,
+            sorted_leaf_tup,
+            leaf2index,
+            leaf2mask,
+            ntips,
+            alltips_mask,
+        )
+        for line in mbresults:
+            names1, names2, meanvar = line.strip().split("|")
+            bip1 = names1.strip().split()
+            bipart = pt.Bipartition.from_leafset(frozenset(bip1), mocktree)
+            vals = meanvar.strip().split()
+            mean = float(vals[0])
+            var = float(vals[1])
+            self.mbresdict[bipart] = [mean, var]
+        trprobfile = pt.Nexustreefile(mb_trprobs_fname)
+        self.trprob_trees = trprobfile.readtrees()
+        trprobfile.close()
+
+    def test_contree(self):
+        ts = pt.TreeSummary(trackbips=True, trackblen=True)
+        tf1 = pt.Nexustreefile(self.t1_fname)
+        for t in tf1:
+            ts.add_tree(t)
+        tf2 = pt.Nexustreefile(self.t2_fname)
+        for t in tf2:
+            ts.add_tree(t)
+        stb = pt.SummaryTreeBuilder(ts)
+        own_contree = stb.contree()
+        own_bipdict = own_contree.bipdict()
+        mb_bipdict = self.mb_contree.bipdict()
+
+        assert self.mb_contree.topology() == own_contree.topology()
+
+        for bip, own_branch in own_bipdict.items():
+            mb_mean, mb_var = self.mbresdict[bip]
+            assert mb_mean == approx_places(own_branch.length)
+            assert mb_var == approx_places(own_branch.length_sd ** 2)
+
+            bip1, bip2 = bip
+            if len(bip1) != 1 and len(bip2) != 1:
+                mb_branch = mb_bipdict[bip]
+                own_freq = round(float(own_branch.posterior), 3)
+                mb_freq = float(mb_branch.label)
+                assert mb_freq == approx_places(own_freq)
+
+    def test_treesummary_update(self):
+        ts1 = pt.TreeSummary(trackbips=True, trackblen=True)
+        tf1 = pt.Nexustreefile(self.t1_fname)
+        for t in tf1:
+            ts1.add_tree(t)
+        tf1.close()
+        ts2 = pt.TreeSummary(trackbips=True, trackblen=True)
+        tf2 = pt.Nexustreefile(self.t2_fname)
+        for t in tf2:
+            ts2.add_tree(t)
+        tf2.close()
+        ts1.update(ts2)
+        stb = pt.SummaryTreeBuilder(ts1)
+        own_contree = stb.contree()
+        own_bipdict = own_contree.bipdict()
+        mb_bipdict = self.mb_contree.bipdict()
+
+        assert self.mb_contree.topology() == own_contree.topology()
+
+        for bip, own_branch in own_bipdict.items():
+            mb_mean, mb_var = self.mbresdict[bip]
+            assert mb_mean == approx_places(own_branch.length)
+            assert mb_var == approx_places(own_branch.length_sd ** 2)
+
+            bip1, bip2 = bip
+            if len(bip1) != 1 and len(bip2) != 1:
+                mb_branch = mb_bipdict[bip]
+                own_freq = float(own_branch.posterior)
+                mb_freq = float(mb_branch.label)
+                assert mb_freq == approx_places(own_freq, places=3)
+
+    def test_treesummary_with_topologies(self):
+        ts = pt.TreeSummary(trackbips=True, tracktopo=True)
+        tf1 = pt.Nexustreefile(self.t1_fname)
+        for t in tf1:
+            ts.add_tree(t)
+        tf2 = pt.Nexustreefile(self.t2_fname)
+        for t in tf2:
+            ts.add_tree(t)
+        for tree in self.trprob_trees:
+            mb_topology = tree.topology()
+            assert mb_topology in ts.biptoposummary
+
+
+class TestTopologytests:
+    """Tests topology related methods"""
+
+    def test_bipdict(self):
+        """Does bipdict() return correct result?"""
+
+        treestring = self.treedata["string_with_label"]
+        mytree = pt.Tree.from_string(treestring)
+        total_leaves = {"KL0F07689", "KW081_13", "SBC669_26", "YAL016W"}
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(total_leaves)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        leaf2index = {leaf: i for i, leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf: (1 << i) for leaf, i in leaf2index.items()}
+        mocktree.cached_attributes = (
+            frozenset_leaves,
+            sorted_leaf_tup,
+            leaf2index,
+            leaf2mask,
+            ntips,
+            alltips_mask,
+        )
+        bipdict = mytree.bipdict()
+
+        expectedkey = pt.Bipartition.from_leafset(frozenset(["YAL016W", "SBC669_26"]), mocktree)
+        expectedlen = 0.124263
+        expectedlab = "0.0507"
+
+        assert expectedkey in bipdict
+        assert bipdict[expectedkey].length == approx_places(expectedlen)
+        assert bipdict[expectedkey].label == expectedlab
+
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        total_leaves = {"s4", "s1", "s3", "s2", "s5"}
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(total_leaves)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        leaf2index = {leaf: i for i, leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf: (1 << i) for leaf, i in leaf2index.items()}
+        mocktree.cached_attributes = (
+            frozenset_leaves,
+            sorted_leaf_tup,
+            leaf2index,
+            leaf2mask,
+            ntips,
+            alltips_mask,
+        )
+        bipdict = mytree.bipdict()
+        expectedkeys = [
+            pt.Bipartition.from_leafset(["s1"], mocktree),
+            pt.Bipartition.from_leafset(["s2"], mocktree),
+            pt.Bipartition.from_leafset(["s3"], mocktree),
+            pt.Bipartition.from_leafset(["s4"], mocktree),
+            pt.Bipartition.from_leafset(["s5"], mocktree),
+            pt.Bipartition.from_leafset(["s4", "s5"], mocktree),
+            pt.Bipartition.from_leafset(["s1", "s2"], mocktree),
+        ]
+
+        expectedvals = [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.25]
+
+        for key in bipdict:
+            assert key in expectedkeys
+
+        for i in range(len(expectedkeys)):
+            key = expectedkeys[i]
+            val = expectedvals[i]
+            assert val == approx_places(bipdict[key].length)
+
+    def test_topology(self):
+        """Does topology() return expected result?"""
+
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        topology = mytree.topology()
+        total_leaves = {"s4", "s1", "s3", "s2", "s5"}
+        mocktree = SimpleNamespace()
+        frozenset_leaves = frozenset(total_leaves)
+        sorted_leaf_tup = tuple(sorted(frozenset_leaves))
+        ntips = len(sorted_leaf_tup)
+        alltips_mask = (1 << ntips) - 1
+        leaf2index = {leaf: i for i, leaf in enumerate(sorted_leaf_tup)}
+        leaf2mask = {leaf: (1 << i) for leaf, i in leaf2index.items()}
+        mocktree.cached_attributes = (
+            frozenset_leaves,
+            sorted_leaf_tup,
+            leaf2index,
+            leaf2mask,
+            ntips,
+            alltips_mask,
+        )
+
+        expectedtop = frozenset(
+            [
+                pt.Bipartition.from_leafset(["s4", "s5"], mocktree),
+                pt.Bipartition.from_leafset(["s4", "s5", "s3"], mocktree),
+                pt.Bipartition.from_leafset(["s4", "s5", "s3", "s2"], mocktree),
+                pt.Bipartition.from_leafset(["s4", "s5", "s3", "s1"], mocktree),
+                pt.Bipartition.from_leafset(["s4", "s5", "s1", "s2"], mocktree),
+                pt.Bipartition.from_leafset(["s1", "s5", "s3", "s2"], mocktree),
+                pt.Bipartition.from_leafset(["s4", "s1", "s3", "s2"], mocktree),
+            ]
+        )
+
+        assert topology == expectedtop
+
+    def test_compatiblewith(self):
+        """Does is_compatible_with() return expected result?"""
+
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+
+        expectedbips = [
+            frozenset([frozenset(["s4", "s5"]), frozenset(["s1", "s2", "s3"])]),
+            frozenset([frozenset(["s4", "s5", "s3"]), frozenset(["s1", "s2"])]),
+            frozenset([frozenset(["s4", "s5", "s3", "s2"]), frozenset(["s1"])]),
+            frozenset([frozenset(["s4", "s5", "s3", "s1"]), frozenset(["s2"])]),
+            frozenset([frozenset(["s4", "s5", "s1", "s2"]), frozenset(["s3"])]),
+            frozenset([frozenset(["s1", "s5", "s3", "s2"]), frozenset(["s4"])]),
+            frozenset([frozenset(["s4", "s1", "s3", "s2"]), frozenset(["s5"])]),
+        ]
+
+        badbips = [
+            frozenset([frozenset(["s3", "s5"]), frozenset(["s1", "s2", "s4"])]),
+            frozenset([frozenset(["s4", "s1", "s3"]), frozenset(["s5", "s2"])]),
+        ]
+
+        for bip in expectedbips:
+            assert mytree.is_compatible_with(bip)
+
+        for bip in badbips:
+            assert not mytree.is_compatible_with(bip)
+
+    def test_is_resolved(self):
+        """Does is_resolved() return expected result?"""
+        for treestring in self.treedata.values():
+            mytree = pt.Tree.from_string(treestring)
+            assert mytree.is_resolved(), treestring
+
+        mytree = pt.Tree.from_string("(A, B, C, D);")
+        assert not mytree.is_resolved()
+
+        mytree = pt.Tree.from_string("(A, (B, C, D));")
+        assert not mytree.is_resolved()
+
+        mytree = pt.Tree.from_string("(A, (B, (C, D), E));")
+        assert not mytree.is_resolved()
+
+    def test_resolve(self):
+        namelist = [f"seq{i}" for i in range(50)]
+        t1 = pt.Tree.from_leaves(namelist)
+        t1.resolve()
+        t1_string = t1.newick()
+        t2 = pt.Tree.from_string(t1_string)
+        assert isinstance(t2, pt.Tree)
+
+
+class TestLengthLabel:
+    """Tests setting and getting of branch lengths and labels"""
+
+    def test_setlength(self):
+        """Does setlength() work correctly?"""
+        treestring = self.treedata["HIVtree"]
+        mytree = pt.Tree.from_string(treestring)
+        anc = mytree.find_mrca({"HV2BE", "HV2D1"})
+        mytree.setlength(anc, "HV2BE", 0.666)
+        mytree.setlength(anc, "HV2D1", 0.333)
+        assert 0.666 == approx_places(mytree.nodedist(anc, "HV2BE"))
+        assert 0.333 == approx_places(mytree.nodedist(anc, "HV2D1"))
+
+    def test_labels(self):
+        """Does setlabel() and getlabel() work correctly?"""
+        treestring = self.treedata["HIVtree"]
+        mytree = pt.Tree.from_string(treestring)
+        anc = mytree.find_mrca({"HV2BE", "HV2D1"})
+        mytree.setlabel(anc, "HV2BE", "Simpel_label")
+        mytree.setlabel(anc, "HV2D1", "Label with space")
+        assert mytree.getlabel(anc, "HV2BE") == "Simpel_label"
+        assert mytree.getlabel(anc, "HV2D1") == "Label with space"
+
+
+class TestTreeChanging:
+    """Tests for functions that alter tree structure"""
+
+    def test_insertnode(self):
+        """Does insert_node() work correctly?"""
+        treestring = self.treedata["HIVtree"]
+        mytree = pt.Tree.from_string(treestring)
+        anc = mytree.find_mrca({"HV2BE", "HV2D1"})
+        pre_nodes = copy.copy(mytree.nodes)
+
+        branchstruct = pt.Branchstruct(length=0.777)
+        branchstruct.label = "New_branch"
+        newnode = mytree.insert_node(anc, ["HV2BE", "HV2D1"], branchstruct)
+        assert mytree.nodedist(newnode, anc) == approx_places(0.777)
+        assert mytree.getlabel(newnode, anc) == "New_branch"
+        assert mytree.parent(newnode) == anc
+        assert mytree.children(newnode) == {"HV2BE", "HV2D1"}
+        assert mytree.children(anc) == {newnode}
+        assert len(pre_nodes) + 1 == len(mytree.nodes)
+        assert pre_nodes < mytree.nodes
+
+        anc2 = mytree.parent(anc)
+        branchstruct = pt.Branchstruct(length=0.999)
+        branchstruct.label = "Lower_branch"
+        newnode2 = mytree.insert_node(anc2, [anc], branchstruct)
+        assert mytree.nodedist(newnode2, anc2) == approx_places(0.999)
+        assert mytree.getlabel(newnode2, anc2) == "Lower_branch"
+        assert mytree.parent(newnode2) == anc2
+        assert mytree.children(newnode2) == {anc}
+        assert mytree.children(anc2) == {newnode2, "HV2SB"}
+
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+        anc = mytree.find_mrca({"s1", "s2"})
+        branchstruct = pt.Branchstruct(length=0.777)
+        branchstruct.label = "New_branch"
+        newnode = mytree.insert_node(anc, ["s1", "s2"], branchstruct)
+        assert mytree.nodedist(newnode, anc) == approx_places(0.777)
+        assert mytree.getlabel(newnode, anc) == "New_branch"
+        assert mytree.parent(newnode) == anc
+        assert mytree.children(newnode) == {"s1", "s2"}
+        assert mytree.children(anc) == {newnode}
+
+    def test_addbranch(self):
+        """Does add_branch() work correctly?"""
+        mytree = pt.Tree.from_leaves(["A", "B", "C", "D", "E"])
+        bipart1 = frozenset([frozenset(["A", "B"]), frozenset(["C", "D", "E"])])
+        bipart2 = frozenset([frozenset(["A", "B", "C"]), frozenset(["D", "E"])])
+        pre_nodes = copy.copy(mytree.nodes)
+
+        branchstruct = pt.Branchstruct(length=0.222)
+        branchstruct.label = "First_branch"
+        mytree.add_branch(bipart1, branchstruct)
+        anc1 = mytree.parent("A")
+        anc2 = mytree.parent("C")
+        root = mytree.root
+        assert mytree.nodedist(anc1, anc2) == approx_places(0.222)
+        assert mytree.getlabel(root, anc1) == "First_branch"
+        assert mytree.getlabel(root, anc2) == "First_branch"
+        assert mytree.children(anc1) == {"A", "B"}
+        assert mytree.children(anc2) == {"C", "D", "E"}
+        assert len(pre_nodes) + 2 == len(mytree.nodes)
+        assert pre_nodes < mytree.nodes
+
+        branchstruct = pt.Branchstruct(length=0.333)
+        branchstruct.label = "Second_branch"
+        mytree.add_branch(bipart2, branchstruct)
+        anc3 = mytree.parent("D")
+        anc4 = mytree.parent(anc3)
+        assert mytree.nodedist(anc3, anc4) == approx_places(0.333)
+        assert mytree.getlabel(anc3, anc4) == "Second_branch"
+        assert mytree.children(anc3) == {"D", "E"}
+        assert mytree.children(anc4) == {anc3, "C"}
+
+    def test_removebranch(self):
+        """Does remove_branch work correctly?"""
+        treestring = self.treedata["HIVtree"]
+        mytree = pt.Tree.from_string(treestring)
+        node1 = mytree.find_mrca({"HV1EL", "HV1Z2", "HV1Z8"})
+        node2 = mytree.parent(node1)
+        node2remotekids = mytree.remote_children(node2)
+        pre_len = mytree.length()
+        pre_nodes = copy.copy(mytree.nodes)
+
+        mytree.remove_branch(node1, node2)
+        assert mytree.remote_children(node2) == node2remotekids
+        with pytest.raises(pt.TreeError):
+            mytree.children(node1)
+        assert pre_nodes - {node1} == mytree.nodes
+        assert len(mytree.children(node2)) == 3
+        assert pre_len == approx_places(mytree.length())
+
+    def test_removeleaf(self):
+        """Does remove_leaf() work correctly?"""
+        treestring = self.treedata["HIVtree"]
+        mytree = pt.Tree.from_string(treestring)
+        anc1 = mytree.find_mrca({"SIVMK", "SIVML"})
+        anc2 = mytree.parent(anc1)
+        removed_dist = mytree.nodedist(anc1, "SIVMK")
+        pre_len = mytree.length()
+        pre_nodes = copy.copy(mytree.nodes)
+
+        mytree.remove_leaf("SIVMK")
+        assert mytree.children(anc2) == {"SIVML", "SIVM1"}
+        assert mytree.length() == approx_places(pre_len - removed_dist)
+        with pytest.raises(pt.TreeError):
+            mytree.children(anc1)
+        assert len(pre_nodes) - 2 == len(mytree.nodes)
+        assert pre_nodes > mytree.nodes
+
+        mytree = pt.Tree.from_string("(A, ((B, C), (D, E)));")
+        anc1 = mytree.parent("A")
+        anc2 = mytree.find_mrca({"B", "C", "D", "E"})
+        pre_root = mytree.root
+
+        mytree.remove_leaf("A")
+        with pytest.raises(pt.TreeError):
+            mytree.children(anc1)
+        assert pre_root == anc1
+        assert mytree.root == anc2
+
+    def test_rename_leaf(self):
+        """Does rename_leaf() work corectly?"""
+        treestring = self.treedata["HIVtree"]
+        mytree = pt.Tree.from_string(treestring)
+        anc = mytree.find_mrca({"SIVMK", "SIVML"})
+        mytree.rename_leaf("SIVMK", "Monkey_Seq")
+        assert mytree.children(anc) == {"SIVML", "Monkey_Seq"}
+        assert mytree.parent("Monkey_Seq") == anc
+        assert "SIVMK" not in mytree.remote_children(mytree.root)
+        assert "SIVMK" not in mytree.nodes
+        assert "SIVMK" not in mytree.leaves
+        assert "Monkey_Seq" in mytree.nodes
+        assert "Monkey_Seq" in mytree.leaves
+
+        with pytest.raises(pt.TreeError):
+            mytree.rename_leaf("Not_there", "new_name")
+
+
+class TestRootTester:
+    """Tests for rooting related methods in Tree object"""
+
+    def test_rootmid(self):
+        """Test that midpoint rooting creates expected tree on some known examples"""
+        treestring = self.treedata["simplestring"]
+        mytree = pt.Tree.from_string(treestring)
+
+        mytree.rootmid()
+        assert mytree.nodedist("s1") == approx_places(0.3125), f"leaves: {mytree.leaves}"
+        assert mytree.nodedist("s2") == approx_places(0.3125)
+        assert mytree.nodedist("s3") == approx_places(0.1875)
+        assert mytree.nodedist("s4") == approx_places(0.3125)
+        assert mytree.nodedist("s5") == approx_places(0.3125)
+
+        treestring = self.treedata["HIVtree_HV1A2root"]
+        mytree = pt.Tree.from_string(treestring)
+        mytree.rootmid()
+        assert mytree.nodedist("SIVM1") == approx_places(mytree.nodedist("HV1RH"))
+        assert mytree.nodedist("SIVM1") == approx_places(0.34765)
+
+    def test_rootminvar(self):
+        """Test that rootminvar finds the minimum variance root"""
+        ts1 = self.treedata["HIVtree"]
+        t1 = pt.Tree.from_string(ts1)
+
+        ts2 = self.treedata["HIVminvar"]
+        t2 = pt.Tree.from_string(ts2)
+
+        t1.rootminvar()
+        assert t1 == t2
+
+
+class TestDist_tree_construction:
+    """Tests methods for constructing trees from distance matrix"""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, data_dir):
+        self.njtreestringlist = [
+            "((A:13.0,B:4.0):2.0,(C:4.0,D:10.0):2.0);",
+            "((A:2,(B:1.5,C:1):3.2):4.1,(D:1.2,(E:2.7,F:3.1):5):5.2);",
+        ]
+        self.njdmatlist = [
+            {
+                "A": {"B": 17, "C": 21, "D": 27},
+                "B": {"A": 17, "C": 12, "D": 18},
+                "C": {"A": 21, "B": 12, "D": 14},
+                "D": {"A": 27, "B": 18, "C": 14},
+            },
+            {
+                "A": {"B": 6.7, "C": 6.2, "D": 12.5, "E": 19, "F": 19.4},
+                "B": {"A": 6.7, "C": 2.5, "D": 15.2, "E": 21.7, "F": 22.1},
+                "C": {"A": 6.2, "B": 2.5, "D": 14.7, "E": 21.2, "F": 21.6},
+                "D": {"A": 12.5, "B": 15.2, "C": 14.7, "E": 8.9, "F": 9.3},
+                "E": {"A": 19, "B": 21.7, "C": 21.2, "D": 8.9, "F": 5.8},
+                "F": {"A": 19.4, "B": 22.1, "C": 21.6, "D": 9.3, "E": 5.8},
+            },
+        ]
+        self.upgmatreelist = [
+            "(((A:8.500,B:8.500):2.500,E:11.000):5.500,(C:14.000,D:14.000):2.500);",
+            "((A:1.500,B:1.500):3.750,(C:2.000,D:2.000):3.250);",
+        ]
+        self.upgmadmatlist = [
+            {
+                "A": {"B": 17, "C": 21, "D": 31, "E": 23},
+                "B": {"A": 17, "C": 30, "D": 34, "E": 21},
+                "C": {"A": 21, "B": 30, "D": 28, "E": 39},
+                "D": {"A": 31, "B": 34, "C": 28, "E": 43},
+                "E": {"A": 23, "B": 21, "C": 39, "D": 43},
+            },
+            {
+                "A": {"B": 3, "C": 11, "D": 11},
+                "B": {"A": 3, "C": 10, "D": 10},
+                "C": {"A": 11, "B": 10, "D": 4},
+                "D": {"A": 11, "B": 10, "C": 4},
+            },
+        ]
+
+        dmat_fname = data_dir / "large_distmat.tsv"
+        njtree_fname = data_dir / "large_njtree.txt"
+        upgmatree_fname = data_dir / "large_upgmatree.txt"
+
+        with dmat_fname.open(encoding="utf-8") as infile:
+            reader = csv.DictReader(infile, delimiter="\t")
+            dictlist = []
+            for rowdict in reader:
+                dictlist.append(rowdict)
+            self.large_distdict = dict(zip(reader.fieldnames, dictlist))
+        self.largephylip_njtree = njtree_fname.read_text(encoding="utf-8")
+        self.largephylip_upgmatree = upgmatree_fname.read_text(encoding="utf-8")
+
+    def test_nj(self):
+        """Verify that nj method produces correct trees for list of distance matrices"""
+        for i in range(len(self.njtreestringlist)):
+            inputtree = pt.Tree.from_string(self.njtreestringlist[i])
+            dmat = pt.Distmatrix.from_distdict(self.njdmatlist[i])
+            njtree = dmat.nj()
+            assert njtree == inputtree
+        inputtree = pt.Tree.from_string(self.largephylip_njtree)
+        dmat = pt.Distmatrix.from_distdict(self.large_distdict)
+        njtree = dmat.nj()
+        assert njtree == inputtree
+
+    def test_upgma(self):
+        """Verify that upgma method produces correct trees for list of distance matrices"""
+        for i in range(len(self.upgmatreelist)):
+            inputtree = pt.Tree.from_string(self.upgmatreelist[i])
+            dmat = pt.Distmatrix.from_distdict(self.upgmadmatlist[i])
+            upgma = dmat.upgma()
+            assert upgma == inputtree, f"\n  i: {i}\n  upgma:\n{upgma}\n  input:\n{inputtree}"
+        inputtree = pt.Tree.from_string(self.largephylip_upgmatree)
+        dmat = pt.Distmatrix.from_distdict(self.large_distdict)
+        upgmatree = dmat.upgma()
+        assert upgmatree == inputtree
+
+
+class TestTreeDistTester:
+    """Tests methods for computing tree distance and similarity"""
+
+    def test_treedist(self):
+        ts = self.treedata["HIVtree"]
+        t1 = pt.Tree.from_string(ts)
+        t2 = pt.Tree.from_string(ts)
+
+        subtreenode = t1.parent("HV2BE")
+        t2.spr(subtreenode, "SIVM1")
+        treedist = t1.treedist(t2, normalise=False)
+        assert treedist == 10
+
+
+# Combined from test_phylotreelib_pytestversion.py
 
 class Test_remove_comments:
 
@@ -1026,16 +1984,17 @@ class Test_compute_sumtree:
 
     def test_hipstr_cladeheight(self, data_dir):
         """HIPSTR tree with mean node heights and rooting at best HIPSTR resolution of root clade"""
+        beast_data_dir = data_dir / "beast"
 
         # Own computation
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.trees")
         tsum = pt.TreeSummary(trackclades=True, trackheight=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="hip", blen="cladeheight")
 
         # Gold standard computed by treeannotator
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_hipstr_mean")
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.treeannot_hipstr_mean")
         tgold = tf.readtree()
 
         # Comparisons
@@ -1044,16 +2003,17 @@ class Test_compute_sumtree:
 
     def test_mrhipstr_cladeheight(self, data_dir):
         """mrHIPSTR tree with mean node heights and rooting at best HIPSTR resolution of root clade"""
+        beast_data_dir = data_dir / "beast"
 
         # Own computation
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.trees")
         tsum = pt.TreeSummary(trackclades=True, trackheight=True, track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mrhip", blen="cladeheight")
 
         # Gold standard computed by treeannotator
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mrhipstr_mean")
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.treeannot_mrhipstr_mean")
         tgold = tf.readtree()
 
         # Comparisons
@@ -1062,9 +2022,10 @@ class Test_compute_sumtree:
 
     def test_mcc_cladeheight(self, data_dir):
         """MCC tree with mean node heights and rooting at best tree's original root"""
+        beast_data_dir = data_dir / "beast"
 
         # Own computation
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.trees")
         tsum = pt.TreeSummary(trackclades=True, trackheight=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
@@ -1072,7 +2033,7 @@ class Test_compute_sumtree:
         town = tsum.compute_sumtree(treetype="mcc", blen="cladeheight")
 
         # Gold standard computed by treeannotator
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_mean")
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.treeannot_mcc_mean")
         tgold = tf.readtree()
 
         # Comparisons
@@ -1081,18 +2042,19 @@ class Test_compute_sumtree:
 
     def test_mcc_caheight(self, data_dir):
         """MCC tree with CA node heights and rooting at best tree's original root"""
+        beast_data_dir = data_dir / "beast"
 
         # Own computation
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.trees" )
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.trees")
         tsum = pt.TreeSummary(trackclades=True, trackheight=True, tracktopo=True,
                               track_subcladepairs=True)
         for t in tf:
             tsum.add_tree(t)
         town = tsum.compute_sumtree(treetype="mcc", blen="caheight",
-                                    count_burnin_filename_list=[(1000, 0, ( data_dir / "random_10tips_1000.trees" ))])
+                                    count_burnin_filename_list=[(1000, 0, (beast_data_dir / "random_10tips_1000.trees"))])
 
         # Gold standard computed by treeannotator
-        tf = pt.Nexustreefile( data_dir / "random_10tips_1000.treeannot_mcc_ca")
+        tf = pt.Nexustreefile(beast_data_dir / "random_10tips_1000.treeannot_mcc_ca")
         tgold = tf.readtree()
 
         # Comparisons
@@ -1470,3 +2432,214 @@ class Test_precision_quantiles_vs_exact_order_statistic:
 
         assert err_k10 <= err_k4 + 1e-15
         assert err_k14 <= err_k10 + 1e-15
+
+
+# Combined from test_sumt_biplen_reference.py
+
+def _popcount(x):
+    return x.bit_count()
+
+
+def _allmask(n_leaves):
+    return (1 << n_leaves) - 1
+
+
+def _leaf_mask(tree: "pt.Tree", leaf):
+    # Tree.cached_attributes typically includes a deterministic leaf ordering,
+    # but leaf2index is already consistent with remotechildren_mask_dict usage.
+    return 1 << tree.leaf2index[leaf]
+
+
+def _node_mask(tree, node):
+    """
+    Return mask for any node (internal node id or leaf name).
+    remotechildren_mask_dict usually includes masks for internal nodes; for leaves
+    we fall back to leaf2index.
+    """
+    rem = tree.remotechildren_mask_dict  # ensures it's computed/cached
+    try:
+        return int(rem[node])
+    except KeyError:
+        # likely a leaf
+        return _leaf_mask(tree, node)
+
+
+def _canon_halfmask(mask, fullmask):
+    """
+    Canonicalize an unrooted split by taking the "smaller side" of the bipartition.
+    """
+    comp = fullmask ^ mask
+    # choose by size first, then by integer value for deterministic tie-breaking
+    a, b = mask, comp
+    pa, pb = _popcount(a), _popcount(b)
+    if pa < pb:
+        return a
+    if pb < pa:
+        return b
+    return min(a, b)
+
+
+def iter_internal_splits_with_lengths(tree):
+    """
+    Yield (halfmask, length) for each INTERNAL split in the tree.
+
+    Internal split definition here: both sides have at least 2 leaves.
+    """
+    n = len(tree.leaves)
+    full = _allmask(n)
+
+    # iterate all directed edges parent->child; each corresponds to one undirected split
+    child_dict = tree.child_dict
+    for parent in tree.intnodes:
+        for child, br in child_dict[parent].items():
+            m = _node_mask(tree, child)
+            hm = _canon_halfmask(m, full)
+            k = _popcount(hm)
+            if 2 <= k <= n - 2:
+                yield (hm, float(br.length))
+
+
+@dataclass
+class SplitAgg:
+    n_trees: int
+    count: Dict[int, int]        # halfmask -> number of trees where split occurs
+    sumlen: Dict[int, float]     # halfmask -> sum of lengths across trees where split occurs
+
+    def meanlen(self, hm):
+        return self.sumlen[hm] / self.count[hm]
+
+    def freq(self, hm):
+        return self.count[hm] / self.n_trees
+
+
+def reference_aggregate(file_path, burnin= 0):
+    """
+    Reference aggregation: counts/frequencies + mean lengths conditional on presence.
+    """
+    tf = pt.Nexustreefile(file_path)
+    # discard burnin trees deterministically
+    for _ in range(burnin):
+        tf.readtree(returntree=False)
+
+    count: Dict[int, int] = {}
+    sumlen: Dict[int, float] = {}
+    n = 0
+
+    for t in tf:
+        n += 1
+        # ensure masks are available
+        _ = t.remotechildren_mask_dict
+
+        seen = set()
+        for hm, blen in iter_internal_splits_with_lengths(t):
+            # split should occur once per tree; guard against any accidental duplicates
+            if hm in seen:
+                continue
+            seen.add(hm)
+            count[hm] = count.get(hm, 0) + 1
+            sumlen[hm] = sumlen.get(hm, 0.0) + blen
+
+    if n == 0:
+        raise RuntimeError("No trees read in reference_aggregate()")
+
+    return SplitAgg(n_trees=n, count=count, sumlen=sumlen)
+
+
+def build_sumt_sumtree(file_path, burnin= 0):
+    tf = pt.Nexustreefile(file_path)
+    for _ in range(burnin):
+        tf.readtree(returntree=False)
+
+    ts = pt.TreeSummary(trackbips=True, trackblen=True)
+    for t in tf:
+        ts.add_tree(t)
+
+    sumtree = pt.build_sumtree(ts, treetype="con", blen="biplen", rooting=None, og=None,
+                              count_burnin_filename_list=None)
+    return sumtree, ts
+
+
+def iter_sumtree_internal_splits_with_lengths(sumtree):
+    """
+    Internal splits in the *summary* tree (should be fully deterministic).
+    """
+    n = len(sumtree.leaves)
+    full = _allmask(n)
+    cd = sumtree.child_dict
+    for parent in sumtree.intnodes:
+        for child, br in cd[parent].items():
+            m = _node_mask(sumtree, child)
+            hm = _canon_halfmask(m, full)
+            k = _popcount(hm)
+            if 2 <= k <= n - 2:
+                yield (hm, float(br.length))
+
+
+# -----------------------------
+# Tests
+# -----------------------------
+
+def test_biplen_means_match_reference_on_majority_splits(data_dir):
+    """
+    For a fixed tree sample file:
+      - compute reference mean lengths for each split (conditional on presence)
+      - compute sumt's summary tree (--con --biplen)
+      - compare branch lengths split-by-split
+    """
+    f = data_dir / "mrbayes" / "neanderthal.nexus.run1.t"
+    ref = reference_aggregate(f, burnin=0)
+    sumtree, ts = build_sumt_sumtree(f, burnin=0)
+    sorted_leaves = sorted(ts.leaves)
+
+    # Majority-rule set from reference
+    majority = {hm for hm, c in ref.count.items() if (c / ref.n_trees) >= 0.5}
+
+    # Compare only splits that appear in the summary tree AND are majority by reference
+    sumtree_splits = dict(iter_sumtree_internal_splits_with_lengths(sumtree))
+    common = majority.intersection(sumtree_splits.keys())
+    assert common, "No common majority splits found; test data unexpected"
+
+    # Tight tolerance: these are computed from the same underlying float lengths.
+    # If this fails, it's likely a real aggregation logic regression.
+    for hm in sorted(common):
+        got = sumtree_splits[hm]
+        exp = ref.meanlen(hm)
+        assert got == pytest.approx(exp, rel=0, abs=1e-12), f"split {hm}: got {got} exp {exp}"
+
+    # Sanity: TreeSummary counts for lengths should be conditional on presence, i.e. br.n == count[hm]
+    # (TreeSummary stores leaf + internal splits; we only check internal ones here.)
+    for hm in common:
+        # Build a mapping from TreeSummary bipartitions -> halfmask
+        # We derive halfmask from the actual bipartition's leaf sets.
+        br = None
+        for (b1, b2), s in ts.bipartsummary.items():
+            # internal only
+            if len(b1) == 1 or len(b2) == 1:
+                continue
+            # convert leaf set to mask using ts.leaves ordering (should match tree order)
+            full = _allmask(len(ts.leaves))
+            m = 0
+            for leaf in b1:
+                m |= 1 << sorted_leaves.index(leaf)  # ok for small n
+            hm2 = _canon_halfmask(m, full)
+            if hm2 == hm:
+                br = s
+                break
+        assert br is not None, "Could not map TreeSummary bipartition to reference halfmask"
+        assert br.n == ref.count[hm], f"split {hm}: TreeSummary n={br.n} ref count={ref.count[hm]}"
+
+
+def test_consensus_topology_matches_reference_majority_set(data_dir):
+    """
+    The consensus topology should contain exactly the set of majority internal splits.
+    """
+    f = data_dir / "mrbayes" / "neanderthal.nexus.run1.t"
+    ref = reference_aggregate(f, burnin=0)
+    sumtree, _ = build_sumt_sumtree(f, burnin=0)
+
+    majority = {hm for hm, c in ref.count.items() if (c / ref.n_trees) >= 0.5}
+    sumtree_splits = set(dict(iter_sumtree_internal_splits_with_lengths(sumtree)).keys())
+
+    # In a majority-rule consensus, internal splits should be exactly the majority set.
+    # (Leaves are always present but excluded here by construction.)
+    assert sumtree_splits == majority
