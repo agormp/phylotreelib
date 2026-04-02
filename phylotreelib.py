@@ -311,6 +311,22 @@ class Branchstruct:
 ###################################################################################################
 ###################################################################################################
 
+#
+# Height invariant:
+# - tree.nodeheightdict[node] is derived from current branch lengths and is cleared by
+#   clear_length_caches(). It is the fast query path for heights on a specific tree.
+# - tree.nodedict[node].height is explicitly assigned metadata (for example posterior mean
+#   height from the summary pipeline). It survives cache clears and may become stale after
+#   topology/branch-length editing.
+#
+# Nodedict invariant:
+# - tree.nodedict is always a dict, never None, but may be empty.
+# - A node entry means explicit metadata has been assigned or materialized for that node.
+# - Tree-editing operations add default entries for newly created nodes and remove entries for
+#   deleted nodes when nodedict is non-empty.
+# - clear_caches() and clear_length_caches() do not clear nodedict.
+#
+
 class Nodestruct:
     """Per-node metadata on a specific tree.
 
@@ -2074,6 +2090,11 @@ class Tree:
 
     @property
     def nodeheightdict(self):
+        """Read-only cache of heights derived from current branch lengths.
+
+        This is distinct from nodedict[node].height, which stores explicitly assigned heights
+        such as posterior mean heights from the summary pipeline.
+        """
         if self._nodeheightdict is None:
             nd = self._nodeheightdict = {}
             rootdist = self.rootdist
@@ -4087,9 +4108,6 @@ class Tree:
         # groups downstream of cutpoint. This essentially finds equally spaced clusters.
         # Leafs that are upstream of cutpoint (closer to root) also form clusters of their own
 
-        # Parses tree-dict, and for each "from" and "to" node, computes distance from root (height)
-        # Saves this as two new atributes on Branchstruct: "parent_height" and "kid_height"
-
         # Also creates sorted list of (pheight, nkids) tuples containing internal node heights
         # and number of branches emanating from node
         # This information can be used to infer number of clusters when cutting above a given node
@@ -4100,13 +4118,6 @@ class Tree:
         # (e.g., if two branches emanate from next node futher out, then ONE additional cluster
         # will be formed by cutting downstream of it)
 
-        # Python note: Lazy implementation where I use .nodedist() function for each node in tree.
-        # Could probably be sped up by using information already in .child_dict dict (thereby essentially
-        # looking at lower branches only once)
-
-        # PYTHON NOTE: simplify. Maybe always return list of leaf-sets.
-        # Make sure that root dists are computed from bottom of tree first
-
         # Sanity check: There can not be more clusters than leaves
         nleaves = len(self.leaves)
         if nclust > nleaves:
@@ -4114,15 +4125,12 @@ class Tree:
             raise TreeError(msg)
 
         # Find nodeheights and number of emanating branches for all internal nodes
+        rootdists = self.rootdist
         nodeheightlist = []
         for parent, kid_dict in self.child_dict.items():
-            pheight = self.nodedist(parent)
+            pheight = rootdists[parent]
             nkids = len(kid_dict)
             nodeheightlist.append((pheight, nkids))
-            for kid in kid_dict:
-                kheight = self.nodedist(kid)
-                kid_dict[kid].parent_height = pheight
-                kid_dict[kid].kid_height = kheight
         nodeheightlist.sort()
         self.nodeheightlist = nodeheightlist
 
@@ -4147,11 +4155,13 @@ class Tree:
         cluster_basenodes = []          # List of basenodes of clusters
         for parent, kid_dict in self.child_dict.items():
             for kid in kid_dict:
-                if kid_dict[kid].parent_height <= cutoff < kid_dict[kid].kid_height:
+                parent_height = rootdists[parent]
+                kid_height = rootdists[kid]
+                if parent_height <= cutoff < kid_height:
                     cluster = self.remote_children(kid)
                     clusterlist.append(cluster)
                     cluster_basenodes.append(kid)       # NOTE: some basenodes may be leaves
-                elif (kid in self.leaves) and kid_dict[kid].kid_height < cutoff:
+                elif (kid in self.leaves) and kid_height < cutoff:
                     cluster = set([kid])
                     clusterlist.append(cluster)
                     cluster_basenodes.append(kid)       # NOTE: some basenodes may be leaves
