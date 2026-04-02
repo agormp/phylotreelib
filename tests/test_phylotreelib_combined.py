@@ -2648,15 +2648,14 @@ def test_consensus_topology_matches_reference_majority_set(data_dir):
 class TestParsimony:
     def _build_tree_with_states(self, treestring, leaf_states=None, internal_states=None):
         tree = pt.Tree.from_string(treestring)
-        ndict = tree.nodedict
 
         if leaf_states:
             for leaf, state in leaf_states.items():
-                ndict[leaf].state = state
+                tree.set_node_attribute(leaf, "state", state)
 
         if internal_states:
             for node, state in internal_states.items():
-                ndict[node].state = state
+                tree.set_node_attribute(node, "state", state)
 
         return tree
 
@@ -2744,7 +2743,7 @@ class TestParsimony:
             leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
         )
         ab_node = tree.find_mrca({"A", "B"})
-        tree.nodedict[ab_node].state = "X"
+        tree.set_node_attribute(ab_node, "state", "X")
 
         fitted = tree.parsimony_assign_fits(fitpref="Y")
 
@@ -2801,7 +2800,7 @@ class TestParsimony:
 
         assert possible is not tree
 
-    def test_parsimony_possible_states_errors_without_nodedict(self):
+    def test_parsimony_possible_states_errors_without_any_states(self):
         tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
 
         with pytest.raises(pt.TreeError):

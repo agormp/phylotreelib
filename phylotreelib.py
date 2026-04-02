@@ -312,33 +312,36 @@ class Branchstruct:
 ###################################################################################################
 
 class Nodestruct:
-    """Class that emulates a struct. Keeps node-related info"""
+    """Per-node metadata on a specific tree.
 
-    __slots__ = ("height", "nleaves", "subcladepairs", "best_pair",
-                 "mean", "M2", "n",
-                 "quantiles", "ci", "height_median",
-                 "clade_cred", "posterior", "freq", "height_sd",
-                 "clade_score",
-                 "state", "primary_set", "secondary_set", "optimal_set",
-                 "fit", "wasambig")
+    Instances live in Tree.nodedict (keyed by node ID). They store explicit metadata
+    assigned to nodes on that particular tree. This is distinct from tree.nodeheightdict,
+    which is a read-only cache derived from branch lengths.
+    """
 
-    def __init__(self, height=0.0, nleaves=None):
+    __slots__ = (
+        "height",
+        "height_sd",
+        "height_median",
+        "ci",
+        "clade_cred",
+        "nleaves",
+        "state",
+        "primary_set",
+        "secondary_set",
+        "optimal_set",
+        "fit",
+        "wasambig",
+    )
+
+    def __init__(self, height=None, nleaves=None):
         self.height = height
-        self.nleaves = nleaves
-        self.subcladepairs = set()
-        self.best_pair = None
-        self.mean = 0.0
-        self.M2 = 0.0
-        self.n = 0
-        self.quantiles = None
-        self.ci = None             # dict of {label: (lo, hi)}, where e.g. label = "90%_CI"
-        self.height_median = None
-        self.clade_cred = None
-        self.posterior = None
-        self.freq = None
         self.height_sd = None
-        self.clade_score = None
-        self.state = ""            # empty string = unlabelled node
+        self.height_median = None
+        self.ci = None
+        self.clade_cred = None
+        self.nleaves = nleaves
+        self.state = ""
         self.primary_set = None
         self.secondary_set = None
         self.optimal_set = None
@@ -369,18 +372,102 @@ class Nodestruct:
 
     ###############################################################################################
 
+    def copy(self):
+        """Returns copy of Nodestruct object, with all attributes included"""
+
+        obj = Nodestruct()
+        for name in self.__slots__:
+            origvalue = getattr(self, name)
+            if isinstance(origvalue, set):
+                setattr(obj, name, origvalue.copy())
+            else:
+                setattr(obj, name, origvalue)
+        return obj
+
+###################################################################################################
+###################################################################################################
+
+class SummaryNodestruct:
+    """Accumulator for per-clade summary statistics across many trees.
+
+    Instances live in TreeSummary._cladesummary or CAHeightEstimator.acc and are never stored
+    in Tree.nodedict.
+    """
+
+    __slots__ = (
+        "height",
+        "nleaves",
+        "mean",
+        "M2",
+        "n",
+        "quantiles",
+        "ci",
+        "height_median",
+        "height_sd",
+        "clade_cred",
+        "posterior",
+        "freq",
+        "clade_score",
+        "subcladepairs",
+        "best_pair",
+    )
+
+    def __init__(self, height=0.0, nleaves=None):
+        self.height = height
+        self.nleaves = nleaves
+        self.mean = 0.0
+        self.M2 = 0.0
+        self.n = 0
+        self.quantiles = None
+        self.ci = None
+        self.height_median = None
+        self.height_sd = None
+        self.clade_cred = None
+        self.posterior = None
+        self.freq = None
+        self.clade_score = None
+        self.subcladepairs = set()
+        self.best_pair = None
+
+    def __str__(self):
+        lines = []
+        for attr in self.__slots__:
+            val = getattr(self, attr)
+            if val is None:
+                continue
+            if attr == "quantiles":
+                continue
+            if isinstance(val, set) and not val:
+                continue
+            if isinstance(val, float):
+                sval = f"{val:.6g}"
+            else:
+                sval = str(val)
+            lines.append(f"{attr}: {sval}")
+        if not lines:
+            return "SummaryNodestruct()"
+        return "SummaryNodestruct(\n  " + "\n  ".join(lines) + "\n)"
+
+    def __repr__(self):
+        return self.__str__()
+
+    ###############################################################################################
+
     def add_subcladepair(self, subclade1, subclade2):
         self.subcladepairs.add(frozenset([subclade1, subclade2]))
 
     ###############################################################################################
 
     def copy(self):
-        """Returns copy of Nodestruct object, with all attributes included"""
+        """Returns copy of SummaryNodestruct."""
 
-        # Python note: will cause problems if any values are not immutable
-        obj = Nodestruct()
+        obj = SummaryNodestruct()
         for name in self.__slots__:
-            setattr(obj, name, getattr(self, name))
+            origvalue = getattr(self, name)
+            if isinstance(origvalue, set):
+                setattr(obj, name, origvalue.copy())
+            else:
+                setattr(obj, name, origvalue)
         return obj
 
 ###################################################################################################
@@ -1092,7 +1179,11 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
 ###################################################################################################
 
 class Tree:
-    """Class representing basic phylogenetic tree object."""
+    """Class representing basic phylogenetic tree object.
+
+    The tree structure lives in child_dict. Explicit per-node metadata lives in nodedict,
+    which is always a plain dict mapping node IDs to Nodestruct instances (possibly empty).
+    """
 
     # Tree is represented as a dictionary of dictionaries. The keys in the top dictionary
     # are the internal nodes, which are numbered consecutively. Each key has an associated
@@ -1115,7 +1206,7 @@ class Tree:
 
     def __init__(self):
         self.child_dict = {}
-        self._nodedict = None
+        self.nodedict = {}
         self.leaves = set()
         self._intnodes = None
         self._nodes = None
@@ -1352,13 +1443,23 @@ class Tree:
         obj = cls.from_leaves(clade._sorted_leaf_tup)
         all_leaves = obj.frozenset_leaves
 
+        def tree_nodestruct_copy(src):
+            nd = Nodestruct()
+            for attr in Nodestruct.__slots__:
+                if hasattr(src, attr):
+                    value = getattr(src, attr)
+                    if isinstance(value, set):
+                        value = value.copy()
+                    setattr(nd, attr, value)
+            return nd
+
         for clade, nodestruct in cladedict.items():
             clade_leaves = clade.get_clade()
             if len(clade_leaves) == 1:
                 leaf = next(iter(clade_leaves))
-                obj.nodedict[leaf] = nodestruct
+                obj.nodedict[leaf] = tree_nodestruct_copy(nodestruct)
             elif clade_leaves == all_leaves:
-                obj.nodedict[obj.root] = nodestruct
+                obj.nodedict[obj.root] = tree_nodestruct_copy(nodestruct)
             else:
                 mrca = obj.find_mrca(clade_leaves)
                 movelist = []
@@ -1366,7 +1467,7 @@ class Tree:
                     if (child in clade_leaves) or (obj.remotechildren_dict[child] <= clade_leaves):
                         movelist.append(child)
                 newnode = obj.split_off_children(mrca, movelist, Branchstruct())
-                obj.nodedict[newnode] = nodestruct
+                obj.nodedict[newnode] = tree_nodestruct_copy(nodestruct)
 
                 # Reset obj caches which are now obsolete
                 obj.clear_caches()
@@ -1856,12 +1957,16 @@ class Tree:
 
     ###############################################################################################
 
-    @property
-    def nodedict(self):
-        """Lazy creation of _nodedict when needed"""
-        if self._nodedict is None:
-            self._nodedict = {node: Nodestruct() for node in self.nodes}
-        return self._nodedict
+    def ensure_nodedict(self):
+        """Ensure every node has a Nodestruct entry in self.nodedict.
+
+        This is intended for algorithms that need to read/write node attributes on all nodes,
+        such as parsimony. Explicit metadata survives cache clears, so clear_caches() does not
+        touch nodedict.
+        """
+        for node in self.nodes:
+            if node not in self.nodedict:
+                self.nodedict[node] = Nodestruct()
 
     ###############################################################################################
 
@@ -2097,7 +2202,7 @@ class Tree:
         obj.root = self.root
         obj.leaves = self.leaves.copy()
         obj.child_dict = self._copy_child_dict(obj, copylengths, copyattr)
-        obj._nodedict = self._copy_nodedict(obj)
+        obj.nodedict = self._copy_nodedict(obj)
         return obj
 
     ###############################################################################################
@@ -2116,23 +2221,21 @@ class Tree:
     ###############################################################################################
 
     def _copy_nodedict(self, obj):
-        if self._nodedict is None:
-            return None
-        else:
-            origdict = self.nodedict
-            newdict = {}
-            for key,orignode in origdict.items():
-                newnode = Nodestruct()
-                for attrname in orignode.__slots__:
-                    origvalue = getattr(orignode, attrname)
-                    if isinstance(origvalue, set):
-                        newvalue = origvalue.copy()
-                    else:
-                        newvalue = origvalue  # Assume all other attributes are immutable
-                    setattr(newnode, attrname, newvalue)
-                newdict[key] = newnode
+        if not self.nodedict:
+            return {}
+        newdict = {}
+        for key,orignode in self.nodedict.items():
+            newnode = Nodestruct()
+            for attrname in orignode.__slots__:
+                origvalue = getattr(orignode, attrname)
+                if isinstance(origvalue, set):
+                    newvalue = origvalue.copy()
+                else:
+                    newvalue = origvalue
+                setattr(newnode, attrname, newvalue)
+            newdict[key] = newnode
 
-            return newdict
+        return newdict
 
     ###############################################################################################
 
@@ -3238,9 +3341,11 @@ class Tree:
                         else:
                             treelist.append(f"{label}")
                 if node_attributes:
-                    metacomment_node = create_metacomment(self.nodedict[child], node_attributes,
-                                                          ci_labels, ci_prefix="height")
-                    treelist.append(metacomment_node)
+                    nd = self.nodedict.get(child)
+                    if nd is not None:
+                        metacomment_node = create_metacomment(nd, node_attributes,
+                                                              ci_labels, ci_prefix="height")
+                        treelist.append(metacomment_node)
                 if printdist:
                     treelist.append(f":{dist:.{precision}g}")
                 if branch_attributes:
@@ -3258,9 +3363,13 @@ class Tree:
         treelist = ["("]
         append_children(root)
         if node_attributes:
-            metacomment_node = create_metacomment(self.nodedict[root], node_attributes,
-                                                  ci_labels, ci_prefix="height")
-            treelist.append(f"){metacomment_node};")
+            nd = self.nodedict.get(root)
+            if nd is not None:
+                metacomment_node = create_metacomment(nd, node_attributes,
+                                                      ci_labels, ci_prefix="height")
+                treelist.append(f"){metacomment_node};")
+            else:
+                treelist.append(");")
         else:
             treelist.append(");")
         treestring = "".join(treelist)
@@ -3434,17 +3543,17 @@ class Tree:
         Deprecated: use generator version iter_cladeinfo when possible.
         This function only to maintain backwards-compatible materialization of dict
 
-        Returns tree in the form of a "clade dictionary": {clade: nodestruct}
-        Nodestructs get the .height and ntips attributes set during construction.
-        If requested: Nodestructs also sets .subcladepairs attribute (set)
+        Returns tree in the form of a "clade dictionary": {clade: SummaryNodestruct}
+        SummaryNodestruct objects get .height and .nleaves set during construction.
+        If requested: SummaryNodestruct also stores .subcladepairs.
         """
         cladedict = {}
         node2clade = {} if track_subcladepairs else None
         it = self.iter_cladeinfo(node2clade=node2clade, keep_remchild_dict=keep_remchild_dict)
 
-        Nodestruct_ = Nodestruct  # local bind
+        SummaryNodestruct_ = SummaryNodestruct  # local bind
         for node, clade, height, nleaves in it:
-            cladedict[clade] = Nodestruct_(height, nleaves)
+            cladedict[clade] = SummaryNodestruct_(height, nleaves)
 
         if track_subcladepairs:
             # Second pass: attach observed child clade pairs to the per-tree nodestructs
@@ -3731,14 +3840,21 @@ class Tree:
         attrname: Name of attribute (e.g., "height")
         attrvalue: Value of attribute (e.g. 0.153)"""
 
-        setattr(self.nodedict[node], attrname, attrvalue)
+        nd = self.nodedict.get(node)
+        if nd is None:
+            nd = Nodestruct()
+            self.nodedict[node] = nd
+        setattr(nd, attrname, attrvalue)
 
     ###############################################################################################
 
     def get_node_attribute(self, node, attrname, default=""):
         """Get specified attribute for the specified node"""
 
-        return getattr(self.nodedict[node], attrname, default)
+        nd = self.nodedict.get(node)
+        if nd is None:
+            return default
+        return getattr(nd, attrname, default)
 
     ###############################################################################################
 
@@ -3807,12 +3923,16 @@ class Tree:
     ###############################################################################################
 
     def set_blens_from_heights(self):
-        """Set all branch lengths based on node heights: blen = height_parent - height_child"""
+        """Set all branch lengths using explicitly assigned nodedict[node].height values.
+
+        This reads from tree.nodedict, not from tree.nodeheightdict.
+        """
 
         # Ensure presence of nodedict and that height attribute exists for all nodes
-        if self._nodedict is None:
-            raise TreeError("Tree does not have nodedict, so height information not available")
-        missing = [n for n in self.nodes if not hasattr(self.nodedict[n], "height")]
+        if not self.nodedict:
+            raise TreeError("Tree has no node attributes (nodedict is empty), so height information not available")
+        missing = [n for n in self.nodes
+                   if n not in self.nodedict or self.nodedict[n].height is None]
         if missing:
             msg = (f"No information about node heights on this tree "
                    f"(missing 'height' attribute for {len(missing)} nodes; e.g. {missing[:5]})")
@@ -3867,9 +3987,10 @@ class Tree:
             curlevel = nextlevel
 
         # If self.nodedict exists: copy relevant parts from self to other
-        if self._nodedict is not None:
+        if self.nodedict:
             for node in other.nodes:
-                other.nodedict[node] = self.nodedict[node]
+                if node in self.nodedict:
+                    other.nodedict[node] = self.nodedict[node].copy()
 
         return (other, basalbranch_copy)
 
@@ -3919,6 +4040,8 @@ class Tree:
                 raise TreeError(f"Cannot graft leaf '{leaf}': name already exists in target tree")
             self.child_dict[graftpoint][leaf] = connect_branchstruct
             self.leaves.add(leaf)
+            if self.nodedict:
+                self.nodedict[leaf] = Nodestruct()
             self.clear_caches()
             return graftpoint
 
@@ -3945,6 +4068,10 @@ class Tree:
 
         # Update leaves and clear caches
         self.leaves.update(other.leaves)
+        if self.nodedict:
+            self.nodedict.setdefault(graftpoint, Nodestruct())
+            if other.nodedict:
+                self.nodedict.update(other.nodedict)
         self.clear_caches()
         return graftpoint
 
@@ -4087,6 +4214,9 @@ class Tree:
             child_dict[newnode][child] = child_dict[parent][child]
             del child_dict[parent][child]
 
+        if self.nodedict:
+            self.nodedict[newnode] = Nodestruct()
+
         self.clear_caches()
         return newnode
 
@@ -4160,6 +4290,9 @@ class Tree:
         self.child_dict[parent][newnode] = upper_bs
         self.child_dict[newnode][child] = lower_bs
         del self.child_dict[parent][child]
+
+        if self.nodedict:
+            self.nodedict[newnode] = Nodestruct()
 
         self.clear_caches()
         return newnode
@@ -4276,9 +4409,7 @@ class Tree:
         parent = self.parent(leaf)
         childset = self.children(parent)
         root = self.root
-
-        if self._nodedict is not None:
-            orignodes = self.nodes.copy()
+        removed_parent = None
 
         # If leaf is part of bifurcation AND is directly attached to root, then
         # the "other child" of the root must become the new root
@@ -4286,6 +4417,7 @@ class Tree:
             [child2] = childset - {leaf}                    # Remaining item is other child
             del self.child_dict[root]                       # Remove entry for old root
             self.root = child2                              # child2 is new root
+            removed_parent = root
 
         # If leaf is part of bifurcation but NOT attached directly to root, then parent
         # must also be removed from tree, and the remaining child needs to be grafted
@@ -4301,22 +4433,25 @@ class Tree:
             self.child_dict[grandparent][child2].length += child2dist   # Cumulated distance
             del self.child_dict[parent]                      # Delete parent and leaf
             del self.child_dict[grandparent][parent]         # Also remove pointer from gp to p
-            del self._parent_dict[leaf]                      # Remove unused entries in parent_dict
-            del self._parent_dict[parent]
+            if self._parent_dict is not None:
+                del self._parent_dict[leaf]                  # Remove unused entries in parent_dict
+                del self._parent_dict[parent]
+            removed_parent = parent
 
         # If leaf is part of multifurcation, then no special cleanup needed
         else:
             del self.child_dict[parent][leaf]
-            del self._parent_dict[leaf]
+            if self._parent_dict is not None:
+                del self._parent_dict[leaf]
 
         # Remove leaf entry from global leaflist
         self.leaves.remove(leaf)
 
         # Clean up nodedict if present
-        if self._nodedict is not None:
-            remnodes = orignodes - self.nodes
-            for node in remnodes:
-                del self.nodedict[node]
+        if self.nodedict:
+            self.nodedict.pop(leaf, None)
+            if removed_parent is not None:
+                self.nodedict.pop(removed_parent, None)
 
         self.clear_caches()
 
@@ -4332,6 +4467,8 @@ class Tree:
         self.child_dict[parent][newleafname] = branchstruct
         self.nodes.add(newleafname)
         self.leaves.add(newleafname)
+        if self.nodedict:
+            self.nodedict[newleafname] = Nodestruct()
 
         self.clear_caches()
 
@@ -4907,6 +5044,7 @@ class Tree:
         self.child_dict[newroot][other] = branch_merged
 
         del self.child_dict[oldroot]
+        self.nodedict.pop(oldroot, None)
         self.clear_caches()
 
     ###############################################################################################
@@ -4972,6 +5110,8 @@ class Tree:
             del self.child_dict[oldparent][newparent]
 
         self.root = newroot
+        if self.nodedict:
+            self.nodedict.setdefault(newroot, Nodestruct())
         self.clear_caches()
 
     ###############################################################################################
@@ -5308,9 +5448,7 @@ class Tree:
         # D. Papamichaila et al., Computational Biology and Chemistry 69 (2017) 171–177
         # Upper and lower sets are here referred to as primary and secondary set
 
-        if self._nodedict is None:
-            msg = "Tree object has no .nodedict attribute. Can't perform parsimony analysis"
-            raise TreeError(msg)
+        self.ensure_nodedict()
 
         treecopy = self.copy_treeobject()
         treecopy = self._hartigan_tip2root_pass(treecopy)
@@ -5802,7 +5940,7 @@ class TreeSummary():
 
         self._bipartsummary = {}        # Dict: {bipartition:branchstruct}
         self._bipartsummary_processed = False
-        self._cladesummary = {}         # Dict: {clade:nodestruct}
+        self._cladesummary = {}         # Dict: {clade:SummaryNodestruct}
         self._cladesummary_processed = False
         self._rootbip_summary = {}      # Dict: {bipartition:rootbipstruct}
         self._rootbip_summary_processed = False
@@ -6077,7 +6215,7 @@ class TreeSummary():
                 cladeset.add(clade)
             s = cladesummary.get(clade)
             if s is None:
-                s = Nodestruct(height, nleaves)
+                s = SummaryNodestruct(height, nleaves)
                 cladesummary[clade] = s
                 if do_ci:
                     s.quantiles = QuantileAccumulator(k=self.quantile_k)
@@ -7055,13 +7193,13 @@ class CAHeightEstimator():
         self.plan = plan                                # CAPlan object with tuple of MRCA queries
         self.trackci = bool(trackci and plan.probs)
 
-        # {node:Nodestruct} dict for accumulating height info from input trees
+        # {node:SummaryNodestruct} dict for accumulating height info from input trees
         acc = {}
         self.acc = acc
         self.quantile_k = quantile_k
 
         def make_acc():
-            s = Nodestruct()
+            s = SummaryNodestruct()
             s.n = 0
             s.mean = 0.0
             s.M2 = 0.0
