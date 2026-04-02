@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [2.2.2] - 2026 April 2
+
+#### Changed
+- `Tree.nodedict` is now always a plain `dict` (never `None`), but may be empty on a fresh tree. Code that assumed every node had an entry immediately after tree construction should use `tree.set_node_attribute(...)` or call `tree.ensure_nodedict()` first.
+- `Tree.newick()` / `Tree.nexus()` now skip node meta-comments for nodes that have no `Nodestruct` entry, rather than assuming all nodes carry metadata.
+- `Tree.cladedict()` now returns `{clade: SummaryNodestruct}` instead of `{clade: Nodestruct}`. This only affects callers that inspect the returned struct type directly.
+- `Tree.set_blens_from_heights()` now raises `TreeError` when `nodedict` is empty, with a clearer error message about missing height metadata.
+
+#### Added
+- `Tree.ensure_nodedict()`: populates `Nodestruct` entries for every node. Use this when an algorithm needs to read or write attributes on all nodes (e.g., parsimony workflows).
+- `SummaryNodestruct`: new class for per-clade summary accumulators used by `TreeSummary` and `CAHeightEstimator`. This separates cross-tree summary state from per-tree node metadata (`Nodestruct`).
+
+#### Fixed
+- `Tree.parsimony_possible_states()` now calls `ensure_nodedict()` internally, so parsimony methods no longer fail on trees with a sparse `nodedict`. The method still raises `TreeError` if no node has a non-empty `.state`.
+- Tree-editing methods (`graft`, `split_off_children`, `add_node_on_branch`, `add_leaf`, `remove_leaf`, `collapse_bifurcating_root`, `reroot`) now keep `nodedict` consistent when adding or removing nodes.
+- `cluster_n()` no longer writes temporary scratch fields onto `Branchstruct` during clustering.
+- `Tree.get_node_attribute()` now returns the supplied default when a node has no `Nodestruct` entry, instead of raising an error.
+- `Tree.set_node_attribute()` now creates a `Nodestruct` on demand for the target node.
+
+---
+
 ## [2.2.1] - 2026 April 1
 
 #### Fixed
