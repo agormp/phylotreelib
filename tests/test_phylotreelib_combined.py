@@ -2806,9 +2806,266 @@ class TestParsimony:
         with pytest.raises(pt.TreeError):
             tree.parsimony_possible_states()
 
-    def test_parsimony_possible_states_errors_without_any_states(self):
-        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
-        _ = tree.nodedict
 
+class TestNodedictRefactor:
+    def test_fresh_tree_has_empty_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        assert isinstance(tree.nodedict, dict)
+        assert len(tree.nodedict) == 0
+
+    def test_set_node_attribute_creates_entry(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        mrca = tree.find_mrca({"A", "B"})
+        tree.set_node_attribute(mrca, "height", 1.5)
+        assert mrca in tree.nodedict
+        assert tree.nodedict[mrca].height == 1.5
+        assert "A" not in tree.nodedict
+
+    def test_get_node_attribute_default(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        assert tree.get_node_attribute("A", "height", default=None) is None
+        assert tree.get_node_attribute("A", "height", default=-1) == -1
+        assert tree.get_node_attribute("A", "height") == ""
+
+    def test_ensure_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.ensure_nodedict()
+        assert set(tree.nodedict.keys()) == tree.nodes
+        for nd in tree.nodedict.values():
+            assert isinstance(nd, pt.Nodestruct)
+
+    def test_ensure_nodedict_preserves_existing(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "state", "human")
+        tree.ensure_nodedict()
+        assert tree.nodedict["A"].state == "human"
+
+    def test_remove_leaf_cleans_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.ensure_nodedict()
+        assert "B" in tree.nodedict
+        tree.remove_leaf("B")
+        assert "B" not in tree.nodedict
+        assert "A" in tree.nodedict
+
+    def test_graft_updates_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "state", "human")
+        parent_of_a = tree.parent("A")
+        grandparent = tree.parent(parent_of_a)
+        tree.graft("E", parent=grandparent, child=parent_of_a, connect_length=0.5)
+        assert "E" in tree.nodedict
+        assert "A" in tree.nodedict
+        assert tree.nodedict["A"].state == "human"
+
+    def test_reroot_updates_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.ensure_nodedict()
+        tree.reroot("A", tree.parent("A"), dist_from_node1=0.5)
+        assert tree.root in tree.nodedict
+
+    def test_spr_nodedict_consistency(self):
+        tree = pt.Tree.randtree(ntips=10, rate_sd=0.1)
+        tree.ensure_nodedict()
+        tree.spr()
+        assert set(tree.nodedict.keys()) <= tree.nodes
+
+    def test_split_off_children_updates_nodedict(self):
+        tree = pt.Tree.from_string("(A:1,B:1,C:1,D:1);")
+        tree.ensure_nodedict()
+        root = tree.root
+        new_node = tree.split_off_children(root, ["A", "B"], pt.Branchstruct(length=0.5))
+        assert new_node in tree.nodedict
+
+    def test_copy_treeobject_independent_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "state", "human")
+        copy = tree.copy_treeobject()
+        assert copy.nodedict["A"].state == "human"
+        copy.nodedict["A"].state = "mink"
+        assert tree.nodedict["A"].state == "human"
+
+    def test_copy_treeobject_empty_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        copy = tree.copy_treeobject()
+        assert isinstance(copy.nodedict, dict)
+        assert len(copy.nodedict) == 0
+
+    def test_subtree_copies_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "state", "human")
+        tree.set_node_attribute("C", "state", "mink")
+        mrca_ab = tree.find_mrca({"A", "B"})
+        subtree, basal = tree.subtree(mrca_ab)
+        assert "A" in subtree.nodedict
+        assert subtree.nodedict["A"].state == "human"
+        assert "C" not in subtree.nodedict
+        subtree.nodedict["A"].state = "bat"
+        assert tree.nodedict["A"].state == "human"
+
+    def test_nodeheightdict_derived(self):
+        tree = pt.Tree.from_string("((A:1,B:1):2,(C:3,D:3):0);")
+        nhd = tree.nodeheightdict
+        assert isinstance(nhd, dict)
+        assert set(nhd.keys()) == tree.nodes
+
+    def test_nodeheightdict_independent_of_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        nhd = tree.nodeheightdict
+        assert len(nhd) > 0
+        assert len(tree.nodedict) == 0
+
+    def test_set_blens_from_heights_uses_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.ensure_nodedict()
+        tree.set_node_attribute(tree.root, "height", 5.0)
+        for kid in tree.children(tree.root):
+            if kid in tree.intnodes:
+                tree.set_node_attribute(kid, "height", 2.0)
+            else:
+                tree.set_node_attribute(kid, "height", 0.0)
+        for parent in tree.intnodes - {tree.root}:
+            for kid in tree.children(parent):
+                tree.set_node_attribute(kid, "height", 0.0)
+        tree.set_blens_from_heights()
+        for kid in tree.children(tree.root):
+            if kid in tree.intnodes:
+                assert tree.child_dict[tree.root][kid].length == 3.0
+
+    def test_set_blens_from_heights_empty_nodedict_raises(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
         with pytest.raises(pt.TreeError):
+            tree.set_blens_from_heights()
+
+    def test_clear_caches_preserves_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "state", "human")
+        tree.clear_caches()
+        assert "A" in tree.nodedict
+        assert tree.nodedict["A"].state == "human"
+
+    def test_clear_length_caches_preserves_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "height", 99.0)
+        _ = tree.nodeheightdict
+        tree.clear_length_caches()
+        assert tree.nodedict["A"].height == 99.0
+        nhd = tree.nodeheightdict
+        assert nhd["A"] != 99.0
+
+    def test_parsimony_with_ensure_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "state", "human")
+        tree.set_node_attribute("B", "state", "human")
+        tree.set_node_attribute("C", "state", "mink")
+        tree.set_node_attribute("D", "state", "mink")
+        result = tree.parsimony_possible_states()
+        for node in result.intnodes:
+            assert result.nodedict[node].optimal_set is not None
+
+    def test_parsimony_no_states_raises(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        with pytest.raises(pt.TreeError, match="There are no nodes with \\.state"):
             tree.parsimony_possible_states()
+
+    def test_cladesummary_uses_summary_nodestruct(self):
+        ts = pt.TreeSummary(trackclades=True, trackheight=True, tracktopo=True)
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        ts.add_tree(tree)
+        for clade, sn in ts.cladesummary.items():
+            assert isinstance(sn, pt.SummaryNodestruct)
+            assert hasattr(sn, "mean")
+            assert hasattr(sn, "M2")
+            assert hasattr(sn, "n")
+
+    def test_tree_nodedict_uses_nodestruct(self):
+        ts = pt.TreeSummary(trackclades=True, trackheight=True, tracktopo=True)
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        ts.add_tree(tree)
+        stb = pt.SummaryTreeBuilder(ts)
+        sumtree = stb.max_clade_cred_tree()
+        tpp = pt.TreePostProcessor(ts)
+        tpp.annotate_sumtree(sumtree)
+        for node, nd in sumtree.nodedict.items():
+            assert isinstance(nd, pt.Nodestruct)
+            assert not hasattr(nd, "mean")
+            assert not hasattr(nd, "M2")
+
+    def test_nodestruct_no_accumulator_slots(self):
+        nd = pt.Nodestruct()
+        assert not hasattr(nd, "mean")
+        assert not hasattr(nd, "M2")
+        assert not hasattr(nd, "subcladepairs")
+        assert not hasattr(nd, "posterior")
+
+    def test_summary_nodestruct_has_accumulator_slots(self):
+        sn = pt.SummaryNodestruct()
+        assert hasattr(sn, "mean")
+        assert hasattr(sn, "M2")
+        assert hasattr(sn, "n")
+        assert hasattr(sn, "subcladepairs")
+        assert hasattr(sn, "posterior")
+        assert hasattr(sn, "freq")
+
+    def test_consensus_pipeline_end_to_end(self):
+        trees = []
+        for _ in range(20):
+            t = pt.Tree.randtree(ntips=8, rate_sd=0.1)
+            trees.append(t)
+
+        ts = pt.TreeSummary(trackbips=True, trackblen=True, trackclades=True)
+        for t in trees:
+            ts.add_tree(t)
+
+        sumtree = pt.build_sumtree(ts, treetype="con", blen="biplen")
+        assert len(sumtree.nodedict) > 0
+        for node in sumtree.intnodes:
+            if node in sumtree.nodedict:
+                assert sumtree.nodedict[node].clade_cred is not None
+
+    def test_cladeheight_pipeline_end_to_end(self):
+        trees = []
+        for _ in range(20):
+            t = pt.Tree.randtree(ntips=8, rate_sd=0.1)
+            trees.append(t)
+
+        ts = pt.TreeSummary(trackclades=True, trackheight=True, tracktopo=True)
+        for t in trees:
+            ts.add_tree(t)
+
+        sumtree = pt.build_sumtree(ts, treetype="mcc", blen="cladeheight")
+        for node in sumtree.nodes:
+            assert node in sumtree.nodedict
+            assert sumtree.nodedict[node].height is not None
+        for parent in sumtree.intnodes:
+            p_height = sumtree.nodedict[parent].height
+            for child in sumtree.children(parent):
+                c_height = sumtree.nodedict[child].height
+                blen = sumtree.child_dict[parent][child].length
+                assert abs(blen - (p_height - c_height)) < 1e-10
+
+    def test_meta_comments_sparse_nodedict(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.set_node_attribute("A", "height", 0.0)
+        pt.configure_basic_printing(tree, print_meta=True, node_attrs=("height",))
+        nwk = tree.newick()
+        assert isinstance(nwk, str)
+        assert "A" in nwk
+
+    def test_cluster_no_branchstruct_heights(self):
+        tree = pt.Tree.randtree(ntips=10, rate_sd=0.1)
+        clusters, basenodes = tree.cluster_n(3)
+        assert len(clusters) == len(basenodes)
+        for parent in tree.intnodes:
+            for child, br in tree.child_dict[parent].items():
+                assert br.parent_height is None
+                assert br.kid_height is None
+
+    def test_cluster_results_unchanged(self):
+        tree = pt.Tree.from_string("(((A:1,B:1):2,(C:1,D:1):2):1,(E:3,F:3):1);")
+        clusters, _ = tree.cluster_n(3)
+        assert len(clusters) >= 3
+        all_leaves = set()
+        for cl in clusters:
+            all_leaves.update(cl)
+        assert all_leaves == tree.leaves
