@@ -50,6 +50,7 @@ This repository uses three main documentation files:
 - `README.md` — (this file) overview and quick start
 - `docs/recipes.md` — copy/paste-ready examples and workflows
 - `docs/api.md` — more extensive reference to the API, plus advanced notes
+- `CHANGELOG.md` — version history and migration notes
 
 The README gives examples of the most common workflows. More specialized details, and the theory behind some of the summary-tree machinery, are in the `docs/` files.
 
