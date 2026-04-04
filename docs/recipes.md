@@ -837,13 +837,17 @@ phylotreelib implements Hartigan's (1973) parsimony algorithm, extended to handl
 multifurcations and internal nodes with observed states. The implementation follows
 [Papamichail et al. (2017)](https://doi.org/10.1016/j.compbiolchem.2017.03.007).
 
+Note: the aim here is to reconstruct ancestral states and count changes on a single given
+tree, not to search tree-space for the most parsimonious tree.
+
 Three methods form a pipeline of increasing summarization:
 
 - `parsimony_possible_states()` — optimal state-sets at every node (Hartigan up+down passes)
 - `parsimony_assign_fits()` — pick one concrete state per node (one optimal reconstruction)
 - `parsimony_count_changes()` — parsimony score + directed change counts
 
-All three return a **copy** of the tree (the original is not modified).
+The first two return an annotated copy of the tree; the third returns a score and a
+dictionary of change counts. None of them modify the original tree.
 
 States can be single strings (one character in the cladistic sense) or tuples of strings
 (multiple independent characters analyzed jointly on the same tree). Single-site and
