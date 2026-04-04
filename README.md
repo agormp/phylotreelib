@@ -45,7 +45,7 @@ python3 -m pip install --upgrade phylotreelib
 
 ## Documentation
 
-This repository uses three main documentation files:
+This repository uses four main documentation files:
 
 - `README.md` — (this file) overview and quick start
 - `docs/recipes.md` — copy/paste-ready examples and workflows
