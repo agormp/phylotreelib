@@ -830,3 +830,203 @@ except pt.TreeError as err:
 ```
 
 ---
+
+### 12. Parsimony
+
+phylotreelib implements Hartigan's (1973) parsimony algorithm, extended to handle
+multifurcations and internal nodes with observed states. The implementation follows
+[Papamichail et al. (2017)](https://doi.org/10.1016/j.compbiolchem.2017.03.007).
+
+Three methods form a pipeline of increasing summarization:
+
+- `parsimony_possible_states()` — optimal state-sets at every node (Hartigan up+down passes)
+- `parsimony_assign_fits()` — pick one concrete state per node (one optimal reconstruction)
+- `parsimony_count_changes()` — parsimony score + directed change counts
+
+All three return a **copy** of the tree (the original is not modified).
+
+States can be single strings (one character in the cladistic sense) or tuples of strings
+(multiple independent characters analyzed jointly on the same tree). Single-site and
+multi-site examples are shown below.
+
+#### Set up a tree with observed states on leaves
+
+Parsimony methods read `.state` from each node's `Nodestruct` in `tree.nodedict`.
+Leaves must have a non-empty `.state`; internal nodes may be left empty (to be inferred)
+or given an observed state (which the algorithm will respect).
+```python
+import phylotreelib as pt
+
+tree = pt.Tree.from_string(
+    "((Mink_1:1,Mink_2:1):1,(Human_1:1,Human_2:1):1,(Bat_1:1,Bat_2:1):1);"
+)
+
+# Assign observed states to leaves
+for leaf in tree.leaves:
+    if leaf.startswith("Mink"):
+        tree.set_node_attribute(leaf, "state", "mink")
+    elif leaf.startswith("Human"):
+        tree.set_node_attribute(leaf, "state", "human")
+    else:
+        tree.set_node_attribute(leaf, "state", "bat")
+```
+
+#### Find optimal state-sets at internal nodes
+```python
+result = tree.parsimony_possible_states()
+
+# result is a copy of tree; inspect the optimal_set at each internal node
+for node in result.sorted_intnodes():
+    ns = result.nodedict[node]
+    print(f"node {node}: optimal_set={ns.optimal_set}  "
+          f"primary_set={ns.primary_set}  secondary_set={ns.secondary_set}")
+```
+
+`optimal_set` gives the full set of states that a node can have on any maximum-parsimony
+reconstruction. `primary_set` and `secondary_set` are the intermediate Hartigan sets.
+
+#### Assign one concrete fit per node
+```python
+fitted = tree.parsimony_assign_fits()
+
+for node in fitted.nodes:
+    ns = fitted.nodedict[node]
+    print(f"node {node}: fit={ns.fit}  wasambig={ns.wasambig}")
+```
+
+When a node is ambiguous (more than one state is equally parsimonious), the algorithm
+picks randomly. Use `fitpref` to prefer a specific state at ambiguous sites:
+```python
+fitted_prefer_human = tree.parsimony_assign_fits(fitpref="human")
+
+for node in fitted_prefer_human.sorted_intnodes():
+    ns = fitted_prefer_human.nodedict[node]
+    print(f"node {node}: fit={ns.fit}  wasambig={ns.wasambig}")
+```
+
+#### Count changes (parsimony score + direction)
+```python
+pscore, countdict = tree.parsimony_count_changes()
+
+print(f"Parsimony score: {pscore}")
+for (from_state, to_state), count in sorted(countdict.items()):
+    print(f"  {from_state} -> {to_state}: {count}")
+```
+
+With `fitpref`:
+```python
+pscore, countdict = tree.parsimony_count_changes(fitpref="human")
+print(f"Parsimony score (fitpref='human'): {pscore}")
+for (from_state, to_state), count in sorted(countdict.items()):
+    print(f"  {from_state} -> {to_state}: {count}")
+```
+
+#### Parsimony with an observed state on an internal node
+
+If an internal node has an observed state, set it before calling any parsimony method.
+The algorithm will treat it as fixed (like a leaf state).
+```python
+import phylotreelib as pt
+
+tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+
+# Label leaves
+for leaf in ["A", "B"]:
+    tree.set_node_attribute(leaf, "state", "X")
+for leaf in ["C", "D"]:
+    tree.set_node_attribute(leaf, "state", "Y")
+
+# Also fix the root's state
+tree.set_node_attribute(tree.root, "state", "X")
+
+pscore, countdict = tree.parsimony_count_changes()
+print(f"Parsimony score: {pscore}")
+for (f, t), c in sorted(countdict.items()):
+    print(f"  {f} -> {t}: {c}")
+```
+
+#### Multi-site parsimony
+
+When each leaf carries observations at multiple independent sites (characters), you can
+pass the state as a tuple of strings instead of a single string. The Hartigan algorithm
+then runs independently at each site in a single tree traversal, and the parsimony score
+and change counts are aggregated across all sites.
+
+All labelled nodes must use tuples of the same length. Unlabelled nodes use the default
+empty string `""` as usual.
+```python
+import phylotreelib as pt
+
+tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+
+# Two sites: a "host" character and a nucleotide character
+tree.set_node_attribute("A", "state", ("mink", "G"))
+tree.set_node_attribute("B", "state", ("mink", "A"))
+tree.set_node_attribute("C", "state", ("human", "G"))
+tree.set_node_attribute("D", "state", ("human", "A"))
+
+pscore, countdict = tree.parsimony_count_changes()
+print(f"Parsimony score (summed over 2 sites): {pscore}")
+for (f, t), c in sorted(countdict.items()):
+    print(f"  {f} -> {t}: {c}")
+```
+
+Note: `countdict` keys are individual state strings (e.g., `("mink", "human")`), not
+tuples of tuples. Changes at different sites that happen to involve the same pair of
+states are summed together.
+
+#### Inspect per-node results in multi-site mode
+
+When states are tuples, the node attributes on the returned tree are also tuple- or
+list-shaped:
+```python
+import phylotreelib as pt
+
+tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+tree.set_node_attribute("A", "state", ("X", "1"))
+tree.set_node_attribute("B", "state", ("X", "2"))
+tree.set_node_attribute("C", "state", ("Y", "1"))
+tree.set_node_attribute("D", "state", ("Y", "2"))
+
+result = tree.parsimony_possible_states()
+
+for node in result.sorted_intnodes():
+    ns = result.nodedict[node]
+    # optimal_set is a list of sets, one per site
+    print(f"node {node}: optimal_set={ns.optimal_set}")
+
+fitted = tree.parsimony_assign_fits()
+
+for node in fitted.sorted_intnodes():
+    ns = fitted.nodedict[node]
+    # fit is a tuple of strings, wasambig is a tuple of bools
+    print(f"node {node}: fit={ns.fit}  wasambig={ns.wasambig}")
+```
+
+#### Multi-site fitpref
+
+`fitpref` accepts either a single string (broadcast to all sites) or a tuple with one
+entry per site. Per-site entries may be `None` for no preference at that site.
+```python
+import phylotreelib as pt
+
+tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1,(E:1,F:1):1);")
+tree.set_node_attribute("A", "state", ("X", "1"))
+tree.set_node_attribute("B", "state", ("Y", "1"))
+tree.set_node_attribute("C", "state", ("X", "2"))
+tree.set_node_attribute("D", "state", ("Y", "2"))
+tree.set_node_attribute("E", "state", ("X", "1"))
+tree.set_node_attribute("F", "state", ("Y", "2"))
+
+# Broadcast: prefer "X" at every site where it is in the optimal set
+pscore, countdict = tree.parsimony_count_changes(fitpref="X")
+print(f"Parsimony score (fitpref='X'): {pscore}")
+
+# Per-site: prefer "X" at site 0, no preference at site 1
+pscore, countdict = tree.parsimony_count_changes(fitpref=("X", None))
+print(f"Parsimony score (fitpref=('X', None)): {pscore}")
+```
+
+Note: `fitpref` only affects the choice among equally parsimonious reconstructions. It
+does not change the parsimony score when the reconstruction is unambiguous.
+
