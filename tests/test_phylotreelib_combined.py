@@ -2663,7 +2663,15 @@ class TestParsimony:
         fitted_ndict = fitted_tree.nodedict
         possible_ndict = possible_tree.nodedict
         for node in fitted_tree.nodes:
-            assert fitted_ndict[node].fit in possible_ndict[node].optimal_set
+            fit = fitted_ndict[node].fit
+            optimal_set = possible_ndict[node].optimal_set
+            if isinstance(optimal_set, list):
+                assert isinstance(fit, tuple)
+                assert len(fit) == len(optimal_set)
+                for si, site_optimal in enumerate(optimal_set):
+                    assert fit[si] in site_optimal
+            else:
+                assert fit in optimal_set
 
     def test_parsimony_score_all_same_state(self):
         tree = self._build_tree_with_states(
@@ -2805,6 +2813,126 @@ class TestParsimony:
 
         with pytest.raises(pt.TreeError):
             tree.parsimony_possible_states()
+
+    def test_parsimony_multisite_basic(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={
+                "A": ("X", "A"),
+                "B": ("X", "A"),
+                "C": ("Y", "A"),
+                "D": ("Y", "A"),
+            },
+        )
+
+        possible = tree.parsimony_possible_states()
+        fitted = tree.parsimony_assign_fits(fitpref=("X", "A"))
+        pscore, countdict = tree.parsimony_count_changes(fitpref=("X", "A"))
+
+        assert pscore == 1
+        assert sum(countdict.values()) == pscore
+        assert dict(countdict) == {("X", "Y"): 1} or dict(countdict) == {("Y", "X"): 1}
+        assert isinstance(fitted.nodedict[fitted.root].fit, tuple)
+        assert fitted.nodedict[fitted.root].fit == ("X", "A")
+        assert possible.nodedict[possible.root].optimal_set == [{"X", "Y"}, {"A"}]
+
+    def test_parsimony_multisite_wasambig_is_tuple(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={
+                "A": ("X", "X"),
+                "B": ("X", "Y"),
+                "C": ("Y", "Y"),
+                "D": ("Y", "Y"),
+            },
+        )
+
+        fitted = tree.parsimony_assign_fits(fitpref=("X", "Y"))
+
+        assert fitted.nodedict[fitted.root].fit == ("X", "Y")
+        assert fitted.nodedict[fitted.root].wasambig == (True, False)
+
+    def test_parsimony_multisite_fitpref_string_broadcast(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={
+                "A": ("X", "X"),
+                "B": ("X", "X"),
+                "C": ("Y", "Z"),
+                "D": ("Y", "Z"),
+            },
+        )
+
+        fitted = tree.parsimony_assign_fits(fitpref="X")
+
+        assert fitted.nodedict[fitted.root].fit == ("X", "X")
+        assert fitted.nodedict[fitted.root].wasambig == (True, True)
+
+    def test_parsimony_multisite_fitpref_tuple_with_none(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={
+                "A": ("X", "A"),
+                "B": ("X", "B"),
+                "C": ("Y", "A"),
+                "D": ("Y", "B"),
+            },
+        )
+
+        possible = tree.parsimony_possible_states()
+        fitted = tree.parsimony_assign_fits(fitpref=(None, "A"))
+
+        assert fitted.nodedict[fitted.root].fit[1] == "A"
+        assert fitted.nodedict[fitted.root].fit[0] in possible.nodedict[possible.root].optimal_set[0]
+        self._all_nodes_fit_within_optimal_set(fitted, possible)
+
+    def test_parsimony_multisite_singleton_tuple_matches_single_site_score(self):
+        treestring = "((A:1,B:1):1,(C:1,D:1):1);"
+        single_tree = self._build_tree_with_states(
+            treestring,
+            leaf_states={"A": "X", "B": "X", "C": "Y", "D": "Y"},
+        )
+        tuple_tree = self._build_tree_with_states(
+            treestring,
+            leaf_states={"A": ("X",), "B": ("X",), "C": ("Y",), "D": ("Y",)},
+        )
+
+        single_score, _ = single_tree.parsimony_count_changes(fitpref="X")
+        tuple_score, _ = tuple_tree.parsimony_count_changes(fitpref=("X",))
+
+        assert single_score == tuple_score == 1
+
+    def test_parsimony_multisite_mixed_state_types_raise(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": "X", "B": ("X", "A"), "C": ("Y", "A"), "D": ("Y", "A")},
+        )
+
+        with pytest.raises(pt.TreeError, match="mix strings and tuples/lists"):
+            tree.parsimony_possible_states()
+
+    def test_parsimony_multisite_inconsistent_lengths_raise(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={"A": ("X",), "B": ("X", "A"), "C": ("Y", "A"), "D": ("Y", "A")},
+        )
+
+        with pytest.raises(pt.TreeError, match="inconsistent tuple/list lengths"):
+            tree.parsimony_possible_states()
+
+    def test_parsimony_multisite_fitpref_length_mismatch_raises(self):
+        tree = self._build_tree_with_states(
+            "((A:1,B:1):1,(C:1,D:1):1);",
+            leaf_states={
+                "A": ("X", "A"),
+                "B": ("X", "A"),
+                "C": ("Y", "B"),
+                "D": ("Y", "B"),
+            },
+        )
+
+        with pytest.raises(pt.TreeError, match="fitpref tuple/list length does not match"):
+            tree.parsimony_assign_fits(fitpref=("X",))
 
 
 class TestNodedictRefactor:
