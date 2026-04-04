@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [2.3.0] - 2026 April 4
+
+#### Added
+- Multi-site parsimony: `parsimony_possible_states()`, `parsimony_assign_fits()`, and `parsimony_count_changes()` now accept tuple-valued states in addition to single strings. When `.state` is set to a tuple of strings (e.g., `("mink", "A", "G")`), the Hartigan algorithm runs independently at each site. The parsimony score and change counts are aggregated across all sites. Single-string states continue to work exactly as before.
+- `fitpref` in `parsimony_assign_fits()` and `parsimony_count_changes()` now accepts a tuple of per-site preferences in addition to a single string (which is broadcast to all sites). Individual entries may be `None` for no preference at that site.
+
+---
+
 ## [2.2.2] - 2026 April 2
 
 #### Changed
