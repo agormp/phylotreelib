@@ -5434,6 +5434,43 @@ class Tree:
 
     ###############################################################################################
 
+    def _detect_parsimony_nsites(self, tree):
+        """Detect whether parsimony states are single-site strings or multi-site tuples/lists."""
+
+        states_present = False
+        state_mode = None
+        nsites = None
+        msg = "There are no nodes with .state attribute in .nodedict. Can't perform parsimony analysis"
+
+        for node in tree.nodes:
+            state = tree.nodedict[node].state
+            if state:
+                states_present = True
+                if isinstance(state, str):
+                    cur_mode = "single"
+                    cur_nsites = 1
+                elif isinstance(state, (tuple, list)):
+                    cur_mode = "multi"
+                    cur_nsites = len(state)
+                else:
+                    raise TreeError("Parsimony states must be strings or tuples/lists of strings")
+
+                if state_mode is None:
+                    state_mode = cur_mode
+                    nsites = cur_nsites
+                else:
+                    if state_mode != cur_mode:
+                        raise TreeError("Parsimony states mix strings and tuples/lists")
+                    if nsites != cur_nsites:
+                        raise TreeError("Parsimony states have inconsistent tuple/list lengths")
+
+        if not states_present:
+            raise TreeError(msg)
+
+        return nsites
+
+    ###############################################################################################
+
     def parsimony_possible_states(self):
         """Performs parsimony analysis on tree object, and returns info about possible states
         at internal nodes.
@@ -5441,6 +5478,8 @@ class Tree:
         Assumes tree object has .nodedict attribute: {nodeid:Nodestruct}, and that each
         Nodestruct has a .state attribute, which is either empty (unlabelled nodes)
         or a string specifying the state (e.g., "mink" or "human" or "A").
+        For multi-site parsimony, .state can also be a tuple of strings where each tuple
+        position is treated as an independent site.
 
         Returns: copy of tree object where nodestructs now also have attributes
         .primary_set, .secondary_set, and .optimal_set
@@ -5461,8 +5500,8 @@ class Tree:
         self.ensure_nodedict()
 
         treecopy = self.copy_treeobject()
-        treecopy = self._hartigan_tip2root_pass(treecopy)
-        treecopy = self._hartigan_root2tip_pass(treecopy)
+        treecopy, nsites = self._hartigan_tip2root_pass(treecopy)
+        treecopy = self._hartigan_root2tip_pass(treecopy, nsites)
 
         return treecopy
 
@@ -5474,25 +5513,42 @@ class Tree:
         fitpref = None: choose random fits at unlabelled nodes, where possible
         fitpref = <concrete state-string>: Set ambiguous state at unlabelled nodes to this value
                  when possible (i.e., when compatible with MP score)
+        For multi-site parsimony, .state can be a tuple of strings, and fitpref can be either
+        a single string broadcast to all sites or a tuple/list of per-site preferences. Use
+        None inside a fitpref tuple/list to indicate no preference for that site.
         """
 
         tree = self.parsimony_possible_states()
         ndict = tree.nodedict
+        root_optimal_set = ndict[tree.root].optimal_set
+        if isinstance(root_optimal_set, list):
+            nsites = len(root_optimal_set)
+        else:
+            nsites = 1
+
+        if isinstance(fitpref, (tuple, list)):
+            if len(fitpref) != nsites:
+                raise TreeError("fitpref tuple/list length does not match number of parsimony sites")
+            if nsites == 1:
+                fitpref = fitpref[0]
 
         # Set fit and wasambig for labelled nodes
         for node in tree.nodes:
             if ndict[node].state:
                 ndict[node].fit = ndict[node].state
-                ndict[node].wasambig = False
+                if nsites == 1:
+                    ndict[node].wasambig = False
+                else:
+                    ndict[node].wasambig = tuple(False for _ in range(nsites))
 
         # Set fit and wasambig for root
-        self._set_fit_and_ambiguity_for_node(tree, tree.root, None, fitpref)
+        self._set_fit_and_ambiguity_for_node(tree, tree.root, None, fitpref, nsites)
 
         # Set fit and wasambig for internal, unlabelled nodes
         for parent in tree.sorted_intnodes(deepfirst=True):
             for child in tree.children(parent):
                 if not ndict[child].state:
-                    self._set_fit_and_ambiguity_for_node(tree, child, parent, fitpref)
+                    self._set_fit_and_ambiguity_for_node(tree, child, parent, fitpref, nsites)
 
         return tree
 
@@ -5508,6 +5564,8 @@ class Tree:
         fitpref = None: choose random fits at unlabelled nodes, where possible
         fitpref = <concrete state-string>: Set ambiguous state at unlabelled nodes to this value
                  when possible (i.e., when compatible with MP score)
+        For multi-site parsimony, .state can be a tuple of strings and fitpref can be either
+        a single string broadcast to all sites or a tuple/list of per-site preferences.
         """
 
         tree = self.parsimony_assign_fits(fitpref)
@@ -5525,13 +5583,31 @@ class Tree:
         ndict = tree.nodedict
         countdict = defaultdict(int)
         pscore = 0
-        for parent in tree.sorted_intnodes(deepfirst=True):
-            pfit = ndict[parent].fit
-            for child in tree.children(parent):
-                cfit = ndict[child].fit
-                if pfit != cfit:
-                    countdict[(pfit,cfit)] += 1
-                    pscore += 1
+        rootfit = ndict[tree.root].fit
+        if isinstance(rootfit, tuple):
+            nsites = len(rootfit)
+        else:
+            nsites = 1
+
+        if nsites == 1:
+            for parent in tree.sorted_intnodes(deepfirst=True):
+                pfit = ndict[parent].fit
+                for child in tree.children(parent):
+                    cfit = ndict[child].fit
+                    if pfit != cfit:
+                        countdict[(pfit,cfit)] += 1
+                        pscore += 1
+        else:
+            for parent in tree.sorted_intnodes(deepfirst=True):
+                pfit = ndict[parent].fit
+                for child in tree.children(parent):
+                    cfit = ndict[child].fit
+                    for si in range(nsites):
+                        pstate = pfit[si]
+                        cstate = cfit[si]
+                        if pstate != cstate:
+                            countdict[(pstate, cstate)] += 1
+                            pscore += 1
 
         return pscore, countdict
 
@@ -5543,37 +5619,61 @@ class Tree:
         Output: same tree object with added attribute .primary_set for all nodes
         """
 
-        # Set primary set of all labelled nodes (both internal and leafs) = state-value
-        # Set secondary set of labelled nodes to be the empty set
-        states_present = False
-        for node in tree.nodes:
-            state = tree.nodedict[node].state
-            if state:
-                states_present = True
-                tree.nodedict[node].primary_set = set([state])
-                tree.nodedict[node].secondary_set = set()
-        if not states_present:
-            raise TreeError("There are no nodes with .state attribute in .nodedict. Can't perform parsimony analysis")
+        nsites = self._detect_parsimony_nsites(tree)
 
-        # Tip-to-root pass: compute upper and lower sets for all unlabelled nodes
-        # All leaves are assumed to be labelled (to have a non-empty .state)
-        for p in tree.sorted_intnodes(deepfirst=False):
-            if not tree.nodedict[p].state:
-                statecount = Counter()
-                for c in tree.children(p):
-                    statecount.update(tree.nodedict[c].primary_set)
-                statecountlist = statecount.most_common()
-                topcount = statecountlist[0][1]
-                maxlist = [state for state,count in statecountlist if count==topcount]
-                almostmaxlist = [state for state,count in statecountlist if count==(topcount - 1)]
-                tree.nodedict[p].primary_set = set(maxlist)
-                tree.nodedict[p].secondary_set = set(almostmaxlist)
+        if nsites == 1:
+            # Set primary set of all labelled nodes (both internal and leafs) = state-value
+            # Set secondary set of labelled nodes to be the empty set
+            for node in tree.nodes:
+                state = tree.nodedict[node].state
+                if state:
+                    tree.nodedict[node].primary_set = set([state])
+                    tree.nodedict[node].secondary_set = set()
 
-        return tree
+            # Tip-to-root pass: compute upper and lower sets for all unlabelled nodes
+            # All leaves are assumed to be labelled (to have a non-empty .state)
+            for p in tree.sorted_intnodes(deepfirst=False):
+                if not tree.nodedict[p].state:
+                    statecount = Counter()
+                    for c in tree.children(p):
+                        statecount.update(tree.nodedict[c].primary_set)
+                    statecountlist = statecount.most_common()
+                    topcount = statecountlist[0][1]
+                    maxlist = [state for state,count in statecountlist if count==topcount]
+                    almostmaxlist = [state for state,count in statecountlist if count==(topcount - 1)]
+                    tree.nodedict[p].primary_set = set(maxlist)
+                    tree.nodedict[p].secondary_set = set(almostmaxlist)
+        else:
+            ndict = tree.nodedict
+
+            for node in tree.nodes:
+                state = ndict[node].state
+                if state:
+                    ndict[node].primary_set = [{s} for s in state]
+                    ndict[node].secondary_set = [set() for _ in state]
+
+            for p in tree.sorted_intnodes(deepfirst=False):
+                if not ndict[p].state:
+                    primary_set = []
+                    secondary_set = []
+                    for si in range(nsites):
+                        statecount = Counter()
+                        for c in tree.children(p):
+                            statecount.update(ndict[c].primary_set[si])
+                        statecountlist = statecount.most_common()
+                        topcount = statecountlist[0][1]
+                        primary_set_si = {s for s, cnt in statecountlist if cnt == topcount}
+                        secondary_set_si = {s for s, cnt in statecountlist if cnt == (topcount - 1)}
+                        primary_set.append(primary_set_si)
+                        secondary_set.append(secondary_set_si)
+                    ndict[p].primary_set = primary_set
+                    ndict[p].secondary_set = secondary_set
+
+        return tree, nsites
 
     ###############################################################################################
 
-    def _hartigan_root2tip_pass(self, tree):
+    def _hartigan_root2tip_pass(self, tree, nsites=1):
         """Perform root-to-tip pass of Hartigan parsimony algorithm.
         Input: tree object with .nodedict now having .primary_set and .secondary_set
             for each node
@@ -5584,41 +5684,84 @@ class Tree:
 
         ndict = tree.nodedict
 
-        # Set optimal_set of root
-        ndict[tree.root].optimal_set = ndict[tree.root].primary_set
+        if nsites == 1:
+            # Set optimal_set of root
+            ndict[tree.root].optimal_set = ndict[tree.root].primary_set
 
-        # Root-to-tip pass: compute optimal_set for each node (labelled or not)
-        for p in tree.sorted_intnodes(deepfirst=True):
-            for c in tree.children(p):
-                p_optimal_set = ndict[p].optimal_set
-                c_primary_set = ndict[c].primary_set
-                if p_optimal_set <= c_primary_set:
-                    ndict[c].optimal_set = p_optimal_set
-                else:
-                    c_secondary_set = ndict[c].secondary_set
-                    ndict[c].optimal_set = c_primary_set | (p_optimal_set & c_secondary_set)
+            # Root-to-tip pass: compute optimal_set for each node (labelled or not)
+            for p in tree.sorted_intnodes(deepfirst=True):
+                for c in tree.children(p):
+                    p_optimal_set = ndict[p].optimal_set
+                    c_primary_set = ndict[c].primary_set
+                    if p_optimal_set <= c_primary_set:
+                        ndict[c].optimal_set = p_optimal_set
+                    else:
+                        c_secondary_set = ndict[c].secondary_set
+                        ndict[c].optimal_set = c_primary_set | (p_optimal_set & c_secondary_set)
+        else:
+            ndict[tree.root].optimal_set = [s.copy() for s in ndict[tree.root].primary_set]
+
+            for p in tree.sorted_intnodes(deepfirst=True):
+                for c in tree.children(p):
+                    c_optimal = []
+                    for si in range(nsites):
+                        p_opt = ndict[p].optimal_set[si]
+                        c_pri = ndict[c].primary_set[si]
+                        if p_opt <= c_pri:
+                            c_optimal.append(p_opt.copy())
+                        else:
+                            c_sec = ndict[c].secondary_set[si]
+                            c_optimal.append(c_pri | (p_opt & c_sec))
+                    ndict[c].optimal_set = c_optimal
 
         return tree
 
     ###############################################################################################
 
-    def _set_fit_and_ambiguity_for_node(self, tree, node, parent, fitpref):
+    def _set_fit_and_ambiguity_for_node(self, tree, node, parent, fitpref, nsites=1):
         """Set fit and ambiguity attributes for a given node."""
 
         ndict = tree.nodedict
 
-        if len(ndict[node].optimal_set) == 1:
-            ndict[node].wasambig = False
-            ndict[node].fit = next(iter(ndict[node].optimal_set))
-        else:
-            ndict[node].wasambig = True
-            if parent and ndict[parent].wasambig and ndict[parent].fit in ndict[node].optimal_set:
-                ndict[node].fit = ndict[parent].fit
+        if nsites == 1:
+            if len(ndict[node].optimal_set) == 1:
+                ndict[node].wasambig = False
+                ndict[node].fit = next(iter(ndict[node].optimal_set))
             else:
-                if fitpref in ndict[node].optimal_set:
-                    ndict[node].fit = fitpref
+                ndict[node].wasambig = True
+                if parent and ndict[parent].wasambig and ndict[parent].fit in ndict[node].optimal_set:
+                    ndict[node].fit = ndict[parent].fit
                 else:
-                    ndict[node].fit = random.choice(tuple(ndict[node].optimal_set))
+                    if fitpref in ndict[node].optimal_set:
+                        ndict[node].fit = fitpref
+                    else:
+                        ndict[node].fit = random.choice(tuple(ndict[node].optimal_set))
+        else:
+            fit = []
+            wasambig = []
+            for si in range(nsites):
+                optimal_set = ndict[node].optimal_set[si]
+                if isinstance(fitpref, str):
+                    site_fitpref = fitpref
+                elif isinstance(fitpref, (tuple, list)):
+                    site_fitpref = fitpref[si]
+                else:
+                    site_fitpref = None
+
+                if len(optimal_set) == 1:
+                    wasambig.append(False)
+                    fit.append(next(iter(optimal_set)))
+                else:
+                    wasambig.append(True)
+                    if parent and ndict[parent].wasambig[si] and ndict[parent].fit[si] in optimal_set:
+                        fit.append(ndict[parent].fit[si])
+                    else:
+                        if site_fitpref in optimal_set:
+                            fit.append(site_fitpref)
+                        else:
+                            fit.append(random.choice(tuple(optimal_set)))
+            ndict[node].wasambig = tuple(wasambig)
+            ndict[node].fit = tuple(fit)
 
         return tree
 
