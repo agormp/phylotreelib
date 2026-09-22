@@ -21,9 +21,9 @@ Main capabilities include:
 - NOTE: labels are interpreted as belonging to branches (bipartitions), not to internal nodes, and this association is maintained after re-rooting etc.
 
 
-## Version 2.0.0
+## Version 2
 
-Version 2 has recently been released, and contains a number of changes to the API compared to version 1.x.x.
+Version 2 introduced several API changes compared with version 1.x.
 
 - See the **Quick start** below for updated examples.
 - For details on API changes and how to update existing scripts, see **[Upgrading from 1.x to 2.x](#upgrading-from-1x-to-2x)**.
@@ -186,7 +186,7 @@ For command-line use, the separate tool [`sumt`](https://github.com/agormp/sumt)
 ```python
 # Download an example tree-sample file (run these 3 lines only once)
 import urllib.request
-URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/data/primate-mtDNA.trees"
 urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
 
 import phylotreelib as pt
@@ -216,7 +216,7 @@ print(sumtree.newick())
 ```python
 # Download an example tree-sample file (run these 3 lines only once)
 import urllib.request
-URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/data/primate-mtDNA.trees"
 urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
 
 import phylotreelib as pt
