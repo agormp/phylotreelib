@@ -2079,6 +2079,8 @@ class Test_init_QuantileAccumulator:
         assert isinstance(qa.counts, dict) or "defaultdict" in type(qa.counts).__name__.lower()
         assert qa.n == 0
         assert isinstance(qa.neg_bucket, int)
+        assert qa.min_value == math.inf
+        assert qa.max_value == -math.inf
 
     def test_custom_k(self):
         qa = pt.QuantileAccumulator(k=3)
@@ -2187,6 +2189,22 @@ class Test_add_QuantileAccumulator:
         assert qa.n == 2
         assert qa.counts[qa.neg_bucket] == 2
 
+    def test_add_tracks_observed_minimum_and_maximum(self):
+        qa = pt.QuantileAccumulator()
+        for x in [3.0, 1.0, 4.0, 2.0]:
+            qa.add(x)
+
+        assert qa.min_value == 1.0
+        assert qa.max_value == 4.0
+
+    def test_add_nonfinite_value_invalidates_observed_bounds(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(2.0)
+        qa.add(float("nan"))
+
+        assert qa.min_value == -math.inf
+        assert qa.max_value == math.inf
+
 
 ###################################################################################################
 
@@ -2205,6 +2223,32 @@ class Test_merge_QuantileAccumulator:
         assert a.n == 5
         # Check some bucket counts explicitly
         assert a.counts[a._bucket(2.0)] == 2
+
+    def test_merge_combines_observed_bounds(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=7)
+
+        for x in [1.0, 3.0]:
+            a.add(x)
+        for x in [-2.0, 5.0]:
+            b.add(x)
+
+        a.merge(b)
+
+        assert a.min_value == -2.0
+        assert a.max_value == 5.0
+
+    def test_merge_preserves_nonfinite_bounds(self):
+        a = pt.QuantileAccumulator(k=7)
+        b = pt.QuantileAccumulator(k=7)
+        a.add(2.0)
+        b.add(float("nan"))
+
+        a.merge(b)
+
+        assert a.min_value == -math.inf
+        assert a.max_value == math.inf
+        assert not a.is_effectively_constant()
 
     def test_merge_incompatible_shift_raises(self):
         a = pt.QuantileAccumulator(k=7)
@@ -2242,6 +2286,43 @@ class Test_merge_QuantileAccumulator:
 
         assert left.n == all_in_one.n
         assert left.quantiles(probs) == all_in_one.quantiles(probs)
+
+
+###################################################################################################
+
+class Test_is_effectively_constant_QuantileAccumulator:
+
+    def test_empty_accumulator_is_not_constant(self):
+        qa = pt.QuantileAccumulator()
+        assert not qa.is_effectively_constant()
+
+    def test_identical_observations_are_constant(self):
+        qa = pt.QuantileAccumulator()
+        for _ in range(10):
+            qa.add(2.5)
+
+        assert qa.is_effectively_constant()
+
+    def test_numerical_noise_is_constant(self):
+        qa = pt.QuantileAccumulator()
+        for x in [2.5, 2.5 + 1e-13, 2.5 - 1e-13]:
+            qa.add(x)
+
+        assert qa.is_effectively_constant()
+
+    def test_meaningful_variation_is_not_constant(self):
+        qa = pt.QuantileAccumulator()
+        for x in [2.5, 2.5001]:
+            qa.add(x)
+
+        assert not qa.is_effectively_constant()
+
+    def test_nonfinite_observation_is_not_constant(self):
+        qa = pt.QuantileAccumulator()
+        qa.add(2.5)
+        qa.add(float("nan"))
+
+        assert not qa.is_effectively_constant()
 
 
 ###################################################################################################
@@ -2432,6 +2513,147 @@ class Test_precision_quantiles_vs_exact_order_statistic:
 
         assert err_k10 <= err_k4 + 1e-15
         assert err_k14 <= err_k10 + 1e-15
+
+
+###################################################################################################
+
+class Test_cladesummary_TreeSummary:
+
+    def test_single_observation_preserves_undefined_sd(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        treesummary = pt.TreeSummary(
+            trackclades=True,
+            trackheight=True,
+            trackci=True,
+            ci_probs=(0.95,),
+        )
+        treesummary.add_tree(tree)
+
+        leaf_clade = pt.Clade.from_leafset({"A"}, tree)
+        nd = treesummary.cladesummary[leaf_clade]
+
+        assert nd.height_sd is None
+        assert nd.height_median == nd.height
+        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+
+    def test_effectively_constant_leaf_height_uses_exact_mean(self):
+        tree1 = pt.Tree.from_string("(A:1,B:2);")
+        tree2 = pt.Tree.from_string("(A:1,B:2.0000000000005);")
+        treesummary = pt.TreeSummary(
+            trackclades=True,
+            trackheight=True,
+            trackci=True,
+            ci_probs=(0.95,),
+        )
+        treesummary.add_tree(tree1)
+        treesummary.add_tree(tree2)
+
+        leaf_clade = pt.Clade.from_leafset({"A"}, tree1)
+        nd = treesummary.cladesummary[leaf_clade]
+
+        assert nd.height_sd == 0.0
+        assert nd.height_median == nd.height
+        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+
+    def test_variable_leaf_height_keeps_quantile_estimates(self):
+        tree1 = pt.Tree.from_string("(A:1,B:2);")
+        tree2 = pt.Tree.from_string("(A:1,B:3);")
+        treesummary = pt.TreeSummary(
+            trackclades=True,
+            trackheight=True,
+            trackci=True,
+            ci_probs=(0.95,),
+        )
+        treesummary.add_tree(tree1)
+        treesummary.add_tree(tree2)
+
+        leaf_clade = pt.Clade.from_leafset({"A"}, tree1)
+        nd = treesummary.cladesummary[leaf_clade]
+
+        assert nd.height_sd > 0.0
+        assert nd.ci["95%_CI"][0] != nd.ci["95%_CI"][1]
+
+
+###################################################################################################
+
+class Test_write_into_CAHeightEstimator:
+
+    def test_single_observation_preserves_undefined_sd(self):
+        sumtree = pt.Tree.from_string("(A:1,B:2);")
+        plan = pt.CAHeightEstimator.build_plan(
+            sumtree,
+            trackci=True,
+            ci_probs=(0.95,),
+        )
+        estimator = pt.CAHeightEstimator(plan, trackci=True)
+        estimator.add_tree(pt.Tree.from_string("(A:1,B:2);"))
+
+        estimator.write_into(sumtree)
+        nd = sumtree.nodedict["A"]
+
+        assert nd.height_sd is None
+        assert nd.height_median == nd.height
+        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+
+    def test_effectively_constant_leaf_height_uses_exact_mean(self):
+        sumtree = pt.Tree.from_string("(A:1,B:2);")
+        plan = pt.CAHeightEstimator.build_plan(
+            sumtree,
+            trackci=True,
+            ci_probs=(0.95,),
+        )
+        estimator = pt.CAHeightEstimator(plan, trackci=True)
+        estimator.add_tree(pt.Tree.from_string("(A:1,B:2);"))
+        estimator.add_tree(pt.Tree.from_string("(A:1,B:2.0000000000005);"))
+
+        estimator.write_into(sumtree)
+        nd = sumtree.nodedict["A"]
+
+        assert nd.height_sd == 0.0
+        assert nd.height_median == nd.height
+        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+
+    def test_variable_leaf_height_keeps_quantile_estimates(self):
+        sumtree = pt.Tree.from_string("(A:1,B:2);")
+        plan = pt.CAHeightEstimator.build_plan(
+            sumtree,
+            trackci=True,
+            ci_probs=(0.95,),
+        )
+        estimator = pt.CAHeightEstimator(plan, trackci=True)
+        estimator.add_tree(pt.Tree.from_string("(A:1,B:2);"))
+        estimator.add_tree(pt.Tree.from_string("(A:1,B:3);"))
+
+        estimator.write_into(sumtree)
+        nd = sumtree.nodedict["A"]
+
+        assert nd.height_sd > 0.0
+        assert nd.ci["95%_CI"][0] != nd.ci["95%_CI"][1]
+
+
+###################################################################################################
+
+class Test_merge_CAHeightEstimator:
+
+    def test_merge_preserves_constant_leaf_height(self):
+        sumtree = pt.Tree.from_string("(A:1,B:2);")
+        plan = pt.CAHeightEstimator.build_plan(
+            sumtree,
+            trackci=True,
+            ci_probs=(0.95,),
+        )
+        left = pt.CAHeightEstimator(plan, trackci=True)
+        right = pt.CAHeightEstimator(plan, trackci=True)
+        left.add_tree(pt.Tree.from_string("(A:1,B:2);"))
+        right.add_tree(pt.Tree.from_string("(A:1,B:2.0000000000005);"))
+
+        left.merge(right)
+        left.write_into(sumtree)
+        nd = sumtree.nodedict["A"]
+
+        assert nd.height_sd == 0.0
+        assert nd.height_median == nd.height
+        assert nd.ci["95%_CI"] == (nd.height, nd.height)
 
 
 # Combined from test_sumt_biplen_reference.py
