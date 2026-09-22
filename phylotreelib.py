@@ -5961,7 +5961,7 @@ class QuantileAccumulator:
         have representative value 0.0.
     """
 
-    __slots__ = ("k", "shift", "scale", "mask", "neg_bucket", "counts", "n")
+    __slots__ = ("k", "shift", "scale", "mask", "neg_bucket", "counts", "n", "min_value", "max_value")
 
     def __init__(self, k = 7):
         self.k = k
@@ -5971,6 +5971,8 @@ class QuantileAccumulator:
         self.neg_bucket = -(10**18)          # int sentinel for x<=0 / non-finite
         self.counts = defaultdict(int)
         self.n = 0
+        self.min_value = math.inf
+        self.max_value = -math.inf
 
     def _bucket(self, x):
         if x <= 0.0 or not math.isfinite(x):
@@ -5992,6 +5994,12 @@ class QuantileAccumulator:
         bkey = self._bucket(x)
         self.counts[bkey] += 1
         self.n += 1
+        if math.isfinite(x):
+            self.min_value = min(self.min_value, x)
+            self.max_value = max(self.max_value, x)
+        else:
+            self.min_value = -math.inf
+            self.max_value = math.inf
 
     def merge(self, other: "QuantileAccumulator"):
         if self.k != other.k:
@@ -6003,6 +6011,16 @@ class QuantileAccumulator:
         for bkey, c in other.counts.items():
             self.counts[bkey] += c
         self.n += other.n
+        self.min_value = min(self.min_value, other.min_value)
+        self.max_value = max(self.max_value, other.max_value)
+
+    def is_effectively_constant(self, *, rel_tol=1e-12, abs_tol=1e-12):
+        """Return True when all finite observations differ only by numerical noise."""
+        if self.n == 0:
+            return False
+        if not (math.isfinite(self.min_value) and math.isfinite(self.max_value)):
+            return False
+        return math.isclose(self.min_value, self.max_value, rel_tol=rel_tol, abs_tol=abs_tol)
 
     def quantile(self, prob):
         """Single q-quantile (prob in [0,1])."""
@@ -6204,7 +6222,17 @@ class TreeSummary():
                 probs.append(0.5)
 
                 for nd in self._cladesummary.values():
-                    qvals = nd.quantiles.quantiles(probs)  # list in same order as probs
+                    is_constant = nd.quantiles.is_effectively_constant()
+
+                    if is_constant:
+                        # Preserve None for a single observation, where sample SD
+                        # is undefined. Otherwise suppress numerical-only variation.
+                        if nd.height_sd is not None:
+                            nd.height_sd = 0.0
+                        qvals = [nd.height] * len(probs)
+                    else:
+                        qvals = nd.quantiles.quantiles(probs) # list in same order as probs
+
                     nd.ci = {}
                     for i,lab in enumerate(self.ci_labels):
                         lo_idx = i * 2
@@ -7484,11 +7512,17 @@ class CAHeightEstimator():
 
         for node, s in self.acc.items():
             mean, sd = self._finalize(s)
+            is_constant = self.trackci and s.quantiles.is_effectively_constant()
+            if is_constant and sd is not None:
+                sd = 0.0
             sumtree.set_node_attribute(node, "height", mean)
             sumtree.set_node_attribute(node, "height_sd", sd)
 
             if self.trackci:
-                qvals = s.quantiles.quantiles(probs)
+                if is_constant:
+                    qvals = [mean] * len(probs)
+                else:
+                    qvals = s.quantiles.quantiles(probs)
                 ci = {}
                 for i, lab in enumerate(ci_labels):
                     ci[lab] = (qvals[2*i], qvals[2*i + 1])
