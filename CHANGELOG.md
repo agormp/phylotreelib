@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [2.3.1] - 2026 September 22
+
+#### Fixed
+- `TreeSummary` and `CAHeightEstimator` now preserve the exact observed node height when all observations are effectively identical. The median and credible-interval endpoints therefore equal the observed height instead of the midpoint of its log bucket.
+
+---
+
 ## [2.3.0] - 2026 April 4
 
 #### Added

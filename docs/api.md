@@ -298,11 +298,13 @@ Two accumulators can be merged simply by adding bucket counts. This is important
 
 ### 10.5 Accuracy trade-off
 
-The method is approximate, not exact.
+For distributions with meaningful variation, the method is approximate rather than exact.
 
 The benefit is that it avoids storing all raw values while still providing useful credible intervals and quantiles for summary-tree annotation.
 
-If exact quantiles are needed for a particular analysis, they should be computed from the raw values outside the accumulator framework.
+There is one exact special case for node-height summaries. `QuantileAccumulator` tracks the minimum and maximum observed values, including across merged accumulators. When `TreeSummary` or `CAHeightEstimator` determines that all observed heights are effectively identical, allowing for small numerical noise, it uses the observed height directly for the median and credible-interval endpoints instead of using a bucket midpoint. This keeps fixed node heights, such as fixed sampling dates at leaves, exact. Node-height distributions with real variation remain approximate, as do branch-length quantiles.
+
+If exact quantiles are needed for a distribution with meaningful variation, they should be computed from the raw values outside the accumulator framework.
 
 ### 10.6 What the tracked quantiles are used for
 
