@@ -424,16 +424,74 @@ class TestTreeNewick:
             branch_attributes=("length_sd", "ci"), ci_labels=("95%_CI",))
         assert "[&" not in result
 
-    @pytest.mark.parametrize("selection", [None, ()])
-    def test_empty_selections(self, annotated_print_tree, selection):
+    def test_empty_selections(self, annotated_print_tree):
         tree = annotated_print_tree
         tree.newick(print_meta=True, node_attributes=("height", "ci"), ci_labels=("95%_CI",))
-        result = tree.newick(print_meta=True, node_attributes=selection,
-                            branch_attributes=selection, ci_labels=selection)
+        result = tree.newick(print_meta=True, node_attributes=(), branch_attributes=())
         assert "[&" not in result
-        result = tree.newick(print_meta=True, node_attributes=("height", "ci"), ci_labels=selection)
+        result = tree.newick(print_meta=True, node_attributes=("height", "ci"), ci_labels=())
         assert "height=" in result
         assert "_CI=" not in result
+
+    def test_automatic_metadata_and_all_intervals(self, annotated_print_tree):
+        tree = annotated_print_tree
+        branch = tree.child_dict[tree.root][tree.find_mrca({"A", "B"})]
+        branch.n = 10
+        branch.mean = 3.0
+        branch.M2 = 2.0
+        branch.parent_height = 5.0
+        branch.kid_height = 2.0
+        branch.quantiles = pt.QuantileAccumulator()
+        result = tree.newick(print_meta=True)
+        assert "height=1.234568,height_sd=0.1" in result
+        assert "posterior=0.975" in result
+        assert "height_80%_CI={1,1.4}" in result
+        assert "height_95%_CI={0.8,1.5}" in result
+        assert "length_80%_CI={2.5,3.5}" in result
+        assert "length_95%_CI={2,4}" in result
+        assert result.endswith(")[&height=5,height_80%_CI={4.5,5.5},height_95%_CI={4,6}];")
+        for field in ("n", "mean", "M2", "quantiles", "parent_height", "kid_height"):
+            assert f",{field}=" not in result
+            assert f"[&{field}=" not in result
+        assert tree.newick(print_meta=True, node_attributes=None, branch_attributes=None,
+                           ci_labels=None) == result
+
+    def test_explicit_attributes_do_not_add_intervals(self, annotated_print_tree):
+        result = annotated_print_tree.newick(
+            print_meta=True, node_attributes=("height",), branch_attributes=("posterior",),
+            ci_labels=("95%_CI",))
+        assert "[&height=1.234568]" in result
+        assert "[&posterior=0.975]" in result
+        assert "_CI=" not in result
+        assert "height_sd=" not in result
+        assert "length_sd=" not in result
+
+    def test_node_and_branch_selections_are_independent(self, annotated_print_tree):
+        tree = annotated_print_tree
+        nodes_only = tree.newick(print_meta=True, branch_attributes=())
+        branches_only = tree.newick(print_meta=True, node_attributes=())
+        assert "height_95%_CI" in nodes_only
+        assert "length_95%_CI" not in nodes_only
+        assert "length_95%_CI" in branches_only
+        assert "height_95%_CI" not in branches_only
+        assert "height=" not in branches_only
+
+    def test_missing_intervals_are_skipped(self, annotated_print_tree):
+        result = annotated_print_tree.newick(print_meta=True, ci_labels=("90%_CI", "95%_CI"))
+        assert "90%_CI" not in result
+        assert "95%_CI" in result
+        assert "80%_CI" not in result
+
+    def test_zero_false_and_collection_metadata(self, annotated_print_tree):
+        tree = annotated_print_tree
+        tree.set_node_attribute("B", "height", 0.0)
+        tree.set_node_attribute("B", "wasambig", False)
+        tree.set_node_attribute("B", "state", ('human host', 'a,"quoted"'))
+        tree.set_node_attribute("B", "primary_set", {"mink", "human"})
+        result = tree.newick(print_meta=True)
+        assert 'B[&height=0,state={"human host","a,""quoted"""},primary_set={"human","mink"},wasambig=false]' in result
+        assert "state=," not in result
+        assert "secondary_set=" not in result
 
     def test_explicit_none_scalar_defaults(self, annotated_print_tree):
         tree = annotated_print_tree
@@ -442,6 +500,13 @@ class TestTreeNewick:
 
 
 class TestTreeNexus:
+
+    def test_automatic_metadata(self, annotated_print_tree):
+        tree = annotated_print_tree
+        result = tree.nexus(print_meta=True)
+        assert tree.newick(print_meta=True) in result
+        assert "height_95%_CI" in result
+        assert "length_95%_CI" in result
 
     def test_forwarding_and_call_independence(self, annotated_print_tree):
         tree = annotated_print_tree
@@ -491,8 +556,10 @@ class TestTreeSetNewick:
     def test_default_precision(self, annotated_print_tree):
         trees = pt.TreeSet()
         trees.addtree(annotated_print_tree)
-        assert trees.newick() == annotated_print_tree.newick(precision=6) + "\n"
+        assert trees.newick() == annotated_print_tree.newick() + "\n"
         assert trees.newick(precision=None) == trees.newick()
+        assert trees.newick(precision=6) == annotated_print_tree.newick(precision=6) + "\n"
+        assert trees.newick(print_meta=True) == annotated_print_tree.newick(print_meta=True) + "\n"
 
 
 class TestTreeSetNexus:
@@ -515,8 +582,10 @@ class TestTreeSetNexus:
     def test_default_precision(self, annotated_print_tree):
         trees = pt.TreeSet()
         trees.addtree(annotated_print_tree)
-        assert annotated_print_tree.newick(precision=6) in trees.nexus()
+        assert annotated_print_tree.newick() in trees.nexus()
         assert trees.nexus(precision=None) == trees.nexus()
+        assert annotated_print_tree.newick(precision=6) in trees.nexus(precision=6)
+        assert annotated_print_tree.newick(print_meta=True) in trees.nexus(print_meta=True)
 
 
 class TestTreeOutput:

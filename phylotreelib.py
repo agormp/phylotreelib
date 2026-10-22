@@ -3076,9 +3076,13 @@ class Tree:
         Return a Newick string for this tree.
 
         Printing options apply only to this call; no formatting settings are stored
-        on the tree. None for a scalar option uses its fixed default. None or an
-        empty sequence for node_attributes, branch_attributes, or ci_labels selects
-        no attributes or intervals of that kind.
+        on the tree. None for a scalar option uses its fixed default. With
+        print_meta=True, None attribute selections include all populated metadata
+        fields (excluding branch accumulators and temporary height caches).
+        Explicit selections include only those fields; an empty sequence includes
+        none. None ci_labels includes all stored intervals; an empty sequence
+        suppresses intervals. Explicit attribute selections must include "ci" to
+        print intervals.
 
         Printing conventions
         --------------------
@@ -3090,8 +3094,11 @@ class Tree:
           Meta output is produced only when print_meta is True. When enabled:
             * `node_attributes` selects Nodestruct attributes to include at each node.
             * `branch_attributes` selects Branchstruct attributes to include on each branch.
-            * If ci_labels is provided and struct.ci exists, CI ranges are emitted as
+            * If "ci" is selected and struct.ci exists, CI ranges are emitted as
               '<prefix>_<label>={lo,hi}' where prefix is 'height' or 'length'.
+            * Missing/None values and empty strings/collections are skipped; zero
+              and False are retained. Strings are quoted, booleans use true/false,
+              and collections use braces (sets are sorted for stable output).
 
         Notes
         -----
@@ -3105,24 +3112,32 @@ class Tree:
         if printlabels is None: printlabels = True
         if print_meta is None:  print_meta = False
 
-        # If meta printing is disabled, suppress all meta-related output
-        if not print_meta:
-            node_attributes = None
-            branch_attributes = None
-            ci_labels = None
+        if print_meta:
+            if node_attributes is None:
+                node_attributes = Nodestruct.__slots__
+            if branch_attributes is None:
+                internal = {"mean", "M2", "n", "quantiles", "parent_height", "kid_height"}
+                branch_attributes = tuple(attr for attr in Branchstruct.__slots__ if attr not in internal)
+        else:
+            node_attributes = ()
+            branch_attributes = ()
 
         def create_metacomment(struct, attributes, ci_labels, ci_prefix=None):
-            """Helper function to create metacomment strings based on attributes of a structure
-            - skips missing attributes
-            - skips None
-            - collapses *_ci_lo/_ci_hi into <prefix>_<ci_label>={lo,hi}
-              if ci_label is provided"""
+            """Serialize selected metadata and CI ranges, skipping missing values."""
 
             def fmt(value):
                 if value is None:
-                    return None
+                    return "?"
+                if isinstance(value, bool):
+                    return "true" if value else "false"
                 if isinstance(value, float):
                     return f"{value:.{precision}g}"
+                if isinstance(value, str):
+                    return '"' + value.replace('"', '""') + '"'
+                if isinstance(value, (list, tuple, set, frozenset)):
+                    if isinstance(value, (set, frozenset)):
+                        value = sorted(value, key=str)
+                    return "{" + ",".join(fmt(item) for item in value) + "}"
                 return str(value)
 
             parts = []
@@ -3134,13 +3149,19 @@ class Tree:
                     continue
                 if not hasattr(struct, attr):
                     continue
-                fmt_value = fmt(getattr(struct, attr))
-                if fmt_value is not None:
-                    parts.append(f"{attr}={fmt_value}")
+                value = getattr(struct, attr)
+                if value is None:
+                    continue
+                if isinstance(value, (str, list, tuple, set, frozenset, dict)) and not value:
+                    continue
+                parts.append(f"{attr}={fmt(value)}")
 
-            # 2) CI ranges (only if label requested)
-            if ci_labels and hasattr(struct, "ci") and struct.ci:
-                for lab in ci_labels:
+            # 2) CI ranges, selected independently for each node or branch
+            if "ci" in requested and getattr(struct, "ci", None):
+                labels = sorted(struct.ci) if ci_labels is None else ci_labels
+                for lab in labels:
+                    if lab not in struct.ci:
+                        continue
                     lo, hi = struct.ci[lab]
                     parts.append(f"{ci_prefix}_{lab}={{{fmt(lo)},{fmt(hi)}}}")
 
@@ -5645,17 +5666,17 @@ class TreeSet():
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6,
+    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
                       translateblock=False, node_attributes=None, branch_attributes=None,
                       colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
                       print_meta=False):
         """Return a NEXUS block, forwarding printing options to every tree.
 
-        Precision defaults to six significant digits for TreeSet output. An explicit
+        Precision defaults to seven significant digits, as for Tree. An explicit
         None uses that same default. See Tree.newick() for metadata options.
         """
         if precision is None:
-            precision = 6
+            precision = 7
 
         # Construct header
         stringlist = ["#NEXUS\n\n"]
@@ -5690,16 +5711,16 @@ class TreeSet():
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6,
+    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
                transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
                print_meta=False):
         """Return Newick strings, forwarding printing options to every tree.
 
-        Precision defaults to six significant digits for TreeSet output. An explicit
+        Precision defaults to seven significant digits, as for Tree. An explicit
         None uses that same default. See Tree.newick() for metadata options.
         """
         if precision is None:
-            precision = 6
+            precision = 7
         stringlist = []
         for tree in self.treelist:
             stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
