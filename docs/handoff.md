@@ -6,7 +6,7 @@ Updated: 2026-10-22. This document records project context, not permission to st
 
 - The Nexus metacomment parser is planned but explicitly deferred by Anders. Do not implement it until asked. See [the parser plan](plans/nexus-metacomment-parser.md).
 - Do not push, publish to PyPI, or change version numbers without a new request. `pyproject.toml` remains at 2.3.1 despite the unreleased changes in the checkout.
-- The printing changes and initial handoff were fast-forwarded into local `main` at `15ed417`. The completed `codex/explicit-tree-printing` branch was deleted. The new Nexus rootedness feature is on `codex/nexus-rootedness`; review it before merging.
+- The printing changes and initial handoff were fast-forwarded into local `main` at `15ed417`, then rootedness changes through `ef90599` were also merged. Both completed branches, `codex/explicit-tree-printing` and `codex/nexus-rootedness`, were deleted. The checkout is on local `main`; none of these changes has been pushed or released.
 - Inspect `git status`, branches, and recent history at the start of a new session. Do not reset unrelated user changes or delete older experimental branches.
 
 ## Repositories
@@ -48,9 +48,9 @@ README, CHANGELOG, docs/api.md, and docs/recipes.md cover the new behavior. Hist
 
 ## Verification baseline
 
-The separate rootedness branch adds explicit `rooted=True/False/None` declarations to Tree/TreeSet Nexus output, with no inference from their convenience/traversal roots. See the [design decision](decisions/nexus-rootedness.md). Its pytest result is 270 passing tests; the matching sumt branch has 123 passing tests. Biopython 1.88 correctly recognized both emitted rootedness declarations. The parser is still deferred and versions are unchanged.
+The merged rootedness feature adds explicit `rooted=True/False/None` declarations to Tree/TreeSet Nexus output, with no inference from their convenience/traversal roots. See the [design decision](decisions/nexus-rootedness.md). After merging, the local main checkouts passed 270 phylotreelib tests and 123 sumt tests. Biopython 1.88 previously verified both emitted rootedness declarations. The parser is still deferred and versions are unchanged.
 
-Eleven sumt CLI workflows were checked against local main; only the expected Nexus declaration changed. Serial and parallel output still matched, and Biopython recognized each Nexus output. The four CI documentation snippets were rerun successfully. See also the [dependency compatibility recommendation](../../sumt/docs/decisions/dependency-compatibility.md); no requirement bounds were changed yet.
+Eleven sumt CLI workflows were checked against the pre-rootedness main baseline; only the expected Nexus declaration changed. Serial and parallel output still matched, and Biopython recognized each Nexus output. The four CI documentation snippets were rerun successfully. See also the [dependency compatibility recommendation](../../sumt/docs/decisions/dependency-compatibility.md); no requirement bounds were changed yet.
 
 Before the new rootedness work: 234 phylotreelib tests and 99 sumt tests pass. Four documentation snippets were executed, including clade-height, CA-height, and branch-length CI exports. The recipe's example download was replaced with the matching local test fixture during verification.
 
@@ -77,5 +77,5 @@ The interpreter used was Python 3.12.4 with pytest 8.3.2 and numpy 1.26.4. No in
 
 1. Complete and review the parser feature before the proposed phylotreelib 3.0.0 release. Anders wants a substantive new feature with the breaking print refactor.
 2. Recheck migration examples, CI behavior, Nexus interoperability, and performance.
-3. If sumt uses the new `rooted` export keyword, update its minimum phylotreelib dependency when the release version is decided. Until then test against the matching source branch, not only the installed 2.3.1 wheel.
+3. sumt now uses the new `rooted` export keyword. Update its minimum phylotreelib dependency when the release version is decided. Until then test against the matching local main checkout, not only the installed 2.3.1 wheel.
 4. Choose versions and publish only after explicit approval. Current version numbers are not a declaration that unreleased code is compatible with the published packages.

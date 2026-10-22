@@ -1,6 +1,6 @@
 # Explicit Nexus rootedness declarations
 
-Date: 2026-10-22. Status: implemented for review on `codex/nexus-rootedness`; not merged or released.
+Date: 2026-10-22. Status: implemented, tested, and merged into local `main` in both repositories. The completed `codex/nexus-rootedness` branches were deleted. Not pushed or released.
 
 ## Context
 
