@@ -588,7 +588,7 @@ print(dmat.nj().newick())
 
 ### 9. Consensus trees and other tree summaries
 
-**Note:** For command-line use, the separate tool `sumt` provides the same functionality with a simpler interface. The examples below show the explicit low-level workflow in `phylotreelib` (TreeSummary --> SummaryTreeBuilder --> TreePostProcessor --> PrintSpec).
+**Note:** For command-line use, the separate tool `sumt` provides the same functionality with a simpler interface. The examples below show the explicit low-level workflow in `phylotreelib` (TreeSummary --> SummaryTreeBuilder --> TreePostProcessor --> Tree.newick() / Tree.nexus()).
 
 * `sumt` GitHub page: [https://github.com/agormp/sumt](https://github.com/agormp/sumt/)
 
@@ -619,10 +619,12 @@ contree = stb.contree(cutoff=0.5, allcompat=False)
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(contree)
 
-# 4) Printing (optional)
-pt.configure_sumtree_printing(contree, treetype="con", blen="biplen", print_meta=True, precision=7)
-
-print(contree.newick())
+# 4) Select labels and metadata for this output
+print(contree.newick(
+    labelfield="bipartition_cred",
+    branch_attributes=("bipartition_cred", "length", "length_sd"),
+    print_meta=True, precision=7,
+))
 ```
 
 #### Build a majority-rule consensus tree with all compatible bipartitions added
@@ -647,9 +649,11 @@ contree = stb.contree(cutoff=0.5, allcompat=True)
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(contree)
 
-pt.configure_sumtree_printing(contree, treetype="all", blen="biplen", print_meta=True, precision=7)
-
-print(contree.newick())
+print(contree.newick(
+    labelfield="bipartition_cred",
+    branch_attributes=("bipartition_cred", "length", "length_sd"),
+    print_meta=True, precision=7,
+))
 ```
 
 #### Build an MCC tree with common-ancestor heights
@@ -687,9 +691,11 @@ mcctree.set_blens_from_heights()
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(mcctree)
 
-pt.configure_sumtree_printing(mcctree, treetype="mcc", blen="caheight", print_meta=True, precision=7)
-
-print(mcctree.newick())
+print(mcctree.newick(
+    node_attributes=("clade_cred", "height", "height_sd"),
+    branch_attributes=("length",),
+    print_meta=True, precision=7,
+))
 ```
 
 #### Build an MBC tree and mid-point root it
@@ -718,15 +724,19 @@ mbctree.rootmid()
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(mbctree)
 
-pt.configure_sumtree_printing(mbctree, treetype="mbc", blen="input", print_meta=True, precision=7)
-
-print(mbctree.newick())
+print(mbctree.newick(
+    labelfield="bipartition_cred",
+    branch_attributes=("bipartition_cred", "length"),
+    print_meta=True, precision=7,
+))
 ```
 
 
 ---
 
 ### 10. Exporting with labels, metadata, and color
+
+Pass options directly to each `newick()` or `nexus()` call. Output calls do not change the tree's formatting defaults. Set `print_meta=True` and select node or branch attributes to include their metadata; omit these arguments for plain output.
 
 #### Plain Newick output
 
@@ -770,13 +780,11 @@ tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
 node = tree.find_mrca({"A", "B"})
 parent = tree.parent(node)
 tree.set_branch_attribute(parent, node, "posterior", 0.98)
-pt.configure_basic_printing(
-    tree,
+print(tree.newick(
     print_meta=True,
-    branch_attrs=("posterior",),
+    branch_attributes=("posterior",),
     precision=6,
-)
-print(tree.newick())
+))
 ```
 
 Output:

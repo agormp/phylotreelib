@@ -179,7 +179,7 @@ If you are working with posterior tree samples (e.g. from BEAST/MrBayes), you ca
 1) **TreeSummary** accumulates frequencies and (optionally) branch-length/node-height statistics
 2) **SummaryTreeBuilder** constructs a summary-tree topology
 3) **TreePostProcessor** adds attributes to the tree annotating it with e.g. support values / branch-length stats
-4) **PrintSpec** controls what attributes are written as branch labels and/or Nexus meta-comments
+4) **Tree.newick() / Tree.nexus()** arguments select branch labels and Nexus meta-comments for each output call
 
 For command-line use, the separate tool [`sumt`](https://github.com/agormp/sumt) wraps these steps in a single command.
 
@@ -205,10 +205,13 @@ sumtree = stb.contree(cutoff=0.5, allcompat=False)
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(sumtree)
 
-# 4) Configure printing (labels + optional meta-comments)
-pt.configure_sumtree_printing(sumtree, treetype="con", blen="biplen", print_meta=True, precision=7)
-
-print(sumtree.newick())
+# 4) Select labels and metadata in the output call
+print(sumtree.newick(
+    labelfield="bipartition_cred",
+    branch_attributes=("bipartition_cred", "length", "length_sd"),
+    print_meta=True,
+    precision=7,
+))
 ```
 
 ### Compute and export a summary tree in one step
@@ -236,21 +239,18 @@ with pt.Nexustreefile("primate-mtDNA.trees") as tf:
         ts.add_tree(tree)
 sumtree = pt.build_sumtree(ts, treetype="mcc", blen="cladeheight", rooting=None,)
 
-pt.configure_sumtree_printing(
-	sumtree,
-	treetype="mcc",
-	blen="cladeheight",
-	trackci=True,
-	print_meta=True
-)
-
 with open("posterior_summary.nexus", "w") as out:
-    out.write(sumtree.nexus())
+    out.write(sumtree.nexus(
+        node_attributes=("clade_cred", "height", "height_sd", "height_median", "ci"),
+        branch_attributes=("length",),
+        ci_labels=ts.ci_labels,
+        print_meta=True,
+    ))
 ```
 
 ### Save in different formats and include metadata
 
-The printing helpers let you choose labels, branch lengths, and metadata comments independently of the tree itself.
+Pass printing options directly to `newick()` or `nexus()`. Options apply only to that call. An ordinary dictionary can be reused for several calls:
 
 ```python
 import phylotreelib as pt
@@ -259,14 +259,14 @@ tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
 mrca = tree.find_mrca({"A", "B"})
 parent = tree.parent(mrca)
 tree.set_branch_attribute(parent, mrca, "posterior", 0.97)
-pt.configure_basic_printing(
-    tree,
-    print_meta=True,
-    branch_attrs=("posterior",),
-    precision=6,
-)
-print(tree.newick())
-print(tree.nexus(translateblock=True))
+print_options = {
+    "print_meta": True,
+    "branch_attributes": ("posterior",),
+    "precision": 6,
+}
+print(tree.newick(**print_options))
+print(tree.nexus(translateblock=True, **print_options))
+print(tree.newick())  # Plain output; previous calls do not change its defaults
 ```
 
 ### Color a selected set of leaves in NEXUS output
@@ -344,6 +344,8 @@ Available classes:
 
 ## Changelog (2.0.0)
 
+These historical notes describe version 2.0.0. The unreleased printing API replaces its stored printing settings; see [Printing without stored defaults](#printing-without-stored-defaults-unreleased).
+
 ### Added
 
 - **Explicit summary-tree pipeline** via `SummaryTreeBuilder` and `TreePostProcessor` (with optional `CAHeightEstimator` for CA-heights and credible intervals).
@@ -407,7 +409,7 @@ The affected call sites are:
 
 `TreeSummary.compute_sumtree(...)` is still available as a convenience wrapper (so many 1.x workflows continue to work), but the preferred style is now the explicit pipeline:
 
-- `TreeSummary` --> `SummaryTreeBuilder` --> `TreePostProcessor` (+ optional `CAHeightEstimator`) --> `PrintSpec`
+- `TreeSummary` --> `SummaryTreeBuilder` --> `TreePostProcessor` (+ optional `CAHeightEstimator`) --> `Tree.newick()` / `Tree.nexus()`
 
 See the "Summarize posterior tree samples" quick-start example above, and the worked examples in `docs/recipes.md`.
 
@@ -589,26 +591,27 @@ Tree.collapse_bifurcating_root(self)
 
 (And `Tree.deroot()` is kept as a deprecated alias.)
 
-### Printing: PrintSpec defaults
+### Printing without stored defaults (unreleased)
 
-**Old (1.x):**
+This is a breaking API change after 2.3.1. `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()` have been removed. Pass the options directly to each output call.
 
-```python
-Tree.newick(self, printdist=True, printlabels=True, labelfield='label', precision=6, ...)
-Tree.nexus(self, printdist=True, printlabels=True, labelfield='label', precision=6, ...)
-```
-
-**New (2.x):**
-
-```python
-Tree.newick(self, printdist=None, printlabels=None, labelfield=None, precision=None, ..., print_meta=None)
-Tree.nexus(self,  printdist=None, printlabels=None, labelfield=None, precision=None, ..., print_meta=None)
-```
-
-In 2.x, passing `None` means "use the Tree's current PrintSpec default". This makes it easy to configure printing once:
+**Before (2.0.0 through 2.3.1):**
 
 ```python
 pt.configure_basic_printing(tree, precision=7, print_meta=True, branch_attrs=("posterior",))
-print(tree.newick())          # uses PrintSpec
-print(tree.nexus())           # uses PrintSpec
+print(tree.newick())
+print(tree.nexus())
 ```
+
+**Now:**
+
+```python
+print(tree.newick(precision=7, print_meta=True, branch_attributes=("posterior",)))
+print(tree.nexus(precision=7, print_meta=True, branch_attributes=("posterior",)))
+```
+
+The helper arguments `node_attrs` and `branch_attrs` become `node_attributes` and `branch_attributes` on the output methods. For summary trees, explicitly select the support and height/length attributes shown in the examples above.
+
+`Tree.newick()` and `Tree.nexus()` default to printing lengths and labels, using `labelfield="label"`, `precision=7`, and `print_meta=False`. `TreeSet` output retains its default precision of six significant digits and also accepts `print_meta` and `ci_labels`.
+
+An explicit `None` for a scalar option uses its fixed default. `None` or an empty sequence for an attribute list selects no attributes; `ci_labels=None` selects no intervals. Set `print_meta=True` to emit the requested metadata. These settings never persist on the tree.

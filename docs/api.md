@@ -17,14 +17,38 @@ The main public entry points are:
 - `Distmatrix`
 - `TreeError`
 - `build_sumtree`
-- `configure_basic_printing`
-- `configure_sumtree_printing`
 
-Helper classes such as `Bipartition`, `Clade`, `Branchstruct`, `Nodestruct`, `PrintSpec`, `SummaryTreeBuilder`, `TreePostProcessor`, `CAHeightEstimator`, and `QuantileAccumulator` are also part of the module, but most users do not need them for ordinary scripting.
+Helper classes such as `Bipartition`, `Clade`, `Branchstruct`, `Nodestruct`, `SummaryTreeBuilder`, `TreePostProcessor`, `CAHeightEstimator`, and `QuantileAccumulator` are also part of the module, but most users do not need them for ordinary scripting.
 
 ---
 
 ### 2. Tree input and output
+
+#### `Tree.newick(...)` and `Tree.nexus(...)`
+
+Printing is controlled by the arguments to each call. No formatting settings are stored on a tree.
+
+```python
+Tree.newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
+            transdict=None, node_attributes=None, branch_attributes=None,
+            ci_labels=None, print_meta=False)
+Tree.nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
+           translateblock=False, node_attributes=None, branch_attributes=None,
+           colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
+           print_meta=False)
+```
+
+- `printdist` and `printlabels` control branch lengths and internal node labels. `labelfield` names the branch attribute to use for those labels.
+- `precision` is the number of significant digits used for floating-point output (`g` formatting).
+- `node_attributes` and `branch_attributes` select metadata from `Nodestruct` and `Branchstruct`. Missing attributes and `None` values are skipped, including on nodes without metadata.
+- `print_meta=True` enables the selected node and branch metadata. Its default, `False`, suppresses that metadata even when attributes or CI labels are provided.
+- `ci_labels` selects entries from each structure's `.ci` mapping when its metadata is emitted. Node intervals are named `height_<label>` and branch intervals `length_<label>`. Node metadata includes the root.
+- Explicit `None` for a scalar setting uses its fixed default. `None` or an empty sequence for an attribute selection or `ci_labels` selects nothing of that kind.
+- `nexus()` wraps `newick()` and forwards these options. Its additional arguments control the translate block and taxon color annotations.
+
+`TreeSet.newick()` and `TreeSet.nexus()` forward the same printing controls, including `print_meta` and `ci_labels`, to each tree. Their default precision remains six significant digits; `precision=None` also means six.
+
+**Unreleased API change:** `PrintSpec` and the `configure_*_printing()` helpers have been removed, along with `Tree.set_print_spec()` and `Tree.get_print_spec()`. Replace a helper call followed by `tree.newick()` with one call that passes the options directly. The former helper arguments `node_attrs` and `branch_attrs` are named `node_attributes` and `branch_attributes` on the output methods.
 
 #### `Treefile(filename, strip_comments=True)`
 
@@ -60,10 +84,12 @@ with pt.Nexustreefile("posterior.trees") as tf:
 # 2) Build + annotate the summary tree (topology + rooting + lengths/heights + support)
 sumtree = pt.build_sumtree(ts, treetype="con", blen="biplen", rooting="mid")
 
-# 3) Configure output (optional)
-pt.configure_sumtree_printing(sumtree, treetype="con", blen="biplen", print_meta=True)
-
-print(sumtree.newick())
+# 3) Select output labels and metadata
+print(sumtree.newick(
+    labelfield="bipartition_cred",
+    branch_attributes=("bipartition_cred", "length", "length_sd"),
+    print_meta=True,
+))
 ```
 
 Parameters
@@ -75,8 +101,7 @@ Notes
 - `"caheight"` needs access to the original tree sample again. Pass `count_burnin_filename_list`
   (the same structure used by `sumt`: tuples of `(count, burnin, filename)`), or do a second pass
   yourself with `CAHeightEstimator`.
-- Printing is intentionally **not** configured by `build_sumtree`; use `Tree.set_print_spec()`,
-  `configure_sumtree_printing()`, or `configure_basic_printing()`.
+- Select printing options when calling `Tree.newick()` or `Tree.nexus()` on the result.
 
 **v2.0.0 note:** The `blen` values `"meandepth"` and `"cadepth"` from v1.x have been renamed to `"cladeheight"` and `"caheight"` respectively.
 
@@ -145,22 +170,6 @@ Conceptually, this function:
 2. roots it if requested
 3. assigns branch lengths and/or node heights
 4. annotates support and associated statistics
-
-#### `configure_basic_printing(...)`
-
-Convenience function for setting a tree's `PrintSpec`.
-
-Use this to choose:
-
-- floating-point precision
-- whether to print lengths and labels
-- which branch attribute acts as the label
-- whether to emit metadata comments
-- which node and branch attributes to include in the comments
-
-#### `configure_sumtree_printing(...)`
-
-Convenience function that chooses sensible printing defaults for summary trees, depending on summary-tree type and branch-length convention.
 
 ---
 
@@ -314,7 +323,15 @@ Quantile summaries are typically used to populate metadata such as:
 - node-height credible intervals
 - medians and related robust summaries
 
-These can then be printed into Newick/NEXUS metadata comments via `configure_basic_printing()` or `configure_sumtree_printing()`.
+Print these with `Tree.newick()` or `Tree.nexus()`, passing `print_meta=True`, the relevant node or branch attributes, and the requested `ci_labels`. For example:
+
+```python
+text = sumtree.nexus(
+    print_meta=True,
+    node_attributes=("height", "height_sd", "height_median", "ci"),
+    ci_labels=("95%_CI",),
+)
+```
 
 ---
 
@@ -329,7 +346,5 @@ For everyday use, it is reasonable to treat the following as the stable public i
 - `Distmatrix`
 - `TreeError`
 - `build_sumtree`
-- `configure_basic_printing`
-- `configure_sumtree_printing`
 
 The remaining classes are useful, but many of them are better regarded as advanced helpers or implementation-level infrastructure unless they are explicitly needed by your workflow.

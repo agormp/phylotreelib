@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## Unreleased
+
+#### Removed
+- Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
+
+#### Changed
+- `Tree.newick()` and `Tree.nexus()` have fixed defaults: lengths and labels enabled, `labelfield="label"`, `precision=7`, and `print_meta=False`. Explicit `None` values for scalar settings use these defaults; `None` attribute lists or CI labels select no attributes or intervals. Each output call is independent.
+
+#### Added
+- `TreeSet.newick()` and `TreeSet.nexus()` accept and forward `print_meta` and `ci_labels`. Their default precision remains six significant digits.
+- Regression tests for explicit printing options, metadata and CI output, independent calls, and TreeSet forwarding.
+
+---
+
 ## [2.3.1] - 2026 September 22
 
 #### Fixed
