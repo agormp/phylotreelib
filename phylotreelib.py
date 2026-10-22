@@ -3225,7 +3225,7 @@ class Tree:
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
               translateblock=False, node_attributes=None, branch_attributes=None,
               colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
-              print_meta=False):
+              print_meta=False, rooted=None):
 
         """
         Return a NEXUS 'begin trees;' block containing this tree.
@@ -3242,7 +3242,16 @@ class Tree:
 
         colorlist, colorfg, colorbg :
             Optional FigTree-style color annotations for taxa.
+
+        rooted : bool or None, default None
+            True declares a rooted tree with [&R]; False declares an unrooted tree
+            with [&U]; None omits the declaration. This does not reroot the tree
+            and is independent of print_meta. Rootedness is not inferred from
+            the implementation root or its number of children.
         """
+
+        if rooted is not None and not isinstance(rooted, bool):
+            raise TreeError("rooted must be True, False, or None")
 
         # Construct header
         if colorlist:
@@ -3265,6 +3274,8 @@ class Tree:
 
         # Add newick tree string with optional meta-comments for figtree format
         stringlist.append("    tree nexus_tree = ")
+        if rooted is not None:
+            stringlist.append("[&R] " if rooted else "[&U] ")
         stringlist.append(self.newick(
             printdist=printdist,
             printlabels=printlabels,
@@ -5669,14 +5680,19 @@ class TreeSet():
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
                       translateblock=False, node_attributes=None, branch_attributes=None,
                       colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
-                      print_meta=False):
+                      print_meta=False, rooted=None):
         """Return a NEXUS block, forwarding printing options to every tree.
 
         Precision defaults to seven significant digits, as for Tree. An explicit
         None uses that same default. See Tree.newick() for metadata options.
+        rooted applies the same declaration to every tree: True emits [&R],
+        False emits [&U], and None omits it. It is independent of print_meta
+        and does not change any tree's root.
         """
         if precision is None:
             precision = 7
+        if rooted is not None and not isinstance(rooted, bool):
+            raise TreeError("rooted must be True, False, or None")
 
         # Construct header
         stringlist = ["#NEXUS\n\n"]
@@ -5698,6 +5714,8 @@ class TreeSet():
         # Add newick trees with metacomments if needed
         for i, tree in enumerate(self.treelist):
             stringlist.append(f"    tree t.{i + 1} = ")
+            if rooted is not None:
+                stringlist.append("[&R] " if rooted else "[&U] ")
             stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
                                           precision=precision, transdict=transdict if translateblock else None,
                                           node_attributes=node_attributes, branch_attributes=branch_attributes,

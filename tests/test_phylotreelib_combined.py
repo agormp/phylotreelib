@@ -501,6 +501,38 @@ class TestTreeNewick:
 
 class TestTreeNexus:
 
+    @pytest.mark.parametrize("rooted, declaration", [(None, ""), (True, "[&R] "), (False, "[&U] ")])
+    @pytest.mark.parametrize("translateblock", [False, True])
+    @pytest.mark.parametrize("print_meta", [False, True])
+    def test_rootedness_declaration(self, annotated_print_tree, rooted, declaration,
+                                   translateblock, print_meta):
+        tree = annotated_print_tree
+        plain = tree.nexus()
+        root = tree.root
+        result = tree.nexus(rooted=rooted, translateblock=translateblock, print_meta=print_meta)
+        expected = tree.newick(print_meta=print_meta,
+                              transdict=tree.transdict() if translateblock else None)
+        assert "    tree nexus_tree = " + declaration + expected in result
+        assert tree.root == root
+        assert tree.nexus() == plain
+        assert "[&R]" not in plain and "[&U]" not in plain
+        assert ("height=" in result) == print_meta
+        parsed = next(pt.Nexustreefile(filecontent=result))
+        assert parsed.equals(tree, rooted=True)
+
+    @pytest.mark.parametrize("sample", ["((A:1,B:1):1,C:2);", "(A:1,B:1,C:1);"])
+    def test_rootedness_is_not_inferred(self, sample):
+        tree = pt.Tree.from_string(sample)
+        assert "[&R]" not in tree.nexus()
+        assert "[&U]" not in tree.nexus()
+        assert "[&R] " in tree.nexus(rooted=True)
+        assert "[&U] " in tree.nexus(rooted=False)
+
+    @pytest.mark.parametrize("rooted", [0, 1, "true", [], {}])
+    def test_invalid_rootedness(self, annotated_print_tree, rooted):
+        with pytest.raises(pt.TreeError, match="rooted must be True, False, or None"):
+            annotated_print_tree.nexus(rooted=rooted)
+
     def test_automatic_metadata(self, annotated_print_tree):
         tree = annotated_print_tree
         result = tree.nexus(print_meta=True)
@@ -563,6 +595,32 @@ class TestTreeSetNewick:
 
 
 class TestTreeSetNexus:
+
+    @pytest.mark.parametrize("rooted, declaration", [(None, ""), (True, "[&R] "), (False, "[&U] ")])
+    @pytest.mark.parametrize("translateblock", [False, True])
+    @pytest.mark.parametrize("print_meta", [False, True])
+    def test_rootedness_declaration(self, annotated_print_tree, rooted, declaration,
+                                   translateblock, print_meta):
+        tree = annotated_print_tree
+        trees = pt.TreeSet()
+        trees.addtree(tree)
+        trees.addtree(tree.copy_treeobject())
+        plain = trees.nexus()
+        result = trees.nexus(rooted=rooted, translateblock=translateblock, print_meta=print_meta)
+        expected = tree.newick(print_meta=print_meta,
+                              transdict=tree.transdict() if translateblock else None)
+        for i in (1, 2):
+            assert f"    tree t.{i} = " + declaration + expected in result
+        parsed = list(pt.Nexustreefile(filecontent=result))
+        assert len(parsed) == 2
+        assert all(t.equals(tree, rooted=True) for t in parsed)
+        assert trees.nexus() == plain
+        assert "[&R]" not in plain and "[&U]" not in plain
+
+    @pytest.mark.parametrize("rooted", [0, 1, "false", [], {}])
+    def test_invalid_rootedness(self, rooted):
+        with pytest.raises(pt.TreeError, match="rooted must be True, False, or None"):
+            pt.TreeSet().nexus(rooted=rooted)
 
     def test_metadata_ci_and_translate_forwarding(self, annotated_print_tree):
         tree = annotated_print_tree
