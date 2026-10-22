@@ -369,6 +369,156 @@ class TestPathMethods:
                     assert parent == mytree.parent(child)
 
 
+@pytest.fixture
+def annotated_print_tree():
+    tree = pt.Tree.from_string("((A:0.123456789,B:2)old:3,C:4);")
+    tree.set_node_attribute("A", "height", 1.23456789)
+    tree.set_node_attribute("A", "height_sd", 0.1)
+    tree.set_node_attribute("A", "ci", {"80%_CI": (1.0, 1.4), "95%_CI": (0.8, 1.5)})
+    tree.set_node_attribute(tree.root, "height", 5.0)
+    tree.set_node_attribute(tree.root, "ci", {"80%_CI": (4.5, 5.5), "95%_CI": (4.0, 6.0)})
+    node = tree.find_mrca({"A", "B"})
+    branch = tree.child_dict[tree.root][node]
+    branch.posterior = 0.975
+    branch.length_sd = 0.25
+    branch.ci = {"80%_CI": (2.5, 3.5), "95%_CI": (2.0, 4.0)}
+    return tree
+
+
+class TestTreeNewick:
+
+    def test_defaults_and_call_independence(self, annotated_print_tree):
+        tree = annotated_print_tree
+        expected = "((A:0.1234568,B:2)old:3,C:4);"
+        assert tree.newick() == expected
+        tree.newick(printdist=False, printlabels=False, print_meta=True,
+                    precision=3, node_attributes=("height", "ci"), ci_labels=("95%_CI",))
+        tree.nexus(print_meta=True, node_attributes=("height",))
+        assert tree.newick() == expected
+
+    @pytest.mark.parametrize("options, expected", [
+        ({"printdist": False}, "((A,B)old,C);"),
+        ({"printlabels": False}, "((A:0.1234568,B:2):3,C:4);"),
+        ({"labelfield": "posterior", "precision": 3}, "((A:0.123,B:2)0.975:3,C:4);"),
+        ({"transdict": {"A": "1", "B": "2", "C": "3"}},
+         "((1:0.1234568,2:2)old:3,3:4);"),
+    ])
+    def test_explicit_options(self, annotated_print_tree, options, expected):
+        assert annotated_print_tree.newick(**options) == expected
+
+    def test_selected_metadata_including_root(self, annotated_print_tree):
+        result = annotated_print_tree.newick(
+            print_meta=True, node_attributes=("height", "ci"),
+            branch_attributes=("length_sd", "ci"), ci_labels=("95%_CI",), precision=4)
+        assert "A[&height=1.235,height_95%_CI={0.8,1.5}]:0.1235" in result
+        assert "old:3[&length_sd=0.25,length_95%_CI={2,4}]" in result
+        assert result.endswith(")[&height=5,height_95%_CI={4,6}];")
+        assert "height_sd" not in result
+        assert "80%_CI" not in result
+        assert "B:2" in result
+
+    @pytest.mark.parametrize("print_meta", [False, None])
+    def test_metadata_suppression(self, annotated_print_tree, print_meta):
+        result = annotated_print_tree.newick(
+            print_meta=print_meta, node_attributes=("height", "ci"),
+            branch_attributes=("length_sd", "ci"), ci_labels=("95%_CI",))
+        assert "[&" not in result
+
+    @pytest.mark.parametrize("selection", [None, ()])
+    def test_empty_selections(self, annotated_print_tree, selection):
+        tree = annotated_print_tree
+        tree.newick(print_meta=True, node_attributes=("height", "ci"), ci_labels=("95%_CI",))
+        result = tree.newick(print_meta=True, node_attributes=selection,
+                            branch_attributes=selection, ci_labels=selection)
+        assert "[&" not in result
+        result = tree.newick(print_meta=True, node_attributes=("height", "ci"), ci_labels=selection)
+        assert "height=" in result
+        assert "_CI=" not in result
+
+    def test_explicit_none_scalar_defaults(self, annotated_print_tree):
+        tree = annotated_print_tree
+        assert tree.newick(printdist=None, printlabels=None, labelfield=None,
+                           precision=None, print_meta=None) == tree.newick()
+
+
+class TestTreeNexus:
+
+    def test_forwarding_and_call_independence(self, annotated_print_tree):
+        tree = annotated_print_tree
+        plain = tree.nexus()
+        options = dict(print_meta=True, printdist=False, labelfield="posterior", precision=3,
+                       node_attributes=("height", "ci"), branch_attributes=("length_sd", "ci"),
+                       ci_labels=("95%_CI",))
+        result = tree.nexus(**options)
+        assert "    tree nexus_tree = " + tree.newick(**options) in result
+        assert result.startswith("#NEXUS")
+        assert result.endswith("\nend;\n")
+        assert "height_95%_CI" in result
+        assert "length_95%_CI" in result
+        assert tree.nexus() == plain
+        assert "[&" not in plain
+
+    def test_translate_block_and_root_metadata(self, annotated_print_tree):
+        tree = annotated_print_tree
+        result = tree.nexus(translateblock=True, print_meta=True, node_attributes=("height",))
+        expected = tree.newick(transdict=tree.transdict(), print_meta=True, node_attributes=("height",))
+        assert "translate" in result.lower()
+        assert expected in result
+        assert expected.endswith(")[&height=5];")
+        parsed = next(pt.Nexustreefile(filecontent=result))
+        assert parsed.equals(tree, rooted=True)
+
+    def test_suppression_and_none_defaults(self, annotated_print_tree):
+        tree = annotated_print_tree
+        assert tree.nexus(printdist=None, printlabels=None, labelfield=None,
+                          precision=None, print_meta=None) == tree.nexus()
+        assert "[&" not in tree.nexus(print_meta=False, node_attributes=("height",))
+
+
+class TestTreeSetNewick:
+
+    def test_metadata_and_ci_forwarding(self, annotated_print_tree):
+        tree = annotated_print_tree
+        trees = pt.TreeSet()
+        trees.addtree(tree)
+        trees.addtree(tree.copy_treeobject())
+        options = dict(print_meta=True, printlabels=False, printdist=False, precision=4,
+                       node_attributes=("height", "ci"), branch_attributes=("length_sd", "ci"),
+                       ci_labels=("95%_CI",), transdict={"A": "1", "B": "2", "C": "3"})
+        assert trees.newick(**options) == (tree.newick(**options) + "\n") * 2
+        assert "[&" not in trees.newick()
+
+    def test_default_precision(self, annotated_print_tree):
+        trees = pt.TreeSet()
+        trees.addtree(annotated_print_tree)
+        assert trees.newick() == annotated_print_tree.newick(precision=6) + "\n"
+        assert trees.newick(precision=None) == trees.newick()
+
+
+class TestTreeSetNexus:
+
+    def test_metadata_ci_and_translate_forwarding(self, annotated_print_tree):
+        tree = annotated_print_tree
+        trees = pt.TreeSet()
+        trees.addtree(tree)
+        trees.addtree(tree.copy_treeobject())
+        options = dict(print_meta=True, printdist=False, printlabels=False, precision=4,
+                       node_attributes=("height", "ci"), branch_attributes=("length_sd", "ci"),
+                       ci_labels=("95%_CI",))
+        result = trees.nexus(translateblock=True, **options)
+        expected = tree.newick(transdict=tree.transdict(), **options)
+        assert "translate" in result.lower()
+        assert result.count(expected) == 2
+        assert len(list(pt.Nexustreefile(filecontent=result))) == 2
+        assert "[&" not in trees.nexus()
+
+    def test_default_precision(self, annotated_print_tree):
+        trees = pt.TreeSet()
+        trees.addtree(annotated_print_tree)
+        assert annotated_print_tree.newick(precision=6) in trees.nexus()
+        assert trees.nexus(precision=None) == trees.nexus()
+
+
 class TestTreeOutput:
     """Tests of string output"""
 
@@ -3397,10 +3547,9 @@ class TestNodedictRefactor:
     def test_meta_comments_sparse_nodedict(self):
         tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
         tree.set_node_attribute("A", "height", 0.0)
-        pt.configure_basic_printing(tree, print_meta=True, node_attrs=("height",))
-        nwk = tree.newick()
+        nwk = tree.newick(print_meta=True, node_attributes=("height",))
         assert isinstance(nwk, str)
-        assert "A" in nwk
+        assert "A[&height=0]:1" in nwk
 
     def test_cluster_no_branchstruct_heights(self):
         tree = pt.Tree.randtree(ntips=10, rate_sd=0.1)

@@ -949,153 +949,6 @@ class NewickStringParser:
 ###################################################################################################
 ###################################################################################################
 
-class PrintSpec:
-
-    def __init__(self, node_attrs=None, branch_attrs=None, ci_labels=None, labelfield="label",
-                 precision=7, printdist=True, printlabels=True, print_meta=False):
-        self.node_attrs = node_attrs
-        self.branch_attrs = branch_attrs
-        self.ci_labels = ci_labels
-        self.labelfield = labelfield
-        self.precision = precision
-        self.printdist = printdist
-        self.printlabels = printlabels
-        self.print_meta = print_meta
-
-###################################################################################################
-###################################################################################################
-
-def configure_basic_printing(tree, precision=6, print_meta=False, printlabels=True,
-                             printdist=True, labelfield="label",
-                             node_attrs=None, branch_attrs=None, ci_labels=None):
-    """
-    Configure default printing for an arbitrary Tree via its PrintSpec.
-
-    This is a lightweight helper that only affects presentation (Tree.newick / Tree.nexus).
-    It does NOT modify the tree topology, branch lengths, or annotations stored on
-    Branchstruct / Nodestruct objects.
-
-    Parameters
-    ----------
-    tree : Tree
-        The tree to configure.
-    precision : int, default 6
-        Number formatting precision used by Tree.newick / Tree.nexus (general format 'g').
-    print_meta : bool, default False
-        Whether to emit BEAST/FigTree-style meta-comments (`[&key=value,...]`).
-        If False, all meta output is suppressed even if node_attrs/branch_attrs/ci_labels
-        are provided.
-    printlabels : bool, default True
-        Whether to print internal node labels (the token after ')' in Newick).
-        Labels are taken from the branch attribute named by `labelfield`.
-    printdist : bool, default True
-        Whether to print branch lengths (`:length`).
-    labelfield : str, default "label"
-        Name of the Branchstruct attribute to use for internal node labels
-        (e.g. "label", "bipartition_cred", "rootcred", ...).
-    node_attrs : sequence[str] or None, default None
-        Node attributes to emit as meta-comments on nodes (from Nodestruct on each node).
-        Example: ("clade_cred", "height", "height_sd").
-    branch_attrs : sequence[str] or None, default None
-        Branch attributes to emit as meta-comments on branches (from Branchstruct).
-        Example: ("bipartition_cred", "length_sd", "rootcred").
-    ci_labels : sequence[str] or None, default None
-        If provided and the struct has a `.ci` dict, emit CI ranges as meta-comments.
-        This is interpreted by Tree.newick's metacomment helper:
-          - for each label in ci_labels, prints something like:
-              "<prefix>_<label>={lo,hi}"
-          - where prefix is "height" for node comments and "length" for branch comments.
-
-    Returns
-    -------
-    Tree
-        The same tree (mutated in-place), returned for convenience/chaining.
-
-    Examples
-    --------
-    # Plain Newick, no meta:
-    configure_basic_printing(tree, print_meta=False)
-
-    # Print support values as internal labels:
-    configure_basic_printing(tree, labelfield="bipartition_cred", printlabels=True)
-
-    # Emit meta-comments for a few attributes:
-    configure_basic_printing(
-        tree,
-        print_meta=True,
-        node_attrs=("clade_cred",),
-        branch_attrs=("bipartition_cred", "length_sd"),
-        ci_labels=("95%_CI",),
-        precision=7,
-    )
-    """
-    tree.set_print_spec(
-        node_attrs=tuple(node_attrs) if node_attrs is not None else None,
-        branch_attrs=tuple(branch_attrs) if branch_attrs is not None else None,
-        ci_labels=tuple(ci_labels) if ci_labels is not None else None,
-        labelfield=labelfield,
-        precision=precision,
-        print_meta=print_meta,
-        printlabels=printlabels,
-        printdist=printdist,
-    )
-    return tree
-
-###################################################################################################
-
-def configure_sumtree_printing(tree, treetype, blen, trackci=False, ci_labels=None,
-                               precision=7, print_meta=True, printlabels=True,
-                               printdist=True):
-    """
-    Set Tree.print_spec based on common summary-tree conventions.
-    Does not modify computed values; only presentation.
-    This helper chooses a conventional `labelfield` depending on summary tree type
-    (e.g. bipartition support for consensus trees).
-    For non-summary trees, use configure_basic_printing() or Tree.set_print_spec().
-    """
-    node_attrs = set()
-    branch_attrs = set()
-
-    # support is always useful as meta
-    if treetype in ("mcc", "hip", "mrhip"):
-        node_attrs.add("clade_cred")
-        # for Newick internal node labels, you’ll typically want clade_cred
-        labelfield = "label"   # because annotate_sumtree sets br.label to clade_cred preferentially
-    else:
-        branch_attrs.add("bipartition_cred")
-        labelfield = "bipartition_cred"  # direct printing without relying on br.label
-
-    # branch length / height attributes
-    if blen == "biplen":
-        branch_attrs.update({"length", "length_sd"})
-    elif blen in ("cladeheight", "caheight"):
-        node_attrs.update({"height", "height_sd"})
-        branch_attrs.add("length")
-    elif blen in ("none", "input"):
-        branch_attrs.add("length")
-
-    if trackci and ci_labels:
-        # attach CI info where it exists
-        if blen == "biplen":
-            branch_attrs.update({"ci", "length_median"})
-        elif blen in ("cladeheight", "caheight"):
-            node_attrs.update({"ci", "height_median"})
-
-    tree.set_print_spec(
-        node_attrs=tuple(sorted(node_attrs)) or None,
-        branch_attrs=tuple(sorted(branch_attrs)) or None,
-        ci_labels=tuple(ci_labels) if ci_labels else None,
-        labelfield=labelfield,
-        precision=precision,
-        print_meta=print_meta,
-        printlabels=printlabels,
-        printdist=printdist,
-    )
-    return tree
-
-###################################################################################################
-###################################################################################################
-
 def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=None,
                   count_burnin_filename_list=None):
     """
@@ -1107,7 +960,7 @@ def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=N
       - sets branch lengths / node heights (TreePostProcessor + optional CAHeightEstimator)
       - annotates support + length/height stats (TreePostProcessor)
 
-    Printing is NOT configured here (use configure_sumtree_printing / Tree.set_print_spec).
+    Pass printing options directly to Tree.newick() or Tree.nexus().
     """
 
     if (rooting == "og") and (not og):
@@ -1245,7 +1098,6 @@ class Tree:
         self._topology_bipart = None
         self._topology_clade = None
         self._cached_attributes = None
-        self._print_spec = None
 
     ###############################################################################################
 
@@ -1519,7 +1371,7 @@ class Tree:
         Notes
         -----
         - This constructor sets obj.leaves and obj.root based on the branch table.
-        - This method does not configure printing; use tree.set_print_spec(...) if desired.
+        - Pass printing options directly to newick() or nexus() when exporting the tree.
         """
 
         nbranches = len(parentlist)
@@ -3217,57 +3069,16 @@ class Tree:
 
     ###############################################################################################
 
-    def set_print_spec(self, node_attrs=None, branch_attrs=None,
-                       ci_labels=None, labelfield=None,
-                       precision=None, printdist=None,
-                       printlabels=None, print_meta=None):
-        """
-        Set default printing options (PrintSpec) for this Tree.
-
-        The PrintSpec controls the defaults used by Tree.newick() and Tree.nexus()
-        when those methods are called without explicit arguments.
-
-        Any argument passed as None leaves the existing PrintSpec value unchanged.
-        Returns self for convenience.
-        """
-
-        cur = self.get_print_spec()
-        self._print_spec = PrintSpec(
-            node_attrs=tuple(node_attrs) if node_attrs is not None else cur.node_attrs,
-            branch_attrs=tuple(branch_attrs) if branch_attrs is not None else cur.branch_attrs,
-            ci_labels=tuple(ci_labels) if ci_labels is not None else cur.ci_labels,
-            labelfield=labelfield if labelfield is not None else cur.labelfield,
-            precision=int(precision) if precision is not None else cur.precision,
-            printdist=bool(printdist) if printdist is not None else cur.printdist,
-            printlabels=bool(printlabels) if printlabels is not None else cur.printlabels,
-            print_meta=bool(print_meta) if print_meta is not None else cur.print_meta,
-        )
-        return self
-
-    ###############################################################################################
-
-    def get_print_spec(self):
-        """
-        Return the Tree's PrintSpec (creating a default one if missing).
-
-        The PrintSpec stores default formatting/annotation choices used by
-        Tree.newick() and Tree.nexus() when called without explicit arguments.
-        """
-
-        if self._print_spec is None:
-            self._print_spec = PrintSpec()
-        return self._print_spec
-
-    ###############################################################################################
-
-    def newick(self, printdist=None, printlabels=None, labelfield=None, precision=None,
+    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
                transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
-               print_meta=None):
+               print_meta=False):
         """
         Return a Newick string for this tree.
 
-        Parameters are optional. Any parameter left as None falls back to the tree's
-        current PrintSpec (see Tree.set_print_spec / Tree.get_print_spec).
+        Printing options apply only to this call; no formatting settings are stored
+        on the tree. None for a scalar option uses its fixed default. None or an
+        empty sequence for node_attributes, branch_attributes, or ci_labels selects
+        no attributes or intervals of that kind.
 
         Printing conventions
         --------------------
@@ -3287,17 +3098,12 @@ class Tree:
         Tip labels are the leaf names (or transdict values if provided).
         """
 
-        spec = self.get_print_spec()
-
-        # 1) Use PrintSpec when args are omitted
-        if precision is None:           precision   = spec.precision
-        if labelfield is None:          labelfield  = spec.labelfield
-        if printdist is None:           printdist   = spec.printdist
-        if printlabels is None:         printlabels = spec.printlabels
-        if print_meta is None:          print_meta  = spec.print_meta
-        if node_attributes is None:     node_attributes = spec.node_attrs
-        if branch_attributes is None:   branch_attributes = spec.branch_attrs
-        if ci_labels is None:           ci_labels = spec.ci_labels
+        # Preserve explicit None as a request for the fixed scalar defaults.
+        if precision is None:   precision = 7
+        if labelfield is None:  labelfield = "label"
+        if printdist is None:   printdist = True
+        if printlabels is None: printlabels = True
+        if print_meta is None:  print_meta = False
 
         # If meta printing is disabled, suppress all meta-related output
         if not print_meta:
@@ -3377,9 +3183,6 @@ class Tree:
                 treelist.append(",")
             del treelist[-1]  # Remove last comma when no more siblings
 
-        # EXECUTION STARTS HERE!
-        # If these are not passed to the function: Check if tree object itself has them as attributes
-        # (eg: TreeSummary.compute_sumtree adds them in this way)
         root = self.root
         treelist = ["("]
         append_children(root)
@@ -3398,17 +3201,17 @@ class Tree:
 
     ###############################################################################################
 
-    def nexus(self, printdist=None, printlabels=None, labelfield=None, precision=None,
+    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
               translateblock=False, node_attributes=None, branch_attributes=None,
               colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
-              print_meta=None):
+              print_meta=False):
 
         """
         Return a NEXUS 'begin trees;' block containing this tree.
 
         This method wraps Tree.newick() for the actual tree string; all printing options
-        (lengths, labels, meta-comments, precision, etc.) follow the same rules as
-        Tree.newick(): explicit arguments override values stored in the tree's PrintSpec.
+        (lengths, labels, meta-comments, precision, etc.) are passed directly to
+        Tree.newick() and apply only to this call.
 
         Parameters
         ----------
@@ -5844,8 +5647,15 @@ class TreeSet():
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=6,
                       translateblock=False, node_attributes=None, branch_attributes=None,
-                      colorlist=None, colorfg="#0000FF", colorbg="#000000"):
-        """Returns nexus or format tree for each tree in the set"""
+                      colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
+                      print_meta=False):
+        """Return a NEXUS block, forwarding printing options to every tree.
+
+        Precision defaults to six significant digits for TreeSet output. An explicit
+        None uses that same default. See Tree.newick() for metadata options.
+        """
+        if precision is None:
+            precision = 6
 
         # Construct header
         stringlist = ["#NEXUS\n\n"]
@@ -5869,7 +5679,8 @@ class TreeSet():
             stringlist.append(f"    tree t.{i + 1} = ")
             stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
                                           precision=precision, transdict=transdict if translateblock else None,
-                                          node_attributes=node_attributes, branch_attributes=branch_attributes))
+                                          node_attributes=node_attributes, branch_attributes=branch_attributes,
+                                          ci_labels=ci_labels, print_meta=print_meta))
             stringlist.append("\n")
 
         # Add footer
@@ -5880,14 +5691,22 @@ class TreeSet():
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=6,
-               transdict=None, node_attributes=None, branch_attributes=None):
-        """Returns newick format tree for each tree in the set as a string"""
+               transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
+               print_meta=False):
+        """Return Newick strings, forwarding printing options to every tree.
+
+        Precision defaults to six significant digits for TreeSet output. An explicit
+        None uses that same default. See Tree.newick() for metadata options.
+        """
+        if precision is None:
+            precision = 6
         stringlist = []
         for tree in self.treelist:
             stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
                                           precision=precision, transdict=transdict,
                                           node_attributes=node_attributes,
-                                          branch_attributes=branch_attributes))
+                                          branch_attributes=branch_attributes,
+                                          ci_labels=ci_labels, print_meta=print_meta))
             stringlist.append("\n")
         return "".join(stringlist)
 
@@ -6796,8 +6615,7 @@ class TreeSummary():
         This method builds the tree topology, roots it (optional), sets branch lengths/node heights,
         and writes summary annotations onto the returned Tree.
 
-        Printing is not configured here. Use configure_sumtree_printing(sumtree, ...) or
-        sumtree.set_print_spec(...) before calling sumtree.newick()/sumtree.nexus().
+        Pass printing options directly to sumtree.newick() or sumtree.nexus().
         """
 
         return build_sumtree(self, treetype=treetype, blen=blen, rooting=rooting, og=og,
