@@ -695,7 +695,7 @@ tpp.annotate_sumtree(mcctree)
 
 # Export all annotations, including root heights, medians, and credible intervals.
 with open("mcc_ca_intervals.nexus", "w") as out:
-    out.write(mcctree.nexus(print_meta=True))
+    out.write(mcctree.nexus(print_meta=True, rooted=True))
 ```
 
 The exported intervals are named `height_80%_CI` and `height_95%_CI`; each holds `{lower,upper}`. They are central, equal-tailed credible intervals, not HPD intervals. `CAHeightEstimator` uses MRCA heights from every sampled tree, including trees where the target clade was not monophyletic. Quantiles are approximate unless a node's height is effectively constant, in which case its mean, median, and interval endpoints coincide.
@@ -706,6 +706,7 @@ For a restricted export, include `"ci"` in the selected node fields:
 with open("mcc_ca_heights_only.nexus", "w") as out:
     out.write(mcctree.nexus(
         print_meta=True,
+        rooted=True,
         node_attributes=("height", "height_median", "ci"),
         branch_attributes=(),
         ci_labels=("95%_CI",),
@@ -809,6 +810,10 @@ Output:
 ```
 ((A:1,B:1):1[&posterior=0.98],(C:1,D:1):1);
 ```
+
+#### Declare rooted or unrooted interpretation
+
+For a tree whose root has a biological interpretation, use `tree.nexus(rooted=True)` to write `[&R]`. For an unrooted tree represented using an arbitrary traversal root, use `tree.nexus(rooted=False)` to write `[&U]`. The default `rooted=None` omits the declaration; it does not mean unrooted. These options do not change topology, branch lengths, or stored heights, and they work with `print_meta=False`. `TreeSet.nexus()` uses the same declaration for every tree in the set.
 
 #### Color leaves selected by a clade query
 

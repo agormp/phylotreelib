@@ -6,7 +6,7 @@ Updated: 2026-10-22. This document records project context, not permission to st
 
 - The Nexus metacomment parser is planned but explicitly deferred by Anders. Do not implement it until asked. See [the parser plan](plans/nexus-metacomment-parser.md).
 - Do not push, publish to PyPI, or change version numbers without a new request. `pyproject.toml` remains at 2.3.1 despite the unreleased changes in the checkout.
-- The printing changes are to be merged into local `main`. A separate `codex/nexus-rootedness` branch is reserved for the newly requested Nexus rootedness output feature; review it before merging.
+- The printing changes and initial handoff were fast-forwarded into local `main` at `15ed417`. The completed `codex/explicit-tree-printing` branch was deleted. The new Nexus rootedness feature is on `codex/nexus-rootedness`; review it before merging.
 - Inspect `git status`, branches, and recent history at the start of a new session. Do not reset unrelated user changes or delete older experimental branches.
 
 ## Repositories
@@ -47,6 +47,10 @@ README, CHANGELOG, docs/api.md, and docs/recipes.md cover the new behavior. Hist
 - Rooting declarations, rerooting, and constant-height quantiles are distinct issues. `[&R]` communicates rootedness; it does not prevent a user or viewer from rerooting, nor does it recalibrate height annotations after rerooting. Do not infer that a particular user manually rerooted a tree merely from a mismatch.
 
 ## Verification baseline
+
+The separate rootedness branch adds explicit `rooted=True/False/None` declarations to Tree/TreeSet Nexus output, with no inference from their convenience/traversal roots. See the [design decision](decisions/nexus-rootedness.md). Its pytest result is 270 passing tests; the matching sumt branch has 123 passing tests. Biopython 1.88 correctly recognized both emitted rootedness declarations. The parser is still deferred and versions are unchanged.
+
+Eleven sumt CLI workflows were checked against local main; only the expected Nexus declaration changed. Serial and parallel output still matched, and Biopython recognized each Nexus output. The four CI documentation snippets were rerun successfully. See also the [dependency compatibility recommendation](../../sumt/docs/decisions/dependency-compatibility.md); no requirement bounds were changed yet.
 
 Before the new rootedness work: 234 phylotreelib tests and 99 sumt tests pass. Four documentation snippets were executed, including clade-height, CA-height, and branch-length CI exports. The recipe's example download was replaced with the matching local test fixture during verification.
 

@@ -240,7 +240,7 @@ sumtree = pt.build_sumtree(ts, treetype="mcc", blen="cladeheight")
 
 # All populated annotations, including the intervals, are exported automatically.
 with open("posterior_summary.nexus", "w") as out:
-    out.write(sumtree.nexus(print_meta=True))
+    out.write(sumtree.nexus(print_meta=True, rooted=True))
 
 # A smaller export: heights, medians, and only the 95% interval.
 print(sumtree.newick(
@@ -276,6 +276,20 @@ print(tree.newick(**print_options))
 print(tree.nexus(translateblock=True, **print_options))
 print(tree.newick())  # Plain output; previous calls do not change its defaults
 ```
+
+### Declare rootedness in Nexus output
+
+Every `Tree` has an internal root for traversal; that alone does not establish that the phylogeny is biologically rooted. State the intended interpretation explicitly when exporting Nexus:
+
+```python
+import phylotreelib as pt
+tree = pt.Tree.from_string("(A:1,B:1,C:1);")
+print(tree.nexus(rooted=True))   # tree nexus_tree = [&R] ...
+print(tree.nexus(rooted=False))  # tree nexus_tree = [&U] ...
+print(tree.nexus())             # No declaration; same as rooted=None
+```
+
+`TreeSet.nexus()` accepts the same argument and applies it to every tree. The declaration is independent of `print_meta`, does not move the root, and is not inferred from the number of root children. Plain Newick output is unchanged. Omitting a declaration leaves interpretation to the reader; it does not explicitly declare the tree unrooted. The current input parser still discards these comments rather than storing rootedness. See the [design and compatibility notes](docs/decisions/nexus-rootedness.md).
 
 ### Color a selected set of leaves in NEXUS output
 

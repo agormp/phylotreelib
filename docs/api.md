@@ -35,7 +35,7 @@ Tree.newick(self, printdist=True, printlabels=True, labelfield="label", precisio
 Tree.nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
            translateblock=False, node_attributes=None, branch_attributes=None,
            colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
-           print_meta=False)
+           print_meta=False, rooted=None)
 ```
 
 - `printdist` and `printlabels` control branch lengths and internal node labels. `labelfield` names the branch attribute to use for those labels.
@@ -46,8 +46,11 @@ Tree.nexus(self, printdist=True, printlabels=True, labelfield="label", precision
 - `ci_labels` selects entries from each structure's `.ci` mapping: `None` includes all stored intervals, an empty sequence includes none, and a sequence of labels selects those present. An explicit node or branch attribute selection must include `"ci"` to print that kind of interval. Node intervals are named `height_<label>` and branch intervals `length_<label>`. Node metadata includes the root.
 - Explicit `None` for a scalar setting uses its fixed default.
 - `nexus()` wraps `newick()` and forwards these options. Its additional arguments control the translate block and taxon color annotations.
+- Nexus-only `rooted=True` emits `[&R]` after `tree <name> =`; `False` emits `[&U]`; `None` (the default) omits the declaration. Only booleans and `None` are accepted. This is independent of `print_meta`, does not reroot the tree, and is never inferred from the library's traversal root or its degree. A missing declaration leaves interpretation to the consumer. Input parsing does not yet preserve it.
 
 `TreeSet.newick()` and `TreeSet.nexus()` forward the same printing controls, including `print_meta` and `ci_labels`, to each tree. Their default precision is seven significant digits, matching `Tree`; `precision=None` also means seven.
+
+`TreeSet.nexus(..., rooted=...)` applies one declaration to every tree in the set. Use separate export calls when different declarations are needed. It has the same validation and default as `Tree.nexus()`; neither Newick method accepts this Nexus-only argument.
 
 **Unreleased API change:** To simplify the workflow, printing is again controlled entirely at the point of export. `PrintSpec` and the `configure_*_printing()` helpers have been removed, along with `Tree.set_print_spec()` and `Tree.get_print_spec()`. Replace a helper call followed by `tree.newick()` with one call that passes the options directly. The former helper arguments `node_attrs` and `branch_attrs` are named `node_attributes` and `branch_attributes` on the output methods. Use empty sequences to suppress unwanted metadata and include `"ci"` in explicit selections that should print intervals. See the [README migration guide](../README.md#printing-without-stored-defaults-unreleased).
 
@@ -341,11 +344,12 @@ for sample in (
 
 sumtree = pt.build_sumtree(ts, treetype="con", blen="biplen")
 with open("consensus_intervals.nexus", "w") as out:
-    out.write(sumtree.nexus(print_meta=True))
+    out.write(sumtree.nexus(print_meta=True, rooted=False))
 
 # Export only branch medians and 95% intervals, alongside ordinary branch lengths.
 print(sumtree.nexus(
     print_meta=True,
+    rooted=False,
     node_attributes=(),
     branch_attributes=("length_median", "ci"),
     ci_labels=("95%_CI",),

@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `TreeSet.newick()` and `TreeSet.nexus()` now default to seven significant digits, matching `Tree` (previously six).
 
 #### Added
+- `Tree.nexus()` and `TreeSet.nexus()` accept an explicit `rooted` argument: `True` writes `[&R]`, `False` writes `[&U]`, and `None` preserves the previous output without a declaration. Rootedness is not inferred from the internal traversal root, is independent of statistical metadata output, and does not change the tree. Input preservation of these flags remains future work.
 - `TreeSet.newick()` and `TreeSet.nexus()` accept and forward `print_meta` and `ci_labels`.
 - Regression tests for explicit and automatic printing options, metadata and CI output, independent calls, and TreeSet forwarding.
 - Complete credible-interval computation and Nexus metadata export examples in the README, API reference, and recipes. The README example now specifies `ci_probs` as well as `trackci=True` to actually request intervals.
