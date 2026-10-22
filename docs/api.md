@@ -40,15 +40,16 @@ Tree.nexus(self, printdist=True, printlabels=True, labelfield="label", precision
 
 - `printdist` and `printlabels` control branch lengths and internal node labels. `labelfield` names the branch attribute to use for those labels.
 - `precision` is the number of significant digits used for floating-point output (`g` formatting).
-- `node_attributes` and `branch_attributes` select metadata from `Nodestruct` and `Branchstruct`. Missing attributes and `None` values are skipped, including on nodes without metadata.
+- `node_attributes` and `branch_attributes` select metadata independently from `Nodestruct` and `Branchstruct`. Omitted or `None` selections include all populated annotation fields; empty sequences include none; explicit sequences include only the named fields. Automatic output excludes internal branch accumulators (`mean`, `M2`, `n`, `quantiles`) and temporary height caches (`parent_height`, `kid_height`).
+- Missing attributes, `None` values, and empty strings/collections are skipped, including on nodes without metadata. Zero and `False` are retained. Strings are quoted, booleans use `true`/`false`, and collections use braces (sets are sorted for stable output).
 - `print_meta=True` enables the selected node and branch metadata. Its default, `False`, suppresses that metadata even when attributes or CI labels are provided.
-- `ci_labels` selects entries from each structure's `.ci` mapping when its metadata is emitted. Node intervals are named `height_<label>` and branch intervals `length_<label>`. Node metadata includes the root.
-- Explicit `None` for a scalar setting uses its fixed default. `None` or an empty sequence for an attribute selection or `ci_labels` selects nothing of that kind.
+- `ci_labels` selects entries from each structure's `.ci` mapping: `None` includes all stored intervals, an empty sequence includes none, and a sequence of labels selects those present. An explicit node or branch attribute selection must include `"ci"` to print that kind of interval. Node intervals are named `height_<label>` and branch intervals `length_<label>`. Node metadata includes the root.
+- Explicit `None` for a scalar setting uses its fixed default.
 - `nexus()` wraps `newick()` and forwards these options. Its additional arguments control the translate block and taxon color annotations.
 
-`TreeSet.newick()` and `TreeSet.nexus()` forward the same printing controls, including `print_meta` and `ci_labels`, to each tree. Their default precision remains six significant digits; `precision=None` also means six.
+`TreeSet.newick()` and `TreeSet.nexus()` forward the same printing controls, including `print_meta` and `ci_labels`, to each tree. Their default precision is seven significant digits, matching `Tree`; `precision=None` also means seven.
 
-**Unreleased API change:** `PrintSpec` and the `configure_*_printing()` helpers have been removed, along with `Tree.set_print_spec()` and `Tree.get_print_spec()`. Replace a helper call followed by `tree.newick()` with one call that passes the options directly. The former helper arguments `node_attrs` and `branch_attrs` are named `node_attributes` and `branch_attributes` on the output methods.
+**Unreleased API change:** To simplify the workflow, printing is again controlled entirely at the point of export. `PrintSpec` and the `configure_*_printing()` helpers have been removed, along with `Tree.set_print_spec()` and `Tree.get_print_spec()`. Replace a helper call followed by `tree.newick()` with one call that passes the options directly. The former helper arguments `node_attrs` and `branch_attrs` are named `node_attributes` and `branch_attributes` on the output methods. Use empty sequences to suppress unwanted metadata and include `"ci"` in explicit selections that should print intervals. See the [README migration guide](../README.md#printing-without-stored-defaults-unreleased).
 
 #### `Treefile(filename, strip_comments=True)`
 
@@ -268,7 +269,7 @@ Tree objects created from string representations (newick or nexus) will interpre
 
 ## 10. Advanced notes: quantile tracking and the QuantileAccumulator
 
-When `trackci=True`, `TreeSummary` tracks approximate quantiles for branch lengths and/or node heights.
+When `trackci=True`, `TreeSummary` tracks approximate quantiles for branch lengths and/or node heights. Also supply `ci_probs`, for example `(0.8, 0.95)`, to request central, equal-tailed credible intervals. With no probabilities specified, no intervals are requested. Enable `trackblen=True` for branch-length statistics or `trackheight=True` for clade-height statistics, alongside the corresponding `trackbips` or `trackclades` flag.
 
 This is done using the `QuantileAccumulator` class.
 
@@ -323,15 +324,35 @@ Quantile summaries are typically used to populate metadata such as:
 - node-height credible intervals
 - medians and related robust summaries
 
-Print these with `Tree.newick()` or `Tree.nexus()`, passing `print_meta=True`, the relevant node or branch attributes, and the requested `ci_labels`. For example:
+Print these with `Tree.newick()` or `Tree.nexus()`, passing `print_meta=True`. Attribute names and CI labels are needed only to restrict output. This complete example computes branch-length intervals for a consensus tree:
 
 ```python
-text = sumtree.nexus(
-    print_meta=True,
-    node_attributes=("height", "height_sd", "height_median", "ci"),
-    ci_labels=("95%_CI",),
+import phylotreelib as pt
+
+ts = pt.TreeSummary(
+    trackbips=True, trackblen=True, trackci=True, ci_probs=(0.8, 0.95),
 )
+for sample in (
+    "((A:1,B:1):2,C:3,D:3);",
+    "((A:1.5,B:1.5):2.5,C:4,D:4);",
+    "((A:1.2,B:1.2):2.8,C:4,D:4);",
+):
+    ts.add_tree(pt.Tree.from_string(sample))
+
+sumtree = pt.build_sumtree(ts, treetype="con", blen="biplen")
+with open("consensus_intervals.nexus", "w") as out:
+    out.write(sumtree.nexus(print_meta=True))
+
+# Export only branch medians and 95% intervals, alongside ordinary branch lengths.
+print(sumtree.nexus(
+    print_meta=True,
+    node_attributes=(),
+    branch_attributes=("length_median", "ci"),
+    ci_labels=("95%_CI",),
+))
 ```
+
+The metadata names include `length_median`, `length_80%_CI`, and `length_95%_CI`. These branch-length quantiles remain approximate, including for constant lengths. For node-height intervals, see the [README example](../README.md#compute-credible-intervals-and-export-a-summary-tree) and the [common-ancestor-height recipe](recipes.md#build-an-mcc-tree-with-common-ancestor-heights-and-credible-intervals).
 
 ---
 

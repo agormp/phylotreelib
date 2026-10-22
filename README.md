@@ -214,39 +214,46 @@ print(sumtree.newick(
 ))
 ```
 
-### Compute and export a summary tree in one step
+### Compute credible intervals and export a summary tree
+
+This small, self-contained example computes an MCC tree with mean clade heights and 80% and 95% credible intervals. For a real analysis, feed trees from `Nexustreefile` into the same accumulator, excluding burn-in first.
 
 ```python
-# Download an example tree-sample file (run these 3 lines only once)
-import urllib.request
-URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/data/primate-mtDNA.trees"
-urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
-
 import phylotreelib as pt
+
+samples = (
+    "((A:1,B:1):2,(C:2,D:2):1);",
+    "((A:1.5,B:1.5):2.5,(C:2,D:2):2);",
+    "((A:1.2,B:1.2):2.8,(C:2.5,D:2.5):1.5);",
+)
 ts = pt.TreeSummary(
-    trackbips=True,
     trackclades=True,
-    trackroot=True,
-    trackblen=True,
     trackheight=True,
-    trackrootblen=True,
     tracktopo=True,
     trackci=True,
+    ci_probs=(0.8, 0.95),
 )
+for sample in samples:
+    ts.add_tree(pt.Tree.from_string(sample))
 
-with pt.Nexustreefile("primate-mtDNA.trees") as tf:
-    for tree in tf:
-        ts.add_tree(tree)
-sumtree = pt.build_sumtree(ts, treetype="mcc", blen="cladeheight", rooting=None,)
+sumtree = pt.build_sumtree(ts, treetype="mcc", blen="cladeheight")
 
+# All populated annotations, including the intervals, are exported automatically.
 with open("posterior_summary.nexus", "w") as out:
-    out.write(sumtree.nexus(
-        node_attributes=("clade_cred", "height", "height_sd", "height_median", "ci"),
-        branch_attributes=("length",),
-        ci_labels=ts.ci_labels,
-        print_meta=True,
-    ))
+    out.write(sumtree.nexus(print_meta=True))
+
+# A smaller export: heights, medians, and only the 95% interval.
+print(sumtree.newick(
+    print_meta=True,
+    node_attributes=("height", "height_median", "ci"),
+    branch_attributes=(),
+    ci_labels=("95%_CI",),
+))
 ```
+
+Specify both `trackci=True` and `ci_probs`: the former enables quantile tracking, while the latter requests interval probabilities. These are central, equal-tailed credible intervals, not HPD intervals. The Nexus metadata contains `height`, `height_median`, `height_80%_CI={lower,upper}`, and `height_95%_CI={lower,upper}`, including annotations on the root. Variable-height quantiles are approximate; effectively constant node heights retain the observed value for the median and both interval endpoints.
+
+See [the recipes](docs/recipes.md#9-consensus-trees-and-other-tree-summaries) for common-ancestor-height intervals and [the API notes](docs/api.md#106-what-the-tracked-quantiles-are-used-for) for branch-length intervals.
 
 ### Save in different formats and include metadata
 
@@ -261,6 +268,7 @@ parent = tree.parent(mrca)
 tree.set_branch_attribute(parent, mrca, "posterior", 0.97)
 print_options = {
     "print_meta": True,
+    "node_attributes": (),
     "branch_attributes": ("posterior",),
     "precision": 6,
 }
@@ -593,6 +601,8 @@ Tree.collapse_bifurcating_root(self)
 
 ### Printing without stored defaults (unreleased)
 
+To simplify the workflow, printing is again configured where the tree is exported: in `newick()` or `nexus()`. The arguments at that call describe the output; there is no earlier configuration step or stored formatting state to keep track of. An ordinary options dictionary can still be reused across calls.
+
 This is a breaking API change after 2.3.1. `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()` have been removed. Pass the options directly to each output call.
 
 **Before (2.0.0 through 2.3.1):**
@@ -606,12 +616,22 @@ print(tree.nexus())
 **Now:**
 
 ```python
-print(tree.newick(precision=7, print_meta=True, branch_attributes=("posterior",)))
-print(tree.nexus(precision=7, print_meta=True, branch_attributes=("posterior",)))
+print(tree.newick(precision=7, print_meta=True, node_attributes=(), branch_attributes=("posterior",)))
+print(tree.nexus(precision=7, print_meta=True, node_attributes=(), branch_attributes=("posterior",)))
 ```
 
-The helper arguments `node_attrs` and `branch_attrs` become `node_attributes` and `branch_attributes` on the output methods. For summary trees, explicitly select the support and height/length attributes shown in the examples above.
+The helper arguments `node_attrs` and `branch_attrs` become `node_attributes` and `branch_attributes` on the output methods. For summary trees, `sumtree.nexus(print_meta=True)` is enough to include all populated annotations; knowing their individual names is optional.
 
-`Tree.newick()` and `Tree.nexus()` default to printing lengths and labels, using `labelfield="label"`, `precision=7`, and `print_meta=False`. `TreeSet` output retains its default precision of six significant digits and also accepts `print_meta` and `ci_labels`.
+`Tree.newick()` and `Tree.nexus()` default to printing lengths and labels, using `labelfield="label"`, `precision=7`, and `print_meta=False`. `TreeSet` uses the same defaults, including seven significant digits (previously six).
 
-An explicit `None` for a scalar option uses its fixed default. `None` or an empty sequence for an attribute list selects no attributes; `ci_labels=None` selects no intervals. Set `print_meta=True` to emit the requested metadata. These settings never persist on the tree.
+With `print_meta=True`, attribute selections work independently for nodes and branches:
+
+| Selection | Output |
+|---|---|
+| Omitted or `None` | All populated annotation fields, including stored intervals |
+| `()` or `[]` | No metadata of that kind |
+| A sequence of names | Only those attributes; include `"ci"` to emit intervals |
+
+Internal accumulators and temporary branch-height caches are excluded from automatic output. Missing/`None` values and empty strings or collections are skipped; zero and `False` are retained. `ci_labels=None` includes all stored intervals, an empty sequence suppresses intervals, and a sequence of labels selects those present.
+
+An explicit `None` for a scalar option uses its fixed default. `print_meta=False` always suppresses node and branch metadata, even if attributes are selected. These settings never persist on the tree. When migrating selective exports, use empty tuples for unwanted metadata and include `"ci"` in explicit attribute selections that should print intervals.

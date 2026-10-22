@@ -12,11 +12,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
-- `Tree.newick()` and `Tree.nexus()` have fixed defaults: lengths and labels enabled, `labelfield="label"`, `precision=7`, and `print_meta=False`. Explicit `None` values for scalar settings use these defaults; `None` attribute lists or CI labels select no attributes or intervals. Each output call is independent.
+- Printing is configured at the point of export to simplify the workflow and remove dependence on earlier configuration calls. `Tree.newick()` and `Tree.nexus()` have fixed defaults: lengths and labels enabled, `labelfield="label"`, `precision=7`, and `print_meta=False`. Explicit `None` values for scalar settings use these defaults. Each output call is independent.
+- With `print_meta=True`, omitted or `None` attribute selections now include all populated annotations, excluding internal accumulators and temporary branch-height caches. Empty sequences suppress that kind of metadata; explicit selections include only the named fields. Include `"ci"` in explicit attribute selections to print intervals. `ci_labels=None` includes all stored intervals; missing requested labels are skipped.
+- Metadata strings are quoted, booleans use `true`/`false`, and collections use braces with deterministic ordering for sets. Missing values and empty strings/collections are omitted; zero and `False` are retained.
+- `TreeSet.newick()` and `TreeSet.nexus()` now default to seven significant digits, matching `Tree` (previously six).
 
 #### Added
-- `TreeSet.newick()` and `TreeSet.nexus()` accept and forward `print_meta` and `ci_labels`. Their default precision remains six significant digits.
-- Regression tests for explicit printing options, metadata and CI output, independent calls, and TreeSet forwarding.
+- `TreeSet.newick()` and `TreeSet.nexus()` accept and forward `print_meta` and `ci_labels`.
+- Regression tests for explicit and automatic printing options, metadata and CI output, independent calls, and TreeSet forwarding.
+- Complete credible-interval computation and Nexus metadata export examples in the README, API reference, and recipes. The README example now specifies `ci_probs` as well as `trackci=True` to actually request intervals.
 
 ---
 

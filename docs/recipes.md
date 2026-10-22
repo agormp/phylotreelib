@@ -656,12 +656,14 @@ print(contree.newick(
 ))
 ```
 
-#### Build an MCC tree with common-ancestor heights
+#### Build an MCC tree with common-ancestor heights and credible intervals
+
+Both passes must use the same post-burn-in sample of rooted clock trees. The example file below is a demonstration sample; when using your own posterior, discard burn-in consistently in both loops.
 
 ```python
 # Download an example tree-sample file (run these 3 lines only once)
 import urllib.request
-URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/primate-mtDNA.trees"
+URL = "https://raw.githubusercontent.com/agormp/phylotreelib/main/tests/data/primate-mtDNA.trees"
 urllib.request.urlretrieve(URL, "primate-mtDNA.trees")
 
 import phylotreelib as pt
@@ -677,8 +679,8 @@ stb = pt.SummaryTreeBuilder(ts)
 mcctree = stb.max_clade_cred_tree()
 
 # Pass 2: compute common-ancestor heights (CA-height) for nodes on the chosen topology
-plan = pt.CAHeightEstimator.build_plan(mcctree, trackci=False)
-est = pt.CAHeightEstimator(plan, trackci=False)
+plan = pt.CAHeightEstimator.build_plan(mcctree, trackci=True, ci_probs=(0.8, 0.95))
+est = pt.CAHeightEstimator(plan, trackci=True)
 
 with pt.Nexustreefile("primate-mtDNA.trees") as tf:
     for tree in tf:
@@ -691,12 +693,26 @@ mcctree.set_blens_from_heights()
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(mcctree)
 
-print(mcctree.newick(
-    node_attributes=("clade_cred", "height", "height_sd"),
-    branch_attributes=("length",),
-    print_meta=True, precision=7,
-))
+# Export all annotations, including root heights, medians, and credible intervals.
+with open("mcc_ca_intervals.nexus", "w") as out:
+    out.write(mcctree.nexus(print_meta=True))
 ```
+
+The exported intervals are named `height_80%_CI` and `height_95%_CI`; each holds `{lower,upper}`. They are central, equal-tailed credible intervals, not HPD intervals. `CAHeightEstimator` uses MRCA heights from every sampled tree, including trees where the target clade was not monophyletic. Quantiles are approximate unless a node's height is effectively constant, in which case its mean, median, and interval endpoints coincide.
+
+For a restricted export, include `"ci"` in the selected node fields:
+
+```python
+with open("mcc_ca_heights_only.nexus", "w") as out:
+    out.write(mcctree.nexus(
+        print_meta=True,
+        node_attributes=("height", "height_median", "ci"),
+        branch_attributes=(),
+        ci_labels=("95%_CI",),
+    ))
+```
+
+For clade-height intervals in a single pass, see the [README example](../README.md#compute-credible-intervals-and-export-a-summary-tree). For direct branch-length intervals on a consensus tree, see the [API example](api.md#106-what-the-tracked-quantiles-are-used-for).
 
 #### Build an MBC tree and mid-point root it
 
@@ -736,7 +752,7 @@ print(mbctree.newick(
 
 ### 10. Exporting with labels, metadata, and color
 
-Pass options directly to each `newick()` or `nexus()` call. Output calls do not change the tree's formatting defaults. Set `print_meta=True` and select node or branch attributes to include their metadata; omit these arguments for plain output.
+Pass options directly to each `newick()` or `nexus()` call. Output calls do not change the tree's formatting defaults. `tree.nexus(print_meta=True)` includes all populated annotations and stored intervals automatically, excluding internal accumulators and temporary caches. Supply `node_attributes` or `branch_attributes` to restrict that kind of metadata; use an empty tuple to suppress it. An explicit selection must include `"ci"` to print intervals. `ci_labels=None` includes all intervals, a sequence selects particular labels, and `()` suppresses intervals. Both `Tree` and `TreeSet` default to seven significant digits. Omit `print_meta` for plain output.
 
 #### Plain Newick output
 
@@ -782,6 +798,7 @@ parent = tree.parent(node)
 tree.set_branch_attribute(parent, node, "posterior", 0.98)
 print(tree.newick(
     print_meta=True,
+    node_attributes=(),
     branch_attributes=("posterior",),
     precision=6,
 ))
