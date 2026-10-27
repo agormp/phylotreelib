@@ -915,6 +915,189 @@ class TreeError(Exception):
 ###################################################################################################
 ###################################################################################################
 
+class MetacommentParser:
+    """Decode one key/value metacomment, without owner or topology knowledge.
+
+    parse() accepts a complete ``[&key=value,...]`` comment token or just its
+    ``key=value,...`` body. The caller frames comments and handles standalone
+    rootedness declarations before calling. Repeated blocks on one owner must
+    be combined, with their duplicate check, by that caller.
+    """
+
+    __slots__ = ("_text", "_pos", "_end")
+
+    _integer = re.compile(r"[+-]?[0-9]+")
+    _float = re.compile(
+        r"[+-]?(?:(?:[0-9]+\.[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?"
+        r"|[0-9]+[eE][+-]?[0-9]+)"
+    )
+
+    def parse(self, comment_or_payload):
+        """Return exact decoded keys and typed values; reject malformed syntax."""
+        self._text = text = comment_or_payload
+        self._pos = 0
+        self._end = len(text)
+        try:
+            self._skip_space()
+            start = self._pos
+            end = self._end
+            while end > start and text[end - 1].isspace():
+                end -= 1
+            self._end = end
+            if start < end and text[start] == "[":
+                if not text.startswith("[&", start):
+                    self._fail("expected an ampersand key/value metacomment", start)
+                if text[end - 1] != "]":
+                    self._fail("unterminated metacomment", end)
+                self._pos = start + 2
+                self._end = end - 1
+            self._skip_space()
+            if self._pos == self._end:
+                self._fail("a key/value metacomment requires at least one pair")
+            values = {}
+            while True:
+                key_position = self._pos
+                key = self._key()
+                self._skip_space()
+                if self._pos == self._end or text[self._pos] != "=":
+                    self._fail(f"expected '=' after annotation key {key!r}")
+                self._pos += 1
+                if key in values:
+                    self._fail(f"duplicate annotation key {key!r}", key_position)
+                values[key] = self._value()
+                self._skip_space()
+                if self._pos == self._end:
+                    return values
+                if text[self._pos] != ",":
+                    self._fail("expected ',' between annotation pairs")
+                self._pos += 1
+                self._skip_space()
+                if self._pos == self._end:
+                    self._fail("trailing comma after annotation pair")
+        finally:
+            # Reusable helper state must not keep an input or partial result alive.
+            self._text = ""
+            self._pos = self._end = 0
+
+    def _skip_space(self):
+        text = self._text
+        pos, end = self._pos, self._end
+        while pos < end and text[pos].isspace():
+            pos += 1
+        self._pos = pos
+
+    def _key(self):
+        text = self._text
+        if self._pos == self._end:
+            self._fail("expected an annotation key")
+        if text[self._pos] in "\"'":
+            key = self._quoted()
+            if not key:
+                self._fail("annotation key must be nonempty")
+            return key
+        key = self._bare("annotation key")
+        if key.startswith("&"):
+            self._fail("unsupported ampersand directive/dialect; "
+                       "an annotation key beginning with '&' must be quoted")
+        return key
+
+    def _bare(self, expected):
+        match = _BARE_META_KEY.match(self._text, self._pos, self._end)
+        if match is None:
+            self._fail(f"expected {expected}")
+        self._pos = match.end()
+        return match.group()
+
+    def _value(self):
+        self._skip_space()
+        if self._pos == self._end:
+            self._fail("expected an annotation value")
+        char = self._text[self._pos]
+        if char in "\"'":
+            return self._quoted()
+        if char == "{":
+            return self._collection()
+        token = self._bare("an annotation value")
+        if token == "?":
+            return MISSING
+        if token == "true":
+            return True
+        if token == "false":
+            return False
+        if self._integer.fullmatch(token):
+            return int(token)
+        if self._float.fullmatch(token):
+            return float(token)
+        return token
+
+    def _collection(self):
+        self._pos += 1
+        self._skip_space()
+        if self._pos < self._end and self._text[self._pos] == "}":
+            self._pos += 1
+            return ()
+        values = []
+        while True:
+            values.append(self._value())
+            self._skip_space()
+            if self._pos == self._end:
+                self._fail("unterminated annotation collection; expected '}'")
+            char = self._text[self._pos]
+            if char == "}":
+                self._pos += 1
+                return tuple(values)
+            if char != ",":
+                self._fail("expected ',' or '}' after collection element")
+            self._pos += 1
+            self._skip_space()
+            if self._pos < self._end and self._text[self._pos] == "}":
+                self._fail("trailing comma in annotation collection")
+
+    def _quoted(self):
+        text = self._text
+        quote_position = self._pos
+        quote = text[quote_position]
+        start = quote_position + 1
+        pieces = None
+        while True:
+            close = text.find(quote, start, self._end)
+            if close < 0:
+                self._fail("unterminated quoted annotation string", quote_position)
+            if close + 1 < self._end and text[close + 1] == quote:
+                if pieces is None:
+                    pieces = []
+                pieces.append(text[start:close])
+                pieces.append(quote)
+                start = close + 2
+                continue
+            if pieces is None:
+                value = text[start:close]
+            else:
+                pieces.append(text[start:close])
+                value = "".join(pieces)
+            self._pos = close + 1
+            if "[" in value or "]" in value:
+                depth = 0
+                for char in value:
+                    if char == "[":
+                        depth += 1
+                    elif char == "]":
+                        depth -= 1
+                        if depth < 0:
+                            self._fail("unbalanced square brackets in quoted annotation string",
+                                       quote_position)
+                if depth:
+                    self._fail("unbalanced square brackets in quoted annotation string",
+                               quote_position)
+            return value
+
+    def _fail(self, message, position=None):
+        if position is None:
+            position = self._pos
+        excerpt = self._text[max(0, position - 24):position + 48]
+        raise TreeError(f"metacomment offset {position}: {message}; near {excerpt!r}")
+
+
 class NewickStringParser:
     """Class creating parser for specific Newick tree string. Used in Tree.from_string"""
 

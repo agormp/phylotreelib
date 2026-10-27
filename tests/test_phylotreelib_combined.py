@@ -6227,3 +6227,160 @@ class Test_NewickStringParser_parse:
     def test_label_only_root_suffix_has_no_invented_length(self):
         tree = pt.Tree.from_string('(A,B)Root;')
         assert tree.root_suffix.label == 'Root' and tree.root_suffix.length is None
+
+
+class Test_MetacommentParser_parse:
+    """Typed annotation payload grammar, independently of positional ownership."""
+
+    @pytest.mark.parametrize("text", [
+        '[&x=1,y={2,3}]',
+        'x=1,y={2,3}',
+        ' \n[& x = 1 , y = { 2, 3 } ]\t',
+    ])
+    def test_comment_or_payload(self, text):
+        assert pt.MetacommentParser().parse(text) == {'x': 1, 'y': (2, 3)}
+
+    def test_scalar_types_and_recursive_collections(self):
+        values = pt.MetacommentParser().parse(
+            '[&integer=-12,positive=+12,zero=0,decimal=1.0,exponent=-2e-3,'
+            'yes=true,no=false,missing=?,empty={},'
+            'nested={1,1,?,{},{{2},3.0},""}]'
+        )
+        assert values['integer'] == -12 and type(values['integer']) is int
+        assert values['positive'] == 12 and type(values['positive']) is int
+        assert values['zero'] == 0 and type(values['zero']) is int
+        assert values['decimal'] == 1.0 and type(values['decimal']) is float
+        assert values['exponent'] == -0.002 and type(values['exponent']) is float
+        assert values['yes'] is True and values['no'] is False
+        assert values['missing'] is pt.MISSING
+        assert values['empty'] == ()
+        assert values['nested'] == (1, 1, pt.MISSING, (), ((2,), 3.0), '')
+        assert type(values['nested'][4][1]) is float
+
+    def test_complete_bare_tokens_and_nonfinite_strings(self):
+        tokens = ('north_coast', '#0000FF', '1.2.3', '1e-', '123ABC',
+                  'True', 'TRUE', 'NA', 'None', 'null', 'nan', 'NaN',
+                  'inf', '+inf', '-Infinity', '??', '?suffix', '0x10',
+                  'a:b/c;(d)!', '&R')
+        text = '[&' + ','.join('k' + str(i) + '=' + token
+                               for i, token in enumerate(tokens)) + ']'
+        values = pt.MetacommentParser().parse(text)
+        assert tuple(values.values()) == tokens
+        assert all(type(value) is str for value in values.values())
+
+    def test_exact_nonempty_key_identity(self):
+        values = pt.MetacommentParser().parse(
+            '[&height=1,"Height"=2,01=3,!color=#0000FF,'
+            'p:q/r;(s)=-1," meta key "=4,"&W"=5,'
+            "'O''Brien'=6,\"Unicode [nordøst]\"=7]"
+        )
+        assert tuple(values) == ('height', 'Height', '01', '!color',
+                                 'p:q/r;(s)', ' meta key ', '&W',
+                                 "O'Brien", 'Unicode [nordøst]')
+        assert values['01'] == 3 and values['!color'] == '#0000FF'
+
+    @pytest.mark.parametrize('text,expected', [
+        ('[&x=""]', ''),
+        ("[&x='']", ''),
+        ("[&x='O''Brien']", "O'Brien"),
+        ('[&x="said ""hello"""]', 'said "hello"'),
+        ('[&x=""""]', '"'),
+        ("[&x='''']", "'"),
+        ("[&x='said \"hello\"']", 'said "hello"'),
+        ('[&x="O\'Brien"]', "O'Brien"),
+        (r'[&x="\n\u0041\\"]', r'\n\u0041\\'),
+        ('[&x=" north\ncoast ø "]', ' north\ncoast ø '),
+        ('[&x=",{}=:;()"]', ',{}=:;()'),
+        ('[&x="sample [north [coastal]]"]', 'sample [north [coastal]]'),
+    ])
+    def test_quoted_strings(self, text, expected):
+        value = pt.MetacommentParser().parse(text)['x']
+        assert value == expected and type(value) is str
+
+    def test_quoted_scalars_stay_strings_recursively(self):
+        value = pt.MetacommentParser().parse('[&x={"1",\'true\',"?","None",""}]')['x']
+        assert value == ('1', 'true', '?', 'None', '')
+        assert all(type(item) is str for item in value)
+
+    @pytest.mark.parametrize('text', [
+        '[&x=1,x=2]', '[&x=1,x=1]', '[&x=?,x=?]',
+        '[&height=1,"height"=1]', "[&'O''Brien'=1,\"O'Brien\"=2]",
+    ])
+    def test_duplicate_decoded_keys(self, text):
+        with pytest.raises(pt.TreeError, match='duplicate annotation key'):
+            pt.MetacommentParser().parse(text)
+
+    @pytest.mark.parametrize('text', [
+        '[&x={1 2}]', '[&x=1 y=2]', '[&x={,1}]', '[&,x=1]',
+        '[&x={1,,2}]', '[&x=1,,y=2]', '[&x={1,}]', '[&x=1,y=2,]',
+        '[&x={{1,}}]', '[&x=]', '[&x={1,}]', '[&x={1,',
+        '[&x=1,,]', '[&x={1],y=2]',
+    ])
+    def test_strict_value_and_separator_positions(self, text):
+        with pytest.raises(pt.TreeError):
+            pt.MetacommentParser().parse(text)
+
+    @pytest.mark.parametrize('text', [
+        '[&]', '[& ]', '', '  \n ', '[&""=1]', "[&''=1]",
+        '[&=1]', '[&x 1.2]', '[&x=north coast]', '[&x=ab[note]cd]',
+        '[&ab[note]cd=1]', '[&x="unterminated]', "[&x='unterminated]",
+        '[&x=1]extra', '[&x=1][&y=2]',
+    ])
+    def test_malformed_payloads(self, text):
+        with pytest.raises(pt.TreeError):
+            pt.MetacommentParser().parse(text)
+
+    @pytest.mark.parametrize('text', [
+        '[&x="["]', '[&x="]"]', '[&x="][north"]',
+        '[&left="[",right="]"]', '[&x={1,{"["}},y="]"]',
+        '[&"["=1,"]"=2]',
+    ])
+    def test_each_quoted_key_and_value_balances_brackets(self, text):
+        with pytest.raises(pt.TreeError, match='unbalanced square brackets'):
+            pt.MetacommentParser().parse(text)
+
+    @pytest.mark.parametrize('text', [
+        '[&W 0.5]', '[&&NHX:S=human]', '[&height 1.2]',
+        '[&W "text=does-not-make-a-pair"]', '[&R]', '[& U ]',
+    ])
+    def test_directives_and_flags_are_not_key_value_lists(self, text):
+        with pytest.raises(pt.TreeError):
+            pt.MetacommentParser().parse(text)
+
+    def test_flag_named_and_quoted_ampersand_assignments(self):
+        assert pt.MetacommentParser().parse(
+            '[&R=1,U=2,r=3,"&W"=4]'
+        ) == {'R': 1, 'U': 2, 'r': 3, '&W': 4}
+
+    def test_mapping_is_not_applied_by_the_payload_helper(self):
+        assert pt.MetacommentParser().parse(
+            '[&height="?",height_95%_CI={1,"?"},length=7]'
+        ) == {'height': '?', 'height_95%_CI': (1, '?'), 'length': 7}
+
+    def test_reuse_after_success_and_failure(self):
+        parser = pt.MetacommentParser()
+        assert parser.parse('[&x=1]') == {'x': 1}
+        with pytest.raises(pt.TreeError, match='duplicate'):
+            parser.parse('[&x=2,x=3]')
+        assert parser.parse('[&x=?,y={}]') == {'x': pt.MISSING, 'y': ()}
+        with pytest.raises(pt.TreeError, match='unterminated quoted'):
+            parser.parse('[&x="unfinished]')
+        assert parser.parse('x=4') == {'x': 4}
+
+    def test_writer_compatible_typed_nested_values(self):
+        original = (pt.MISSING, True, False, 0, 1, 1.0, -0.0, 1e-3,
+                    '1', '?', 'nordøst [coast]', 'said "yes"', (), ('x',))
+        key = 'quoted key [north]'
+        text = ('[&' + pt._format_metadata_key(key) + '='
+                + pt._format_metadata_value(original, None) + ']')
+        decoded = pt.MetacommentParser().parse(text)[key]
+        assert decoded == original
+        assert decoded[0] is pt.MISSING
+        assert type(decoded[3]) is int and type(decoded[5]) is float
+        assert math.copysign(1.0, decoded[6]) == -1.0
+
+    def test_error_has_local_offset_key_and_excerpt(self):
+        with pytest.raises(pt.TreeError) as caught:
+            pt.MetacommentParser().parse('[&height=1,"height"=2]')
+        message = str(caught.value)
+        assert 'offset' in message and "'height'" in message and 'near' in message
