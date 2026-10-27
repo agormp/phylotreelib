@@ -6490,6 +6490,9 @@ class TreeSummary():
             else:
                 self_rootbipsum[other_rootbip] = other_s
 
+        self._rootbip_summary_processed = False
+        self._sorted_rootbips = None
+
     ###############################################################################################
 
     def _updatetopo(self, other):

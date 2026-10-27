@@ -2820,6 +2820,33 @@ class Test_set_biplen_on_existing_tree_TreePostProcessor:
         assert target.parent_dict is parents
 
 
+class Test_update_TreeSummary:
+
+    def test_merge_refreshes_warmed_root_frequencies_and_order(self):
+        rooted_at_a = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        rooted_at_b = pt.Tree.from_string("(B:1,(A:1,C:1):1);")
+        root_a = rooted_at_a.rootbip()
+        root_b = rooted_at_b.rootbip()
+        recipient = pt.TreeSummary(trackroot=True)
+        recipient.add_tree(rooted_at_a)
+        assert recipient.rootbipsummary[root_a].freq == 1
+        assert [bip for _, bip, _ in recipient.sorted_rootbips] == [root_a]
+        donor = pt.TreeSummary(trackroot=True)
+        donor.add_tree(rooted_at_a)
+        for _ in range(3):
+            donor.add_tree(rooted_at_b)
+
+        recipient.update(donor)
+
+        assert recipient.tree_count == 5
+        assert recipient.rootbipsummary[root_a].n == 2
+        assert recipient.rootbipsummary[root_a].freq == pytest.approx(0.4)
+        assert recipient.rootbipsummary[root_b].n == 3
+        assert recipient.rootbipsummary[root_b].freq == pytest.approx(0.6)
+        assert [n for n, _, _ in recipient.sorted_rootbips] == [3, 2]
+        assert [bip for _, bip, _ in recipient.sorted_rootbips] == [root_b, root_a]
+
+
 class Test_cladesummary_TreeSummary:
 
     def test_single_observation_preserves_undefined_sd(self):

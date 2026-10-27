@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Merging `TreeSummary` root counts now refreshes cached root frequencies and sorted root summaries, including newly observed root positions.
 - `TreePostProcessor.set_biplen_on_existing_tree()` now invalidates length-derived caches after its final root-edge assignments, so warmed distance queries reflect the new lengths.
 
 #### Removed
