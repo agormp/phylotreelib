@@ -5237,6 +5237,11 @@ class Tree:
             sibling = rootkids[0] if rootkids[1] == prune_node else rootkids[1]
             sibling_len = self.child_dict[old_root][sibling].length
 
+        # Leaf extraction returns a name, so retain its metadata locally across pruning.
+        leaf_metadata = None
+        if prune_node in self.leaves and prune_node in self.nodedict:
+            leaf_metadata = copy.deepcopy(self.nodedict[prune_node])
+
         # Prune subtree, keep track of length of basal branch
         subtree, basalbranch = self.prune_subtree(prune_node)
         basal_len = basalbranch.length
@@ -5252,10 +5257,13 @@ class Tree:
         # - insert graftpoint on (regraft_parent -> regraft_node)
         # - connect_length uses basal_len + sibling_len (preserves overall length)
         connect_len = basal_len + sibling_len
-        self.graft(subtree, parent=regraft_parent, child=regraft_node,
-                   dist_from_parent=dist_from_parent, frac_from_parent=frac_from_parent,
-                   connect_length=connect_len, connect_branchstruct=None,
-                   graftlabel=None)
+        graftpoint = self.graft(
+            subtree, parent=regraft_parent, child=regraft_node,
+            dist_from_parent=dist_from_parent, frac_from_parent=frac_from_parent,
+            connect_length=connect_len, connect_branchstruct=None, graftlabel=None)
+        if leaf_metadata is not None:
+            self.nodedict[prune_node] = leaf_metadata
+            self.nodedict.setdefault(graftpoint, Nodestruct())
 
         return prune_node, regraft_node
 

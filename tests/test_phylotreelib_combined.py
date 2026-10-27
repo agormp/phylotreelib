@@ -2008,6 +2008,45 @@ class Test_translateblock:
 ###################################################################################################
 
 class TestSPR:
+    @pytest.mark.parametrize("annotate_survivor", [False, True])
+    def test_moved_leaf_retains_independent_metadata(self, annotate_survivor):
+        tree = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
+        tree.set_node_attribute("A", "height", 1.25)
+        tree.set_node_attribute("A", "state", "sampled")
+        tree.set_node_attribute("A", "ci", {"95%_CI": (0.5, 2.0)})
+        tree.set_node_attribute("A", "primary_set", {"human", "mink"})
+        moved = tree.nodedict["A"]
+        if annotate_survivor:
+            tree.set_node_attribute("C", "height", 9.0)
+            survivor = tree.nodedict["C"]
+        total_length = tree.length()
+        assert tree.nodedist("A", "C") == pytest.approx(14)
+        assert tree.rootdist["A"] == pytest.approx(4)
+
+        assert tree.spr("A", "C", frac_from_parent=0.5) == ("A", "C")
+
+        restored = tree.nodedict["A"]
+        assert restored is not moved
+        assert restored.height == 1.25
+        assert restored.state == "sampled"
+        assert restored.ci == {"95%_CI": (0.5, 2.0)}
+        assert restored.primary_set == {"human", "mink"}
+        restored.ci["95%_CI"] = (8.0, 9.0)
+        restored.primary_set.add("changed")
+        assert moved.ci == {"95%_CI": (0.5, 2.0)}
+        assert moved.primary_set == {"human", "mink"}
+        graftpoint = tree.parent("A")
+        assert tree.nodedict[graftpoint].height is None
+        assert tree.nodedict[graftpoint].state == ""
+        assert tree.leaves == {"A", "B", "C", "D"}
+        assert set(tree.nodedict) <= tree.nodes
+        assert tree.length() == pytest.approx(total_length)
+        assert tree.nodedist("A", "C") == pytest.approx(3)
+        assert tree.rootdist["A"] == pytest.approx(9)
+        if annotate_survivor:
+            assert tree.nodedict["C"] is survivor
+            assert survivor.height == 9.0
+
     def test_spr_raises_on_two_leaf_tree(self):
         """SPR should not work on a tree with only 2 leaves."""
         tree = pt.Tree.from_leaves(["A", "B"])
