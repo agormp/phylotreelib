@@ -6482,3 +6482,225 @@ class Test_AnnotatedNewickParser_tokenize:
         with pytest.raises(pt.TreeError) as caught:
             pt.Tree.from_string(text, parse_meta=True)
         assert f'Tree offset {text.rindex("[&x=1]")}' in str(caught.value)
+
+
+class Test_comment_end:
+
+    def test_nested_comments_use_brackets_without_quote_interpretation(self):
+        text = '[ordinary "[" [nested] "]"; end]rest'
+        assert pt._comment_end(text, 0) == text.index("rest")
+        assert pt._comment_end("[ordinary [nested]", 0) is None
+        quoted_close = '[x="]";rest'
+        assert pt._comment_end(quoted_close, 0) == quoted_close.index("]") + 1
+
+
+class Test_read_tree_text_Newicktreefile:
+
+    @pytest.mark.parametrize("buffer_size", [7, 65536])
+    def test_raw_preserves_comments_semicolons_root_suffix_and_adjacent_trees(self, monkeypatch, buffer_size):
+        monkeypatch.setattr(pt.TreefileBase, "_BUFFER_SIZE", buffer_size)
+        first = '[&R](A[&note="x;y"],B)Root[&height=3]:0.0[&rate=2];'
+        second = '(C[ordinary "[" [nested] "]"; note],D);'
+        with pt.Newicktreefile(filecontent=first + second + " [trailing comment]") as reader:
+            assert reader.read_tree_text() == first
+            assert reader.get_treestring() == second
+            assert reader.readtree(False) is None
+            assert reader.read_tree_text() is None
+            assert not hasattr(reader, "below_root")
+
+    @pytest.mark.parametrize("text", ["(A,B)", "(A[unfinished;B);", "(A],B);"])
+    def test_unfinished_and_stray_comment_input_fails_lexically(self, text):
+        with pt.Newicktreefile(filecontent=text) as reader:
+            with pytest.raises(pt.TreeError):
+                reader.read_tree_text()
+
+    def test_empty_content_and_comment_only_tail_are_clean_eof(self):
+        for text in ("", " \n[complete [nested] comment] \n"):
+            with pt.Newicktreefile(filecontent=text) as reader:
+                assert reader.read_tree_text() is None
+
+
+class Test_read_tree_text_Nexustreefile:
+
+    def test_concatenated_complete_nexus_documents_remain_supported(self):
+        first = pt.Tree.from_string("(A:1,B:2);")
+        first.rooted = True
+        second = pt.Tree.from_string("(C:3,D:4);")
+        second.rooted = False
+        content = first.nexus(translateblock=True) + second.nexus(translateblock=True)
+        with pt.Nexustreefile(filecontent=content) as reader:
+            trees = list(reader)
+        assert [tree.leaves for tree in trees] == [{"A", "B"}, {"C", "D"}]
+        assert [tree.rooted for tree in trees] == [True, False]
+        assert trees[0].nodedist("A", "B") == 3.0
+        assert trees[1].nodedist("C", "D") == 7.0
+
+    @pytest.mark.parametrize("middle", ["#NEXUSgarbage\n", "#INVALID\n"])
+    def test_repeated_signature_is_validated(self, middle):
+        content = '#NEXUS\nbegin trees;tree x=(A,B);end;' + middle + 'begin trees;tree y=(C,D);end;'
+        with pt.Nexustreefile(filecontent=content) as reader:
+            assert reader.readtree().leaves == {"A", "B"}
+            with pytest.raises(pt.TreeError, match="Expected #NEXUS"):
+                reader.readtree()
+
+    def test_repeated_signature_inside_an_unclosed_block_is_not_discarded(self):
+        content = '#NEXUS\nbegin trees;tree x=(A,B);#NEXUS\nbegin trees;tree y=(C,D);end;'
+        with pt.Nexustreefile(filecontent=content) as reader:
+            assert reader.readtree().leaves == {"A", "B"}
+            with pytest.raises(pt.TreeError):
+                reader.readtree()
+
+    @pytest.mark.parametrize("buffer_size", [7, 65536])
+    def test_headers_unrelated_blocks_and_original_post_equals_text(self, monkeypatch, buffer_size):
+        monkeypatch.setattr(pt.TreefileBase, "_BUFFER_SIZE", buffer_size)
+        first = ' [&R] (1[&height=1],2)Root:0.0[&rate=2];'
+        second = '\n(1,2);'
+        content = ('[leading [comment]]\n#NEXUS\n'
+                   'begin taxa; dimensions ntax=2; taxlabels A B; end;'
+                   'begin figtree; set value=[ordinary; [nested]]; tree fake=(X,Y); end;'
+                   'begin trees; translate 1 A, 2 B;'
+                   'tree first [p=0.2] =' + first
+                   + 'utree second=' + second + 'end;')
+        with pt.Nexustreefile(filecontent=content) as reader:
+            assert reader.read_tree_text() == first
+            assert reader._last_command_kind == "TREE"
+            parser = reader.parser_obj
+            assert reader.readtree(False) == second
+            assert reader._last_command_kind == "UTREE"
+            assert reader.parser_obj is parser
+            assert reader.transdict == {"1": "A", "2": "B"}
+            assert reader.read_tree_text() is None
+            assert not hasattr(reader, "below_root")
+
+    def test_translation_and_command_context_remain_stable_after_later_block(self):
+        content = ('#NEXUS\nbegin trees;translate 1 A,2 B;'
+                   'tree first = (1,2);end;'
+                   'begin trees;translate 1 C,2 D;'
+                   'utree second = (1,2);end;')
+        with pt.Nexustreefile(filecontent=content) as reader:
+            first = reader.read_tree_text()
+            first_context = reader.parser_obj, reader._last_command_kind
+            first_mapping = reader.transdict
+            second = reader.read_tree_text()
+            second_context = reader.parser_obj, reader._last_command_kind
+            assert reader.transdict is not first_mapping
+            assert first_mapping == {"1": "A", "2": "B"}
+            assert first_context[0] is not second_context[0]
+            # Workers receive only raw text and stable parser/command context.
+            old_parser, old_kind = pickle.loads(pickle.dumps(first_context))
+            one = pt.Tree._from_string_private(old_parser, first, command_kind=old_kind)
+            two = pt.Tree._from_string_private(second_context[0], second,
+                                               command_kind=second_context[1])
+            assert one.leaves == {"A", "B"}
+            assert one.rooted is None
+            assert two.leaves == {"C", "D"}
+            assert two.rooted is False
+
+    def test_later_tree_block_without_translate_does_not_reuse_old_mapping(self):
+        content = ('#NEXUS\nbegin trees;translate 1 A,2 B;tree x=(1,2);end;'
+                   'begin trees;tree y=(1,2);end;')
+        with pt.Nexustreefile(filecontent=content) as reader:
+            assert reader.readtree().leaves == {"A", "B"}
+            assert reader.readtree().leaves == {"1", "2"}
+            assert reader.transdict is None
+
+
+class Test_readtree_TreefileBase:
+
+    @pytest.mark.parametrize("parse_meta", [False, True])
+    @pytest.mark.parametrize("nexus", [False, True])
+    def test_root_flags_native_values_and_suffix_use_same_parser(self, parse_meta, nexus):
+        description = '[&R](A[&height=1.0],B)Root[&height=3]:0.0[&rate=2];'
+        reader_type = pt.Nexustreefile if nexus else pt.Newicktreefile
+        content = '#NEXUS\nbegin trees;tree x=' + description + 'end;' if nexus else description
+        with reader_type(filecontent=content, parse_meta=parse_meta) as reader:
+            tree = next(reader)
+            assert tree.rooted is True
+            assert tree.root_suffix.label == "Root"
+            assert tree.root_suffix.length == 0.0
+            assert not hasattr(tree, "below_root")
+            if parse_meta:
+                assert tree.nodedict["A"].height == 1.0
+                assert tree.nodedict[tree.root].height == 3
+                assert tree.root_suffix.extra_meta == {"rate": 2}
+            else:
+                assert tree.nodedict == {}
+                assert tree.root_suffix.extra_meta is None
+            assert reader.readtree() is None
+            with pytest.raises(TypeError):
+                reader.__next__(False)
+
+
+class Test_skip_trees_TreefileBase:
+
+    @pytest.mark.parametrize("nexus", [False, True])
+    def test_skip_ignores_payload_and_declaration_semantics_without_parsing(self, monkeypatch, nexus):
+        first = '(A[&height={}],B);'
+        second = '[&R][&U](C,D);'
+        third = '(E[ordinary; [nested]],F);'
+        reader_type = pt.Nexustreefile if nexus else pt.Newicktreefile
+        content = ('#NEXUS\nbegin trees;tree a=' + first + 'utree b=' + second
+                   + 'tree c=' + third + 'end;') if nexus else first + second + third
+        with reader_type(filecontent=content, parse_meta=True) as reader:
+            with monkeypatch.context() as patch:
+                def forbidden(*args, **kwargs):
+                    raise AssertionError("skip constructed or parsed a Tree")
+                patch.setattr(pt.Tree, "__init__", forbidden)
+                patch.setattr(pt.AnnotatedNewickParser, "parse", forbidden)
+                patch.setattr(reader, "read_tree_text", forbidden)
+                assert reader.skip_trees(2) == 2
+            assert reader.readtree().leaves == {"E", "F"}
+            assert reader.skip_trees(5) == 0
+
+
+class Test_fast_treecount:
+
+    @pytest.mark.parametrize("fileformat", ["newick", "nexus"])
+    def test_count_is_lexical_without_tree_or_description_construction(self, monkeypatch, tmp_path, fileformat):
+        descriptions = ('(A[&height={}],B);', '[&R][&U](C,D);', '(E[&note="x;y"],F);')
+        if fileformat == "nexus":
+            text = '#NEXUS\nbegin trees;' + ''.join(
+                f'tree t{index}={value}' for index, value in enumerate(descriptions)) + 'end;'
+        else:
+            text = ''.join(descriptions)
+        filename = tmp_path / "trees.txt"
+        filename.write_text(text)
+        def forbidden(*args, **kwargs):
+            raise AssertionError("count constructed topology or a full tree description")
+        monkeypatch.setattr(pt.Tree, "__init__", forbidden)
+        monkeypatch.setattr(pt.AnnotatedNewickParser, "parse", forbidden)
+        monkeypatch.setattr(pt.Newicktreefile, "read_tree_text", forbidden)
+        monkeypatch.setattr(pt.Nexustreefile, "read_tree_text", forbidden)
+        assert pt.fast_treecount(filename, fileformat=fileformat) == 3
+
+
+class Test_count_trees_by_parsing:
+
+    def test_historical_namespace_and_string_fallback_call_shapes(self, tmp_path):
+        filename = tmp_path / "trees.newick"
+        filename.write_text('(A[&x="a;b"],B);(C,D);')
+        assert pt.count_trees_by_parsing(filename, SimpleNamespace(informat="newick")) == 2
+        assert pt.count_trees_by_parsing(filename, "newick") == 2
+        assert pt.count_trees_by_parsing(filename, args=SimpleNamespace(informat="newick")) == 2
+
+
+class Test_new_Treefile:
+
+    @pytest.mark.parametrize("nexus", [False, True])
+    def test_signature_detection_and_removed_flag_arguments(self, tmp_path, nexus):
+        filename = tmp_path / "trees.txt"
+        content = '[leading [nested]]\n#nexus\nbegin trees;tree x=(A,B);end;' if nexus else '(A,B);'
+        filename.write_text(content)
+        with pt.Treefile(filename, parse_meta=True) as reader:
+            assert isinstance(reader, pt.Nexustreefile if nexus else pt.Newicktreefile)
+            assert reader.readtree().leaves == {"A", "B"}
+        with pytest.raises(TypeError):
+            pt.Treefile(filename, False)
+        with pytest.raises(TypeError):
+            pt.Treefile(filename, strip_comments=False)
+        with pytest.raises(TypeError):
+            pt.Newicktreefile(None, '(A,B);', False)
+        with pytest.raises(TypeError):
+            pt.Newicktreefile(filecontent='(A,B);', strip_comments=False)
+        with pytest.raises(TypeError):
+            pt.Nexustreefile(filecontent='#NEXUS\nbegin trees;end;', strip_comments=False)

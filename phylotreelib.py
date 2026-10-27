@@ -296,41 +296,19 @@ def remove_comments(text):
 ####################################################################################
 
 def fast_treecount(filename, fileformat="nexus"):
-    """Heuristic: count patterns ([;=\n] etc) to infer number of trees"""
-
-    # Empirically: if ); is in file, then this == number of trees
-    n_terminators = count_bytestring(filename, b");")
-    if n_terminators > 0:
-        return n_terminators
-
-    # Count semicolon: if == 1 (possibly after nexus correction): 1 tree
-    n_semicolons = count_bytestring(filename, b";")
-    if n_semicolons == 1:
-        return 1
+    """Count complete descriptions using the same lexical rules as file readers."""
+    fileformat = fileformat.lower()
     if fileformat == "nexus":
-        n_other_semicolon_patterns  = count_bytestring(filename, b"egin taxa;")
-        n_other_semicolon_patterns += count_bytestring(filename, b"egin trees;")
-        n_other_semicolon_patterns += count_bytestring(filename, b"nd;")
-        n_other_semicolon_patterns += count_bytestring(filename, b"imensions ntax")
-        n_other_semicolon_patterns += count_bytestring(filename, b"axlabels")
-        n_other_semicolon_patterns += count_bytestring(filename, b"ranslate")
-        n_semicolons -= n_other_semicolon_patterns
-    if n_semicolons == 1:
-        return 1
-
-    # If we got this far, and filetype is newick then bail out and use precise counting
-    if fileformat == "newick":
-        return count_trees_by_parsing(filename, fileformat)
-
-    # Final attempt to infer ntrees for nexus files:
-    # count "= (", and "tree "
-    # Add the values that are not 0 to list, choose minimum as count
-    # Should be robust to most variations, but should check at end of sumt...
-    n_eqparen = count_bytestring(filename, b"= (")
-    n_treestr = count_bytestring(filename, b"tree ")
-    countlist = [n_semicolons, n_eqparen, n_treestr]
-    notzero = [val for val in countlist if val>0]
-    return min(notzero)
+        reader_type = Nexustreefile
+    elif fileformat == "newick":
+        reader_type = Newicktreefile
+    else:
+        raise TreeError(f"Unsupported tree-file format: {fileformat!r}")
+    count = 0
+    with reader_type(filename=filename) as reader:
+        while reader._skip_one_tree():
+            count += 1
+    return count
 
 ####################################################################################
 
@@ -360,16 +338,14 @@ def count_bytestring(filename, bytestring):
 
 ####################################################################################
 
-def count_trees_by_parsing(filename, args):
-    # Open treefile. Discard (i.e., silently pass by) the requested number of trees
-    if args.informat == "nexus":
-        treefile = Nexustreefile(filename)
-    else:
-        treefile = Newicktreefile(filename)
-    treecount = 0
-    for tree in treefile:
-        treecount += 1
-    return treecount
+def count_trees_by_parsing(filename, args="nexus"):
+    """Compatibility entry point; counting now skips topology construction.
+
+    Accept both the historical args.informat object and the string format passed
+    by the former fast_treecount fallback. Focused tests cover both call shapes.
+    """
+    fileformat = args if isinstance(args, str) else args.informat
+    return fast_treecount(filename, fileformat=fileformat)
 
 ###################################################################################################
 ###################################################################################################
@@ -8011,356 +7987,377 @@ class CAHeightEstimator():
 ###################################################################################################
 ###################################################################################################
 
-class TreefileBase():
-    """Abstract base-class for representing tree file objects."""
+_INPUT_SPECIAL_RE = re.compile(r"[;\[\]]")
+_INPUT_HEADER_SPECIAL_RE = re.compile(r"[;=\[\]]")
+_INPUT_NONSPACE_RE = re.compile(r"\S")
+_INPUT_SPACE_RE = re.compile(r"\s*")
+_NEXUS_COMMAND_PART_RE = re.compile(r"[A-Za-z0-9_./-]+")
+_NEXUS_TREE_NAME_RE = re.compile(r"\s*(?:\*\s*)?[\w./-]+\s*\Z")
 
-    # Classes for specific formats inherit from this class and add extra stuff as needed.
-    # NOTE: i am opening files in "read text" with encoding UTF-8. Will this work across platforms?
 
-    def __init__(self, filename, filecontent, strip_comments=True):
+def _without_envelope_comments(text):
+    """Remove complete header comments without splitting a containing word."""
+    parts = []
+    position = 0
+    while True:
+        start = text.find("[", position)
+        if start < 0:
+            parts.append(text[position:])
+            return "".join(parts)
+        parts.append(text[position:start])
+        end = _comment_end(text, start)
+        if end is None:
+            raise TreeError("Unterminated Nexus header comment")
+        position = end
 
-        num_args = (filename is not None) + (filecontent is not None)
-        if num_args != 1:
-            raise TreeError("TreefileBase __init__ requires either filename or filecontent (not both)")
-        elif filecontent:
-            self.treefile = StringIO(filecontent)
-        else:
-            self.treefile = open(filename, mode="rt", encoding="UTF-8")
 
-        self.buffer = ""                # Used for keeping leftovers after reading whole line
-        self.below_root = None
-        self.strip_comments = strip_comments
+class TreefileBase:
+    """Shared buffered lexical framing; concrete readers supply file syntax."""
 
-    ###############################################################################################
+    _BUFFER_SIZE = 65536
+
+    def __init__(self, filename, filecontent, *, parse_meta=False):
+        if (filename is not None) + (filecontent is not None) != 1:
+            raise TreeError("TreefileBase requires exactly one of filename or filecontent")
+        self.treefile = (StringIO(filecontent) if filecontent is not None
+                         else open(filename, mode="rt", encoding="UTF-8"))
+        self.parse_meta = parse_meta
+        self._buffer = ""
+        self._position = 0
+        self._buffer_offset = 0
+        self._eof = False
+        self._last_command_kind = None
 
     def __enter__(self):
-        """Implements context manager behaviour for TreefileBase types.
-        Usage example:
-            with pt.Newicktreefile(filename) as tf:
-                mytree = tf.readtree()
-            mytree.rootminvar()
-        """
         return self
 
-    ###############################################################################################
-
-    def __exit__(self, type, value, traceback):
-        """Implements context manager behaviour for TreefileBase types.
-        Usage example:
-            with pt.Newicktreefile(filename) as tf:
-                mytree = tf.readtree()
-            mytree.rootminvar()
-        """
-        # Python note: consider adding code to handle exceptions (but maybe ok to just pass on?)
+    def __exit__(self, exception_type, exception, traceback):
         self.close()
 
-    ###############################################################################################
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        tree = self.readtree()
+        if tree is None:
+            raise StopIteration
+        return tree
+
+    def _fill_buffer(self):
+        if self._position < len(self._buffer):
+            return True
+        if self._eof:
+            return False
+        self._buffer_offset += len(self._buffer)
+        self._buffer = self.treefile.read(self._BUFFER_SIZE)
+        self._position = 0
+        if not self._buffer:
+            self._eof = True
+            return False
+        return True
+
+    def _skip_comment(self):
+        """Skip from an opening bracket, with state spanning input buffers."""
+        self._position += 1
+        depth = 1
+        while self._fill_buffer():
+            match = _COMMENT_BRACKET_RE.search(self._buffer, self._position)
+            if match is None:
+                self._position = len(self._buffer)
+                continue
+            self._position = match.end()
+            depth += 1 if match.group() == "[" else -1
+            if depth == 0:
+                return
+        raise TreeError("Unterminated input comment")
+
+    def _skip_envelope_space(self):
+        """Skip only envelope whitespace/comments, never tree-description text."""
+        while self._fill_buffer():
+            self._position = _INPUT_SPACE_RE.match(self._buffer, self._position).end()
+            if self._position == len(self._buffer):
+                continue
+            char = self._buffer[self._position]
+            if char == "[":
+                self._skip_comment()
+            elif char == "]":
+                raise TreeError("Stray ']' outside a comment at input character "
+                                + str(self._buffer_offset + self._position))
+            else:
+                return True
+        return False
+
+    def _read_prefix(self, count):
+        parts = []
+        while count and self._fill_buffer():
+            end = min(len(self._buffer), self._position + count)
+            parts.append(self._buffer[self._position:end])
+            count -= end - self._position
+            self._position = end
+        return "".join(parts)
+
+    def _has_nexus_signature(self):
+        if not self._skip_envelope_space():
+            return False
+        # UTF-8 BOM handling is confined to file-signature inspection.
+        if self._buffer[self._position] == "\ufeff":
+            self._position += 1
+            self._skip_envelope_space()
+        if self._read_prefix(6).upper() != "#NEXUS":
+            return False
+        return (not self._fill_buffer()
+                or self._buffer[self._position].isspace()
+                or self._buffer[self._position] == "[")
+
+    def _reset_after_signature_probe(self):
+        self.treefile.seek(0)
+        self._buffer = ""
+        self._position = self._buffer_offset = 0
+        self._eof = False
+
+    def _read_to_delimiter(self, *, header=False, retain=True):
+        """Return (text-or-True, delimiter), or (None, None) at clean EOF.
+
+        Ordinary runs are skipped by regex. Nested comments track brackets only;
+        quotes inside comments do not suspend nesting. General quoted-name syntax
+        outside comments remains deferred. Discarding paths never assemble text.
+        """
+        pieces = [] if retain else None
+        depth = 0
+        content = False
+        outside_pattern = _INPUT_HEADER_SPECIAL_RE if header else _INPUT_SPECIAL_RE
+        while self._fill_buffer():
+            piece_start = self._position
+            while self._position < len(self._buffer):
+                pattern = _COMMENT_BRACKET_RE if depth else outside_pattern
+                match = pattern.search(self._buffer, self._position)
+                end = match.start() if match is not None else len(self._buffer)
+                if not depth and not content:
+                    content = _INPUT_NONSPACE_RE.search(self._buffer, self._position, end) is not None
+                if match is None:
+                    self._position = end
+                    break
+                char = match.group()
+                self._position = match.end()
+                if depth:
+                    depth += 1 if char == "[" else -1
+                elif char == "[":
+                    depth = 1
+                elif char == "]":
+                    raise TreeError("Stray ']' outside a comment at input character "
+                                    + str(self._buffer_offset + match.start()))
+                else:
+                    if retain:
+                        pieces.append(self._buffer[piece_start:self._position])
+                    return ("".join(pieces) if retain else True), char
+            if retain:
+                pieces.append(self._buffer[piece_start:self._position])
+        if depth:
+            raise TreeError("Unterminated input comment")
+        if content:
+            raise TreeError("Unfinished input: expected a terminating semicolon")
+        return None, None
+
+    def _read_to_semicolon(self, *, retain=True):
+        value, _ = self._read_to_delimiter(retain=retain)
+        return value
+
+    def read_tree_text(self):
+        raise NotImplementedError
 
     def get_treestring(self):
-        """Return next tree-string"""
-
-        # We are now at beginning of treestring, read until semi-colon encountered
-        # Raise StopIteration when EOF has been reached
-        stringlist = [self.buffer]
-
-        if ";" not in self.buffer:           # Only read on if end of treestring not reached
-            for line in self.treefile:
-                stringlist.append(line)
-                if ";" in line:
-                    break
-
-        treestring = "".join(stringlist)
-
-        # If we got this far and still haven't found ";" then EOF must have been reached
-        # Signal EOF to caller, which can then clean up and stop iteration
-        if ";" not in treestring:
-            return None
-
-        stringparts = treestring.split(";")
-        treestring = "".join([stringparts[0], ";"])
-        self.buffer = "".join(stringparts[1:])
-
-        # Finally: check if there is information below the root node,
-        # i.e., between last right parenthesis and the semicolon.
-        # If so then save as self.below_root
-        # Python note: can possibly be done smarter. And what should happen with below root part?
-        last_right_paren = treestring.rfind(')')
-        if last_right_paren != -1:
-            self.below_root = treestring[last_right_paren + 1:-1]
-            if self.below_root:
-                treestring = treestring[:last_right_paren + 1] + ";"
-        return treestring
-
-    ###############################################################################################
+        return self.read_tree_text()
 
     def readtree(self, returntree=True):
-        """Reads one treestring from file and returns as Tree object if requested.
-        Returns None when exhausted file"""
+        text = self.read_tree_text()
+        if text is None or not returntree:
+            return text
+        return Tree._from_string_private(self.parser_obj, text,
+                                         command_kind=self._last_command_kind)
 
-        try:
-            tree = self.__next__(returntree)
-            return tree
-        except StopIteration:
-            self.treefile.close()
-            return None
+    def _skip_one_tree(self):
+        raise NotImplementedError
 
-    ###############################################################################################
+    def skip_trees(self, n):
+        """Skip up to n descriptions lexically and return the actual skipped count."""
+        if n < 0:
+            raise TreeError("skip_trees requires a nonnegative count")
+        skipped = 0
+        for _ in range(n):
+            if not self._skip_one_tree():
+                break
+            skipped += 1
+        return skipped
 
     def readtrees(self, discardprop=0.0):
-        """Reads trees from file and returns as TreeSet object. Can discard fraction of trees"""
-
-        # Avoid erroneous error message when running pylint ("self" is OK for iteration)
-        # pylint: disable=not-an-iterable
-
         treeset = TreeSet()
         for tree in self:
             treeset.addtree(tree)
         if discardprop > 0:
-            ndiscard = int(discardprop * len(treeset))
-            treeset = treeset[ndiscard:]
-
+            treeset = treeset[int(discardprop * len(treeset)):]
         return treeset
 
-    ###############################################################################################
-
     def close(self):
-        """For explicit closing of Treefile before content exhausted"""
         self.treefile.close()
-
-###################################################################################################
-###################################################################################################
+        self._eof = True
+        self._position = len(self._buffer)
 
 
 class Newicktreefile(TreefileBase):
-    """Class representing Newick tree file. Iteration returns tree-objects"""
+    """Newick descriptions with shared lexical framing and one reusable parser."""
 
-    def __init__(self, filename=None, filecontent=None, strip_comments=True):
-        TreefileBase.__init__(self, filename, filecontent, strip_comments)
-        # HACK!!! Minimal file format check:
-        # Read first three lines in file, check whether any of them contains "#NEXUS".
-        # If so then this is presumably NOT a Newick file (but a nexus file...) => exit.
-        # If not, then hope that this IS a Newick file. Reset file pointer and proceed.
-        filestart = self.treefile.readline()
-        filestart += self.treefile.readline()
-        filestart += self.treefile.readline()
-        if filestart.find("#NEXUS") != -1:
-            msg = "File does not appear to be in Newick format"
-            raise TreeError(msg)
-        else:
-            self.treefile.seek(0)       # Reset pointer to start of file
+    def __init__(self, filename=None, filecontent=None, *, parse_meta=False):
+        super().__init__(filename, filecontent, parse_meta=parse_meta)
+        try:
+            is_nexus = self._has_nexus_signature()
+            self._reset_after_signature_probe()
+            if is_nexus:
+                raise TreeError("File does not appear to be in Newick format")
+            self.transdict = None
+            self.parser_obj = AnnotatedNewickParser(parse_meta=parse_meta)
+        except BaseException:
+            self.close()
+            raise
 
-    ###############################################################################################
+    def read_tree_text(self):
+        text = self._read_to_semicolon()
+        if text is None:
+            self.close()
+        return text
 
-    def __iter__(self):
-        return self
+    def _skip_one_tree(self):
+        found = self._read_to_semicolon(retain=False) is not None
+        if not found:
+            self.close()
+        return found
 
-    ###############################################################################################
-
-    def __next__(self, returntree=True):
-        treestring = self.get_treestring()
-        if treestring is None:
-            self.treefile.close()
-            raise StopIteration
-        else:
-            if self.strip_comments:
-                treestring = remove_comments(treestring)
-            if returntree:
-                tree = Tree.from_string(treestring)
-                tree.below_root = self.below_root
-                return tree
-            else:
-                return treestring
-
-###################################################################################################
-###################################################################################################
 
 class Nexustreefile(TreefileBase):
-    """Class representing Nexus tree file. Iteration returns tree object or None"""
+    """Nexus envelope processing; original post-'=' descriptions stay intact."""
 
-    ###############################################################################################
-
-    def __init__(self, filename=None, filecontent=None, strip_comments=True):
-        """Read past NEXUS file header, parse translate block if present"""
-
-        TreefileBase.__init__(self, filename, filecontent, strip_comments)
-
-        ###########################################################################################
-
-        def skip_comment(line):
-            """Reads past a NEXUS comment"""
-
-            if line.count("[") > line.count("]"):
-                for extraline in self.treefile:
-                    line += extraline
-                    if line.count("[") == line.count("]"):
-                        break
-
-            # Now we should have an equal number of "[" and "]"
-            # Remove comments
-            return remove_comments(line)
-
-        ###########################################################################################
-
-        def read_until(pattern, skipcomment=False):
-            """Read and return filecontent up to and including 'pattern'"""
-
-            readsofar = ""
-
-            # Read one line until text pattern encountered. Skip comments, chek for EOF
-            for line in self.treefile:
-                if "[" in line and skipcomment:
-                    line = skip_comment(line)
-                elif line == "":
-                    msg = "Bug: EOF reached before read_until pattern was encountered"
-                    raise TreeError(msg)
-
-                readsofar += line
-                if pattern.search(readsofar):
-                    break
-
-            return readsofar
-
-        ###########################################################################################
-
-        # EXECUTION of __init__ STARTS HERE
+    def __init__(self, filename=None, filecontent=None, *, parse_meta=False):
+        super().__init__(filename, filecontent, parse_meta=parse_meta)
         self.transdict = None
+        self.parser_obj = AnnotatedNewickParser(parse_meta=parse_meta)
+        self._block_name = None
+        self._awaiting_description = False
+        try:
+            if not self._has_nexus_signature():
+                raise TreeError("File does not appear to be in Nexus format")
+            # Prime only the first header, not its description. Count/skip never
+            # has to assemble the first tree just because construction occurs.
+            self._advance_to_tree_header()
+        except BaseException:
+            self.close()
+            raise
 
-        # Regular expressions that are used frequently during execution
-        # DOTALL flag forces "." to also match newlines
-        # "*?" means non-greedy matching - match as little text as possible
-        self.begin_trees_pattern = re.compile(r"""
-                                    begin\s+trees           # "begin trees"
-                                    (\s+[\w\-\/\.]+\s*)?    # possible block name
-                                    ;                       # semicolon after "begin trees"
-                                    """, re.IGNORECASE | re.VERBOSE)
+    def _read_command_keyword(self):
+        if not self._skip_envelope_space():
+            return None
+        parts = []
+        while self._fill_buffer():
+            match = _NEXUS_COMMAND_PART_RE.match(self._buffer, self._position)
+            if match is not None:
+                parts.append(match.group())
+                self._position = match.end()
+                if self._position == len(self._buffer):
+                    continue
+            if self._buffer[self._position] == "[":
+                self._skip_comment()
+                continue
+            break
+        if not parts:
+            raise TreeError("Expected a Nexus command at input character "
+                            + str(self._buffer_offset + self._position))
+        return "".join(parts).upper()
 
-        self.tree_header_pattern = re.compile(r"""
-                                    ^.*?u?tree              # up to first tree/utree
-                                    \s+(\*\s)?\s*           # optional "*"
-                                    [\w\-\/\.]+             # tree name
-                                    (?:\s*\[[^\[\]]*\]\s*)* # optional comments (BEAST inserts these)
-                                    \s*=                    # equals
-                                    """, re.IGNORECASE | re.DOTALL | re.VERBOSE)
+    def _command_rest(self, *, retain=False):
+        rest = self._read_to_semicolon(retain=retain)
+        if rest is None:
+            raise TreeError("Unfinished Nexus command: expected a semicolon")
+        return rest
 
-        self.end_pattern = re.compile(r"\send(block)?;", re.IGNORECASE)
+    def _new_translation(self, mapping):
+        # Never mutate a mapping/parser retained by previously returned chunks.
+        self.transdict = mapping
+        self.parser_obj = AnnotatedNewickParser(transdict=mapping, parse_meta=self.parse_meta)
 
-        # Read past "begin trees;" (take all allowed variants into account)
-        filestart = read_until(self.begin_trees_pattern, skipcomment=True)
+    def _read_translation(self):
+        table = _without_envelope_comments(self._command_rest(retain=True)[:-1])
+        mapping = {}
+        for entry in table.split(","):
+            words = entry.split()
+            if len(words) != 2:
+                raise TreeError("Expected an unquoted code/name pair in Nexus TRANSLATE")
+            mapping[words[0]] = sys.intern(words[1])
+        self._new_translation(mapping)
 
-        # Minimal fileformat check: start of NEXUS file should contain "#NEXUS". If not then exit:
-        if filestart.find("#NEXUS") == -1:      # The string "#NEXUS" was not found
-            msg = "File does not appear to be in NEXUS format"
-            raise TreeError(msg)
+    def _advance_to_tree_header(self):
+        while True:
+            # Retain existing workflows concatenating complete Nexus documents.
+            if self._block_name is None and self._skip_envelope_space():
+                if self._buffer[self._position] in ("#", "\ufeff"):
+                    if not self._has_nexus_signature():
+                        raise TreeError("Expected #NEXUS between complete Nexus documents")
+                    continue
+            keyword = self._read_command_keyword()
+            if keyword is None:
+                return False
+            if self._block_name is None:
+                if keyword == "BEGIN":
+                    words = _without_envelope_comments(self._command_rest(retain=True)[:-1]).split()
+                    if not words:
+                        raise TreeError("Expected a Nexus block name after BEGIN")
+                    self._block_name = words[0].upper()
+                    if self._block_name == "TREES":
+                        self._new_translation(None)
+                else:
+                    self._command_rest()
+            elif keyword in ("END", "ENDBLOCK"):
+                self._command_rest()
+                self._block_name = None
+            elif self._block_name != "TREES":
+                self._command_rest()
+            elif keyword == "TRANSLATE":
+                self._read_translation()
+            elif keyword in ("TREE", "UTREE"):
+                header, delimiter = self._read_to_delimiter(header=True)
+                if delimiter != "=":
+                    raise TreeError("Expected '=' after Nexus tree name")
+                name = _without_envelope_comments(header[:-1])
+                if not _NEXUS_TREE_NAME_RE.fullmatch(name):
+                    raise TreeError("Expected a supported Nexus tree name before '='")
+                self._last_command_kind = keyword
+                self._awaiting_description = True
+                return True
+            else:
+                self._command_rest()
 
-        # Read past first "tree <NAME> =" statement. Keep text that was read in buffer
-        self.buffer = read_until(self.tree_header_pattern, skipcomment=True)
+    def _next_description(self, *, retain):
+        if not self._awaiting_description and not self._advance_to_tree_header():
+            self.close()
+            return None
+        value = self._read_to_semicolon(retain=retain)
+        if value is None:
+            raise TreeError("Unfinished Nexus tree description after '='")
+        self._awaiting_description = False
+        return value
 
-        # If buffer contains a "translate" block: parse it
-        if re.search("translate", self.buffer, re.IGNORECASE):
+    def read_tree_text(self):
+        return self._next_description(retain=True)
 
-            self.transdict = {}
+    def _skip_one_tree(self):
+        return self._next_description(retain=False) is not None
 
-            # Remove start of buffer
-            pattern = re.compile(r"^.*translate\s*", re.IGNORECASE | re.DOTALL)
-            self.buffer = pattern.sub("", self.buffer)
-
-            # Remove end of buffer, only "translate" block core remains after this
-            # NOTE: I originally had following complicated pattern
-            # This was found to break on some trees.
-            # Why did I use that? Are there some cases that I am no longer covering?
-            # re.compile(";\s+u?tree\s+(\*\s)?\s*[\w\-\/\.]+\s*=.*", re.IGNORECASE | re.DOTALL)
-            pattern = re.compile(r";\s+.*tree.*", re.IGNORECASE | re.DOTALL)
-            transblock = pattern.sub("", self.buffer)
-
-            # Split on commas, generating list of "code-whitespace-origname" pairs
-            # then split each of these on whitespace, and build translation dictionary
-            translist = transblock.split(",")
-            for transpair in translist:
-                words = transpair.split()
-                code = words[0]
-                realname = sys.intern(words[1])
-                self.transdict[code] = realname
-
-        # Keep everything after "tree <NAME> =" in self.buffer: may contain tree!
-        # Non-greedy mathching *?: find first = and then every non-start parenthesis
-        pattern = re.compile("^.*?=[^(]*", re.DOTALL)
-        self.buffer = pattern.sub("", self.buffer)
-
-        # Instantiate parser object once: this can be used repeatedly when parsing individual tree strings
-        self.parser_obj = NewickStringParser(self.transdict)
-
-    ###############################################################################################
-
-    def __iter__(self):
-        return self
-
-    ###############################################################################################
-
-    def __next__(self, returntree=True):
-
-        treestring = self.get_treestring()
-        if treestring is None:
-            self.treefile.close()
-            raise StopIteration
-
-        # remove comments in brackets if requested
-        # remove leading "tree NAME =" (compiled regexp "tree_header_pattern")
-        # Implementation note: does not parse figtree comments!
-        if self.strip_comments:                       # NEW
-            treestring = remove_comments(treestring)  # existing
-        treestring = self.tree_header_pattern.sub("", treestring)
-
-        # If "end;" statement has been reached: terminate for loop, do NOT return tree object
-        if self.end_pattern.search(treestring):
-            self.treefile.close()
-            raise StopIteration
-
-        # Return tree object if requested. else return treestring
-        if returntree:
-            tree = Tree._from_string_private(self.parser_obj, treestring)
-            tree.below_root = self.below_root
-            return tree
-        else:
-            return treestring
-
-###################################################################################################
-###################################################################################################
 
 class Treefile:
-    """Factory for making Newick or Nexus treefile objects. Autodetects fileformat"""
+    """Factory retaining its filename-only public input API."""
 
-    def __new__(klass, filename, strip_comments=True):
-
-        def read_until_non_comment(filename):
-            with open(filename, 'r') as file:
-                content = []
-                comment_level = 0  # Counter to track the nesting level of comments
-                for line in file:
-                    stripped_line = ""
-                    i = 0
-                    while i < len(line):
-                        char = line[i]
-                        if char == '[':  # Start of a comment or deeper nesting
-                            comment_level += 1
-                        elif char == ']':  # End of a comment or moving up a nesting level
-                            comment_level -= 1
-                            if comment_level < 0:  # Malformed comment structure
-                                raise ValueError("Mismatched comment brackets in the file.")
-                            i += 1  # Skip the closing bracket
-                            continue
-                        elif comment_level == 0:  # Not inside a comment
-                            stripped_line += char
-                        i += 1
-                    content.append(line)
-                    if stripped_line.strip():  # If there's any non-commented text
-                        break
-                return ''.join(content)
-
-        headertext = read_until_non_comment(filename)
-        if "#nexus" in headertext.lower():
-            return Nexustreefile(filename=filename, strip_comments=strip_comments)
-        else:
-            return Newicktreefile(filename=filename, strip_comments=strip_comments)
+    def __new__(cls, filename, *, parse_meta=False):
+        with TreefileBase(filename, None) as probe:
+            is_nexus = probe._has_nexus_signature()
+        reader = Nexustreefile if is_nexus else Newicktreefile
+        return reader(filename=filename, parse_meta=parse_meta)
 
 ###################################################################################################
 ###################################################################################################
