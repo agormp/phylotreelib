@@ -5330,6 +5330,62 @@ class Test_subtree:
         assert original_branch.extra_meta == {"colors": ["red", "blue"]}
         assert source.rooted is state
 
+    def test_proper_extraction_keeps_basal_data_separate_and_copies_metadata(self):
+        source = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        node = source.find_mrca({"A", "B"})
+        source.root_suffix = pt.Branchstruct(length=0.0, label="source-root")
+        source.root_suffix.extra_meta = {"stem": ["old"]}
+        source.set_node_attribute(node, "extra_meta", {"node": ["retained"]})
+        incoming = source.child_dict[source.root][node]
+        incoming.label = "basal-label"
+        incoming.extra_meta = {"basal": ["kept"]}
+        inner = source.child_dict[node]["A"]
+        inner.extra_meta = {"inner": ["kept"]}
+
+        extracted, basal = source.subtree(node)
+
+        assert extracted.root_suffix is None
+        assert extracted.nodedict[node].extra_meta == {"node": ["retained"]}
+        assert basal.label == "basal-label"
+        assert basal.length == 3.0
+        assert basal.extra_meta == {"basal": ["kept"]}
+        extracted.nodedict[node].extra_meta["node"].append("new")
+        extracted.child_dict[node]["A"].extra_meta["inner"].append("new")
+        basal.extra_meta["basal"].append("new")
+        assert source.nodedict[node].extra_meta == {"node": ["retained"]}
+        assert inner.extra_meta == {"inner": ["kept"]}
+        assert incoming.extra_meta == {"basal": ["kept"]}
+        assert source.root_suffix.extra_meta == {"stem": ["old"]}
+
+    @pytest.mark.parametrize("stem_length", [None, 0.0, 0.75])
+    def test_source_root_copies_suffix_without_inventing_basal_branch(self, stem_length):
+        source = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        source.root_suffix = pt.Branchstruct(length=stem_length, label="RootName")
+        source.root_suffix.extra_meta = {"rate": [1.2, pt.MISSING]}
+        source.set_node_attribute(source.root, "extra_meta", {"root_node": ["own"]})
+
+        extracted, basal = source.subtree(source.root)
+
+        assert basal is None
+        assert extracted.root_suffix is not source.root_suffix
+        assert extracted.root_suffix.length == stem_length
+        assert extracted.root_suffix.label == "RootName"
+        assert extracted.root_suffix.extra_meta["rate"][1] is pt.MISSING
+        extracted.root_suffix.extra_meta["rate"][0] = 9.0
+        extracted.nodedict[extracted.root].extra_meta["root_node"].append("new")
+        assert source.root_suffix.extra_meta["rate"] == [1.2, pt.MISSING]
+        assert source.nodedict[source.root].extra_meta == {"root_node": ["own"]}
+
+    @pytest.mark.parametrize("empty_container", [False, True])
+    def test_source_root_does_not_allocate_empty_suffix(self, empty_container):
+        source = pt.Tree.from_string("(A:1,B:2,C:3);")
+        if empty_container:
+            source.root_suffix = pt.Branchstruct(length=None)
+            source.root_suffix.extra_meta = {}
+        extracted, basal = source.subtree(source.root)
+        assert extracted.root_suffix is None
+        assert basal is None
+
 
 class Test_prune_subtree:
 

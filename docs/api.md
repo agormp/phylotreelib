@@ -435,3 +435,7 @@ Root selectors (`rootmid()`, `rootminvar()`, `rootout()` and successful `TreePos
 ### Extracted Tree interpretation
 
 A Tree returned by `subtree()` inherits True, False or None from the source at extraction time, including extraction at the source root. `prune_subtree()` obtains that result before editing the source. Selecting a traversal subtree does not infer biological rootedness. Leaf extraction still returns a name string plus its copied basal branch; it creates no Tree state or new wrapper.
+
+### Extraction suffix and basal branch
+
+`subtree(source.root)` independently copies retained source suffix data and returns `basal_branch=None`. A proper internal subtree has `root_suffix=None` and returns its former incoming branch separately, including its label and annotations. Leaf extraction keeps the same string/copied-basal-branch interface. A basal branch never becomes an implicit root label or stem. Extracted node data, internal edges, the basal branch and a copied suffix isolate supported mutable annotations. `prune_subtree()` obtains the extracted result before source mutation. Pruning the entire source root is outside the existing valid-retained-Tree contract.

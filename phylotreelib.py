@@ -2282,25 +2282,33 @@ class Tree:
         obj.child_dict = self._copy_child_dict(obj, copylengths, copyattr)
         obj.nodedict = self._copy_nodedict(obj) if copyattr else {}
         obj.rooted = self.rooted
-        if self.root_suffix is not None:
-            suffix = self.root_suffix.copy(copylengths, copyattr)
-            if self.root_suffix.length is None:
-                suffix.length = None
-            # An absent stem stays absent; default computational fields are not suffix data.
-            annotations = suffix.extra_meta
-            has_extras = (any(value is not None for value in annotations.values())
-                          if isinstance(annotations, dict) else annotations is not None)
-            has_native_data = False
-            for field in suffix.__slots__:
-                if field in ("length", "extra_meta"):
-                    continue
-                value = getattr(suffix, field)
-                if value is not None and suffix.is_interesting(field, value):
-                    has_native_data = True
-                    break
-            if suffix.length is not None or has_extras or has_native_data:
-                obj.root_suffix = suffix
+        obj.root_suffix = self._copy_root_suffix(copylengths, copyattr)
         return obj
+
+    ###############################################################################################
+
+    def _copy_root_suffix(self, copylengths=True, copyattr=True):
+        """Copy retained suffix information, omitting an empty result."""
+        if self.root_suffix is None:
+            return None
+        suffix = self.root_suffix.copy(copylengths, copyattr)
+        if self.root_suffix.length is None:
+            suffix.length = None
+        # An absent stem stays absent; default computational fields are not suffix data.
+        annotations = suffix.extra_meta
+        has_extras = (any(value is not None for value in annotations.values())
+                      if isinstance(annotations, dict) else annotations is not None)
+        has_native_data = False
+        for field in suffix.__slots__:
+            if field in ("length", "extra_meta"):
+                continue
+            value = getattr(suffix, field)
+            if value is not None and suffix.is_interesting(field, value):
+                has_native_data = True
+                break
+        if suffix.length is not None or has_extras or has_native_data:
+            return suffix
+        return None
 
     ###############################################################################################
 
@@ -3944,6 +3952,7 @@ class Tree:
 
         A returned Tree inherits the source's rootedness interpretation at extraction.
         The source is unchanged. The leaf result remains a string without Tree state.
+        Only extraction at the source root copies its suffix; a proper subtree has none.
         `basal_branch` is a copy of the incoming Branchstruct, or None at the source root.
         """
 
@@ -3961,6 +3970,8 @@ class Tree:
         other = Tree()
         other.root = basenode
         other.rooted = self.rooted
+        if basenode == self.root:
+            other.root_suffix = self._copy_root_suffix()
         curlevel = [basenode]
         while curlevel:
             nextlevel = []
