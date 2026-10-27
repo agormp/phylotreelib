@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- Documented and verified complete SPR preservation of rootedness and surviving node/edge attachment, suffix retention only while the old root survives, and fresh merged/split/connecting fields. Qualified its existing root-adjacent connection-length adjustment.
 - Documented and tested graft preservation of recipient rootedness at actual graft entry, independently of donor state, suffix information and connection length, including leaf grafts.
 - Documented and verified explicit graft connection precedence: donor suffix data never contributes implicitly; a deliberately prepared suffix Branchstruct can be transferred through the existing connection argument.
 - Documented consuming graft ownership for donor contents and supplied connecting Branchstructs, with verified explicit-copy usage when callers retain independently usable originals.

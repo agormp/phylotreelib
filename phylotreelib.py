@@ -5392,7 +5392,16 @@ class Tree:
 
         Branch lengths:
           - The regraft edge length is preserved (split into two segments).
-          - The pruned basal branch length is reused as the new connecting branch length.
+          - The fresh connecting branch uses the detached basal length plus the
+            other root-child branch length when pruning a direct child of a
+            bifurcating root, retaining the existing total-length adjustment.
+
+        Preserve rootedness. Retain the suffix when the old root survives; clear
+        it if pruning removes that root. Merged/split/connecting edges start with
+        fresh non-length fields, while moved internal and unrelated edges retain
+        annotations. Surviving node metadata follows final IDs; deleted nodes are
+        removed and the graftpoint starts empty. Retention does not establish
+        continued scientific validity of statistics.
 
         Returns (prune_node, regraft_node).
         """

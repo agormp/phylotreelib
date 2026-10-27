@@ -2438,6 +2438,125 @@ class TestSPR:
         with pytest.raises(pt.TreeError):
             tree.spr(prune_node=prune_node, regraft_node=tree.root)
 
+    @pytest.mark.parametrize("state", [True, False, None])
+    @pytest.mark.parametrize("promote_root", [False, True])
+    def test_complete_spr_keeps_state_and_suffix_tracks_actual_root_survival(self, state, promote_root):
+        text = "(A:1,((B:2,C:3):4,D:5):6);" if promote_root else "((A:1,B:2):3,(C:4,D:5):6);"
+        target = "B" if promote_root else "C"
+        tree = pt.Tree.from_string(text)
+        tree.rooted = state
+        old_root = tree.root
+        tree.root_suffix = pt.Branchstruct(length=0.4, label="oldroot")
+        suffix = tree.root_suffix
+        tree.set_node_attribute(old_root, "state", "oldroot")
+        tree.set_node_attribute("A", "state", "moved")
+        tree.set_node_attribute(target, "height", 22.0)
+        surviving_metadata = tree.nodedict[target]
+        basal = tree.child_dict[tree.parent("A")]["A"]
+        basal.label = "do not transfer with reused length"
+        basal.extra_meta = {"basal_rate": 7.0}
+        target_parent = tree.parent(target)
+        tree.child_dict[target_parent][target].label = "split"
+        tree.child_dict[target_parent][target].extra_meta = {"target_rate": 8.0}
+        total = tree.length()
+        before_distances = tree.rootdist
+        assert tree.nodedist("A", target) == pytest.approx(13 if promote_root else 14)
+
+        assert tree.spr("A", target, frac_from_parent=0.5) == ("A", target)
+
+        assert tree.rooted is state
+        assert tree.leaves == {"A", "B", "C", "D"}
+        assert tree.length() == pytest.approx(total)
+        assert tree.rootdist is not before_distances
+        assert tree.rootdist["A"] == pytest.approx(12 if promote_root else 9)
+        assert tree.nodedist("A", target) == pytest.approx(8 if promote_root else 3)
+        assert tree.nodedict["A"].state == "moved"
+        assert tree.nodedict[target] is surviving_metadata
+        graftpoint = tree.parent("A")
+        connecting = tree.child_dict[graftpoint]["A"]
+        assert connecting.length == pytest.approx(7 if promote_root else 1)
+        assert connecting.label == "" and connecting.extra_meta is None
+        upper = tree.child_dict[tree.parent(graftpoint)][graftpoint]
+        lower = tree.child_dict[graftpoint][target]
+        assert upper.label == lower.label == ""
+        assert upper.extra_meta is None and lower.extra_meta is None
+        assert tree.nodedict[graftpoint].state is None
+        assert tree.nodedict[graftpoint].extra_meta is None
+        assert set(tree.nodedict) <= tree.nodes
+        if promote_root:
+            assert tree.root != old_root
+            assert old_root not in tree.nodedict
+            assert tree.root_suffix is None
+        else:
+            assert tree.root == old_root
+            assert tree.root_suffix is suffix
+            merged = tree.child_dict[tree.root]["B"]
+            assert merged.length == pytest.approx(5)
+            assert merged.label == "" and merged.extra_meta is None
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_internal_subtree_metadata_follows_final_ids_and_unrelated_edges_survive(self, state):
+        tree = pt.Tree.from_string("(((A:1,B:2):3,C:4):5,(D:6,E:7):8);")
+        # Make the detached root collide with the graftpoint ID allocated after pruning.
+        original_base = tree.find_mrca({"A", "B"})
+        prune_node = max(tree.intnodes) + 1
+        tree.rename_intnode(original_base, prune_node)
+        removed_parent = tree.parent(prune_node)
+        tree.rooted = state
+        old_root = tree.root
+        tree.root_suffix = pt.Branchstruct(length=0.4, label="root")
+        suffix = tree.root_suffix
+        tree.set_node_attribute(prune_node, "height", 9.0)
+        tree.set_node_attribute(prune_node, "extra_meta", {"node_note": ["moved"]})
+        tree.set_node_attribute("A", "state", "leaf moved")
+        tree.set_node_attribute(removed_parent, "state", "deleted")
+        tree.set_node_attribute("C", "state", "survives")
+        c_metadata = tree.nodedict["C"]
+        tree.child_dict[prune_node]["A"].extra_meta = {"rate": [1, 2]}
+        original_moved_edge = tree.child_dict[prune_node]["A"]
+        tree.child_dict[removed_parent][prune_node].extra_meta = {"basal": "omit"}
+        tree.child_dict[tree.root][removed_parent].label = "merged upper"
+        tree.child_dict[removed_parent]["C"].extra_meta = {"merged lower": "omit"}
+        de = tree.parent("D")
+        tree.child_dict[de]["D"].extra_meta = {"split": "omit"}
+        tree.child_dict[de]["E"].label = "unrelated"
+        tree.child_dict[de]["E"].extra_meta = {"keep": [3, 4]}
+        unrelated_edge = tree.child_dict[de]["E"]
+        total = tree.length()
+        assert tree.nodedist("A", "E") == pytest.approx(24)
+        assert tree.rootdist["A"] == pytest.approx(9)
+
+        tree.spr(prune_node, "D", frac_from_parent=0.5)
+
+        moved_root = tree.parent("A")
+        graftpoint = tree.parent(moved_root)
+        assert moved_root != prune_node
+        assert graftpoint == prune_node
+        assert tree.nodedict[moved_root].height == 9.0
+        assert tree.nodedict[moved_root].extra_meta == {"node_note": ["moved"]}
+        assert tree.nodedict["A"].state == "leaf moved"
+        moved_edge = tree.child_dict[moved_root]["A"]
+        assert moved_edge.extra_meta == {"rate": [1, 2]}
+        assert moved_edge.extra_meta is not original_moved_edge.extra_meta
+        assert tree.child_dict[de]["E"] is unrelated_edge
+        assert unrelated_edge.label == "unrelated"
+        assert unrelated_edge.extra_meta == {"keep": [3, 4]}
+        assert tree.nodedict["C"] is c_metadata
+        assert removed_parent not in tree.nodes and removed_parent not in tree.nodedict
+        assert tree.nodedict[graftpoint].height is None
+        assert tree.nodedict[graftpoint].extra_meta is None
+        for parent, child in ((tree.root, "C"), (de, graftpoint), (graftpoint, "D"),
+                              (graftpoint, moved_root)):
+            branch = tree.child_dict[parent][child]
+            assert branch.label == "" and branch.extra_meta is None
+        assert tree.child_dict[graftpoint][moved_root].length == pytest.approx(3)
+        assert tree.length() == pytest.approx(total)
+        assert tree.nodedist("A", "E") == pytest.approx(14)
+        assert tree.rootdist["A"] == pytest.approx(15)
+        assert tree.root == old_root and tree.root_suffix is suffix
+        assert tree.rooted is state
+        assert set(tree.nodedict) <= tree.nodes
+
 
 ###################################################################################################
 
