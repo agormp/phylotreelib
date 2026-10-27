@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Metadata strings are quoted, booleans use `true`/`false`, and collections use braces with deterministic ordering for sets. Unset None values are omitted; explicit MISSING, empty strings/collections, zero and `False` are retained.
 
 #### Added
+- `Tree.unroot()` deliberately establishes an unrooted interpretation, including two-leaf and unchanged-root cases. Structural collapse clears a displaced rooted interpretation to None; the deprecated `deroot()` alias keeps structural semantics.
 - Programmatic `root_suffix` label/stem output under the existing explicit controls. Selected stem metadata requires an emitted stem length; an absent length never becomes an invented zero. Root-node annotations remain separate.
 - Exact metadata-key resolution and selected owner/key value validation, typed float/MISSING/empty-value output, quoted keys and independently balanced brackets in annotation strings. Emitted branch annotations require emitted structural lengths.
 - `Tree.rooted` and optional `Tree.root_suffix` data fields and copy support, preserving absent versus explicit-zero stem lengths. Input interpretation and tree-edit transitions follow in the parser migration.

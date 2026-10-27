@@ -4996,6 +4996,15 @@ class Tree:
 
     ###############################################################################################
 
+    def unroot(self):
+        """Establish an unrooted interpretation, retaining a needed traversal root."""
+        rootkids = self.children(self.root)
+        if len(rootkids) != 2 or any(child in self.intnodes for child in rootkids):
+            self.collapse_bifurcating_root()
+        self.rooted = False
+
+    ###############################################################################################
+
     def collapse_bifurcating_root(self):
         """
         If the current root has exactly two children, remove the root node and connect the two
@@ -5025,6 +5034,9 @@ class Tree:
         else:
             raise TreeError("Cannot collapse bifurcating root: only leaves are present")
         self.root = newroot
+        self.root_suffix = None
+        if self.rooted is True:
+            self.rooted = None
         self.child_dict[newroot][other] = branch_merged
 
         del self.child_dict[oldroot]

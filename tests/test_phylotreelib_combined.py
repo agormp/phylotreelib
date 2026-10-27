@@ -5153,3 +5153,68 @@ class Test_match_nodes:
         assert first.rooted is second.rooted is state
         assert first.root_suffix is first_suffix
         assert second.root_suffix is second_suffix
+
+
+class Test_collapse_bifurcating_root:
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_actual_removal_clears_suffix_and_only_invalidates_meaningful_root(self, state):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4);")
+        tree.rooted = state
+        oldroot = tree.root
+        newroot = tree.find_mrca({"B", "C"})
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="old-root")
+        tree.set_node_attribute(oldroot, "state", "deleted")
+        tree.set_node_attribute(newroot, "state", "retained")
+        survivor = tree.nodedict[newroot]
+        tree.collapse_bifurcating_root()
+        assert tree.rooted is (None if state is True else state)
+        assert tree.root_suffix is None
+        assert oldroot not in tree.nodedict
+        assert tree.nodedict[newroot] is survivor
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_multifurcation_noop_preserves_state_and_suffix(self, state):
+        tree = pt.Tree.from_string("(A:1,B:2,C:3);")
+        tree.rooted = state
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="same-root")
+        suffix, root = tree.root_suffix, tree.root
+        tree.collapse_bifurcating_root()
+        assert tree.rooted is state
+        assert tree.root == root
+        assert tree.root_suffix is suffix
+
+    def test_two_leaf_structural_collapse_still_raises(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.rooted = True
+        with pytest.raises(pt.TreeError, match="only leaves"):
+            tree.collapse_bifurcating_root()
+        assert tree.rooted is True
+
+
+class Test_unroot:
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    @pytest.mark.parametrize("sample", ["(A:1,(B:2,C:3):4);", "(A:1,B:2,C:3);", "(A:1,B:2);"])
+    def test_deliberate_unrooting_establishes_false_and_obeys_suffix_ownership(self, state, sample):
+        tree = pt.Tree.from_string(sample)
+        tree.rooted = state
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="old-root")
+        suffix, oldroot = tree.root_suffix, tree.root
+        leaves = tree.leaves.copy()
+        tree.unroot()
+        assert tree.rooted is False
+        assert tree.leaves == leaves
+        if tree.root == oldroot:
+            assert tree.root_suffix is suffix
+        else:
+            assert tree.root_suffix is None
+
+
+class Test_deroot:
+
+    def test_deprecated_alias_keeps_mechanical_semantics(self):
+        tree = pt.Tree.from_string("(A:1,(B:2,C:3):4);")
+        tree.rooted = True
+        tree.deroot()
+        assert tree.rooted is None

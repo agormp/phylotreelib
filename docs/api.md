@@ -425,3 +425,7 @@ Consensus, compatible-bipartition insertion, MBC and branch annotation write-bac
 ### Deliberate and computational root movement
 
 A successful public `reroot()` selects a rooted interpretation, including when selecting the current root. It retains the existing geometry and does not automatically collapse the previous bifurcating root. Actual root replacement clears the old `root_suffix`; a genuine no-op retains it. Surviving nodes retain their node data, and a new root node starts with normal empty data. Internal computational movement uses the same mechanics without selecting rootedness: displacement clears True to None and preserves False/None; a no-op preserves all states. `match_nodes()` uses this mechanical route on its temporary copies.
+
+### Unrooting and structural root collapse
+
+`unroot()` establishes False after successful structural preparation. A multifurcating or two-leaf traversal root remains in place, preserving its suffix and node data. `collapse_bifurcating_root()` is mechanical: actual removal clears the suffix and deleted-root node data and changes True to None; False/None remain unchanged. A non-bifurcating no-op preserves all states. Direct structural collapse of a two-leaf tree still raises TreeError. The deprecated `deroot()` alias continues to mean structural collapse; use `unroot()` to declare an unrooted interpretation.
