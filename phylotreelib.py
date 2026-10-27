@@ -205,7 +205,7 @@ def _selected_metadata_keys(owner, attributes, owner_kind, extra):
         yield from extra
 
 
-def _metadata_pairs(owner, attributes, owner_kind, precision, ci_labels=None):
+def _metadata_pairs(owner, attributes, owner_kind, precision):
     """Resolve and format selected exact annotation keys, without changing stored data.
 
     owner_kind is 'node' or 'branch' (including a root-suffix Branchstruct).
@@ -223,9 +223,6 @@ def _metadata_pairs(owner, attributes, owner_kind, precision, ci_labels=None):
     for key in _selected_metadata_keys(owner, attributes, owner_kind, extra):
         if not isinstance(key, str) or not key:
             raise TreeError(f"{owner_kind} annotation key must be a nonempty string; got {key!r}")
-        if (ci_labels is not None and _INTERVAL_META_KEYS[owner_kind].fullmatch(key)
-                and key not in ci_labels):
-            continue
         if key in seen:
             continue
         seen.add(key)
@@ -3254,7 +3251,7 @@ class Tree:
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
-               transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
+               transdict=None, node_attributes=None, branch_attributes=None, *,
                print_meta=False):
         """Export structural information and selected exact annotation keys.
 
@@ -3269,7 +3266,7 @@ class Tree:
         if print_meta is None: print_meta = False
 
         def metacomment(owner, attributes, kind):
-            parts = _metadata_pairs(owner, attributes, kind, precision, ci_labels)
+            parts = _metadata_pairs(owner, attributes, kind, precision)
             return "[&" + ",".join(parts) + "]" if parts else ""
 
         def label_text(branch):
@@ -3315,7 +3312,7 @@ class Tree:
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
               translateblock=False, node_attributes=None, branch_attributes=None,
-              colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
+              colorlist=None, colorfg="#0000FF", colorbg="#000000", *,
               print_meta=False, rooted=None):
 
         """
@@ -3375,7 +3372,6 @@ class Tree:
             transdict=transdict,
             node_attributes=node_attributes,
             branch_attributes=branch_attributes,
-            ci_labels=ci_labels,
             print_meta=print_meta,
         ))
 
@@ -5789,7 +5785,7 @@ class TreeSet():
 
     def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
                       translateblock=False, node_attributes=None, branch_attributes=None,
-                      colorlist=None, colorfg="#0000FF", colorbg="#000000", ci_labels=None,
+                      colorlist=None, colorfg="#0000FF", colorbg="#000000", *,
                       print_meta=False, rooted=None):
         """Return a NEXUS block, forwarding printing options to every tree.
 
@@ -5829,7 +5825,7 @@ class TreeSet():
             stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,
                                           precision=precision, transdict=transdict if translateblock else None,
                                           node_attributes=node_attributes, branch_attributes=branch_attributes,
-                                          ci_labels=ci_labels, print_meta=print_meta))
+                                          print_meta=print_meta))
             stringlist.append("\n")
 
         # Add footer
@@ -5840,7 +5836,7 @@ class TreeSet():
     ###############################################################################################
 
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
-               transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
+               transdict=None, node_attributes=None, branch_attributes=None, *,
                print_meta=False):
         """Return Newick strings, forwarding printing options to every tree.
 
@@ -5855,7 +5851,7 @@ class TreeSet():
                                           precision=precision, transdict=transdict,
                                           node_attributes=node_attributes,
                                           branch_attributes=branch_attributes,
-                                          ci_labels=ci_labels, print_meta=print_meta))
+                                          print_meta=print_meta))
             stringlist.append("\n")
         return "".join(stringlist)
 

@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `TreePostProcessor.set_biplen_on_existing_tree()` now invalidates length-derived caches after its final root-edge assignments, so warmed distance queries reflect the new lengths.
 
 #### Removed
+- Removed writer `ci_labels` and the `"ci"` output-group shortcut. Select complete exact annotation keys; literal `ci` is ordinary metadata. Trailing metadata/declaration switches are keyword-only, so removed positional calls fail instead of rebinding silently.
 - Removed public `.ci` storage from ordinary and summary structs. Intervals now use complete keys such as `height_95%_CI` or `length_95%_CI` in lazy `extra_meta` dictionaries, alongside unknown annotations.
 - Removed `Nodestruct.nleaves` and its constructor argument. Descendant counts remain in `SummaryNodestruct` and topology-derived calculations; summary construction no longer leaks bookkeeping into exported tree metadata.
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
@@ -25,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Unset `Nodestruct.state` and `Branchstruct.length_sd` now default to `None`, distinguishing unlabelled/unestimated data from an actual empty string or estimated zero. Parsimony retains its existing no-state behavior.
 - `Tree.set_branch_attribute()` now invalidates only length-derived caches for structural length writes and retains valid Tree caches for stored metadata updates, avoiding repeated topology recomputation during annotation.
 - Printing is configured at the point of export to simplify the workflow and remove dependence on earlier configuration calls. `Tree.newick()` and `Tree.nexus()` have fixed defaults: lengths and labels enabled, `labelfield="label"`, `precision=7`, and `print_meta=False`. Explicit `None` values for scalar settings use these defaults. Each output call is independent.
-- With `print_meta=True`, omitted or `None` attribute selections now include all populated annotations, excluding internal accumulators and temporary branch-height caches. Empty sequences suppress that kind of metadata; explicit selections include only the named fields. Include `"ci"` in explicit attribute selections to print intervals. `ci_labels=None` includes all stored intervals; missing requested labels are skipped.
+- With `print_meta=True`, omitted or `None` attribute selections now include all populated annotations, excluding internal accumulators and temporary branch-height caches. Empty sequences suppress that kind of metadata; explicit selections include only the named fields. Use complete interval keys in explicit selections; missing requested keys are skipped.
 - Metadata strings are quoted, booleans use `true`/`false`, and collections use braces with deterministic ordering for sets. Unset None values are omitted; explicit MISSING, empty strings/collections, zero and `False` are retained.
 - `TreeSet.newick()` and `TreeSet.nexus()` now default to seven significant digits, matching `Tree` (previously six).
 
@@ -34,7 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Tree.rooted` and optional `Tree.root_suffix` data fields and copy support, preserving absent versus explicit-zero stem lengths. Input interpretation and tree-edit transitions follow in the parser migration.
 - Shared public `MISSING` annotation marker, preserving identity through copying and multiprocessing serialization. `None` continues to mean unset; required explicit node heights reject either missing state before changing lengths.
 - `Tree.nexus()` and `TreeSet.nexus()` accept an explicit `rooted` argument: `True` writes `[&R]`, `False` writes `[&U]`, and `None` preserves the previous output without a declaration. Rootedness is not inferred from the internal traversal root, is independent of statistical metadata output, and does not change the tree. Input preservation of these flags remains future work.
-- `TreeSet.newick()` and `TreeSet.nexus()` accept and forward `print_meta` and `ci_labels`.
+- `TreeSet.newick()` and `TreeSet.nexus()` accept and forward explicit metadata selections and `print_meta`.
 - Regression tests for explicit and automatic printing options, metadata and CI output, independent calls, and TreeSet forwarding.
 - Complete credible-interval computation and Nexus metadata export examples in the README, API reference, and recipes. The README example now specifies `ci_probs` as well as `trackci=True` to actually request intervals.
 
