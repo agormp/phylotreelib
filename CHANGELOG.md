@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Struct and Tree copies now isolate retained nested mutable annotation data. `copyattr=False` omits node metadata as well as branch attributes.
 - Single-leaf SPR now preserves an independent copy of the moved node metadata, including when it was the tree's only annotated node, without changing leaf extraction or branch-length calculations.
 - Grafting now retains donor node metadata even when the recipient initially has none, and initializes the inserted graftpoint with default node data.
 - Leaf and internal-node renaming now moves node metadata to the final identifier, including duplicate-name resolution and donor renaming during grafting.
@@ -28,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `TreeSet.newick()` and `TreeSet.nexus()` now default to seven significant digits, matching `Tree` (previously six).
 
 #### Added
+- `Tree.rooted` and optional `Tree.root_suffix` data fields and copy support, preserving absent versus explicit-zero stem lengths. Input interpretation and tree-edit transitions follow in the parser migration.
 - Shared public `MISSING` annotation marker, preserving identity through copying and multiprocessing serialization. `None` continues to mean unset; required explicit node heights reject either missing state before changing lengths.
 - `Tree.nexus()` and `TreeSet.nexus()` accept an explicit `rooted` argument: `True` writes `[&R]`, `False` writes `[&U]`, and `None` preserves the previous output without a declaration. Rootedness is not inferred from the internal traversal root, is independent of statistical metadata output, and does not change the tree. Input preservation of these flags remains future work.
 - `TreeSet.newick()` and `TreeSet.nexus()` accept and forward `print_meta` and `ci_labels`.

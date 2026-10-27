@@ -85,6 +85,22 @@ def _get_missing_value():
 MISSING = _MissingValue()
 
 
+def _copy_annotation_value(value):
+    """Isolate supported mutable annotation containers, leaving other objects alone."""
+    if isinstance(value, dict):
+        return {key: _copy_annotation_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_copy_annotation_value(item) for item in value]
+    if isinstance(value, tuple):
+        items = tuple(_copy_annotation_value(item) for item in value)
+        return value if all(a is b for a, b in zip(value, items)) else items
+    if isinstance(value, set):
+        return {_copy_annotation_value(item) for item in value}
+    if isinstance(value, frozenset):
+        return value
+    return value
+
+
 # Compiled regular expression for comment removal, stored on the module
 _COMMENT_NONNESTED_RE = re.compile(r"\[[^\[\]]*\]")
 
@@ -311,13 +327,12 @@ class Branchstruct:
         copylength: copy .length attribute
         copyattr: copy remaining attributes"""
 
-        # Python note: only works as deepcopy if all attributes are immutable. Rewrite!
         obj = Branchstruct()
         if copylengths:
             obj.length = self.length
         if copyattr:
             for name in self.__slots__[1:]:
-                setattr(obj, name, getattr(self, name))
+                setattr(obj, name, _copy_annotation_value(getattr(self, name)))
         return obj
 
     ###############################################################################################
@@ -416,11 +431,7 @@ class Nodestruct:
 
         obj = Nodestruct()
         for name in self.__slots__:
-            origvalue = getattr(self, name)
-            if isinstance(origvalue, set):
-                setattr(obj, name, origvalue.copy())
-            else:
-                setattr(obj, name, origvalue)
+            setattr(obj, name, _copy_annotation_value(getattr(self, name)))
         return obj
 
 ###################################################################################################
@@ -502,11 +513,7 @@ class SummaryNodestruct:
 
         obj = SummaryNodestruct()
         for name in self.__slots__:
-            origvalue = getattr(self, name)
-            if isinstance(origvalue, set):
-                setattr(obj, name, origvalue.copy())
-            else:
-                setattr(obj, name, origvalue)
+            setattr(obj, name, _copy_annotation_value(getattr(self, name)))
         return obj
 
 ###################################################################################################
@@ -1099,6 +1106,8 @@ class Tree:
     def __init__(self):
         self.child_dict = {}
         self.nodedict = {}
+        self.rooted = None
+        self.root_suffix = None
         self.leaves = set()
         self._intnodes = None
         self._nodes = None
@@ -1338,10 +1347,7 @@ class Tree:
             nd = Nodestruct()
             for attr in Nodestruct.__slots__:
                 if hasattr(src, attr):
-                    value = getattr(src, attr)
-                    if isinstance(value, set):
-                        value = value.copy()
-                    setattr(nd, attr, value)
+                    setattr(nd, attr, _copy_annotation_value(getattr(src, attr)))
             return nd
 
         for clade, nodestruct in cladedict.items():
@@ -2090,15 +2096,29 @@ class Tree:
     def copy_treeobject(self, copylengths=True, copyattr=True):
         """Returns copy of Tree object.
         copylengths: copy lengths (otherwise set to 0.0)
-        copyattr: copy non-length attributes
-        Caches are not copied.
-        Similar to effect of copy.deepcopy but customized and much faster"""
+        copyattr: copy node and non-length branch/suffix attributes
+        Retained mutable annotation values are independent; caches are not copied.
+        Rootedness is preserved under both copy flags."""
 
         obj = Tree()
         obj.root = self.root
         obj.leaves = self.leaves.copy()
         obj.child_dict = self._copy_child_dict(obj, copylengths, copyattr)
-        obj.nodedict = self._copy_nodedict(obj)
+        obj.nodedict = self._copy_nodedict(obj) if copyattr else {}
+        obj.rooted = self.rooted
+        if self.root_suffix is not None:
+            suffix = self.root_suffix.copy(copylengths, copyattr)
+            if self.root_suffix.length is None:
+                suffix.length = None
+            # An absent stem stays absent; default computational fields are not suffix data.
+            annotations = suffix.ci
+            has_extras = (any(value is not None for value in annotations.values())
+                          if isinstance(annotations, dict) else annotations is not None)
+            fields = ("length_median", "length_sd", "posterior", "freq",
+                      "bipartition_cred", "rootcred")
+            if (suffix.length is not None or suffix.label not in (None, "")
+                    or has_extras or any(getattr(suffix, field) is not None for field in fields)):
+                obj.root_suffix = suffix
         return obj
 
     ###############################################################################################
@@ -2117,21 +2137,7 @@ class Tree:
     ###############################################################################################
 
     def _copy_nodedict(self, obj):
-        if not self.nodedict:
-            return {}
-        newdict = {}
-        for key,orignode in self.nodedict.items():
-            newnode = Nodestruct()
-            for attrname in orignode.__slots__:
-                origvalue = getattr(orignode, attrname)
-                if isinstance(origvalue, set):
-                    newvalue = origvalue.copy()
-                else:
-                    newvalue = origvalue
-                setattr(newnode, attrname, newvalue)
-            newdict[key] = newnode
-
-        return newdict
+        return {key: node.copy() for key, node in self.nodedict.items()}
 
     ###############################################################################################
 
@@ -5268,7 +5274,7 @@ class Tree:
         # Leaf extraction returns a name, so retain its metadata locally across pruning.
         leaf_metadata = None
         if prune_node in self.leaves and prune_node in self.nodedict:
-            leaf_metadata = copy.deepcopy(self.nodedict[prune_node])
+            leaf_metadata = self.nodedict[prune_node].copy()
 
         # Prune subtree, keep track of length of basal branch
         subtree, basalbranch = self.prune_subtree(prune_node)

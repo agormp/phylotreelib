@@ -1363,6 +1363,44 @@ class Test_copy_Branchstruct:
         assert b1.freq == b2.freq
         assert b1.posterior == b2.posterior
 
+
+    def test_supported_mutable_annotation_values_are_independent(self):
+        source = pt.Branchstruct(length=3.0, label="edge")
+        source.ci = _copy_foundation_payload()
+
+        copied = source.copy()
+
+        assert copied is not source
+        assert copied.length == 3.0
+        assert copied.label == "edge"
+        assert copied.ci == source.ci
+        assert copied.ci is not source.ci
+        assert isinstance(copied.ci["height_95%_CI"], list)
+        assert isinstance(copied.ci["nested"], tuple)
+        assert isinstance(copied.ci["nested"][0], list)
+        assert isinstance(copied.ci["nested"][0][0], set)
+        assert isinstance(copied.ci["frozen"], frozenset)
+        assert copied.ci["missing"] is pt.MISSING
+        assert copied.ci["nested"][1][1] is pt.MISSING
+
+        copied.ci["height_95%_CI"][0] = 9.0
+        copied.ci["nested"][0][0].add("blue")
+        copied.ci["new_key"] = "copy only"
+
+        assert source.ci["height_95%_CI"] == [1.0, 2.0]
+        assert source.ci["nested"][0][0] == {"red"}
+        assert "new_key" not in source.ci
+
+    def test_omitted_attributes_do_not_retain_annotation_mapping(self):
+        source = pt.Branchstruct(length=3.0, label="edge")
+        source.ci = _copy_foundation_payload()
+
+        copied = source.copy(copyattr=False)
+
+        assert copied.length == 3.0
+        assert copied.label == ""
+        assert copied.ci is None
+
 ###################################################################################################
 ###################################################################################################
 
@@ -1836,6 +1874,130 @@ class Test_copy_treeobject:
                 for kid in t2.children(parent):
                     t2lab = t2.getlabel(parent, kid)
                     assert t2lab == ""
+
+
+    @pytest.mark.parametrize("rooted", [True, False, None])
+    @pytest.mark.parametrize("copylengths,copyattr", [
+        (True, True), (True, False), (False, True), (False, False),
+    ])
+    def test_root_interpretation_and_identity_survive_all_copy_flags(
+        self, rooted, copylengths, copyattr,
+    ):
+        source = pt.Tree.from_string("(A:2,B:3);")
+        source.rooted = rooted
+        source.set_node_attribute(source.root, "height", 8.0)
+        source.set_node_attribute("A", "state", "red")
+        source.set_branch_attribute(source.root, "A", "label", "edge")
+
+        copied = source.copy_treeobject(copylengths=copylengths, copyattr=copyattr)
+
+        assert copied is not source
+        assert copied.root == source.root
+        assert copied.leaves == source.leaves
+        assert copied.nodes == source.nodes
+        assert copied.topology_clade == source.topology_clade
+        assert copied.rooted is rooted
+        assert copied.root_suffix is None
+        assert copied.nodedist("A", "B") == (5.0 if copylengths else 0.0)
+        assert copied.get_branch_attribute(copied.root, "A", "label") == (
+            "edge" if copyattr else ""
+        )
+        if copyattr:
+            assert copied.nodedict[source.root].height == 8.0
+            assert copied.nodedict["A"].state == "red"
+            assert copied.nodedict[source.root] is not source.nodedict[source.root]
+        else:
+            assert copied.nodedict == {}
+        assert source.nodedict[source.root].height == 8.0
+        assert source.nodedict["A"].state == "red"
+        assert source.nodedist("A", "B") == 5.0
+
+    def test_full_copy_isolates_node_branch_and_suffix_annotation_values(self):
+        source = pt.Tree.from_string("(A:2,B:3);")
+        source.set_node_attribute(source.root, "ci", _copy_foundation_payload())
+        source.set_branch_attribute(source.root, "A", "ci", _copy_foundation_payload())
+        source.root_suffix = pt.Branchstruct(length=0.0, label="root_label")
+        source.root_suffix.ci = _copy_foundation_payload()
+
+        copied = source.copy_treeobject()
+        copied.nodedict[copied.root].ci["nested"][0][0].add("node_copy")
+        copied.child_dict[copied.root]["A"].ci["height_95%_CI"][0] = 11.0
+        copied.root_suffix.ci["nested"][0][0].add("stem_copy")
+
+        assert source.nodedict[source.root].ci["nested"][0][0] == {"red"}
+        assert source.child_dict[source.root]["A"].ci["height_95%_CI"] == [1.0, 2.0]
+        assert source.root_suffix.ci["nested"][0][0] == {"red"}
+        assert copied.root_suffix is not source.root_suffix
+        assert copied.root_suffix.length == 0.0
+        assert copied.root_suffix.label == "root_label"
+        assert copied.root_suffix.ci["missing"] is pt.MISSING
+        assert copied.nodedist("A", "B") == source.nodedist("A", "B") == 5.0
+
+    @pytest.mark.parametrize(
+        "stem_length,copylengths,copyattr,expected_length,expected_present",
+        [
+            (None, True, True, None, True),
+            (None, False, True, None, True),
+            (None, True, False, None, False),
+            (None, False, False, None, False),
+            (0.0, True, False, 0.0, True),
+            (2.5, True, False, 2.5, True),
+            (2.5, False, False, 0.0, True),
+            (2.5, False, True, 0.0, True),
+        ],
+    )
+    def test_suffix_copy_flags_distinguish_absent_and_present_stem_lengths(
+        self, stem_length, copylengths, copyattr, expected_length, expected_present,
+    ):
+        source = pt.Tree.from_string("(A:2,B:3);")
+        source.root_suffix = pt.Branchstruct(length=stem_length, label="root_label")
+        source.root_suffix.ci = {"rate": [1.0, 2.0]}
+
+        copied = source.copy_treeobject(copylengths=copylengths, copyattr=copyattr)
+
+        if not expected_present:
+            assert copied.root_suffix is None
+        else:
+            assert copied.root_suffix is not source.root_suffix
+            assert copied.root_suffix.length == expected_length
+            if copyattr:
+                assert copied.root_suffix.label == "root_label"
+                assert copied.root_suffix.ci == {"rate": [1.0, 2.0]}
+                copied.root_suffix.ci["rate"][0] = 99.0
+            else:
+                assert copied.root_suffix.label == ""
+                assert copied.root_suffix.ci is None
+        assert source.root_suffix.length == stem_length
+        assert source.root_suffix.label == "root_label"
+        assert source.root_suffix.ci == {"rate": [1.0, 2.0]}
+
+    def test_suffix_with_only_present_empty_or_missing_annotations_is_retained(self):
+        source = pt.Tree.from_string("(A:2,B:3);")
+        source.root_suffix = pt.Branchstruct(length=None)
+        source.root_suffix.ci = {
+            "empty_string": "", "empty_collection": (),
+            "zero": 0, "false": False, "missing": pt.MISSING,
+        }
+
+        copied = source.copy_treeobject()
+
+        assert copied.root_suffix is not None
+        assert copied.root_suffix.length is None
+        assert copied.root_suffix.ci == source.root_suffix.ci
+        assert copied.root_suffix.ci is not source.root_suffix.ci
+        assert copied.root_suffix.ci["missing"] is pt.MISSING
+
+    def test_suffix_with_no_retained_information_is_omitted(self):
+        source = pt.Tree.from_string("(A:2,B:3);")
+        source.root_suffix = pt.Branchstruct(length=None)
+        source.root_suffix.ci = {}
+
+        copied = source.copy_treeobject()
+
+        assert copied.root_suffix is None
+        assert source.root_suffix is not None
+        assert source.root_suffix.length is None
+        assert source.root_suffix.ci == {}
 
 ###################################################################################################
 
@@ -4025,3 +4187,63 @@ class TestNodedictRefactor:
         for cl in clusters:
             all_leaves.update(cl)
         assert all_leaves == tree.leaves
+
+
+def _copy_foundation_payload():
+    """Supported annotation containers with one mutable descendant in a tuple."""
+    return {
+        "height_95%_CI": [1.0, 2.0],
+        "nested": ([{"red"}], ("fixed", pt.MISSING)),
+        "frozen": frozenset({"north", "south"}),
+        "missing": pt.MISSING,
+    }
+
+
+class Test_pickle_MISSING:
+
+    def test_identity_survives_direct_and_struct_pickle_roundtrips(self):
+        assert pickle.loads(pickle.dumps(pt.MISSING)) is pt.MISSING
+        node = pt.Nodestruct()
+        node.ci = {"missing": pt.MISSING, "nested": (pt.MISSING,)}
+
+        restored = pickle.loads(pickle.dumps(node))
+
+        assert restored.ci["missing"] is pt.MISSING
+        assert restored.ci["nested"][0] is pt.MISSING
+
+
+class Test_init_Tree:
+
+    def test_root_interpretation_and_suffix_start_absent(self):
+        tree = pt.Tree()
+        assert tree.rooted is None
+        assert tree.root_suffix is None
+
+
+class Test_copy_Nodestruct:
+
+    def test_annotations_and_native_nested_parsimony_values_are_independent(self):
+        source = pt.Nodestruct(height=7.0)
+        source.ci = _copy_foundation_payload()
+        source.primary_set = [{"red"}, {"green"}]
+        source.optimal_set = {"red"}
+
+        copied = source.copy()
+
+        assert copied.height == 7.0
+        assert copied.ci == source.ci
+        assert copied.ci is not source.ci
+        assert copied.ci["missing"] is pt.MISSING
+        assert isinstance(copied.ci["nested"], tuple)
+        assert isinstance(copied.ci["nested"][0], list)
+        assert isinstance(copied.primary_set, list)
+        assert isinstance(copied.primary_set[0], set)
+        assert isinstance(copied.optimal_set, set)
+
+        copied.ci["nested"][0][0].add("blue")
+        copied.primary_set[0].add("blue")
+        copied.optimal_set.add("green")
+
+        assert source.ci["nested"][0][0] == {"red"}
+        assert source.primary_set == [{"red"}, {"green"}]
+        assert source.optimal_set == {"red"}
