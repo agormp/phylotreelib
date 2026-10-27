@@ -581,6 +581,44 @@ class TestTreeNexus:
                           precision=None, print_meta=None) == tree.nexus()
         assert "[&" not in tree.nexus(print_meta=False, node_attributes=("height",))
 
+    @pytest.mark.parametrize('rooted,declaration', [(True, '[&R]'), (False, '[&U]'), (None, None)])
+    def test_full_nexus_retains_state_while_plain_newick_omits_declaration(self, rooted, declaration):
+        text = ('(A[&height=1.0000000000000002,tag={true,1,1.0,?}]'
+                ':0.10000000000000002[&posterior=0.8,length_95%_CI={0.05,0.2}],'
+                'B:2)Root[&height=3]:0.5[&rate=1e-10];')
+        tree = pt.Tree.from_string(text, parse_meta=True)
+        tree.rooted = rooted
+        options = dict(print_meta=True, node_attributes=('height', 'tag'),
+                       branch_attributes=('posterior', 'length_95%_CI', 'rate'))
+        nexus_text = tree.nexus(**options)
+        if declaration is None:
+            assert '[&R]' not in nexus_text and '[&U]' not in nexus_text
+        else:
+            assert declaration in nexus_text
+        with pt.Nexustreefile(filecontent=nexus_text, parse_meta=True) as reader:
+            decoded = reader.readtree()
+            assert reader.readtree() is None
+        assert decoded.rooted is rooted
+        newick_text = tree.newick(**options)
+        assert '[&R]' not in newick_text and '[&U]' not in newick_text
+        plain = pt.Tree.from_string(newick_text, parse_meta=True)
+        assert plain.rooted is None
+        for current in (decoded, plain):
+            assert current.nodedict['A'].height == 1.0000000000000002
+            tag = current.nodedict['A'].extra_meta['tag']
+            assert tag == (True, 1, 1.0, pt.MISSING)
+            assert tag[0] is True and type(tag[1]) is int and type(tag[2]) is float
+            assert tag[3] is pt.MISSING
+            branch = current.child_dict[current.root]['A']
+            assert branch.length == 0.10000000000000002 and branch.posterior == 0.8
+            assert branch.extra_meta['length_95%_CI'] == (0.05, 0.2)
+            assert current.root_suffix.label == 'Root' and current.root_suffix.length == 0.5
+            assert current.root_suffix.extra_meta['rate'] == 1e-10
+        assert tree.rooted is rooted  # Export does not change interpretation.
+        with pt.Nexustreefile(filecontent=tree.nexus(print_rootedness=False, **options),
+                              parse_meta=True) as reader:
+            assert reader.readtree().rooted is None
+
 
 class TestTreeSetNewick:
 
@@ -1497,6 +1535,110 @@ class Test_from_string:
         assert mytree.nodes == expected_nodes
         assert mytree.children(0) == {1, "KL0F07689", "KW081_13"}
         assert mytree.children(1) == {"SBC669_26", "YAL016W"}
+
+    def test_beast_ca_fixture_native_and_generic_owners_roundtrip(self, annotation_producer_input):
+        text, translation = annotation_producer_input('beast/random_10tips_1000.treeannot_mcc_ca')
+        tree = pt.Tree.from_string(text, transdict=translation, parse_meta=True)
+        assert len(tree.leaves) == 10 and 's00' in tree.leaves
+        assert tree.rooted is None  # This actual fixture supplies no declaration.
+        assert tree.root_suffix.length == 0.0
+        assert tree._nodeheightdict is None
+        encoded = tree.newick(
+            print_meta=True,
+            node_attributes=('height', 'height_median', 'height_95%_HPD',
+                             'CAheight_95%_HPD', 'length', 'length_median',
+                             'length_95%_HPD', 'posterior'),
+            branch_attributes=(),
+        )
+        decoded = pt.Tree.from_string(encoded, parse_meta=True)
+        for current in (tree, decoded):
+            node = current.nodedict['s00']
+            branch = current.child_dict[current.parent('s00')]['s00']
+            assert node.height == 0.3894414960000004 and type(node.height) is float
+            assert node.height_median == 0.34226349999999994
+            assert node.extra_meta['height_95%_HPD'] == (0.0, 0.968169)
+            assert type(node.extra_meta['height_95%_HPD']) is tuple
+            assert all(type(value) is float for value in node.extra_meta['height_95%_HPD'])
+            assert node.extra_meta['CAheight_95%_HPD'] == (0.0, 0.968169)
+            assert node.extra_meta['length'] == 0.20585859039999968
+            assert node.extra_meta['length_95%_HPD'] == (0.09111859999999994, 0.317102)
+            assert node.extra_meta['length_median'] == 0.19533300000000003
+            assert branch.length == 0.5695019715  # Colon length remains independent.
+            assert branch.length_median is None and branch.extra_meta is None
+            assert current.nodedict[current.root].height == 1.1903651784999993
+            assert current.root_suffix.length == 0.0 and current.rooted is None
+
+    def test_beast_mean_fixture_preserves_leading_declaration_and_precolon_statistics(self, annotation_producer_input):
+        text, translation = annotation_producer_input('beast/random_10tips_1000.treeannot_mcc_mean')
+        tree = pt.Tree.from_string(text, transdict=translation, parse_meta=True)
+        assert tree.rooted is True and tree.root_suffix is None
+        encoded = tree.newick(
+            print_meta=True,
+            node_attributes=('height_median', 'height_mean', 'height_95%_HPD',
+                             'length', 'length_median', 'length_95%_HPD', 'posterior'),
+            branch_attributes=(),
+        )
+        decoded = pt.Tree.from_string(encoded, parse_meta=True)
+        assert decoded.rooted is None  # Plain Newick deliberately carries no declaration.
+        for current in (tree, decoded):
+            node = current.nodedict['s03']
+            branch = current.child_dict[current.parent('s03')]['s03']
+            assert node.height is None and node.height_median == 0.32481499999999996
+            assert node.extra_meta['height_mean'] == 0.3763489003999995
+            assert node.extra_meta['length'] == 0.3763489003999995
+            assert branch.length == 0.13221569840952402
+            assert branch.length_median is None and branch.posterior is None
+            cherry = current.find_mrca({'s03', 's04'})
+            assert set(current.children(cherry)) == {'s03', 's04'}
+            assert current.nodedict[cherry].extra_meta['posterior'] == 0.084
+            assert current.nodedict[cherry].extra_meta['height_95%_HPD'] == (0.13973200000000008, 1.092982)
+            assert current.child_dict[current.parent(cherry)][cherry].posterior is None
+            assert current.root_suffix is None
+
+    def test_mrbayes_summary_fixture_translates_and_converts_branch_labels(self, annotation_producer_input):
+        text, translation = annotation_producer_input('mrbayes/contest.nexus.con.tre')
+        # Existing translation/format/label settings keep their positional slots.
+        tree = pt.Tree.from_string(text, translation, 'newick', 'posterior', float,
+                                   parse_meta=True)
+        assert len(tree.leaves) == 40 and {'u16376', 'u16382'} <= tree.leaves
+        assert tree.rooted is None and tree.nodedict == {}
+        encoded = tree.newick(printlabels=False, print_meta=True,
+                              node_attributes=(), branch_attributes=('posterior',))
+        decoded = pt.Tree.from_string(encoded, parse_meta=True)
+        for current in (tree, decoded):
+            cherry = current.find_mrca({'u16376', 'u16382'})
+            assert set(current.children(cherry)) == {'u16376', 'u16382'}
+            branch = current.child_dict[current.parent(cherry)][cherry]
+            assert branch.posterior == 0.914 and type(branch.posterior) is float
+            assert branch.length == 3.010486e-3
+            assert current.child_dict[cherry]['u16376'].length == 1.357325e-3
+            assert current.rooted is None and current.nodedict == {}
+            assert current.root_suffix is None
+        assert '[&R]' not in tree.nexus() and '[&U]' not in tree.nexus()
+
+    def test_annotation_input_preserves_transdict_and_root_label_converter_settings(self):
+        translation = {'1': 'Alpha', '2': 'Beta', '3': 'Gamma'}
+        text = ('[&U]((1[&tag=1]:1,2:2)0.75[&note="node"]:3,3:4)0.25:0;')
+        tree = pt.Tree.from_string(text, translation, 'newick', 'freq', float, parse_meta=True)
+        assert tree.leaves == {'Alpha', 'Beta', 'Gamma'}
+        assert tree.rooted is False and tree.nodedict['Alpha'].extra_meta['tag'] == 1
+        assert type(tree.nodedict['Alpha'].extra_meta['tag']) is int
+        cherry = tree.find_mrca({'Alpha', 'Beta'})
+        assert tree.nodedict[cherry].extra_meta['note'] == 'node'
+        assert tree.child_dict[tree.root][cherry].freq == 0.75
+        assert type(tree.child_dict[tree.root][cherry].freq) is float
+        assert tree.root_suffix.freq == 0.25 and type(tree.root_suffix.freq) is float
+        assert tree.root_suffix.length == 0.0
+        encoded = tree.newick(labelfield='freq', print_meta=True,
+                              node_attributes=('tag', 'note'), branch_attributes=())
+        decoded = pt.Tree.from_string(encoded, label_attr_name='freq', label_type=float,
+                                      parse_meta=True)
+        cherry = decoded.find_mrca({'Alpha', 'Beta'})
+        assert decoded.child_dict[decoded.root][cherry].freq == 0.75
+        assert decoded.root_suffix.freq == 0.25 and decoded.root_suffix.length == 0.0
+        assert decoded.nodedict['Alpha'].extra_meta['tag'] == 1
+        assert decoded.nodedict[cherry].extra_meta['note'] == 'node'
+        assert decoded.rooted is None
 
 ###################################################################################################
 
@@ -6704,3 +6846,23 @@ class Test_new_Treefile:
             pt.Newicktreefile(filecontent='(A,B);', strip_comments=False)
         with pytest.raises(TypeError):
             pt.Nexustreefile(filecontent='#NEXUS\nbegin trees;end;', strip_comments=False)
+
+
+@pytest.fixture
+def annotation_producer_input(data_dir):
+    """Extract the first one-line description from these retained producer fixtures.
+
+    This deliberately bounded test helper is not an alternative Nexus reader.
+    """
+    import re
+
+    def first(relative_path):
+        text = (data_dir / relative_path).read_text()
+        table = re.search(r'\btranslate\b(.*?);', text, re.IGNORECASE | re.DOTALL)
+        assert table is not None
+        translation = dict(entry.split() for entry in table.group(1).split(','))
+        tree = re.search(r'^\s*tree\b[^=]*=\s*(.*)$', text, re.IGNORECASE | re.MULTILINE)
+        assert tree is not None and tree.group(1).rstrip().endswith(';')
+        return tree.group(1).strip(), translation
+
+    return first
