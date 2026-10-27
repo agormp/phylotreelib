@@ -60,6 +60,31 @@ import numpy as np
 # Various functions used by methods, that do not fit neatly in any class
 ###################################################################################################
 
+class _MissingValue:
+    """Shared explicit annotation missingness; None remains unset."""
+
+    __slots__ = ()
+
+    def __repr__(self):
+        return "MISSING"
+
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo):
+        return self
+
+    def __reduce__(self):
+        return (_get_missing_value, ())
+
+
+def _get_missing_value():
+    return MISSING
+
+
+MISSING = _MissingValue()
+
+
 # Compiled regular expression for comment removal, stored on the module
 _COMMENT_NONNESTED_RE = re.compile(r"\[[^\[\]]*\]")
 
@@ -210,7 +235,7 @@ class Branchstruct:
         "quantiles": None,
         "ci": None,
         "length_median": None,
-        "length_sd": 0.0,
+        "length_sd": None,
         "posterior": None,
         "freq": None,
         "bipartition_cred": None,
@@ -228,7 +253,7 @@ class Branchstruct:
         self.quantiles = None
         self.ci = None            # dict of {label: (lo, hi)}, where e.g. label = "90%_CI"
         self.length_median = None
-        self.length_sd = 0.0
+        self.length_sd = None
         self.posterior = None
         self.freq = None
         self.bipartition_cred = None
@@ -355,7 +380,7 @@ class Nodestruct:
         self.height_median = None
         self.ci = None
         self.clade_cred = None
-        self.state = ""
+        self.state = None
         self.primary_set = None
         self.secondary_set = None
         self.optimal_set = None
@@ -3790,7 +3815,8 @@ class Tree:
         if not self.nodedict:
             raise TreeError("Tree has no node attributes (nodedict is empty), so height information not available")
         missing = [n for n in self.nodes
-                   if n not in self.nodedict or self.nodedict[n].height is None]
+                   if n not in self.nodedict or self.nodedict[n].height is None
+                   or self.nodedict[n].height is MISSING]
         if missing:
             msg = (f"No information about node heights on this tree "
                    f"(missing 'height' attribute for {len(missing)} nodes; e.g. {missing[:5]})")

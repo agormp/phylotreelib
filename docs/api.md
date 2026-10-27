@@ -377,3 +377,5 @@ The remaining classes are useful, but many of them are better regarded as advanc
 ### Ordinary node records and summary counts
 
 `Nodestruct(height=None)` stores metadata for one tree node. It no longer accepts a `nleaves` argument or exposes that field. Descendant counts belong to `SummaryNodestruct` and are computed from topology by `Tree.iter_cladeinfo()`; final trees do not inherit those summary bookkeeping fields.
+
+`None` means unset metadata; `MISSING` explicitly represents unavailable annotation information and survives copy/pickle by identity. Missing explicit heights cannot be used by `set_blens_from_heights()`. Fresh `Nodestruct.state` and unestimated `Branchstruct.length_sd` are `None`; explicitly assigned empty strings and zero remain distinct data.

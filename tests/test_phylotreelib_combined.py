@@ -2,6 +2,7 @@ import copy
 import csv
 import itertools
 import math
+import pickle
 import random
 import textwrap
 from dataclasses import dataclass
@@ -1507,6 +1508,50 @@ class Test_from_leaf:
 
 ###################################################################################################
 
+class Test_MISSING:
+
+    def test_copy_and_pickle_preserve_singleton_identity(self):
+        assert repr(pt.MISSING) == "MISSING"
+        assert copy.copy(pt.MISSING) is pt.MISSING
+        assert copy.deepcopy(pt.MISSING) is pt.MISSING
+        assert pickle.loads(pickle.dumps(pt.MISSING)) is pt.MISSING
+
+
+class Test_optional_annotation_defaults:
+
+    def test_unset_state_and_sd_are_distinct_from_empty_and_zero(self):
+        node = pt.Nodestruct()
+        branch = pt.Branchstruct()
+        assert node.state is None
+        assert branch.length_sd is None
+        assert pt.Branchstruct.default_for("length_sd") is None
+        node.state = ""
+        branch.length_sd = 0.0
+        assert node.state == ""
+        assert branch.length_sd == 0.0
+        tree = pt.Tree.from_string("(A:1,B:1);")
+        tree.ensure_nodedict()
+        with pytest.raises(pt.TreeError, match="no nodes.*state"):
+            tree.parsimony_possible_states()
+
+
+class Test_set_blens_from_heights:
+
+    @pytest.mark.parametrize("missing_node", ["root", "B"])
+    def test_explicitly_missing_height_fails_before_length_writes(self, missing_node):
+        tree = pt.Tree.from_string("(A:1,B:1);")
+        tree.set_node_attribute(tree.root, "height", 3.0)
+        tree.set_node_attribute("A", "height", 0.0)
+        tree.set_node_attribute("B", "height", 0.0)
+        node = tree.root if missing_node == "root" else missing_node
+        tree.set_node_attribute(node, "height", pt.MISSING)
+        before = tree.newick()
+        with pytest.raises(pt.TreeError, match="height"):
+            tree.set_blens_from_heights()
+        assert tree.newick() == before
+        assert tree.get_node_attribute(node, "height") is pt.MISSING
+
+
 class Test_init_Nodestruct:
 
     def test_leaf_count_is_not_ordinary_node_metadata(self):
@@ -2065,7 +2110,7 @@ class TestSPR:
         assert moved.primary_set == {"human", "mink"}
         graftpoint = tree.parent("A")
         assert tree.nodedict[graftpoint].height is None
-        assert tree.nodedict[graftpoint].state == ""
+        assert tree.nodedict[graftpoint].state is None
         assert tree.leaves == {"A", "B", "C", "D"}
         assert set(tree.nodedict) <= tree.nodes
         assert tree.length() == pytest.approx(total_length)
@@ -2220,7 +2265,7 @@ class TestGraft:
         assert recipient.nodedict["D"] is leaf_meta
         assert recipient.get_node_attribute("D", "state") == "donor"
         assert recipient.nodedict[graftpoint].height is None
-        assert recipient.nodedict[graftpoint].state == ""
+        assert recipient.nodedict[graftpoint].state is None
         assert "B" not in recipient.nodedict
         assert set(recipient.nodedict) <= recipient.nodes
 
