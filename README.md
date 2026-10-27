@@ -18,7 +18,7 @@ Main capabilities include:
 - summarizing posterior tree samples into consensus, MCC, MBC, and HIPSTR-style summary trees
 - exporting trees with labels, metadata, and optional coloring for visualization in tree viewers (e.g., FigTree)
 - library has been optimized for high speed and low memory consumption
-- NOTE: labels are interpreted as belonging to branches (bipartitions), not to internal nodes, and this association is maintained after re-rooting etc.
+- Internal labels belong to incoming branches. Reversing an existing edge retains its annotations; merged or subdivided edges use the editing rules below. Retention does not establish that a statistic remains scientifically valid after rerooting.
 
 
 ## Version 2
@@ -142,7 +142,7 @@ print(tree.newick())
 Output:
 
 ```text
-(((E:1,F:1):1,C:2):1,A:2);
+(((E:1.0,F:1.0):1.0,C:2.0):1.0,A:2.0);
 ```
 
 ### Perform a specified SPR move
@@ -160,7 +160,7 @@ print(tree.newick())
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=12, randomlen=True)
+tree = pt.Tree.randtree(ntips=12)
 print(tree.newick(printdist=False))
 # semi-random: choose prune node, randomize regraft point
 prune_node = next(iter(tree.possible_spr_prune_nodes()))
@@ -180,6 +180,10 @@ If you are working with posterior tree samples (e.g. from BEAST/MrBayes), you ca
 2) **SummaryTreeBuilder** constructs a summary-tree topology
 3) **TreePostProcessor** adds attributes to the tree annotating it with e.g. support values / branch-length stats
 4) **Tree.newick() / Tree.nexus()** arguments select branch labels and Nexus meta-comments for each output call
+
+Input observations enter independent accumulators, and constructed summary outputs are independently editable. Complete per-file statistics or diagnostics before `recipient.update(donor)`: merging can transfer mutable branch, clade, root and topology records. Use the recipient afterward; only the donor's scalar `len(donor)` remains available for immediate progress reporting.
+
+With topology tracking and `store_trees=True`, the first input Tree for each topology may be retained by reference. Leave its topology, names, lengths, rootedness and metadata unchanged while a summary retains it; copy it explicitly before editing. Read-only queries, printing and normal cache work remain allowed. The same lifetime follows representatives transferred by a summary merge. See the [ownership recipes](docs/recipes.md#merge-completed-partial-summaries).
 
 For command-line use, the separate tool [`sumt`](https://github.com/agormp/sumt) wraps these steps in a single command.
 
@@ -295,7 +299,9 @@ print(tree.nexus())                        # Unknown interpretation: omit declar
 
 `TreeSet.nexus()` uses each tree's own `rooted` state. The boolean `print_rootedness` switch defaults to `True` and is independent of `print_meta`; printing does not move the root or change its interpretation. Plain Newick output has no declaration. Omitting a declaration does not explicitly declare a tree unrooted.
 
-The former `nexus(rooted=...)` output argument has been removed. Input declaration retention and automatic rootedness transitions in constructors/editing operations are still pending, so set known state explicitly after those operations. The current input parser still discards declarations. See the [API notes](docs/api.md#root-information-and-copying) for the implemented state and root-suffix fields; the earlier [rootedness decision](docs/decisions/nexus-rootedness.md) records the historical explicit-value API.
+The former `nexus(rooted=...)` output argument has been removed. Constructors and editing operations now maintain interpretation: public rooting selects True, deliberate `unroot()` selects False, and pruning/grafting/SPR preserve their accepted entry interpretation. Generic construction and current undeclared string input remain None. Bipartition/NJ construction establishes False; clade/MCC/HIPSTR/mrHIPSTR, ancestral-model random trees and UPGMA establish True.
+
+Input declaration retention, annotation-aware readers, TREE/UTREE context and shared raw/count/skip paths remain later work; the current input parser still discards declarations. Nexus itself leaves rooted/unrooted interpretation unspecified when neither declaration is supplied; see the [recorded source check](docs/decisions/nexus-rootedness.md). The [API notes](docs/api.md#root-information-and-copying) describe the current fields; the earlier rootedness decision also records the historical explicit-value API.
 
 ### Color a selected set of leaves in NEXUS output
 
@@ -324,7 +330,9 @@ Useful attributes:
 - `tree.leaves` — set of leaf names
 - `tree.intnodes` — set of internal node IDs
 - `tree.nodes` — set of all nodes
-- `tree.root` — current root node ID
+- `tree.root` — traversal-root node ID
+- `tree.rooted` — True, False or None interpretation
+- `tree.root_suffix` — optional root-label/stem data outside the topology
 
 A tabular representation can be obtained with:
 
@@ -657,3 +665,16 @@ Internal accumulators, temporary branch-height caches and the `extra_meta` conta
 Public `.ci` has been removed from node, branch and summary records. Intervals now live in the optional `extra_meta` dictionary under complete keys, for example `node.extra_meta["height_95%_CI"]`. The writer `ci_labels` argument and `"ci"` group shortcut are removed: select complete keys through `node_attributes` or `branch_attributes`. A literal annotation named `ci` is still an ordinary annotation. `print_meta` and Nexus `print_rootedness` are keyword-only, so old positional interval filters fail clearly instead of binding to a different option.
 
 An explicit `None` for an existing scalar printing setting uses its fixed default, including full precision for `precision=None`. `print_meta=False` suppresses optional node and branch metadata. When suppressing branch lengths with `printdist=False`, use `branch_attributes=()` or disable metadata: emitted branch annotations require lengths to preserve positional ownership. Internal labels remain independently controlled. Fresh `Nodestruct.state` and unestimated `Branchstruct.length_sd` are None, distinct from an explicitly assigned empty state or zero SD. These data defaults do not create stored formatting preferences.
+
+
+### Tree editing and ownership (unreleased)
+
+Successful `reroot()`, midpoint, outgroup and minimum-variance rooting establish `rooted=True`, including a successful choice of the existing root. `unroot()` establishes False even when a traversal root must remain. `collapse_bifurcating_root()` and its deprecated `deroot()` alias are mechanical: actual removal clears an accepted True interpretation to None, while a geometric no-op preserves state. Actual root replacement/removal clears `root_suffix`; selecting the same root preserves it.
+
+Pruning, grafting and complete SPR preserve the remaining recipient's rootedness, including surviving-child promotion during pruning. Extracted Trees inherit source state; leaf extraction still returns a leaf-name string and a separate copied basal branch. Only extraction at the source root copies its suffix. An old suffix is cleared when that root is removed, independently of preserved interpretation.
+
+Successful `recipient.graft(donor, ...)` consumes the donor's contents. Continue using the recipient, or pass `donor.copy_treeobject()` to preserve an independently usable original. An explicit connecting Branchstruct transfers too; copy it first when retaining an independent original. Donor root-suffix data never supplies a connection implicitly: the supplied connecting struct takes precedence, otherwise `connect_length` (default zero) is used.
+
+Merged branches retain summed structural length and fresh non-length fields; `Branchstruct.merge()` no longer accepts `check_compat`. Subdivision defaults to `copy_attrs="none"`; explicit `"lower"` and `"both"` retain independent annotation copies. `remove_branch()` redistributes structural length onto fresh descendant-edge records. Existing edges that merely reverse retain their data, but their scientific meaning may need reassessment.
+
+Length setters, caller scaling loops and `set_blens_from_heights()` preserve stored annotations and invalidate derived length caches. Stored node heights and an annotation named `length` are data, separate from structural lengths and branch-derived height caches. Low-level direct `.length` writes require an explicit `tree.clear_length_caches()` afterward. None of these operations silently recalculates imported statistics.

@@ -63,7 +63,7 @@ tree.set_node_attribute("A", "extra_meta", {
 tree.nodedict["A"].extra_meta["location"] = "Norway"
 ```
 
-Native setters get/replace whole fields; they do not redirect arbitrary attribute names into dictionary entries or implicitly merge maps. For output, native scalar fields are authoritative; otherwise a non-None extra entry takes precedence over eligible native-field fallback. A literal entry named `extra_meta` is valid and does not serialize the container itself. Only selected values are validated.
+Native getters/setters read or replace whole fields; they do not redirect arbitrary attribute names into dictionary entries or implicitly merge maps. For output, native scalar fields are authoritative; otherwise a non-None extra entry takes precedence over eligible native-field fallback. A literal entry named `extra_meta` is valid and does not serialize the container itself. Only selected values are validated.
 
 Recognized interval keys match `height_[0-9]+(?:\.[0-9]+)?%_(?:CI|HPD)` on nodes or `length_[0-9]+(?:\.[0-9]+)?%_(?:CI|HPD)` on branches. They accept whole MISSING or two ordered numeric/MISSING endpoints. Numeric scalars and endpoints exclude booleans. Wrong-owner and other keys remain generic; pairs alone do not establish interval semantics. Validation does not impose probability ranges, endpoint ordering or scientific consistency.
 
@@ -79,7 +79,7 @@ The shared public `MISSING` marker retains identity through copying and pickle. 
 
 `copy_treeobject(copylengths=True, copyattr=True)` preserves rootedness under either flag and independently copies retained mutable annotation containers. `copyattr=False` omits node metadata and non-length branch/suffix fields. `copylengths=False` resets a present stem to zero while preserving an absent stem as None; a suffix with no retained information is omitted. This does not establish independent copying of unrelated accumulators.
 
-**Current input/editing limitation:** the annotation-aware parser/readers and automatic constructor/edit rootedness transitions are subsequent stages. Existing readers still expose `strip_comments`; input declarations and structured suffix data are not yet retained through the planned parser. Set known rootedness after constructing/editing a tree and before exporting it. The fields, copying and output described above are implemented; they do not imply that the planned `parse_meta` input API already exists.
+**Current input limitation:** constructor and editing transitions are implemented as described below. Annotation-aware readers, declaration retention, TREE/UTREE context, raw/count/skip paths and the `sumt` `.trprobs` migration remain later work. Existing readers still expose `strip_comments`; input declarations and structured suffix data are not yet retained through the planned parser. Plain parsing without retained declaration context leaves rootedness unspecified. These implemented fields, copying and output controls do not imply that the planned `parse_meta` input API already exists. Nexus itself supplies no rootedness default when a declaration is absent; see the [recorded specification check](decisions/nexus-rootedness.md).
 
 #### `Treefile(filename, strip_comments=True)`
 
@@ -91,7 +91,67 @@ Use this when you want one entry point regardless of the underlying tree-file fo
 
 Class representing a Newick tree file.
 
-#### Building summary trees (preferred)
+
+
+---
+
+### 3. Tree construction and editing
+
+#### Constructor interpretation
+
+Generic `Tree()`, `from_leaves()` and `from_branchinfo()` leave rootedness None. `from_biplist()`, `from_topology()` and neighbor joining establish False. `from_cladedict()`, UPGMA and ancestral random Yule/coalescent generation establish True, including rate-varying random lengths. Consensus/all-compatible consensus/MBC inherit the unrooted construction; MCC/HIPSTR/mrHIPSTR inherit the oriented clade construction. Deliberate subsequent rooting establishes True. Estimating heights, lengths or support preserves interpretation rather than inferring one, and retained representative Trees keep their original state. Plain parsing without retained declaration context remains unspecified until the input migration.
+
+#### Rooting, unrooting and structural root collapse
+
+A successful public `reroot()` selects a rooted interpretation, including when selecting the current root. It retains the existing geometry and does not automatically collapse the previous bifurcating root. Actual root replacement clears the old `root_suffix`; a genuine no-op retains it. Surviving nodes retain their node data, and a new root node starts with normal empty data. Internal computational movement uses the same mechanics without selecting rootedness: displacement clears True to None and preserves False/None; a no-op preserves all states. `match_nodes()` uses this mechanical route on its temporary copies.
+
+`unroot()` establishes False after successful structural preparation. A multifurcating or two-leaf traversal root remains in place, preserving its suffix and node data. `collapse_bifurcating_root()` is mechanical: actual removal clears the suffix and deleted-root node data and changes True to None; False/None remain unchanged. A non-bifurcating no-op preserves all states. Direct structural collapse of a two-leaf tree still raises TreeError. The deprecated `deroot()` alias continues to mean structural collapse; use `unroot()` to declare an unrooted interpretation.
+
+Root selectors (`rootmid()`, `rootminvar()`, `rootout()` and successful `TreePostProcessor.root_maxfreq()`) establish True, including success paths that keep the current root. A genuine no-op retains its suffix; an actual remove/recreate step clears it even if the final geometric position is equivalent. `root_maxfreq()` retains its existing root-position calculation; its unfinished length-fraction/rootcred work remains separate.
+
+#### Branch merging
+
+`Branchstruct.merge(other)` returns a fresh branch whose structural length is the sum of both lengths. Labels, statistics, intervals, extras and accumulator state start from normal defaults; neither input changes. The unused `check_compat` argument has been removed. Root-edge combination and the serial join after removing a non-root bifurcating parent follow this same length-only rule. Node data stays with surviving nodes; deleted-node data is removed. Callers may explicitly assign justified annotations to the result.
+
+#### Branch subdivision
+
+`add_node_on_branch(..., copy_attrs="none")` divides structural length and starts both segments with fresh non-length fields by default. `copy_attrs="lower"` explicitly copies annotations to the original-child segment; `"both"` copies them independently to both segments. Copied statistics are not rescaled. `upper_branchstruct` still installs the supplied object directly and sets its length to the calculated upper length. Automatic graft and reroot subdivisions also start without source annotations. Endpoint-node data remains attached to its nodes, and the inserted node starts with normal empty data. `split_off_children()` moves existing edges and is outside this subdivision rule.
+
+#### Branch removal and length redistribution
+
+`remove_branch()` removes an internal edge and its child node, adding an equal share of the removed structural length to each reattached descendant edge. Total tree length is conserved; pairwise distances generally change. The reattached edges have new endpoints and fresh non-length fields even when the removed length is zero. The deleted node's metadata is removed. Unrelated edges and surviving-node data are retained; no statistic or annotation named `length` is numerically redistributed.
+
+#### Existing-edge reversal
+
+Reversing an existing edge retains its Branchstruct and annotation values unchanged. Its endpoints, length and unrooted split remain, so reversal does not copy or reinterpret annotations. Directional values and rooted-clade support labels may no longer describe the descending side; callers must reassess/recompute them where needed. This attachment rule does not restore data already discarded by a separate merge or subdivision, nor does it guarantee scientific validity after rerooting.
+
+#### Pruning and extraction
+
+Successful `remove_leaf()`, `remove_leaves()`, `prune_subtree()` and pruning wrappers preserve the remaining Tree's rootedness, including surviving-child promotion. This retains the oriented surviving clade and differs from structural root collapse retaining both sides. Actual removal of the old root clears its entire suffix and deleted-node data; surviving-node annotations stay attached. A selection-only wrapper does not mutate state or suffix. Extracted Tree state is inherited before source mutation. Existing valid-retained-Tree geometry and singleton/empty boundaries are unchanged.
+
+A Tree returned by `subtree()` inherits True, False or None from the source at extraction time, including extraction at the source root. `prune_subtree()` obtains that result before editing the source. Selecting a traversal subtree does not infer biological rootedness. Leaf extraction still returns a name string plus its copied basal branch; it creates no Tree state or new wrapper.
+
+`subtree(source.root)` independently copies retained source suffix data and returns `basal_branch=None`. A proper internal subtree has `root_suffix=None` and returns its former incoming branch separately, including its label and annotations. Leaf extraction keeps the same string/copied-basal-branch interface. A basal branch never becomes an implicit root label or stem. Extracted node data, internal edges, the basal branch and a copied suffix isolate supported mutable annotations. `prune_subtree()` obtains the extracted result before source mutation. Pruning the entire source root is outside the existing valid-retained-Tree contract.
+
+#### Grafting and donor ownership
+
+A successful `recipient.graft(donor, ...)` consumes donor contents: ID/name renaming and direct adoption of child dictionaries, branches and node metadata remain. Continue using the recipient; the donor is neither an independently usable Tree nor a synchronized subtree view. Pass `donor.copy_treeobject()` to retain an independent original. An explicit connecting Branchstruct transfers directly too; copy it first when retaining an independent original. No automatic copy/reset, ownership guard, donor-cache synchronization or new rollback guarantee is added. Leaf strings create no separately maintained donor Tree.
+
+A supplied `connect_branchstruct` defines the connection and takes precedence over `connect_length`; otherwise a fresh branch uses `connect_length`, defaulting to 0.0. A donor label, stem length or stem annotations never transfers implicitly to the connection or recipient root. To reuse a donor suffix deliberately, supply it as the connecting struct after setting an actual numeric structural length. Supplying `connect_length` too does not fill a missing length in that struct. The recipient retains its root/suffix, and donor root-node annotations stay with the surviving donor-root node. Detached basal branches remain separate and can also be supplied explicitly.
+
+Successful grafts preserve the recipient's True/False/None interpretation at actual graft entry, for both Tree and leaf-name donors. Donor state, root degree, stem data and connecting length do not select a new interpretation. In a compound operation, graft preserves the state left by earlier steps; it does not restore an older historical state.
+
+#### Complete SPR
+
+Successful `spr()` preserves rootedness through its pruning/graft components. It retains the suffix if the old root survives and clears it if pruning removes that root. Moved internal edges and unrelated edges retain annotations; merged/split/connecting edges start with fresh non-length fields. Surviving node data follows final IDs, deleted data is removed, and the graftpoint starts empty. A moved leaf's node data is retained locally without changing extraction's leaf-string API. The connection uses detached basal length plus the other root-child length when pruning a direct child of a bifurcating root; its existing selection, placement and length calculations remain. The temporary donor is consumed. Preserving data does not recalculate its scientific meaning.
+
+#### Direct numerical length edits
+
+`setlength()` and native structural `set_branch_attribute(..., "length", value)` retain node/branch annotations and clear length-derived caches. Caller scaling loops have the same contract; statistical annotations are neither scaled nor recomputed automatically. `set_blens_from_heights()` reads explicitly stored node heights and writes represented lengths only. Rootedness, node IDs and the external root suffix remain unchanged. An extra annotation named `length` is separate data, not a structural write. Raw `.length` assignments require `clear_length_caches()` before derived queries; no watched fields or automatic annotation conversion is added.
+
+---
+
+### 4. Building summary trees
 
 The summary-tree machinery is split into three roles:
 
@@ -124,11 +184,13 @@ print(sumtree.newick(
 ```
 
 Parameters
+
 - `treetype`: `"con"`, `"all"`, `"mcc"`, `"mbc"`, `"hip"`, `"mrhip"`
 - `blen`: `"biplen"`, `"cladeheight"`, `"caheight"`, `"input"`, `"none"`
-- `rooting`: `"mid"`, `"minvar"`, `"og"`, or `None` (meaning: keep as-is / leave unrooted)
+- `rooting`: `"mid"`, `"minvar"`, `"og"`, or `None`. None preserves the construction interpretation: consensus/all-compatible consensus/MBC are unrooted, while MCC/HIPSTR/mrHIPSTR are rooted. A successful explicit rooting operation establishes True.
 
 Notes
+
 - `"caheight"` needs access to the original tree sample again. Pass `count_burnin_filename_list`
   (the same structure used by `sumt`: tuples of `(count, burnin, filename)`), or do a second pass
   yourself with `CAHeightEstimator`.
@@ -164,6 +226,25 @@ should prefer `SummaryTreeBuilder` / `TreePostProcessor` (or simply `build_sumtr
 - `cladetoposummary`
 - `sorted_biplist`
 - `sorted_rootbips`
+
+
+---
+
+### 5. Summary ownership
+
+#### Independent input accumulation and constructed outputs
+
+`TreeSummary.add_tree()` reads observed structural branch lengths into its own bipartition accumulators. It does not use input branches as accumulators or inherit sample labels, annotations or pre-existing statistics. Each newly observed bipartition gets one fresh record; later observations update that record using the existing numerical algorithms. Lazy summary finalization therefore leaves input branch data unchanged. Optional retained representative Trees have the separate storage contract below.
+
+Consensus, compatible-bipartition insertion, MBC and branch annotation write-back materialize independently editable output branches and retained mutable annotations. Output branches contain the resulting lengths and intended annotations, with fresh accumulator/scratch fields and no quantile histograms. Repeated outputs are independent of one another and the summary. Annotation write-back can replace target Branchstruct objects; reacquire branch references from the returned Tree after a call. The low-level `from_biplist()` and `split_off_children()` direct-assignment contracts are unchanged. Exact-key interval write-back still preserves target entries that the calculation does not write.
+
+#### Summary merging transfers ownership
+
+Complete per-file statistics and diagnostics before `recipient.update(donor)`. Matching records combine into existing recipient records; unseen branch, clade, root and topology records may transfer directly, including histograms, interval dictionaries and child-clade-pair sets. Use the recipient afterward. Further donor accumulation, statistical reads or merging into another independent result are unsupported, because recipient updates/finalization can change transferred records. `len(donor)` remains available for immediate scalar progress reporting. No automatic donor copying, reset or reuse guard is added. This is separate from independent input accumulators and independently editable constructed outputs.
+
+#### Retained representative Trees
+
+With topology tracking and `store_trees=True`, the first Tree for each topology is retained by reference, potentially in both topology dictionaries. Leave its topology, names, lengths, rootedness and stored metadata unchanged while any summary retains it, including after a consuming merge. Read-only queries, printing and normal derived-cache work remain allowed. Edit an explicit `copy_treeobject()` instead. No automatic snapshot, mutation guard or ownership registry is added. The default `store_trees=False` imposes no representative-storage lifetime restriction. Representatives are retained input samples; their arbitrary annotations do not become aggregate statistics. Constructed summary outputs have a separate independent ownership contract.
 
 ---
 
@@ -232,9 +313,9 @@ Use consensus trees when your main goal is to summarize branch support rather th
 
 ##### Maximum clade credibility (MCC)
 
-The MCC tree is the sampled tree whose product of clade posterior frequencies is maximal, or equivalently whose sum of log clade frequencies is maximal.
+MCC selects the observed rooted topology whose product of clade posterior frequencies is maximal, or equivalently whose sum of log clade frequencies is maximal. It reconstructs an independently editable tree from that clade topology and summary records; it does not return or edit a retained input representative.
 
-This approach prioritizes trees built from highly supported clades.
+This approach prioritizes topologies built from highly supported clades.
 
 ##### Maximum bipartition credibility (MBC)
 
@@ -245,29 +326,19 @@ The MBC tree is analogous but uses branch bipartitions instead of rooted clades.
 - MCC is usually the natural choice for rooted posterior trees, especially clock trees.
 - MBC can be useful when input trees are unrooted or bipartition support is the quantity of interest.
 
-Both methods choose one sampled topology rather than constructing an abstract consensus topology.
+Both methods choose an observed topology and construct an independent output. MBC uses an unrooted bipartition construction; MCC uses an oriented clade construction.
 
 #### 9.3 HIPSTR and mrHIPSTR
 
 `phylotreelib` also supports HIPSTR-style summary trees, following the idea of highest independent posterior subtree reconstruction.
 
-The key idea is to combine local posterior subtree information in a principled way to construct a summary topology.
-
-Practical rule of thumb:
-
-- use HIPSTR when you want a summary-tree method based on posterior subtree reconstruction rather than a single sampled tree's global score
-- use mrHIPSTR for the majority-rule variant
+The implementation recursively scores observed child-clade pairs and reconstructs an oriented clade hierarchy. HIPSTR can include clades below 50% support. mrHIPSTR favors clades with support above 50% and resolves the remaining hierarchy; it can also include lower-supported clades. Their rooted interpretation comes from clade construction, independently of root-frequency placement.
 
 #### 9.4 Root summaries
 
 When `trackroot=True`, `TreeSummary` can record where the root occurred across sampled trees.
 
-This allows:
-
-- placing the root of a summary tree on the most frequently observed root bipartition
-- annotating each branch with `rootcred`, the posterior frequency with which that branch carried the root
-
-This is useful when the posterior distribution contains uncertainty about root placement.
+`TreePostProcessor.root_maxfreq()` selects the most frequent recorded root bipartition compatible with the target tree, and a successful call establishes True. Its existing position calculation remains; unfinished length-fraction/rootcred work is separate. `set_rootcredibility()` annotates branches with `rootcred`, the posterior frequency with which each branch carried the root. Root summaries are useful when the posterior distribution contains uncertainty about root placement.
 
 #### 9.5 Branch lengths versus node heights
 
@@ -292,7 +363,7 @@ Two closely related conventions appear in the package:
 
 #### 9.6  Branch labels are treated as branch attributes
 
-Tree objects created from string representations (newick or nexus) will interpret labels as belonging to the branch (bipartition) not a node at either end of that branch. This affiliation will remain after rerooting.
+Ordinary Newick/Nexus labels belong to incoming branches. Reversing an existing edge retains its label and annotation values; separate merges and subdivisions follow the editing rules above. Directional labels and rooted-clade support can need scientific reassessment after rerooting.
 
 
 ---
@@ -400,80 +471,3 @@ For everyday use, it is reasonable to treat the following as the stable public i
 - `build_sumtree`
 
 The remaining classes are useful, but many of them are better regarded as advanced helpers or implementation-level infrastructure unless they are explicitly needed by your workflow.
-
-
-### Branch merging
-
-`Branchstruct.merge(other)` returns a fresh branch whose structural length is the sum of both lengths. Labels, statistics, intervals, extras and accumulator state start from normal defaults; neither input changes. The unused `check_compat` argument has been removed. Root-edge combination and the serial join after removing a non-root bifurcating parent follow this same length-only rule. Node data stays with surviving nodes; deleted-node data is removed. Callers may explicitly assign justified annotations to the result.
-
-### Branch subdivision
-
-`add_node_on_branch(..., copy_attrs="none")` divides structural length and starts both segments with fresh non-length fields by default. `copy_attrs="lower"` explicitly copies annotations to the original-child segment; `"both"` copies them independently to both segments. Copied statistics are not rescaled. `upper_branchstruct` still installs the supplied object directly and sets its length to the calculated upper length. Automatic graft and reroot subdivisions also start without source annotations. Endpoint-node data remains attached to its nodes, and the inserted node starts with normal empty data. `split_off_children()` moves existing edges and is outside this subdivision rule.
-
-### Branch removal and length redistribution
-
-`remove_branch()` removes an internal edge and its child node, adding an equal share of the removed structural length to each reattached descendant edge. Total tree length is conserved; pairwise distances generally change. The reattached edges have new endpoints and fresh non-length fields even when the removed length is zero. The deleted node's metadata is removed. Unrelated edges and surviving-node data are retained; no statistic or annotation named `length` is numerically redistributed.
-
-### Input branch accumulation
-
-`TreeSummary.add_tree()` reads observed structural branch lengths into its own bipartition accumulators. It does not use input branches as accumulators or inherit sample labels, annotations or pre-existing statistics. Each newly observed bipartition gets one fresh record; later observations update that record using the existing numerical algorithms. Lazy summary finalization therefore leaves input branch data unchanged. Optional retained representative Trees have the separate storage contract below.
-
-### Constructed summary output ownership
-
-Consensus, compatible-bipartition insertion, MBC and branch annotation write-back materialize independently editable output branches and retained mutable annotations. Output branches contain the resulting lengths and intended annotations, with fresh accumulator/scratch fields and no quantile histograms. Repeated outputs are independent of one another and the summary. Annotation write-back can replace target Branchstruct objects; reacquire branch references from the returned Tree after a call. The low-level `from_biplist()` and `split_off_children()` direct-assignment contracts are unchanged. Exact-key interval write-back still preserves target entries that the calculation does not write.
-
-### Deliberate and computational root movement
-
-A successful public `reroot()` selects a rooted interpretation, including when selecting the current root. It retains the existing geometry and does not automatically collapse the previous bifurcating root. Actual root replacement clears the old `root_suffix`; a genuine no-op retains it. Surviving nodes retain their node data, and a new root node starts with normal empty data. Internal computational movement uses the same mechanics without selecting rootedness: displacement clears True to None and preserves False/None; a no-op preserves all states. `match_nodes()` uses this mechanical route on its temporary copies.
-
-### Unrooting and structural root collapse
-
-`unroot()` establishes False after successful structural preparation. A multifurcating or two-leaf traversal root remains in place, preserving its suffix and node data. `collapse_bifurcating_root()` is mechanical: actual removal clears the suffix and deleted-root node data and changes True to None; False/None remain unchanged. A non-bifurcating no-op preserves all states. Direct structural collapse of a two-leaf tree still raises TreeError. The deprecated `deroot()` alias continues to mean structural collapse; use `unroot()` to declare an unrooted interpretation.
-
-Root selectors (`rootmid()`, `rootminvar()`, `rootout()` and successful `TreePostProcessor.root_maxfreq()`) establish True, including success paths that keep the current root. A genuine no-op retains its suffix; an actual remove/recreate step clears it even if the final geometric position is equivalent. `root_maxfreq()` retains its existing root-position calculation; its unfinished length-fraction/rootcred work remains separate.
-
-### Extracted Tree interpretation
-
-A Tree returned by `subtree()` inherits True, False or None from the source at extraction time, including extraction at the source root. `prune_subtree()` obtains that result before editing the source. Selecting a traversal subtree does not infer biological rootedness. Leaf extraction still returns a name string plus its copied basal branch; it creates no Tree state or new wrapper.
-
-### Extraction suffix and basal branch
-
-`subtree(source.root)` independently copies retained source suffix data and returns `basal_branch=None`. A proper internal subtree has `root_suffix=None` and returns its former incoming branch separately, including its label and annotations. Leaf extraction keeps the same string/copied-basal-branch interface. A basal branch never becomes an implicit root label or stem. Extracted node data, internal edges, the basal branch and a copied suffix isolate supported mutable annotations. `prune_subtree()` obtains the extracted result before source mutation. Pruning the entire source root is outside the existing valid-retained-Tree contract.
-
-### Pruning and root promotion
-
-Successful `remove_leaf()`, `remove_leaves()`, `prune_subtree()` and pruning wrappers preserve the remaining Tree's rootedness, including surviving-child promotion. This retains the oriented surviving clade and differs from structural root collapse retaining both sides. Actual removal of the old root clears its entire suffix and deleted-node data; surviving-node annotations stay attached. A selection-only wrapper does not mutate state or suffix. Extracted Tree state is inherited before source mutation. Existing valid-retained-Tree geometry and singleton/empty boundaries are unchanged.
-
-### Constructor and summary interpretation
-
-Generic `Tree()`, `from_leaves()` and `from_branchinfo()` leave rootedness None. `from_biplist()`, `from_topology()` and neighbor joining establish False. `from_cladedict()`, UPGMA and ancestral random Yule/coalescent generation establish True, including rate-varying random lengths. Consensus/all-compatible consensus/MBC inherit the unrooted construction; MCC/HIPSTR/mrHIPSTR inherit the oriented clade construction. Deliberate subsequent rooting establishes True. Estimating heights, lengths or support preserves interpretation rather than inferring one, and retained representative Trees keep their original state. Plain parsing without retained declaration context remains unspecified until the input migration.
-
-### Summary merging transfers ownership
-
-Complete per-file statistics and diagnostics before `recipient.update(donor)`. Matching records combine into existing recipient records; unseen branch, clade, root and topology records may transfer directly, including histograms, interval dictionaries and child-clade-pair sets. Use the recipient afterward. Further donor accumulation, statistical reads or merging into another independent result are unsupported, because recipient updates/finalization can change transferred records. `len(donor)` remains available for immediate scalar progress reporting. No automatic donor copying, reset or reuse guard is added. This is separate from independent input accumulators and independently editable constructed outputs.
-
-### Retained representative Trees
-
-With topology tracking and `store_trees=True`, the first Tree for each topology is retained by reference, potentially in both topology dictionaries. Leave its topology, names, lengths, rootedness and stored metadata unchanged while any summary retains it, including after a consuming merge. Read-only queries, printing and normal derived-cache work remain allowed. Edit an explicit `copy_treeobject()` instead. No automatic snapshot, mutation guard or ownership registry is added. The default `store_trees=False` imposes no representative-storage lifetime restriction. Representatives are retained input samples; their arbitrary annotations do not become aggregate statistics. Constructed summary outputs have a separate independent ownership contract.
-
-### Grafting transfers donor ownership
-
-A successful `recipient.graft(donor, ...)` consumes donor contents: ID/name renaming and direct adoption of child dictionaries, branches and node metadata remain. Continue using the recipient; the donor is neither an independently usable Tree nor a synchronized subtree view. Pass `donor.copy_treeobject()` to retain an independent original. An explicit connecting Branchstruct transfers directly too; copy it first when retaining an independent original. No automatic copy/reset, ownership guard, donor-cache synchronization or new rollback guarantee is added. Leaf strings create no separately maintained donor Tree.
-
-### Graft connections and donor suffixes
-
-A supplied `connect_branchstruct` defines the connection and takes precedence over `connect_length`; otherwise a fresh branch uses `connect_length`, defaulting to 0.0. A donor label, stem length or stem annotations never transfers implicitly to the connection or recipient root. To reuse a donor suffix deliberately, supply it as the connecting struct after setting an actual numeric structural length. Supplying `connect_length` too does not fill a missing length in that struct. The recipient retains its root/suffix, and donor root-node annotations stay with the surviving donor-root node. Detached basal branches remain separate and can also be supplied explicitly.
-
-Successful grafts preserve the recipient's True/False/None interpretation at actual graft entry, for both Tree and leaf-name donors. Donor state, root degree, stem data and connecting length do not select a new interpretation. In a compound operation, graft preserves the state left by earlier steps; it does not restore an older historical state.
-
-### Complete SPR
-
-Successful `spr()` preserves rootedness through its pruning/graft components. It retains the suffix if the old root survives and clears it if pruning removes that root. Moved internal edges and unrelated edges retain annotations; merged/split/connecting edges start with fresh non-length fields. Surviving node data follows final IDs, deleted data is removed, and the graftpoint starts empty. A moved leaf's node data is retained locally without changing extraction's leaf-string API. The connection uses detached basal length plus the other root-child length when pruning a direct child of a bifurcating root; its existing selection, placement and length calculations remain. The temporary donor is consumed. Preserving data does not recalculate its scientific meaning.
-
-### Existing-edge reversal
-
-Reversing an existing edge retains its Branchstruct and annotation values unchanged. Its endpoints, length and unrooted split remain, so reversal does not copy or reinterpret annotations. Directional values and rooted-clade support labels may no longer describe the descending side; callers must reassess/recompute them where needed. This attachment rule does not restore data already discarded by a separate merge or subdivision, nor does it guarantee scientific validity after rerooting.
-
-### Direct numerical length edits
-
-`setlength()` and native structural `set_branch_attribute(..., "length", value)` retain node/branch annotations and clear length-derived caches. Caller scaling loops have the same contract; statistical annotations are neither scaled nor recomputed automatically. `set_blens_from_heights()` reads explicitly stored node heights and writes represented lengths only. Rootedness, node IDs and the external root suffix remain unchanged. An extra annotation named `length` is separate data, not a structural write. Raw `.length` assignments require `clear_length_caches()` before derived queries; no watched fields or automatic annotation conversion is added.

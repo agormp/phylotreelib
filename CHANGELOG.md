@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- Active API, README and recipes now document implemented ownership/root/edit contracts and explicit-copy workflows, correct the Nexus-default and summary-method descriptions, and keep parser/reader migrations distinct from completed behavior.
 - Documented and verified direct length assignment, caller scaling loops and height-to-length conversion: retain stored annotations/rootedness/suffixes without statistical rescaling, and refresh length-derived caches. Raw slot writes require explicit invalidation.
 - Documented and verified annotation attachment on existing reversed edges: objects and values are retained without transformation, while directional/rooted-clade statistics remain the caller's scientific responsibility. Merge/subdivision rules apply separately.
 - Documented and verified complete SPR preservation of rootedness and surviving node/edge attachment, suffix retention only while the old root survives, and fresh merged/split/connecting fields. Qualified its existing root-adjacent connection-length adjustment.
@@ -59,7 +60,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Tree.unroot()` deliberately establishes an unrooted interpretation, including two-leaf and unchanged-root cases. Structural collapse clears a displaced rooted interpretation to None; the deprecated `deroot()` alias keeps structural semantics.
 - Programmatic `root_suffix` label/stem output under the existing explicit controls. Selected stem metadata requires an emitted stem length; an absent length never becomes an invented zero. Root-node annotations remain separate.
 - Exact metadata-key resolution and selected owner/key value validation, typed float/MISSING/empty-value output, quoted keys and independently balanced brackets in annotation strings. Emitted branch annotations require emitted structural lengths.
-- `Tree.rooted` and optional `Tree.root_suffix` data fields and copy support, preserving absent versus explicit-zero stem lengths. Input interpretation and tree-edit transitions follow in the parser migration.
+- `Tree.rooted` and optional `Tree.root_suffix` data fields and copy support, preserving absent versus explicit-zero stem lengths. Constructor/edit transitions follow the contracts above; input interpretation remains part of the parser migration.
 - Shared public `MISSING` annotation marker, preserving identity through copying and multiprocessing serialization. `None` continues to mean unset; required explicit node heights reject either missing state before changing lengths.
 - `TreeSet.newick()` and `TreeSet.nexus()` accept and forward explicit metadata selections and `print_meta`.
 - Regression tests for explicit and automatic printing options, metadata and CI output, independent calls, and TreeSet forwarding.

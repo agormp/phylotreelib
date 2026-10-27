@@ -133,14 +133,14 @@ D
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=20, randomlen=True)
+tree = pt.Tree.randtree(ntips=20)
 ```
 
 #### Random tree with specified leaf names
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(leaflist=["Human", "Chimp", "Bonobo", "Gorilla", "Orangutan"], randomlen=True)
+tree = pt.Tree.randtree(leaflist=["Human", "Chimp", "Bonobo", "Gorilla", "Orangutan"])
 ```
 
 
@@ -238,11 +238,13 @@ print(tree.find_common_leaf(leafset))
 
 ### 4. Rooting and rerooting
 
+Public `reroot()`, `rootmid()`, `rootout()` and `rootminvar()` establish `tree.rooted=True` on success, including a successful no-op at the existing root. `unroot()` deliberately establishes False. Mechanical `collapse_bifurcating_root()` and deprecated `deroot()` preserve False/None, and clear True to None only when a root is actually removed. Root replacement/removal clears its suffix; a true same-root no-op retains it. Retained edge/node annotations are not automatically recalculated for their new scientific interpretation.
+
 #### Midpoint rooting
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=5, randomlen=True)
+tree = pt.Tree.randtree(ntips=5)
 print(tree)
 tree.rootmid()
 print(tree)
@@ -252,7 +254,7 @@ print(tree)
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=5, randomlen=True)
+tree = pt.Tree.randtree(ntips=5)
 tree.rootminvar()
 ```
 
@@ -292,7 +294,18 @@ tree.reroot(node1=parent, node2=node, frac_from_node1=0.25)
 print(tree)
 ```
 
+#### Establish an unrooted interpretation
+
+```python
+import phylotreelib as pt
+tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+tree.unroot()
+print(tree.nexus())  # [&U]; the traversal representation still has a root node.
+```
+
 #### Remove one leaf
+
+Pruning preserves the remaining Tree's rootedness, including promotion of the surviving root child. The old suffix is cleared only if that root is removed. Surviving node annotations stay attached; deleted-node data is removed, and serially merged branches keep summed lengths with fresh non-length fields.
 
 ```python
 import phylotreelib as pt
@@ -328,8 +341,7 @@ print("Basal branch length:", basal.length)
 print(sub.newick())
 ```
 
-**Note:** `subtree()` does not modify the original tree. It returns a detached copy of the subtree
-and a copy of the incoming `Branchstruct` (the basal branch into the basenode).
+**Note:** `subtree()` does not modify the source. An extracted Tree inherits its rootedness and independently copies retained mutable annotation data. A proper internal subtree has `root_suffix=None`; its former incoming Branchstruct is returned separately as `basal`. Extraction at the source root independently copies that root suffix and returns `basal=None`. The leaf case remains `(leaf_name, copied_basal_branch)` without a new wrapper. A basal label/stem is never promoted implicitly into an extracted root suffix.
 
 #### Prune a subtree out of the tree
 
@@ -375,8 +387,7 @@ print(tree)
 
 #### Insert a node on an existing branch
 
-This operation inserts a node *on* a specific existing edge (parent → child) and splits the
-original branch length between the two new segments.
+This operation inserts a node *on* an existing edge and divides its structural length. The default `copy_attrs="none"` gives both segments fresh non-length fields. Explicit `"lower"` copies annotations to the original-child segment; `"both"` copies them independently to both. Values are retained without scaling their scientific meaning. A supplied `upper_branchstruct` is still installed directly and receives the calculated upper length.
 
 ```python
 import phylotreelib as pt
@@ -397,8 +408,9 @@ print(tree)
 
 #### Graft one tree onto another
 
-`graft()` inserts a graft point on an existing edge in the target tree (parent → child), then
-attaches either a whole Tree (via its root) or a single leaf name below that graft point.
+`graft()` inserts a point on an existing target edge and attaches a Tree through its root, or a single leaf name. It preserves recipient rootedness and root suffix. Passing a Tree directly consumes its dictionaries, branches and node metadata; use the recipient afterward. Supply an independent copy when preserving the original, as below. Explicit connecting Branchstructs also transfer directly and should be copied first if an independent original is needed.
+
+`connect_branchstruct` takes precedence over `connect_length`; otherwise a fresh connection uses `connect_length`, default zero. Donor suffix labels/stems/annotations do not supply connection data automatically. To reuse a donor suffix deliberately, give it a meaningful numeric length and pass it explicitly as the connecting struct.
 
 ```python
 import phylotreelib as pt
@@ -412,9 +424,9 @@ parent = left.parent(child)
 
 print(left)
 
-# Attach `right` below the graft point, 30% of the way from parent to child
-# The new connecting branch above right subtree has length 0.25
-left.graft(right, parent=parent, child=child,
+# Preserve right by grafting an independent copy; that supplied copy is consumed.
+# Place it 30% down the selected edge, with a separate connection of length 0.25.
+left.graft(right.copy_treeobject(), parent=parent, child=child,
            frac_from_parent=0.3, connect_length=0.25,
            graftlabel="grafted_")
 
@@ -423,6 +435,8 @@ print(left)
 ```
 
 #### SPR with specified prune and regraft points
+
+Complete SPR preserves rootedness. The suffix stays when the original root survives and is cleared if pruning promotes another node. Moved-node data follows final IDs; merged, split and connecting edges have fresh non-length fields, while internal moved edges and unrelated edges retain their annotations. Retention does not prove continued scientific validity. Total length uses the existing basal-length connection, plus the other root-child length when pruning a direct child of a bifurcating root.
 
 ```python
 import phylotreelib as pt
@@ -438,7 +452,7 @@ print(tree.newick(printdist=False))
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=5, randomlen=True)
+tree = pt.Tree.randtree(ntips=5)
 print(tree.newick(precision=2))
 prune_node = next(iter(tree.leaves))
 prune_node, regraft_node = tree.spr(prune_node=prune_node)
@@ -450,7 +464,7 @@ print(tree.newick(precision=2))
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=7, randomlen=True)
+tree = pt.Tree.randtree(ntips=7)
 print(f"{tree.newick(printdist=False)}\tlength: {tree.length()}")
 for _ in range(10):
     tree.spr()
@@ -483,7 +497,7 @@ print(f"n_leaves={len(tree.leaves)}  length={tree.length():.6g}")
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=200, randomlen=True)
+tree = pt.Tree.randtree(ntips=200)
 tree.prune_maxlen(nkeep=30, keeplist=["s001", "s120", "s178"])
 ```
 
@@ -491,7 +505,7 @@ tree.prune_maxlen(nkeep=30, keeplist=["s001", "s120", "s178"])
 
 ```python
 import phylotreelib as pt
-tree = pt.Tree.randtree(ntips=50, randomlen=True)
+tree = pt.Tree.randtree(ntips=50)
 tree.rootminvar()
 keepers = tree.prune_maxlen(nkeep=10, return_leaves=True)
 with open("colorprune.nexus", "w") as outfile:
@@ -508,7 +522,7 @@ Note: the leaves selected to be retained after pruning will now be colored red w
 
 ```python
 import phylotreelib as pt
-t1 = pt.Tree.randtree(ntips=30, randomlen=True)
+t1 = pt.Tree.randtree(ntips=30)
 t2 = t1.copy_treeobject()
 t2.spr()
 print(t1.treedist_RF(t2))
@@ -519,7 +533,7 @@ print(t1.treedist_RF(t2, normalise=True))
 
 ```python
 import phylotreelib as pt
-t1 = pt.Tree.randtree(ntips=20, randomlen=True)
+t1 = pt.Tree.randtree(ntips=20)
 t2 = t1.copy_treeobject()
 t2.rootmid()
 print(t1.treedist_RF(t2, rooted=False))
@@ -530,7 +544,7 @@ print(t1.treedist_RF(t2, rooted=True))
 
 ```python
 import phylotreelib as pt
-t1 = pt.Tree.randtree(ntips=30, randomlen=True)
+t1 = pt.Tree.randtree(ntips=30)
 t2 = t1.copy_treeobject()
 for _ in range(3):
     t2.spr()
@@ -541,7 +555,7 @@ print(t1.treedist_pathdiff(t2))
 
 ```python
 import phylotreelib as pt
-t1 = pt.Tree.randtree(ntips=10, randomlen=True)
+t1 = pt.Tree.randtree(ntips=10)
 t2 = t1.copy_treeobject()
 t2.spr()
 (treedist, n_shared, n_uniq1, n_uniq2, n_bip1, n_bip2, tree1_unique_biparts,
@@ -592,7 +606,46 @@ print(dmat.nj().newick())
 
 * `sumt` GitHub page: [https://github.com/agormp/sumt](https://github.com/agormp/sumt/)
 
-More detailed discussion of summary tree methods is in `docs/api.md`.
+More detailed discussion of summary tree methods is in `docs/api.md`. Input observations use independent accumulators, and constructed summary output Trees have independent branch/annotation data. Retained representatives and consumed partial summaries have the separate contracts below.
+
+#### Merge completed partial summaries
+
+Complete any diagnostics that need separate summaries before merging. A successful `combined.update(part)` combines matching branch, clade, root and topology records and may adopt unseen records directly, including histograms, interval dictionaries and child-clade-pair sets. Use the recipient for subsequent accumulation and statistics; only the donor's scalar count remains safe for progress reporting. No automatic copy, donor reset or reuse guard is added.
+
+```python
+import phylotreelib as pt
+
+combined = pt.TreeSummary(trackbips=True, trackblen=True)
+part = pt.TreeSummary(trackbips=True, trackblen=True)
+combined.add_tree(pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);"))
+part.add_tree(pt.Tree.from_string("((A:2,C:3):4,B:5,D:6);"))
+
+combined.update(part)
+print("merged trees:", len(part))  # Scalar progress count remains available.
+print("combined trees:", len(combined))
+summary_branches = combined.bipartsummary
+```
+
+Do not add observations to `part`, query its statistics or merge it into another independent result afterward. Recipient updates/finalization may change transferred records.
+
+#### Edit a copy of a retained representative
+
+With clade/bipartition topology tracking and `store_trees=True`, the first Tree for each topology is retained by reference. Leave its topology, names, lengths, rootedness and metadata unchanged while any summary retains it. Read-only queries, printing and normal cache work remain allowed. Copy before editing:
+
+```python
+import phylotreelib as pt
+
+sample = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+summary = pt.TreeSummary(trackbips=True, tracktopo=True, store_trees=True)
+summary.add_tree(sample)
+record = next(iter(summary.biptoposummary.values()))
+
+editable = record.tree.copy_treeobject()
+editable.setlength(editable.parent("A"), "A", 2.0)
+print(editable.newick())
+```
+
+The original sample remains retained. Its no-edit lifetime follows references transferred by summary merges. A Tree may be retained in both topology dictionaries; storage makes no automatic snapshot and adds no mutation guard. The default `store_trees=False` has no representative-storage lifetime restriction. A retained sample's arbitrary annotations are not aggregate summary statistics.
 
 #### Build a majority-rule consensus tree
 
@@ -825,9 +878,9 @@ print(tree.nexus())                       # [&U]
 print(tree.nexus(print_rootedness=False))  # Omit the known declaration
 ```
 
-`rooted=None` on the Tree omits the declaration when its interpretation is unknown. The boolean `print_rootedness` switch defaults to True and works independently of `print_meta`; it never changes state or geometry. `TreeSet.nexus()` uses each tree's own state. The old `nexus(rooted=...)` value argument has been removed.
+`tree.rooted = None` omits the declaration when interpretation is unknown. Nexus leaves rooted/unrooted interpretation unspecified without either declaration; see the [recorded specification check](decisions/nexus-rootedness.md). The boolean `print_rootedness` switch defaults to True and works independently of `print_meta`; it never changes state or geometry. `TreeSet.nexus()` uses each tree's own state. The old `nexus(rooted=...)` value argument has been removed.
 
-Input declaration retention and automatic constructor/edit rootedness transitions are still pending in this development checkout. Set known state after those operations. Programmatic root labels/stem lengths and annotations use `root_suffix`; see the [API root-information notes](api.md#root-information-and-copying).
+Constructor and editing rootedness transitions are implemented: clade/MCC/HIPSTR/mrHIPSTR and ancestral-model random trees are rooted, bipartition/consensus/MBC construction is unrooted, and deliberate rooting establishes True. Generic construction/current undeclared string parsing remains None. Input declaration retention, annotation-aware readers, TREE/UTREE context and raw/count/skip integration remain later work. Programmatic root labels/stem lengths and annotations use `root_suffix`; see the [API root-information notes](api.md#root-information-and-copying).
 
 #### Color leaves selected by a clade query
 
@@ -1078,3 +1131,12 @@ print(f"Parsimony score (fitpref=('X', None)): {pscore}")
 Note: `fitpref` only affects the choice among equally parsimonious reconstructions. It
 does not change the parsimony score when the reconstruction is unambiguous.
 
+
+
+### Editing lengths and retained annotations
+
+`setlength()` and `set_branch_attribute(..., "length", value)` change structural lengths and refresh derived length caches without clearing stored node/branch annotations. Caller scaling loops follow the same rule; `set_blens_from_heights()` uses explicitly stored heights and rejects missing required values. An imported annotation named `length` stays distinct from a colon length, and stored node heights stay distinct from `nodeheightdict` derived from branch lengths.
+
+For low-level batch writes directly to `tree.child_dict[parent][child].length`, call `tree.clear_length_caches()` after the batch. Ordinary metadata assignments do not invalidate topology caches or silently recalibrate statistics. Reassess retained scientific annotations explicitly after topology or length edits.
+
+`Branchstruct.merge(other)` creates a fresh length-only result, and its unused `check_compat` argument has been removed. `remove_branch()` redistributes the removed structural length equally onto fresh descendant-edge records, retaining unrelated edges and surviving-node data. Existing edges that only reverse during rerooting keep their labels/annotations, whose directional or rooted-clade meaning may need reassessment.
