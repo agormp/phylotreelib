@@ -1190,6 +1190,23 @@ class Test_rename_intnode:
         tree.rename_intnode(tree.root, 99)
         assert tree.nodedict == {}
 
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_root_identifier_change_preserves_interpretation_suffix_and_node_data(self, state):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        tree.rooted = state
+        tree.root_suffix = pt.Branchstruct(length=0.5, label="same position")
+        suffix = tree.root_suffix
+        tree.set_node_attribute(tree.root, "extra_meta", {"root": [pt.MISSING]})
+        record = tree.nodedict[tree.root]
+        before = tree.newick()
+        oldroot = tree.root
+        newroot = max(tree.intnodes) + 10
+        tree.rename_intnode(oldroot, newroot)
+        assert tree.root == newroot and tree.rooted is state
+        assert tree.root_suffix is suffix
+        assert tree.nodedict[newroot] is record and oldroot not in tree.nodedict
+        assert tree.newick() == before
+
 
 class TestRootTester:
     """Tests for rooting related methods in Tree object"""
@@ -2955,7 +2972,7 @@ class TestSubtreeAndPruneSubtree:
 
 class TestAddNodeOnBranch:
 
-    @pytest.mark.parametrize("mode", [None, "lower", "both"])
+    @pytest.mark.parametrize("mode", [None, "none", "lower", "both"])
     def test_annotation_copy_choices_and_node_attachment(self, mode):
         tree = pt.Tree.from_string("(A:8,B:2);")
         tree.set_node_attribute("A", "state", "tip")
@@ -2982,7 +2999,7 @@ class TestAddNodeOnBranch:
             assert lower.extra_meta == original.extra_meta
             lower.extra_meta["length_95%_CI"][0] = 5
             assert original.extra_meta["length_95%_CI"] == [3, 9]
-        elif mode is None:
+        elif mode in (None, "none"):
             assert lower.label == "" and lower.posterior is lower.extra_meta is None
 
     def test_explicit_upper_branch_overrides_default_without_copying(self):
@@ -4813,10 +4830,6 @@ class Test_copy_Nodestruct:
         assert source.extra_meta["nested"][0][0] == {"red"}
         assert source.primary_set == [{"red"}, {"green"}]
         assert source.optimal_set == {"red"}
-
-# Focused tests to integrate into tests/test_phylotreelib_combined.py.
-# Assumes its existing imports: phylotreelib as pt and pytest.
-
 
 class Test_metadata_pairs:
 

@@ -101,9 +101,7 @@ def _copy_annotation_value(value):
     return value
 
 
-# Private helpers for integration into phylotreelib.py; this is not a standalone module.
-# Globals supplied by the library: MISSING, TreeError and re.
-# Call _metadata_pairs only when metadata output is requested.
+# Resolve metadata only on requested output, using exact owner/key rules.
 
 _NATIVE_META_SCALARS = {
     "node": frozenset(("height", "height_sd", "height_median", "clade_cred")),
