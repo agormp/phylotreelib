@@ -1447,6 +1447,8 @@ class AnnotatedNewickParser(NewickStringParser):
             owner = self._current_branch()
             owner_id = (owner_kind, self.node_stack[-1])
         elif state in ("LEAF", "INTNODE_END", "LABEL"):
+            if not self.node_stack:
+                raise TreeError("Annotation after the root topology was closed")
             owner_kind = "node"
             node = self.node_stack[-1]
             if node not in self.treeobj.nodedict:

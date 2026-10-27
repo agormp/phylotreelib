@@ -6560,7 +6560,7 @@ class Test_AnnotatedNewickParser_parse:
         assert tree.rooted is False and tree.nodedict == {}
         assert tree.root_suffix.length == 2 and tree.root_suffix.extra_meta is None
 
-    @pytest.mark.parametrize('text', ['(A[&x=1][&x=1],B);', '(A[&height=1,"height"=2],B);', '(A:[&x=1]1[&x=2],B);', '(A[&height="2"],B);', '(A[&height_95%_HPD={1}],B);', '(A[&W 0.5],B);', '[&lnP=-12](A,B);'])
+    @pytest.mark.parametrize('text', ['(A[&x=1][&x=1],B);', '(A[&height=1,"height"=2],B);', '(A:[&x=1]1[&x=2],B);', '(A[&height="2"],B);', '(A[&height_95%_HPD={1}],B);', '(A[&W 0.5],B);', '[&lnP=-12](A,B);', '(A,B))[&x=1];'])
     def test_metadata_errors_are_not_silently_dropped(self, text):
         with pytest.raises(pt.TreeError):
             pt.Tree.from_string(text, parse_meta=True)
