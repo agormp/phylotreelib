@@ -2794,6 +2794,32 @@ class Test_precision_quantiles_vs_exact_order_statistic:
 
 ###################################################################################################
 
+class Test_set_biplen_on_existing_tree_TreePostProcessor:
+
+    def test_final_root_edge_writes_invalidate_warmed_distances(self):
+        sample = pt.Tree.from_string("(A:3,B:7);")
+        summary = pt.TreeSummary(trackbips=True, trackblen=True,
+                                 trackroot=True, trackrootblen=True)
+        summary.add_tree(sample)
+        target = pt.Tree.from_string("(A:1,B:1);")
+        parents = target.parent_dict
+        assert target.nodedist("A", "B") == 2
+        assert target.rootdist["A"] == target.rootdist["B"] == 1
+        target.build_dist_dict()
+
+        result = pt.TreePostProcessor(summary).set_biplen_on_existing_tree(target)
+
+        assert result is target
+        assert target.child_dict[target.root]["A"].length == pytest.approx(3)
+        assert target.child_dict[target.root]["B"].length == pytest.approx(7)
+        assert target.nodedist("A", "B") == pytest.approx(10)
+        assert target.rootdist["A"] == pytest.approx(3)
+        assert target.rootdist["B"] == pytest.approx(7)
+        target.build_dist_dict()
+        assert target.dist_dict["A"]["B"] == pytest.approx(10)
+        assert target.parent_dict is parents
+
+
 class Test_cladesummary_TreeSummary:
 
     def test_single_observation_preserves_undefined_sd(self):

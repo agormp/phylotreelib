@@ -7065,6 +7065,8 @@ class TreePostProcessor():
         sumtree.child_dict[sumtree_root][kid1].length = dist_to_kid1
         sumtree.child_dict[sumtree_root][kid2].length = dist_to_kid2
 
+        sumtree.clear_length_caches()
+
         return sumtree
 
     ###############################################################################################
