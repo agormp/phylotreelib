@@ -469,3 +469,7 @@ Successful grafts preserve the recipient's True/False/None interpretation at act
 ### Complete SPR
 
 Successful `spr()` preserves rootedness through its pruning/graft components. It retains the suffix if the old root survives and clears it if pruning removes that root. Moved internal edges and unrelated edges retain annotations; merged/split/connecting edges start with fresh non-length fields. Surviving node data follows final IDs, deleted data is removed, and the graftpoint starts empty. A moved leaf's node data is retained locally without changing extraction's leaf-string API. The connection uses detached basal length plus the other root-child length when pruning a direct child of a bifurcating root; its existing selection, placement and length calculations remain. The temporary donor is consumed. Preserving data does not recalculate its scientific meaning.
+
+### Existing-edge reversal
+
+Reversing an existing edge retains its Branchstruct and annotation values unchanged. Its endpoints, length and unrooted split remain, so reversal does not copy or reinterpret annotations. Directional values and rooted-clade support labels may no longer describe the descending side; callers must reassess/recompute them where needed. This attachment rule does not restore data already discarded by a separate merge or subdivision, nor does it guarantee scientific validity after rerooting.

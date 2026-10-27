@@ -5087,6 +5087,9 @@ class Tree:
         """
         Place a new root on branch or at existing node.
         Successful public rerooting establishes rootedness. Existing roots are not collapsed here.
+        Existing edges that only reverse keep their branch objects and annotations.
+        Directional/rooted-clade statistics may need reassessment or recomputation;
+        attachment retention does not establish scientific validity after rerooting.
 
         If polytomy=True:
            The root is moved to the existing node `node1` (no new node inserted).

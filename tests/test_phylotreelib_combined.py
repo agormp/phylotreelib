@@ -5377,6 +5377,32 @@ class Test_reroot:
             tree.reroot("A")
         assert tree.rooted is False
 
+    def test_reversed_existing_edges_keep_objects_values_and_attachment(self):
+        tree = pt.Tree.from_string("(((A:1,B:2):3,C:4):5,D:6,E:7);")
+        base = tree.find_mrca({"A", "B"})
+        middle = tree.parent(base)
+        oldroot = tree.root
+        old_edges = [(oldroot, middle), (middle, base)]
+        records = []
+        for parent, child in old_edges:
+            branch = tree.child_dict[parent][child]
+            branch.label = "old descendant support"
+            branch.posterior = pt.MISSING
+            branch.extra_meta = {"directional": [child], "empty": (), "false": False}
+            records.append((parent, child, branch, branch.extra_meta, branch.length))
+        unrelated = tree.child_dict[oldroot]["E"]
+        tree.set_node_attribute(base, "height", 9.0)
+        tree.reroot(base, polytomy=True)
+        for parent, child, branch, mapping, length in records:
+            assert tree.child_dict[child][parent] is branch
+            assert branch.length == length
+            assert branch.label == "old descendant support"
+            assert branch.posterior is pt.MISSING
+            assert branch.extra_meta is mapping
+            assert mapping == {"directional": [child], "empty": (), "false": False}
+        assert tree.child_dict[oldroot]["E"] is unrelated
+        assert tree.nodedict[base].height == 9.0
+
 
 class Test_remove_branch:
 
