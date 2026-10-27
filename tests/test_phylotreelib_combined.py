@@ -1119,6 +1119,63 @@ class TestTreeChanging:
             mytree.rename_leaf("Not_there", "new_name")
 
 
+class Test_rename_leaf:
+
+    @pytest.mark.parametrize("requested,fixdups,final", [
+        ("X", False, "X"), ("B", True, "B_2"),
+    ])
+    def test_metadata_follows_resolved_name(self, requested, fixdups, final):
+        tree = pt.Tree.from_string("(A:1,B:2,B_1:3,C:4);")
+        tree.set_node_attribute("A", "height", 5.0)
+        tree.set_node_attribute("C", "state", "untouched")
+        moved = tree.nodedict["A"]
+        untouched = tree.nodedict["C"]
+
+        tree.rename_leaf("A", requested, fixdups=fixdups)
+
+        assert "A" not in tree.nodes
+        assert "A" not in tree.nodedict
+        assert tree.nodedict[final] is moved
+        assert tree.get_node_attribute(final, "height") == 5.0
+        assert tree.nodedict["C"] is untouched
+        assert set(tree.nodedict) == {final, "C"}
+        assert tree.nodedist(final, "C") == pytest.approx(5)
+
+    def test_unannotated_tree_stays_sparse(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.rename_leaf("A", "X")
+        assert tree.nodedict == {}
+
+
+class Test_rename_intnode:
+
+    @pytest.mark.parametrize("rename_root", [False, True])
+    def test_metadata_follows_node_id(self, rename_root):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        old = tree.root if rename_root else tree.find_mrca({"A", "B"})
+        tree.set_node_attribute(old, "height", 5.0)
+        tree.set_node_attribute("A", "state", "untouched")
+        moved = tree.nodedict[old]
+        untouched = tree.nodedict["A"]
+
+        tree.rename_intnode(old, 99)
+
+        assert old not in tree.nodes
+        assert old not in tree.nodedict
+        assert tree.nodedict[99] is moved
+        assert tree.get_node_attribute(99, "height") == 5.0
+        assert tree.nodedict["A"] is untouched
+        assert set(tree.nodedict) == {99, "A"}
+        assert tree.nodedist("A", "C") == pytest.approx(8)
+        if rename_root:
+            assert tree.root == 99
+
+    def test_unannotated_tree_stays_sparse(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        tree.rename_intnode(tree.root, 99)
+        assert tree.nodedict == {}
+
+
 class TestRootTester:
     """Tests for rooting related methods in Tree object"""
 
@@ -2075,6 +2132,30 @@ class TestGraft:
         ints = [n for n in t1.intnodes if isinstance(n, int)]
         assert len(ints) == len(set(ints))
         assert graftpoint in t1.intnodes
+
+    def test_metadata_follows_donor_id_and_leaf_renaming(self):
+        recipient = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
+        recipient.set_node_attribute("A", "state", "recipient")
+        recipient_meta = recipient.nodedict["A"]
+        donor = pt.Tree.from_string("(D:1,(E:1,F:1):1);")
+        donor_internal = donor.find_mrca({"E", "F"})
+        donor.set_node_attribute(donor.root, "height", 3.0)
+        donor.set_node_attribute(donor_internal, "height", 2.0)
+        donor.set_node_attribute("D", "state", "donor")
+        root_meta = donor.nodedict[donor.root]
+        internal_meta = donor.nodedict[donor_internal]
+        leaf_meta = donor.nodedict["D"]
+
+        recipient.graft(donor, parent=recipient.root, child="A",
+                        frac_from_parent=0.5, graftlabel="p_")
+
+        assert recipient.nodedict[recipient.parent("p_D")] is root_meta
+        assert recipient.nodedict[recipient.find_mrca({"p_E", "p_F"})] is internal_meta
+        assert recipient.nodedict["p_D"] is leaf_meta
+        assert recipient.get_node_attribute("p_D", "state") == "donor"
+        assert recipient.nodedict["A"] is recipient_meta
+        assert "D" not in recipient.nodedict
+        assert set(recipient.nodedict) <= recipient.nodes
 
 ###################################################################################################
 

@@ -4672,6 +4672,9 @@ class Tree:
         self.parent_dict[newname] = self.parent_dict[oldname]
         del self.parent_dict[oldname]
 
+        if oldname in self.nodedict:
+            self.nodedict[newname] = self.nodedict.pop(oldname)
+
         self.clear_caches()
 
     ###############################################################################################
@@ -4701,6 +4704,9 @@ class Tree:
         else:
             self.child_dict[parent][newnum] = self.child_dict[parent][oldnum]
             del self.child_dict[parent][oldnum]
+
+        if oldnum in self.nodedict:
+            self.nodedict[newnum] = self.nodedict.pop(oldnum)
 
         self.clear_caches()
 
