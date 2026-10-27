@@ -421,3 +421,7 @@ The remaining classes are useful, but many of them are better regarded as advanc
 ### Constructed summary output ownership
 
 Consensus, compatible-bipartition insertion, MBC and branch annotation write-back materialize independently editable output branches and retained mutable annotations. Output branches contain the resulting lengths and intended annotations, with fresh accumulator/scratch fields and no quantile histograms. Repeated outputs are independent of one another and the summary. Annotation write-back can replace target Branchstruct objects; reacquire branch references from the returned Tree after a call. The low-level `from_biplist()` and `split_off_children()` direct-assignment contracts are unchanged. Exact-key interval write-back still preserves target entries that the calculation does not write.
+
+### Deliberate and computational root movement
+
+A successful public `reroot()` selects a rooted interpretation, including when selecting the current root. It retains the existing geometry and does not automatically collapse the previous bifurcating root. Actual root replacement clears the old `root_suffix`; a genuine no-op retains it. Surviving nodes retain their node data, and a new root node starts with normal empty data. Internal computational movement uses the same mechanics without selecting rootedness: displacement clears True to None and preserves False/None; a no-op preserves all states. `match_nodes()` uses this mechanical route on its temporary copies.

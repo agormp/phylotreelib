@@ -2695,8 +2695,8 @@ class Tree:
             arbitrarykid = random.choice(tuple(self.leaves))
             newroot1 = self.parent(arbitrarykid)
             newroot2 = other.parent(arbitrarykid)
-            self.reroot(newroot1, polytomy=True)
-            other.reroot(newroot2, polytomy=True)
+            self._move_root(newroot1, polytomy=True)
+            other._move_root(newroot2, polytomy=True)
 
         # Now possible to match internal nodes based on their offspring
         node1to2 = dict()
@@ -5037,7 +5037,7 @@ class Tree:
                dist_from_node1=None, frac_from_node1=0.5):
         """
         Place a new root on branch or at existing node.
-        Removes previous root node if present at bifurcation.
+        Successful public rerooting establishes rootedness. Existing roots are not collapsed here.
 
         If polytomy=True:
            The root is moved to the existing node `node1` (no new node inserted).
@@ -5048,6 +5048,15 @@ class Tree:
            This inserts a new internal node on that branch and then reverses parent→child
            direction along the path back to the old root.
         """
+
+        self._move_root(node1, node2, polytomy, dist_from_node1, frac_from_node1)
+        self.rooted = True
+
+    ###############################################################################################
+
+    def _move_root(self, node1, node2=None, polytomy=False,
+                   dist_from_node1=None, frac_from_node1=0.5):
+        """Use the existing root-moving mechanics without establishing a rooted interpretation."""
 
         # Choose / create the new root node
         if polytomy:
@@ -5094,6 +5103,10 @@ class Tree:
             del self.child_dict[oldparent][newparent]
 
         self.root = newroot
+        if newroot != oldroot:
+            self.root_suffix = None
+            if self.rooted is True:
+                self.rooted = None
         if self.nodedict:
             self.nodedict.setdefault(newroot, Nodestruct())
         self.clear_caches()

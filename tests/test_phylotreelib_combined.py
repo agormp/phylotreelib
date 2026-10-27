@@ -4856,6 +4856,47 @@ class Test_reroot:
                    for branch in tree.child_dict[tree.root].values())
         assert original.extra_meta == {"length_95%_CI": [1, 9]}
 
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_selecting_current_root_establishes_rootedness_and_keeps_suffix(self, state):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        tree.rooted = state
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="same-root")
+        suffix = tree.root_suffix
+        root = tree.root
+        before = tree.newick()
+        tree.reroot(root, polytomy=True)
+        assert tree.rooted is True
+        assert tree.root == root
+        assert tree.root_suffix is suffix
+        assert tree.newick() == before
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_existing_node_reroot_clears_suffix_and_keeps_node_ownership(self, state):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        oldroot = tree.root
+        newroot = tree.find_mrca({"A", "B"})
+        tree.rooted = state
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="old-root")
+        tree.set_node_attribute(oldroot, "extra_meta", {"old": ["own"]})
+        tree.set_node_attribute(newroot, "extra_meta", {"new": ["own"]})
+        old_node = tree.nodedict[oldroot]
+        new_node = tree.nodedict[newroot]
+        reversed_branch = tree.child_dict[oldroot][newroot]
+        tree.reroot(newroot, polytomy=True)
+        assert tree.rooted is True
+        assert tree.root == newroot
+        assert tree.root_suffix is None
+        assert tree.nodedict[oldroot] is old_node
+        assert tree.nodedict[newroot] is new_node
+        assert tree.child_dict[newroot][oldroot] is reversed_branch
+
+    def test_failed_selection_does_not_establish_interpretation(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        tree.rooted = False
+        with pytest.raises(pt.TreeError, match="Need to specify node2"):
+            tree.reroot("A")
+        assert tree.rooted is False
+
 
 class Test_remove_branch:
 
@@ -5065,3 +5106,50 @@ class Test_max_bipart_cred_tree_SummaryTreeBuilder:
         bip = next(iter(outputs))
         outputs[bip].extra_meta["length_95%_CI"][0] = -99.0
         assert summary.bipartsummary[bip].extra_meta["length_95%_CI"][0] != -99.0
+
+
+class Test_move_root:
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_mechanical_reorientation_does_not_establish_rootedness(self, state):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        tree.rooted = state
+        newroot = tree.find_mrca({"A", "B"})
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="old-root")
+        tree._move_root(newroot, polytomy=True)
+        assert tree.rooted is (None if state is True else state)
+        assert tree.root_suffix is None
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_mechanical_noop_preserves_state_and_suffix(self, state):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        tree.rooted = state
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="same-root")
+        suffix = tree.root_suffix
+        tree._move_root(tree.root, polytomy=True)
+        assert tree.rooted is state
+        assert tree.root_suffix is suffix
+
+
+class Test_match_nodes:
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_comparison_uses_mechanical_route_and_preserves_sources(self, monkeypatch, state):
+        first = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        second = pt.Tree.from_string("(A:1,(B:1,(C:1,D:1):2):1);")
+        first.rooted = second.rooted = state
+        first.root_suffix = pt.Branchstruct(length=0.0, label="first")
+        second.root_suffix = pt.Branchstruct(length=0.0, label="second")
+        first_suffix, second_suffix = first.root_suffix, second.root_suffix
+        before = first.newick(), second.newick()
+
+        def reject_deliberate_root(*args, **kwargs):
+            raise AssertionError("comparison must use mechanical root movement")
+
+        monkeypatch.setattr(pt.Tree, "reroot", reject_deliberate_root)
+        mapping, _, _ = first.match_nodes(second)
+        assert all(mapping[leaf] == leaf for leaf in first.leaves)
+        assert (first.newick(), second.newick()) == before
+        assert first.rooted is second.rooted is state
+        assert first.root_suffix is first_suffix
+        assert second.root_suffix is second_suffix

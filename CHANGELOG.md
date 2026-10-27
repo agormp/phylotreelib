@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- Successful public `reroot()` establishes rootedness, including a current-root no-op; computational root movement and `match_nodes()` use shared mechanics without selecting an interpretation. Actual root replacement clears the old suffix while node data stays attached.
 - `remove_branch()` now gives reattached branches fresh non-length fields and removes the deleted internal node's metadata, while preserving its existing length redistribution and unrelated data.
 - Branch subdivision now defaults to `copy_attrs="none"`, including automatic graft/reroot subdivisions. Explicit `"lower"` and `"both"` retain independent annotation copies without rescaling statistics; an explicit upper Branchstruct still overrides the upper segment.
 - Serial branch joins now consistently retain only summed structural lengths, including non-root parent removal in `remove_leaf()`. `Branchstruct.merge()` returns fresh non-length defaults; its unused `check_compat` argument has been removed.
