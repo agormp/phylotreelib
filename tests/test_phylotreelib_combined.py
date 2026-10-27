@@ -2001,6 +2001,37 @@ class Test_copy_treeobject:
         assert copied.root_suffix.extra_meta is not source.root_suffix.extra_meta
         assert copied.root_suffix.extra_meta["missing"] is pt.MISSING
 
+    @pytest.mark.parametrize("field,value", [
+        ("mean", 0.9), ("M2", 0.25), ("n", 3),
+        ("parent_height", 0.0), ("kid_height", pt.MISSING),
+    ])
+    def test_suffix_retains_nondefault_native_fields(self, field, value):
+        source = pt.Tree.from_string("(A:2,B:3);")
+        source.root_suffix = pt.Branchstruct(length=None)
+        setattr(source.root_suffix, field, value)
+
+        copied = source.copy_treeobject()
+
+        assert copied.root_suffix is not None
+        assert copied.root_suffix is not source.root_suffix
+        assert copied.root_suffix.length is None
+        if value is pt.MISSING:
+            assert getattr(copied.root_suffix, field) is pt.MISSING
+        else:
+            assert getattr(copied.root_suffix, field) == value
+        assert source.copy_treeobject(copyattr=False).root_suffix is None
+        assert getattr(source.root_suffix, field) is value
+
+    def test_suffix_configured_native_label_survives_copy(self):
+        source = pt.Tree.from_string("(A:2,B:3);")
+        source.root_suffix = pt.Branchstruct(length=None)
+        source.root_suffix.mean = 0.9
+
+        copied = source.copy_treeobject()
+
+        assert source.newick(labelfield="mean") == "(A:2.0,B:3.0)0.9;"
+        assert copied.newick(labelfield="mean") == source.newick(labelfield="mean")
+
     def test_suffix_with_no_retained_information_is_omitted(self):
         source = pt.Tree.from_string("(A:2,B:3);")
         source.root_suffix = pt.Branchstruct(length=None)

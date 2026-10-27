@@ -2278,10 +2278,15 @@ class Tree:
             annotations = suffix.extra_meta
             has_extras = (any(value is not None for value in annotations.values())
                           if isinstance(annotations, dict) else annotations is not None)
-            fields = ("length_median", "length_sd", "posterior", "freq",
-                      "bipartition_cred", "rootcred")
-            if (suffix.length is not None or suffix.label not in (None, "")
-                    or has_extras or any(getattr(suffix, field) is not None for field in fields)):
+            has_native_data = False
+            for field in suffix.__slots__:
+                if field in ("length", "extra_meta"):
+                    continue
+                value = getattr(suffix, field)
+                if value is not None and suffix.is_interesting(field, value):
+                    has_native_data = True
+                    break
+            if suffix.length is not None or has_extras or has_native_data:
                 obj.root_suffix = suffix
         return obj
 

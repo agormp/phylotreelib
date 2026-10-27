@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Tree copies retain nondefault root-suffix fields, including root labels selected through a configured native field.
 - Struct and Tree copies now isolate retained nested mutable annotation data. `copyattr=False` omits node metadata as well as branch attributes.
 - Single-leaf SPR now preserves an independent copy of the moved node metadata, including when it was the tree's only annotated node, without changing leaf extraction or branch-length calculations.
 - Grafting now retains donor node metadata even when the recipient initially has none, and initializes the inserted graftpoint with default node data.
