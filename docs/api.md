@@ -385,3 +385,9 @@ The remaining classes are useful, but many of them are better regarded as advanc
 `Tree.rooted` is a separate True/False/None interpretation field; `root` remains the traversal-node identifier. `root_suffix` is absent (`None`) or a `Branchstruct` for the root label, optional stem length and stem annotations outside the topology. These data/copy foundations precede parser interpretation and operation-state transitions.
 
 `copy_treeobject(copylengths=True, copyattr=True)` preserves rootedness under either flag and independently copies retained mutable annotation containers. `copyattr=False` omits node metadata and non-length branch/suffix fields. `copylengths=False` resets a present stem to zero while preserving an absent stem as `None`; a suffix with no retained information is omitted. This does not establish independent copying of unrelated accumulator objects.
+
+### Annotation storage
+
+Public `.ci` has been removed from `Nodestruct`, `Branchstruct` and `SummaryNodestruct`. All non-native annotations, including intervals, live under full keys in `extra_meta`, initially `None`. For example, `tree.set_node_attribute("A", "extra_meta", {"height_95%_CI": (1.0, 2.0), "location": "Denmark"})` assigns a whole ordinary dictionary; native setters do not redirect arbitrary attribute names into entries. Edit existing entries directly when retaining other annotations.
+
+Recognized native scalar fields remain authoritative and cannot be duplicated in `extra_meta`. Recognized intervals have owner-specific numeric-pair validation; other keys retain generic values. Selected `MISSING` emits `?`; whole-value None is unset, while collection elements require `MISSING` rather than None. Valid empty strings and collections are retained. Only selected values are validated. Imported `length` and `nleaves` keys remain annotations and do not replace structural lengths or summary counts.

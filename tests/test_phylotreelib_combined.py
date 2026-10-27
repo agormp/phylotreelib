@@ -375,14 +375,14 @@ def annotated_print_tree():
     tree = pt.Tree.from_string("((A:0.123456789,B:2)old:3,C:4);")
     tree.set_node_attribute("A", "height", 1.23456789)
     tree.set_node_attribute("A", "height_sd", 0.1)
-    tree.set_node_attribute("A", "ci", {"80%_CI": (1.0, 1.4), "95%_CI": (0.8, 1.5)})
+    tree.set_node_attribute("A", "extra_meta", {"height_80%_CI": (1.0, 1.4), "height_95%_CI": (0.8, 1.5)})
     tree.set_node_attribute(tree.root, "height", 5.0)
-    tree.set_node_attribute(tree.root, "ci", {"80%_CI": (4.5, 5.5), "95%_CI": (4.0, 6.0)})
+    tree.set_node_attribute(tree.root, "extra_meta", {"height_80%_CI": (4.5, 5.5), "height_95%_CI": (4.0, 6.0)})
     node = tree.find_mrca({"A", "B"})
     branch = tree.child_dict[tree.root][node]
     branch.posterior = 0.975
     branch.length_sd = 0.25
-    branch.ci = {"80%_CI": (2.5, 3.5), "95%_CI": (2.0, 4.0)}
+    branch.extra_meta = {"length_80%_CI": (2.5, 3.5), "length_95%_CI": (2.0, 4.0)}
     return tree
 
 
@@ -393,7 +393,7 @@ class TestTreeNewick:
         expected = "((A:0.1234568,B:2)old:3,C:4);"
         assert tree.newick() == expected
         tree.newick(printdist=False, printlabels=False, print_meta=True,
-                    precision=3, node_attributes=("height", "ci"), ci_labels=("95%_CI",))
+                    precision=3, node_attributes=("height", "height_95%_CI"), branch_attributes=(), ci_labels=("height_95%_CI", "length_95%_CI"))
         tree.nexus(print_meta=True, node_attributes=("height",))
         assert tree.newick() == expected
 
@@ -409,28 +409,28 @@ class TestTreeNewick:
 
     def test_selected_metadata_including_root(self, annotated_print_tree):
         result = annotated_print_tree.newick(
-            print_meta=True, node_attributes=("height", "ci"),
-            branch_attributes=("length_sd", "ci"), ci_labels=("95%_CI",), precision=4)
+            print_meta=True, node_attributes=("height", "height_95%_CI"),
+            branch_attributes=("length_sd", "length_95%_CI"), ci_labels=("height_95%_CI", "length_95%_CI"), precision=4)
         assert "A[&height=1.235,height_95%_CI={0.8,1.5}]:0.1235" in result
-        assert "old:3[&length_sd=0.25,length_95%_CI={2,4}]" in result
-        assert result.endswith(")[&height=5,height_95%_CI={4,6}];")
+        assert "old:3[&length_sd=0.25,length_95%_CI={2.0,4.0}]" in result
+        assert result.endswith(")[&height=5.0,height_95%_CI={4.0,6.0}];")
         assert "height_sd" not in result
-        assert "80%_CI" not in result
+        assert "height_80%_CI" not in result
         assert "B:2" in result
 
     @pytest.mark.parametrize("print_meta", [False, None])
     def test_metadata_suppression(self, annotated_print_tree, print_meta):
         result = annotated_print_tree.newick(
-            print_meta=print_meta, node_attributes=("height", "ci"),
-            branch_attributes=("length_sd", "ci"), ci_labels=("95%_CI",))
+            print_meta=print_meta, node_attributes=("height", "height_95%_CI"),
+            branch_attributes=("length_sd", "length_95%_CI"), ci_labels=("height_95%_CI", "length_95%_CI"))
         assert "[&" not in result
 
     def test_empty_selections(self, annotated_print_tree):
         tree = annotated_print_tree
-        tree.newick(print_meta=True, node_attributes=("height", "ci"), ci_labels=("95%_CI",))
+        tree.newick(print_meta=True, node_attributes=("height", "height_95%_CI"), ci_labels=("height_95%_CI", "length_95%_CI"))
         result = tree.newick(print_meta=True, node_attributes=(), branch_attributes=())
         assert "[&" not in result
-        result = tree.newick(print_meta=True, node_attributes=("height", "ci"), ci_labels=())
+        result = tree.newick(print_meta=True, node_attributes=("height", "height_95%_CI"), ci_labels=())
         assert "height=" in result
         assert "_CI=" not in result
 
@@ -446,11 +446,11 @@ class TestTreeNewick:
         result = tree.newick(print_meta=True)
         assert "height=1.234568,height_sd=0.1" in result
         assert "posterior=0.975" in result
-        assert "height_80%_CI={1,1.4}" in result
+        assert "height_80%_CI={1.0,1.4}" in result
         assert "height_95%_CI={0.8,1.5}" in result
         assert "length_80%_CI={2.5,3.5}" in result
-        assert "length_95%_CI={2,4}" in result
-        assert result.endswith(")[&height=5,height_80%_CI={4.5,5.5},height_95%_CI={4,6}];")
+        assert "length_95%_CI={2.0,4.0}" in result
+        assert result.endswith(")[&height=5.0,height_80%_CI={4.5,5.5},height_95%_CI={4.0,6.0}];")
         for field in ("n", "mean", "M2", "quantiles", "parent_height", "kid_height"):
             assert f",{field}=" not in result
             assert f"[&{field}=" not in result
@@ -460,7 +460,7 @@ class TestTreeNewick:
     def test_explicit_attributes_do_not_add_intervals(self, annotated_print_tree):
         result = annotated_print_tree.newick(
             print_meta=True, node_attributes=("height",), branch_attributes=("posterior",),
-            ci_labels=("95%_CI",))
+            ci_labels=("height_95%_CI", "length_95%_CI"))
         assert "[&height=1.234568]" in result
         assert "[&posterior=0.975]" in result
         assert "_CI=" not in result
@@ -478,10 +478,10 @@ class TestTreeNewick:
         assert "height=" not in branches_only
 
     def test_missing_intervals_are_skipped(self, annotated_print_tree):
-        result = annotated_print_tree.newick(print_meta=True, ci_labels=("90%_CI", "95%_CI"))
-        assert "90%_CI" not in result
-        assert "95%_CI" in result
-        assert "80%_CI" not in result
+        result = annotated_print_tree.newick(print_meta=True, ci_labels=("height_90%_CI", "height_95%_CI"))
+        assert "height_90%_CI" not in result
+        assert "height_95%_CI" in result
+        assert "height_80%_CI" not in result
 
     def test_zero_false_and_collection_metadata(self, annotated_print_tree):
         tree = annotated_print_tree
@@ -490,7 +490,7 @@ class TestTreeNewick:
         tree.set_node_attribute("B", "state", ('human host', 'a,"quoted"'))
         tree.set_node_attribute("B", "primary_set", {"mink", "human"})
         result = tree.newick(print_meta=True)
-        assert 'B[&height=0,state={"human host","a,""quoted"""},primary_set={"human","mink"},wasambig=false]' in result
+        assert 'B[&height=0.0,state={"human host","a,""quoted"""},primary_set={"human","mink"},wasambig=false]' in result
         assert "state=," not in result
         assert "secondary_set=" not in result
 
@@ -544,9 +544,9 @@ class TestTreeNexus:
     def test_forwarding_and_call_independence(self, annotated_print_tree):
         tree = annotated_print_tree
         plain = tree.nexus()
-        options = dict(print_meta=True, printdist=False, labelfield="posterior", precision=3,
-                       node_attributes=("height", "ci"), branch_attributes=("length_sd", "ci"),
-                       ci_labels=("95%_CI",))
+        options = dict(print_meta=True, printdist=True, labelfield="posterior", precision=3,
+                       node_attributes=("height", "height_95%_CI"), branch_attributes=("length_sd", "length_95%_CI"),
+                       ci_labels=("height_95%_CI", "length_95%_CI"))
         result = tree.nexus(**options)
         assert "    tree nexus_tree = " + tree.newick(**options) in result
         assert result.startswith("#NEXUS")
@@ -562,7 +562,7 @@ class TestTreeNexus:
         expected = tree.newick(transdict=tree.transdict(), print_meta=True, node_attributes=("height",))
         assert "translate" in result.lower()
         assert expected in result
-        assert expected.endswith(")[&height=5];")
+        assert expected.endswith(")[&height=5.0];")
         parsed = next(pt.Nexustreefile(filecontent=result))
         assert parsed.equals(tree, rooted=True)
 
@@ -580,9 +580,9 @@ class TestTreeSetNewick:
         trees = pt.TreeSet()
         trees.addtree(tree)
         trees.addtree(tree.copy_treeobject())
-        options = dict(print_meta=True, printlabels=False, printdist=False, precision=4,
-                       node_attributes=("height", "ci"), branch_attributes=("length_sd", "ci"),
-                       ci_labels=("95%_CI",), transdict={"A": "1", "B": "2", "C": "3"})
+        options = dict(print_meta=True, printlabels=False, printdist=True, precision=4,
+                       node_attributes=("height", "height_95%_CI"), branch_attributes=("length_sd", "length_95%_CI"),
+                       ci_labels=("height_95%_CI", "length_95%_CI"), transdict={"A": "1", "B": "2", "C": "3"})
         assert trees.newick(**options) == (tree.newick(**options) + "\n") * 2
         assert "[&" not in trees.newick()
 
@@ -628,9 +628,9 @@ class TestTreeSetNexus:
         trees = pt.TreeSet()
         trees.addtree(tree)
         trees.addtree(tree.copy_treeobject())
-        options = dict(print_meta=True, printdist=False, printlabels=False, precision=4,
-                       node_attributes=("height", "ci"), branch_attributes=("length_sd", "ci"),
-                       ci_labels=("95%_CI",))
+        options = dict(print_meta=True, printdist=True, printlabels=False, precision=4,
+                       node_attributes=("height", "height_95%_CI"), branch_attributes=("length_sd", "length_95%_CI"),
+                       ci_labels=("height_95%_CI", "length_95%_CI"))
         result = trees.nexus(translateblock=True, **options)
         expected = tree.newick(transdict=tree.transdict(), **options)
         assert "translate" in result.lower()
@@ -1366,40 +1366,40 @@ class Test_copy_Branchstruct:
 
     def test_supported_mutable_annotation_values_are_independent(self):
         source = pt.Branchstruct(length=3.0, label="edge")
-        source.ci = _copy_foundation_payload()
+        source.extra_meta = _copy_foundation_payload()
 
         copied = source.copy()
 
         assert copied is not source
         assert copied.length == 3.0
         assert copied.label == "edge"
-        assert copied.ci == source.ci
-        assert copied.ci is not source.ci
-        assert isinstance(copied.ci["height_95%_CI"], list)
-        assert isinstance(copied.ci["nested"], tuple)
-        assert isinstance(copied.ci["nested"][0], list)
-        assert isinstance(copied.ci["nested"][0][0], set)
-        assert isinstance(copied.ci["frozen"], frozenset)
-        assert copied.ci["missing"] is pt.MISSING
-        assert copied.ci["nested"][1][1] is pt.MISSING
+        assert copied.extra_meta == source.extra_meta
+        assert copied.extra_meta is not source.extra_meta
+        assert isinstance(copied.extra_meta["height_95%_CI"], list)
+        assert isinstance(copied.extra_meta["nested"], tuple)
+        assert isinstance(copied.extra_meta["nested"][0], list)
+        assert isinstance(copied.extra_meta["nested"][0][0], set)
+        assert isinstance(copied.extra_meta["frozen"], frozenset)
+        assert copied.extra_meta["missing"] is pt.MISSING
+        assert copied.extra_meta["nested"][1][1] is pt.MISSING
 
-        copied.ci["height_95%_CI"][0] = 9.0
-        copied.ci["nested"][0][0].add("blue")
-        copied.ci["new_key"] = "copy only"
+        copied.extra_meta["height_95%_CI"][0] = 9.0
+        copied.extra_meta["nested"][0][0].add("blue")
+        copied.extra_meta["new_key"] = "copy only"
 
-        assert source.ci["height_95%_CI"] == [1.0, 2.0]
-        assert source.ci["nested"][0][0] == {"red"}
-        assert "new_key" not in source.ci
+        assert source.extra_meta["height_95%_CI"] == [1.0, 2.0]
+        assert source.extra_meta["nested"][0][0] == {"red"}
+        assert "new_key" not in source.extra_meta
 
     def test_omitted_attributes_do_not_retain_annotation_mapping(self):
         source = pt.Branchstruct(length=3.0, label="edge")
-        source.ci = _copy_foundation_payload()
+        source.extra_meta = _copy_foundation_payload()
 
         copied = source.copy(copyattr=False)
 
         assert copied.length == 3.0
         assert copied.label == ""
-        assert copied.ci is None
+        assert copied.extra_meta is None
 
 ###################################################################################################
 ###################################################################################################
@@ -1914,23 +1914,23 @@ class Test_copy_treeobject:
 
     def test_full_copy_isolates_node_branch_and_suffix_annotation_values(self):
         source = pt.Tree.from_string("(A:2,B:3);")
-        source.set_node_attribute(source.root, "ci", _copy_foundation_payload())
-        source.set_branch_attribute(source.root, "A", "ci", _copy_foundation_payload())
+        source.set_node_attribute(source.root, "extra_meta", _copy_foundation_payload())
+        source.set_branch_attribute(source.root, "A", "extra_meta", _copy_foundation_payload())
         source.root_suffix = pt.Branchstruct(length=0.0, label="root_label")
-        source.root_suffix.ci = _copy_foundation_payload()
+        source.root_suffix.extra_meta = _copy_foundation_payload()
 
         copied = source.copy_treeobject()
-        copied.nodedict[copied.root].ci["nested"][0][0].add("node_copy")
-        copied.child_dict[copied.root]["A"].ci["height_95%_CI"][0] = 11.0
-        copied.root_suffix.ci["nested"][0][0].add("stem_copy")
+        copied.nodedict[copied.root].extra_meta["nested"][0][0].add("node_copy")
+        copied.child_dict[copied.root]["A"].extra_meta["height_95%_CI"][0] = 11.0
+        copied.root_suffix.extra_meta["nested"][0][0].add("stem_copy")
 
-        assert source.nodedict[source.root].ci["nested"][0][0] == {"red"}
-        assert source.child_dict[source.root]["A"].ci["height_95%_CI"] == [1.0, 2.0]
-        assert source.root_suffix.ci["nested"][0][0] == {"red"}
+        assert source.nodedict[source.root].extra_meta["nested"][0][0] == {"red"}
+        assert source.child_dict[source.root]["A"].extra_meta["height_95%_CI"] == [1.0, 2.0]
+        assert source.root_suffix.extra_meta["nested"][0][0] == {"red"}
         assert copied.root_suffix is not source.root_suffix
         assert copied.root_suffix.length == 0.0
         assert copied.root_suffix.label == "root_label"
-        assert copied.root_suffix.ci["missing"] is pt.MISSING
+        assert copied.root_suffix.extra_meta["missing"] is pt.MISSING
         assert copied.nodedist("A", "B") == source.nodedist("A", "B") == 5.0
 
     @pytest.mark.parametrize(
@@ -1951,7 +1951,7 @@ class Test_copy_treeobject:
     ):
         source = pt.Tree.from_string("(A:2,B:3);")
         source.root_suffix = pt.Branchstruct(length=stem_length, label="root_label")
-        source.root_suffix.ci = {"rate": [1.0, 2.0]}
+        source.root_suffix.extra_meta = {"rate": [1.0, 2.0]}
 
         copied = source.copy_treeobject(copylengths=copylengths, copyattr=copyattr)
 
@@ -1962,19 +1962,19 @@ class Test_copy_treeobject:
             assert copied.root_suffix.length == expected_length
             if copyattr:
                 assert copied.root_suffix.label == "root_label"
-                assert copied.root_suffix.ci == {"rate": [1.0, 2.0]}
-                copied.root_suffix.ci["rate"][0] = 99.0
+                assert copied.root_suffix.extra_meta == {"rate": [1.0, 2.0]}
+                copied.root_suffix.extra_meta["rate"][0] = 99.0
             else:
                 assert copied.root_suffix.label == ""
-                assert copied.root_suffix.ci is None
+                assert copied.root_suffix.extra_meta is None
         assert source.root_suffix.length == stem_length
         assert source.root_suffix.label == "root_label"
-        assert source.root_suffix.ci == {"rate": [1.0, 2.0]}
+        assert source.root_suffix.extra_meta == {"rate": [1.0, 2.0]}
 
     def test_suffix_with_only_present_empty_or_missing_annotations_is_retained(self):
         source = pt.Tree.from_string("(A:2,B:3);")
         source.root_suffix = pt.Branchstruct(length=None)
-        source.root_suffix.ci = {
+        source.root_suffix.extra_meta = {
             "empty_string": "", "empty_collection": (),
             "zero": 0, "false": False, "missing": pt.MISSING,
         }
@@ -1983,21 +1983,21 @@ class Test_copy_treeobject:
 
         assert copied.root_suffix is not None
         assert copied.root_suffix.length is None
-        assert copied.root_suffix.ci == source.root_suffix.ci
-        assert copied.root_suffix.ci is not source.root_suffix.ci
-        assert copied.root_suffix.ci["missing"] is pt.MISSING
+        assert copied.root_suffix.extra_meta == source.root_suffix.extra_meta
+        assert copied.root_suffix.extra_meta is not source.root_suffix.extra_meta
+        assert copied.root_suffix.extra_meta["missing"] is pt.MISSING
 
     def test_suffix_with_no_retained_information_is_omitted(self):
         source = pt.Tree.from_string("(A:2,B:3);")
         source.root_suffix = pt.Branchstruct(length=None)
-        source.root_suffix.ci = {}
+        source.root_suffix.extra_meta = {}
 
         copied = source.copy_treeobject()
 
         assert copied.root_suffix is None
         assert source.root_suffix is not None
         assert source.root_suffix.length is None
-        assert source.root_suffix.ci == {}
+        assert source.root_suffix.extra_meta == {}
 
 ###################################################################################################
 
@@ -2248,7 +2248,7 @@ class TestSPR:
         tree = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
         tree.set_node_attribute("A", "height", 1.25)
         tree.set_node_attribute("A", "state", "sampled")
-        tree.set_node_attribute("A", "ci", {"95%_CI": (0.5, 2.0)})
+        tree.set_node_attribute("A", "extra_meta", {"height_95%_CI": (0.5, 2.0)})
         tree.set_node_attribute("A", "primary_set", {"human", "mink"})
         moved = tree.nodedict["A"]
         if annotate_survivor:
@@ -2264,11 +2264,11 @@ class TestSPR:
         assert restored is not moved
         assert restored.height == 1.25
         assert restored.state == "sampled"
-        assert restored.ci == {"95%_CI": (0.5, 2.0)}
+        assert restored.extra_meta == {"height_95%_CI": (0.5, 2.0)}
         assert restored.primary_set == {"human", "mink"}
-        restored.ci["95%_CI"] = (8.0, 9.0)
+        restored.extra_meta["height_95%_CI"] = (8.0, 9.0)
         restored.primary_set.add("changed")
-        assert moved.ci == {"95%_CI": (0.5, 2.0)}
+        assert moved.extra_meta == {"height_95%_CI": (0.5, 2.0)}
         assert moved.primary_set == {"human", "mink"}
         graftpoint = tree.parent("A")
         assert tree.nodedict[graftpoint].height is None
@@ -3243,7 +3243,7 @@ class Test_cladesummary_TreeSummary:
 
         assert nd.height_sd is None
         assert nd.height_median == nd.height
-        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+        assert nd.extra_meta["height_95%_CI"] == (nd.height, nd.height)
 
     def test_effectively_constant_leaf_height_uses_exact_mean(self):
         tree1 = pt.Tree.from_string("(A:1,B:2);")
@@ -3262,7 +3262,7 @@ class Test_cladesummary_TreeSummary:
 
         assert nd.height_sd == 0.0
         assert nd.height_median == nd.height
-        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+        assert nd.extra_meta["height_95%_CI"] == (nd.height, nd.height)
 
     def test_variable_leaf_height_keeps_quantile_estimates(self):
         tree1 = pt.Tree.from_string("(A:1,B:2);")
@@ -3280,7 +3280,7 @@ class Test_cladesummary_TreeSummary:
         nd = treesummary.cladesummary[leaf_clade]
 
         assert nd.height_sd > 0.0
-        assert nd.ci["95%_CI"][0] != nd.ci["95%_CI"][1]
+        assert nd.extra_meta["height_95%_CI"][0] != nd.extra_meta["height_95%_CI"][1]
 
 
 ###################################################################################################
@@ -3302,7 +3302,7 @@ class Test_write_into_CAHeightEstimator:
 
         assert nd.height_sd is None
         assert nd.height_median == nd.height
-        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+        assert nd.extra_meta["height_95%_CI"] == (nd.height, nd.height)
 
     def test_effectively_constant_leaf_height_uses_exact_mean(self):
         sumtree = pt.Tree.from_string("(A:1,B:2);")
@@ -3320,7 +3320,7 @@ class Test_write_into_CAHeightEstimator:
 
         assert nd.height_sd == 0.0
         assert nd.height_median == nd.height
-        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+        assert nd.extra_meta["height_95%_CI"] == (nd.height, nd.height)
 
     def test_variable_leaf_height_keeps_quantile_estimates(self):
         sumtree = pt.Tree.from_string("(A:1,B:2);")
@@ -3337,7 +3337,7 @@ class Test_write_into_CAHeightEstimator:
         nd = sumtree.nodedict["A"]
 
         assert nd.height_sd > 0.0
-        assert nd.ci["95%_CI"][0] != nd.ci["95%_CI"][1]
+        assert nd.extra_meta["height_95%_CI"][0] != nd.extra_meta["height_95%_CI"][1]
 
 
 ###################################################################################################
@@ -3362,7 +3362,7 @@ class Test_merge_CAHeightEstimator:
 
         assert nd.height_sd == 0.0
         assert nd.height_median == nd.height
-        assert nd.ci["95%_CI"] == (nd.height, nd.height)
+        assert nd.extra_meta["height_95%_CI"] == (nd.height, nd.height)
 
 
 # Combined from test_sumt_biplen_reference.py
@@ -3869,7 +3869,7 @@ class TestParsimony:
 class Test_set_branch_attribute:
 
     @pytest.mark.parametrize("attribute,value", [
-        ("posterior", 0.9), ("length_sd", 0.2), ("ci", {"95%_CI": (0.1, 0.9)}),
+        ("posterior", 0.9), ("length_sd", 0.2), ("extra_meta", {"length_95%_CI": (0.1, 0.9)}),
     ])
     def test_metadata_updates_retain_valid_caches(self, attribute, value):
         tree = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
@@ -4168,7 +4168,7 @@ class TestNodedictRefactor:
         tree.set_node_attribute("A", "height", 0.0)
         nwk = tree.newick(print_meta=True, node_attributes=("height",))
         assert isinstance(nwk, str)
-        assert "A[&height=0]:1" in nwk
+        assert "A[&height=0.0]:1" in nwk
 
     def test_cluster_no_branchstruct_heights(self):
         tree = pt.Tree.randtree(ntips=10, rate_sd=0.1)
@@ -4204,12 +4204,12 @@ class Test_pickle_MISSING:
     def test_identity_survives_direct_and_struct_pickle_roundtrips(self):
         assert pickle.loads(pickle.dumps(pt.MISSING)) is pt.MISSING
         node = pt.Nodestruct()
-        node.ci = {"missing": pt.MISSING, "nested": (pt.MISSING,)}
+        node.extra_meta = {"missing": pt.MISSING, "nested": (pt.MISSING,)}
 
         restored = pickle.loads(pickle.dumps(node))
 
-        assert restored.ci["missing"] is pt.MISSING
-        assert restored.ci["nested"][0] is pt.MISSING
+        assert restored.extra_meta["missing"] is pt.MISSING
+        assert restored.extra_meta["nested"][0] is pt.MISSING
 
 
 class Test_init_Tree:
@@ -4224,26 +4224,209 @@ class Test_copy_Nodestruct:
 
     def test_annotations_and_native_nested_parsimony_values_are_independent(self):
         source = pt.Nodestruct(height=7.0)
-        source.ci = _copy_foundation_payload()
+        source.extra_meta = _copy_foundation_payload()
         source.primary_set = [{"red"}, {"green"}]
         source.optimal_set = {"red"}
 
         copied = source.copy()
 
         assert copied.height == 7.0
-        assert copied.ci == source.ci
-        assert copied.ci is not source.ci
-        assert copied.ci["missing"] is pt.MISSING
-        assert isinstance(copied.ci["nested"], tuple)
-        assert isinstance(copied.ci["nested"][0], list)
+        assert copied.extra_meta == source.extra_meta
+        assert copied.extra_meta is not source.extra_meta
+        assert copied.extra_meta["missing"] is pt.MISSING
+        assert isinstance(copied.extra_meta["nested"], tuple)
+        assert isinstance(copied.extra_meta["nested"][0], list)
         assert isinstance(copied.primary_set, list)
         assert isinstance(copied.primary_set[0], set)
         assert isinstance(copied.optimal_set, set)
 
-        copied.ci["nested"][0][0].add("blue")
+        copied.extra_meta["nested"][0][0].add("blue")
         copied.primary_set[0].add("blue")
         copied.optimal_set.add("green")
 
-        assert source.ci["nested"][0][0] == {"red"}
+        assert source.extra_meta["nested"][0][0] == {"red"}
         assert source.primary_set == [{"red"}, {"green"}]
         assert source.optimal_set == {"red"}
+
+# Focused tests to integrate into tests/test_phylotreelib_combined.py.
+# Assumes its existing imports: phylotreelib as pt and pytest.
+
+
+class Test_metadata_pairs:
+
+    def test_absent_and_explicitly_empty_mapping_do_not_gain_entries(self):
+        node = pt.Nodestruct()
+        assert node.extra_meta is None
+        assert pt._metadata_pairs(node, None, "node", None) == []
+        assert node.extra_meta is None
+        node.extra_meta = {}
+        assert pt._metadata_pairs(node, None, "node", None) == []
+        assert node.extra_meta == {}
+
+    def test_selected_presence_types_and_nested_values(self):
+        node = pt.Nodestruct()
+        node.extra_meta = {
+            "unset": None, "missing": pt.MISSING, "empty": "", "collection": (),
+            "integer": 1, "float": 1.0, "false": False, "zero": 0,
+            "nested": (1, 1.0, True, "1", (pt.MISSING,)),
+        }
+        assert pt._metadata_pairs(node, None, "node", None) == [
+            "missing=?", 'empty=""', "collection={}", "integer=1", "float=1.0",
+            "false=false", "zero=0", 'nested={1,1.0,true,"1",{?}}',
+        ]
+        assert "unset" in node.extra_meta
+        assert node.extra_meta["unset"] is None
+
+    def test_exact_selection_literal_keys_and_duplicate_selection(self):
+        node = pt.Nodestruct()
+        node.extra_meta = {"ci": "literal", "height_95%_CI": (1, 2),
+                           "extra_meta": "literal container name"}
+        assert pt._metadata_pairs(node, ("ci", "ci", "absent"), "node", None) == ['ci="literal"']
+        assert pt._metadata_pairs(node, ("extra_meta",), "node", None) == [
+            'extra_meta="literal container name"']
+        assert pt._metadata_pairs(node, (), "node", None) == []
+        node.extra_meta = None
+        assert pt._metadata_pairs(node, ("extra_meta",), "node", None) == []
+
+    def test_extra_precedence_and_none_native_fallback(self):
+        branch = pt.Branchstruct(length=0.5)
+        branch.extra_meta = {"length": 0.7, "mean": 12, "extra_meta": "literal"}
+        assert pt._metadata_pairs(branch, ("length", "mean"), "branch", None) == [
+            "length=0.7", "mean=12"]
+        branch.extra_meta["length"] = None
+        assert pt._metadata_pairs(branch, ("length",), "branch", None) == ["length=0.5"]
+        automatic = pt._metadata_pairs(branch, None, "branch", None)
+        assert "mean=12" in automatic
+        assert 'extra_meta="literal"' in automatic
+        assert not any(pair.startswith(("M2=", "n=", "quantiles=", "parent_height=", "kid_height="))
+                       for pair in automatic)
+        branch.extra_meta["mean"] = None
+        assert not any(pair.startswith("mean=")
+                       for pair in pt._metadata_pairs(branch, None, "branch", None))
+
+    @pytest.mark.parametrize("value", [None, pt.MISSING, 1, (1, 2)])
+    def test_selected_native_scalar_duplicate_storage_is_invalid(self, value):
+        node = pt.Nodestruct(height=2.0)
+        node.extra_meta = {"height": value, "safe": 3}
+        assert pt._metadata_pairs(node, ("safe",), "node", None) == ["safe=3"]
+        with pytest.raises(pt.TreeError, match="node annotation 'height'.*native field"):
+            pt._metadata_pairs(node, ("height",), "node", None)
+
+    @pytest.mark.parametrize("value", [True, "2", (), (1, 2)])
+    def test_mapped_scalar_type_errors_are_selected_only(self, value):
+        node = pt.Nodestruct(height=value)
+        node.extra_meta = {"safe": 0}
+        assert pt._metadata_pairs(node, ("safe",), "node", None) == ["safe=0"]
+        with pytest.raises(pt.TreeError, match="node annotation 'height'.*number or MISSING"):
+            pt._metadata_pairs(node, ("height",), "node", None)
+
+    @pytest.mark.parametrize("value,expected", [
+        (pt.MISSING, "?"), ((pt.MISSING, 2.5), "{?,2.5}"),
+        ((pt.MISSING, pt.MISSING), "{?,?}"), ([1, 2.0], "{1,2.0}"),
+    ])
+    def test_recognized_interval_missingness_and_ordered_pairs(self, value, expected):
+        node = pt.Nodestruct()
+        node.extra_meta = {"height_95%_HPD": value}
+        assert pt._metadata_pairs(node, None, "node", None) == ["height_95%_HPD=" + expected]
+
+    @pytest.mark.parametrize("value", [(), (1,), (1, 2, 3), (None, 2), (True, 2),
+                                             ((1,), 2), {1, 2}, "interval"])
+    def test_recognized_interval_rejects_wrong_shapes(self, value):
+        branch = pt.Branchstruct()
+        branch.extra_meta = {"length_95%_CI": value}
+        with pytest.raises(pt.TreeError, match="branch annotation 'length_95%_CI'.*endpoints"):
+            pt._metadata_pairs(branch, ("length_95%_CI",), "branch", None)
+
+    def test_interval_recognition_is_owner_aware_exact_and_not_a_range_check(self):
+        node = pt.Nodestruct()
+        node.extra_meta = {"height_095.0%_CI": (9, -1), "height_150%_HPD": (1, 2),
+                           "length_95%_CI": "wrong owner stays generic",
+                           "height_95%_hpd": (), "height_1e2%_CI": "generic"}
+        assert pt._metadata_pairs(node, None, "node", None) == [
+            "height_095.0%_CI={9,-1}", "height_150%_HPD={1,2}",
+            'length_95%_CI="wrong owner stays generic"', "height_95%_hpd={}",
+            'height_1e2%_CI="generic"',
+        ]
+
+    @pytest.mark.parametrize("value", [(None,), (1, (2, None)), [1, None]])
+    def test_nested_none_is_rejected_without_changing_stored_values(self, value):
+        node = pt.Nodestruct()
+        node.extra_meta = {"invalid": value, "safe": "kept"}
+        assert pt._metadata_pairs(node, ("safe",), "node", None) == ['safe="kept"']
+        with pytest.raises(pt.TreeError, match="node annotation 'invalid'.*collection element.*MISSING"):
+            pt._metadata_pairs(node, ("invalid",), "node", None)
+        assert node.extra_meta["invalid"] is value
+
+    def test_keys_and_strings_use_doubled_double_quotes_and_literal_backslashes(self):
+        node = pt.Nodestruct()
+        node.extra_meta = {
+            'a "quoted" key': 'O\'Brien said "hello" [north [coast]]\\n',
+            "&directive": "literal", "!color": "#0000FF", "1": "1",
+            "a:b/c;(d)": "punctuation allowed in bare key",
+        }
+        assert pt._metadata_pairs(node, None, "node", None) == [
+            '"a ""quoted"" key"="O\'Brien said ""hello"" [north [coast]]\\n"',
+            '"&directive"="literal"', '!color="#0000FF"', '1="1"',
+            'a:b/c;(d)="punctuation allowed in bare key"',
+        ]
+
+    @pytest.mark.parametrize("value", ["[", "]", "][", ("[", "]")])
+    def test_each_selected_string_must_balance_its_own_square_brackets(self, value):
+        node = pt.Nodestruct()
+        node.extra_meta = {"bad": value, "safe": "[balanced]"}
+        assert pt._metadata_pairs(node, ("safe",), "node", None) == ['safe="[balanced]"']
+        with pytest.raises(pt.TreeError, match="node annotation 'bad'.*unbalanced square brackets"):
+            pt._metadata_pairs(node, ("bad",), "node", None)
+
+    @pytest.mark.parametrize("key", ["", 1, "bad[", "bad]", "bad]["])
+    def test_selected_invalid_keys_raise_useful_errors(self, key):
+        node = pt.Nodestruct()
+        node.extra_meta = {key: 1, "safe": 2}
+        assert pt._metadata_pairs(node, ("safe",), "node", None) == ["safe=2"]
+        with pytest.raises(pt.TreeError, match="node annotation"):
+            pt._metadata_pairs(node, (key,), "node", None)
+
+    def test_full_and_explicit_precision_preserve_float_category(self):
+        node = pt.Nodestruct()
+        node.extra_meta = {"precise": 1.2345678901234567, "rounded": 1.0001,
+                           "large_integer": 123456789012345678901234567890,
+                           "negative_zero": -0.0}
+        assert pt._metadata_pairs(node, ("precise",), "node", None) == [
+            "precise=1.2345678901234567"]
+        assert pt._metadata_pairs(node, ("precise", "rounded"), "node", 3) == [
+            "precise=1.23", "rounded=1.0"]
+        assert pt._metadata_pairs(node, ("large_integer", "negative_zero"), "node", 3) == [
+            "large_integer=123456789012345678901234567890", "negative_zero=-0.0"]
+
+    def test_sets_are_deterministic_even_when_str_values_would_tie(self):
+        node = pt.Nodestruct()
+        node.extra_meta = {"values": {1, "1", "z"}, "frozen": frozenset(("b", "a"))}
+        assert pt._metadata_pairs(node, None, "node", None) == [
+            'values={"1","z",1}', 'frozen={"a","b"}']
+
+
+class Test_extra_meta_storage:
+
+    @pytest.mark.parametrize("struct_type", [pt.Nodestruct, pt.Branchstruct, pt.SummaryNodestruct])
+    def test_lazy_dictionary_replaces_public_ci(self, struct_type):
+        owner = struct_type()
+        assert owner.extra_meta is None
+        assert not hasattr(owner, "ci")
+        with pytest.raises(AttributeError):
+            owner.ci = {}
+
+    def test_native_setters_replace_the_map_and_do_not_route_unknown_names(self):
+        tree = pt.Tree.from_string("(A:1,B:1);")
+        supplied = {"nleaves": "imported value", "extra_meta": "literal", "ci": 3}
+        tree.set_node_attribute("A", "extra_meta", supplied)
+        assert tree.get_node_attribute("A", "extra_meta") is supplied
+        with pytest.raises(AttributeError):
+            tree.set_node_attribute("A", "unknown_annotation", 4)
+        result = tree.newick(print_meta=True,
+                             node_attributes=("nleaves", "extra_meta", "ci"),
+                             branch_attributes=())
+        assert 'A[&nleaves="imported value",extra_meta="literal",ci=3]' in result
+        replacement = {"other": 5}
+        tree.set_node_attribute("A", "extra_meta", replacement)
+        assert tree.nodedict["A"].extra_meta is replacement
+        assert replacement == {"other": 5}

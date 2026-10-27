@@ -101,6 +101,161 @@ def _copy_annotation_value(value):
     return value
 
 
+# Private helpers for integration into phylotreelib.py; this is not a standalone module.
+# Globals supplied by the library: MISSING, TreeError and re.
+# Call _metadata_pairs only when metadata output is requested.
+
+_NATIVE_META_SCALARS = {
+    "node": frozenset(("height", "height_sd", "height_median", "clade_cred")),
+    "branch": frozenset(("length_median", "length_sd", "posterior", "freq",
+                         "bipartition_cred", "rootcred")),
+}
+_INTERVAL_META_KEYS = {
+    "node": re.compile(r"height_[0-9]+(?:\.[0-9]+)?%_(?:CI|HPD)"),
+    "branch": re.compile(r"length_[0-9]+(?:\.[0-9]+)?%_(?:CI|HPD)"),
+}
+_AUTO_BRANCH_META_EXCLUDED = frozenset((
+    "mean", "M2", "n", "quantiles", "parent_height", "kid_height", "extra_meta",
+))
+_BARE_META_KEY = re.compile(r"[^\s,={}\[\]'\"]+")
+
+
+def _quote_metadata_string(value):
+    """Encode one string, whose square brackets must balance independently."""
+    if "[" in value or "]" in value:
+        depth = 0
+        for char in value:
+            if char == "[":
+                depth += 1
+            elif char == "]":
+                depth -= 1
+                if depth < 0:
+                    raise TreeError(f"unbalanced square brackets in string {value!r}")
+        if depth:
+            raise TreeError(f"unbalanced square brackets in string {value!r}")
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _format_metadata_key(key):
+    if not isinstance(key, str) or not key:
+        raise TreeError(f"annotation key must be a nonempty string; got {key!r}")
+    if not key.startswith("&") and _BARE_META_KEY.fullmatch(key):
+        return key
+    return _quote_metadata_string(key)
+
+
+def _format_metadata_value(value, precision):
+    """Format supported typed values; None is handled only at whole-entry resolution."""
+    if value is MISSING:
+        return "?"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        text = repr(value) if precision is None else f"{value:.{precision}g}"
+        # Preserve the float category without special non-finite recognition/checks.
+        if text.lstrip("+-").isdigit():
+            text += ".0"
+        return text
+    if isinstance(value, str):
+        return _quote_metadata_string(value)
+    if isinstance(value, (tuple, list, set, frozenset)):
+        parts = []
+        for index, item in enumerate(value):
+            try:
+                parts.append(_format_metadata_value(item, precision))
+            except TreeError as error:
+                raise TreeError(f"collection element {index}: {error}") from error
+        if isinstance(value, (set, frozenset)):
+            # Sort encoded contents: str(1) and str("1") otherwise tie nondeterministically.
+            parts.sort()
+        return "{" + ",".join(parts) + "}"
+    if value is None:
+        raise TreeError("None is not a collection value; use MISSING for unavailable elements")
+    raise TreeError(f"unsupported annotation value {value!r} ({type(value).__name__})")
+
+
+def _validate_mapped_metadata_value(owner_kind, key, value):
+    """Apply bounded owner/key type-and-shape rules, without scientific validation."""
+    if value is MISSING:
+        return
+    if key in _NATIVE_META_SCALARS[owner_kind]:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TreeError(f"expected a number or MISSING; got {value!r}")
+    elif _INTERVAL_META_KEYS[owner_kind].fullmatch(key):
+        if (not isinstance(value, (tuple, list)) or len(value) != 2
+                or any(endpoint is not MISSING
+                       and (isinstance(endpoint, bool)
+                            or not isinstance(endpoint, (int, float)))
+                       for endpoint in value)):
+            raise TreeError(f"expected two ordered numeric/MISSING endpoints or MISSING; "
+                            f"got {value!r}")
+
+
+def _selected_metadata_keys(owner, attributes, owner_kind, extra):
+    if attributes is not None:
+        yield from attributes
+        return
+    excluded = _AUTO_BRANCH_META_EXCLUDED if owner_kind == "branch" else ("extra_meta",)
+    for key in owner.__slots__:
+        if key not in excluded:
+            yield key
+    if extra is not None:
+        yield from extra
+
+
+def _metadata_pairs(owner, attributes, owner_kind, precision, ci_labels=None):
+    """Resolve and format selected exact annotation keys, without changing stored data.
+
+    owner_kind is 'node' or 'branch' (including a root-suffix Branchstruct).
+    None selection includes eligible native fields and dictionary entries. An empty
+    selection includes nothing. Accumulator exclusions apply to automatic native
+    enumeration; explicitly requested native fields keep their existing meaning.
+    """
+    if owner is None:
+        return []
+    extra = owner.extra_meta
+    scalar_keys = _NATIVE_META_SCALARS[owner_kind]
+    automatic = attributes is None
+    seen = set()
+    pairs = []
+    for key in _selected_metadata_keys(owner, attributes, owner_kind, extra):
+        if not isinstance(key, str) or not key:
+            raise TreeError(f"{owner_kind} annotation key must be a nonempty string; got {key!r}")
+        if (ci_labels is not None and _INTERVAL_META_KEYS[owner_kind].fullmatch(key)
+                and key not in ci_labels):
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        if key in scalar_keys:
+            if extra is not None and key in extra:
+                raise TreeError(f"{owner_kind} annotation {key!r} belongs in its native field, "
+                                "not extra_meta")
+            value = getattr(owner, key)
+        elif extra is not None and key in extra and extra[key] is not None:
+            value = extra[key]
+        else:
+            # The container itself never becomes a native annotation. A literal
+            # extra_meta entry was already handled through the dictionary above.
+            if (key == "extra_meta" or key not in owner.__slots__
+                    or automatic and owner_kind == "branch"
+                    and key in _AUTO_BRANCH_META_EXCLUDED):
+                continue
+            value = getattr(owner, key)
+        if value is None:
+            continue
+        try:
+            formatted_key = _format_metadata_key(key)
+            _validate_mapped_metadata_value(owner_kind, key, value)
+            formatted_value = _format_metadata_value(value, precision)
+        except TreeError as error:
+            raise TreeError(f"{owner_kind} annotation {key!r}: {error}") from error
+        pairs.append(f"{formatted_key}={formatted_value}")
+    return pairs
+
+
 # Compiled regular expression for comment removal, stored on the module
 _COMMENT_NONNESTED_RE = re.compile(r"\[[^\[\]]*\]")
 
@@ -237,7 +392,7 @@ class Branchstruct:
 
     __slots__ = ("length", "label",
                  "mean", "M2", "n",
-                 "quantiles", "ci", "length_median", "length_sd",
+                 "quantiles", "extra_meta", "length_median", "length_sd",
                  "posterior", "freq", "bipartition_cred", "rootcred",
                  "parent_height", "kid_height")
 
@@ -249,7 +404,7 @@ class Branchstruct:
         "M2": 0.0,
         "n": 0,
         "quantiles": None,
-        "ci": None,
+        "extra_meta": None,
         "length_median": None,
         "length_sd": None,
         "posterior": None,
@@ -267,7 +422,7 @@ class Branchstruct:
         self.M2 = 0.0
         self.n = 0
         self.quantiles = None
-        self.ci = None            # dict of {label: (lo, hi)}, where e.g. label = "90%_CI"
+        self.extra_meta = None       # Allocated only when non-native annotations are retained.
         self.length_median = None
         self.length_sd = None
         self.posterior = None
@@ -379,7 +534,7 @@ class Nodestruct:
         "height",
         "height_sd",
         "height_median",
-        "ci",
+        "extra_meta",
         "clade_cred",
         "state",
         "primary_set",
@@ -393,7 +548,7 @@ class Nodestruct:
         self.height = height
         self.height_sd = None
         self.height_median = None
-        self.ci = None
+        self.extra_meta = None
         self.clade_cred = None
         self.state = None
         self.primary_set = None
@@ -451,7 +606,7 @@ class SummaryNodestruct:
         "M2",
         "n",
         "quantiles",
-        "ci",
+        "extra_meta",
         "height_median",
         "height_sd",
         "clade_cred",
@@ -469,7 +624,7 @@ class SummaryNodestruct:
         self.M2 = 0.0
         self.n = 0
         self.quantiles = None
-        self.ci = None
+        self.extra_meta = None
         self.height_median = None
         self.height_sd = None
         self.clade_cred = None
@@ -2111,7 +2266,7 @@ class Tree:
             if self.root_suffix.length is None:
                 suffix.length = None
             # An absent stem stays absent; default computational fields are not suffix data.
-            annotations = suffix.ci
+            annotations = suffix.extra_meta
             has_extras = (any(value is not None for value in annotations.values())
                           if isinstance(annotations, dict) else annotations is not None)
             fields = ("length_median", "length_sd", "posterior", "freq",
@@ -3101,153 +3256,60 @@ class Tree:
     def newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
                transdict=None, node_attributes=None, branch_attributes=None, ci_labels=None,
                print_meta=False):
+        """Export structural information and selected exact annotation keys.
+
+        Metadata decoding is separate from output. Native scalar fields are authoritative;
+        other annotations, including intervals, are entries in optional extra_meta maps.
+        None is unset; MISSING and valid empty values remain present when selected.
         """
-        Return a Newick string for this tree.
-
-        Printing options apply only to this call; no formatting settings are stored
-        on the tree. None for a scalar option uses its fixed default. With
-        print_meta=True, None attribute selections include all populated metadata
-        fields (excluding branch accumulators and temporary height caches).
-        Explicit selections include only those fields; an empty sequence includes
-        none. None ci_labels includes all stored intervals; an empty sequence
-        suppresses intervals. Explicit attribute selections must include "ci" to
-        print intervals.
-
-        Printing conventions
-        --------------------
-        - Branch lengths are printed as ':<length>' if printdist is True.
-        - Internal node labels (the token after ')') are printed if printlabels is True.
-          Labels are taken from the incoming Branchstruct attribute named by `labelfield`
-          (default: 'label').
-        - Meta-comments use BEAST/FigTree style: '[&key=value,...]'.
-          Meta output is produced only when print_meta is True. When enabled:
-            * `node_attributes` selects Nodestruct attributes to include at each node.
-            * `branch_attributes` selects Branchstruct attributes to include on each branch.
-            * If "ci" is selected and struct.ci exists, CI ranges are emitted as
-              '<prefix>_<label>={lo,hi}' where prefix is 'height' or 'length'.
-            * Missing/None values and empty strings/collections are skipped; zero
-              and False are retained. Strings are quoted, booleans use true/false,
-              and collections use braces (sets are sorted for stable output).
-
-        Notes
-        -----
-        Tip labels are the leaf names (or transdict values if provided).
-        """
-
-        # Preserve explicit None as a request for the fixed scalar defaults.
-        if precision is None:   precision = 7
-        if labelfield is None:  labelfield = "label"
-        if printdist is None:   printdist = True
+        if precision is None: precision = 7
+        if labelfield is None: labelfield = "label"
+        if printdist is None: printdist = True
         if printlabels is None: printlabels = True
-        if print_meta is None:  print_meta = False
+        if print_meta is None: print_meta = False
 
-        if print_meta:
-            if node_attributes is None:
-                node_attributes = Nodestruct.__slots__
-            if branch_attributes is None:
-                internal = {"mean", "M2", "n", "quantiles", "parent_height", "kid_height"}
-                branch_attributes = tuple(attr for attr in Branchstruct.__slots__ if attr not in internal)
-        else:
-            node_attributes = ()
-            branch_attributes = ()
+        def metacomment(owner, attributes, kind):
+            parts = _metadata_pairs(owner, attributes, kind, precision, ci_labels)
+            return "[&" + ",".join(parts) + "]" if parts else ""
 
-        def create_metacomment(struct, attributes, ci_labels, ci_prefix=None):
-            """Serialize selected metadata and CI ranges, skipping missing values."""
-
-            def fmt(value):
-                if value is None:
-                    return "?"
-                if isinstance(value, bool):
-                    return "true" if value else "false"
-                if isinstance(value, float):
-                    return f"{value:.{precision}g}"
-                if isinstance(value, str):
-                    return '"' + value.replace('"', '""') + '"'
-                if isinstance(value, (list, tuple, set, frozenset)):
-                    if isinstance(value, (set, frozenset)):
-                        value = sorted(value, key=str)
-                    return "{" + ",".join(fmt(item) for item in value) + "}"
-                return str(value)
-
-            parts = []
-            requested = set(attributes)
-
-            # 1) regular attributes
-            for attr in attributes:
-                if attr == "ci":
-                    continue
-                if not hasattr(struct, attr):
-                    continue
-                value = getattr(struct, attr)
-                if value is None:
-                    continue
-                if isinstance(value, (str, list, tuple, set, frozenset, dict)) and not value:
-                    continue
-                parts.append(f"{attr}={fmt(value)}")
-
-            # 2) CI ranges, selected independently for each node or branch
-            if "ci" in requested and getattr(struct, "ci", None):
-                labels = sorted(struct.ci) if ci_labels is None else ci_labels
-                for lab in labels:
-                    if lab not in struct.ci:
-                        continue
-                    lo, hi = struct.ci[lab]
-                    parts.append(f"{ci_prefix}_{lab}={{{fmt(lo)},{fmt(hi)}}}")
-
-            if not parts:
+        def label_text(branch):
+            label = getattr(branch, labelfield, None)
+            if label is None:
                 return ""
-            return f"[&{','.join(parts)}]"
+            return f"{label:.{precision}g}" if isinstance(label, float) else str(label)
 
-
-        def append_children(parentnode):
-            """Recursive function that has main responsibility for building Newick tree string"""
-
-            for child in self.children(parentnode):
-                branchstruct = self.child_dict[parentnode][child]
-                dist = branchstruct.length
+        def append_children(parent):
+            for child in self.children(parent):
+                branch = self.child_dict[parent][child]
                 if child in self.leaves:
-                    treelist.append(transdict[child] if transdict else child)
+                    pieces.append(transdict[child] if transdict else child)
                 else:
-                    treelist.append("(")
+                    pieces.append("(")
                     append_children(child)
-                    treelist.append(")")
+                    pieces.append(")")
                     if printlabels:
-                        label = getattr(branchstruct, labelfield, "")
-                        if isinstance(label, float):
-                            treelist.append(f"{label:.{precision}g}")
-                        else:
-                            treelist.append(f"{label}")
-                if node_attributes:
-                    nd = self.nodedict.get(child)
-                    if nd is not None:
-                        metacomment_node = create_metacomment(nd, node_attributes,
-                                                              ci_labels, ci_prefix="height")
-                        treelist.append(metacomment_node)
+                        pieces.append(label_text(branch))
+                if print_meta:
+                    pieces.append(metacomment(self.nodedict.get(child), node_attributes, "node"))
                 if printdist:
-                    treelist.append(f":{dist:.{precision}g}")
-                if branch_attributes:
-                    metacomment_branch = create_metacomment(branchstruct, branch_attributes,
-                                                            ci_labels, ci_prefix="length")
-                    treelist.append(metacomment_branch)
+                    pieces.append(f":{branch.length:.{precision}g}")
+                if print_meta:
+                    comment = metacomment(branch, branch_attributes, "branch")
+                    if comment and not printdist:
+                        raise TreeError(f"branch {parent!r}->{child!r}: selected annotations "
+                                        "require an emitted branch length; select no branch "
+                                        "metadata or disable metadata output")
+                    pieces.append(comment)
+                pieces.append(",")
+            pieces.pop()
 
-                treelist.append(",")
-            del treelist[-1]  # Remove last comma when no more siblings
-
-        root = self.root
-        treelist = ["("]
-        append_children(root)
-        if node_attributes:
-            nd = self.nodedict.get(root)
-            if nd is not None:
-                metacomment_node = create_metacomment(nd, node_attributes,
-                                                      ci_labels, ci_prefix="height")
-                treelist.append(f"){metacomment_node};")
-            else:
-                treelist.append(");")
-        else:
-            treelist.append(");")
-        treestring = "".join(treelist)
-        return treestring
+        pieces = ["("]
+        append_children(self.root)
+        pieces.append(")")
+        if print_meta:
+            pieces.append(metacomment(self.nodedict.get(self.root), node_attributes, "node"))
+        pieces.append(";")
+        return "".join(pieces)
 
     ###############################################################################################
 
@@ -6096,11 +6158,11 @@ class TreeSummary():
 
                 for br in self._bipartsummary.values():
                     qvals = br.quantiles.quantiles(probs)  # list in same order as probs
-                    br.ci = {}
+                    br.extra_meta = {}
                     for i,lab in enumerate(self.ci_labels):
                         lo_idx = i * 2
                         hi_idx = lo_idx + 1
-                        br.ci[lab] = (qvals[lo_idx], qvals[hi_idx])
+                        br.extra_meta["length_" + lab] = (qvals[lo_idx], qvals[hi_idx])
                     br.length_median = qvals[-1]
 
             self._bipartsummary_processed = True
@@ -6139,11 +6201,11 @@ class TreeSummary():
                     else:
                         qvals = nd.quantiles.quantiles(probs) # list in same order as probs
 
-                    nd.ci = {}
+                    nd.extra_meta = {}
                     for i,lab in enumerate(self.ci_labels):
                         lo_idx = i * 2
                         hi_idx = lo_idx + 1
-                        nd.ci[lab] = (qvals[lo_idx], qvals[hi_idx])
+                        nd.extra_meta["height_" + lab] = (qvals[lo_idx], qvals[hi_idx])
                     nd.height_median = qvals[-1]
 
             self._cladesummary_processed = True
@@ -7158,7 +7220,7 @@ class TreePostProcessor():
                         node_attrs.update({"height", "height_sd"})
                         if self.treesum.trackci:
                             # these attributes may or may not exist; set if present
-                            for attr in ("ci", "height_median"):
+                            for attr in ("extra_meta", "height_median"):
                                 if hasattr(nd, attr):
                                     sumtree.set_node_attribute(node, attr, getattr(nd, attr))
                                     node_attrs.add(attr)
@@ -7179,7 +7241,7 @@ class TreePostProcessor():
                         sumtree.set_branch_attribute(parent, child, "length_sd", br.length_sd)
                         branch_attrs.update({"length", "length_sd"})
                         if self.treesum.trackci:
-                            for attr in ("ci", "length_median"):
+                            for attr in ("extra_meta", "length_median"):
                                 if hasattr(br, attr):
                                     sumtree.set_branch_attribute(parent, child, attr, getattr(br, attr))
                                     branch_attrs.add(attr)
@@ -7435,8 +7497,8 @@ class CAHeightEstimator():
                     qvals = s.quantiles.quantiles(probs)
                 ci = {}
                 for i, lab in enumerate(ci_labels):
-                    ci[lab] = (qvals[2*i], qvals[2*i + 1])
-                sumtree.set_node_attribute(node, "ci", ci)
+                    ci["height_" + lab] = (qvals[2*i], qvals[2*i + 1])
+                sumtree.set_node_attribute(node, "extra_meta", ci)
                 sumtree.set_node_attribute(node, "height_median", qvals[-1])
 
         return sumtree
