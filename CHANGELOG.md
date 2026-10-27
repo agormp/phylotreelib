@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Grafting now retains donor node metadata even when the recipient initially has none, and initializes the inserted graftpoint with default node data.
 - Leaf and internal-node renaming now moves node metadata to the final identifier, including duplicate-name resolution and donor renaming during grafting.
 - Merging `TreeSummary` root counts now refreshes cached root frequencies and sorted root summaries, including newly observed root positions.
 - `TreePostProcessor.set_biplen_on_existing_tree()` now invalidates length-derived caches after its final root-edge assignments, so warmed distance queries reflect the new lengths.

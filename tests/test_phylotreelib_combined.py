@@ -2133,6 +2133,30 @@ class TestGraft:
         assert len(ints) == len(set(ints))
         assert graftpoint in t1.intnodes
 
+    def test_donor_metadata_survives_an_unannotated_recipient(self):
+        recipient = pt.Tree.from_string("(A:2,B:4,C:6);")
+        assert recipient.nodedict == {}
+        donor = pt.Tree.from_string("(D:1,(E:1,F:1):1);")
+        donor_internal = donor.find_mrca({"E", "F"})
+        donor.set_node_attribute(donor.root, "height", 3.0)
+        donor.set_node_attribute(donor_internal, "height", 2.0)
+        donor.set_node_attribute("D", "state", "donor")
+        root_meta = donor.nodedict[donor.root]
+        internal_meta = donor.nodedict[donor_internal]
+        leaf_meta = donor.nodedict["D"]
+
+        graftpoint = recipient.graft(donor, parent=recipient.root, child="A",
+                                     frac_from_parent=0.5)
+
+        assert recipient.nodedict[recipient.parent("D")] is root_meta
+        assert recipient.nodedict[recipient.find_mrca({"E", "F"})] is internal_meta
+        assert recipient.nodedict["D"] is leaf_meta
+        assert recipient.get_node_attribute("D", "state") == "donor"
+        assert recipient.nodedict[graftpoint].height is None
+        assert recipient.nodedict[graftpoint].state == ""
+        assert "B" not in recipient.nodedict
+        assert set(recipient.nodedict) <= recipient.nodes
+
     def test_metadata_follows_donor_id_and_leaf_renaming(self):
         recipient = pt.Tree.from_string("(A:1,(B:1,C:1):1);")
         recipient.set_node_attribute("A", "state", "recipient")

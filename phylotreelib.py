@@ -3924,7 +3924,7 @@ class Tree:
 
         # Update leaves and clear caches
         self.leaves.update(other.leaves)
-        if self.nodedict:
+        if self.nodedict or other.nodedict:
             self.nodedict.setdefault(graftpoint, Nodestruct())
             if other.nodedict:
                 self.nodedict.update(other.nodedict)
