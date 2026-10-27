@@ -1416,11 +1416,18 @@ class AnnotatedNewickParser(NewickStringParser):
             if end is None:
                 raise TreeError(f"Unterminated comment at offset {start}")
             if treestring.startswith("[&", start):
-                if self.parse_meta and pending:
-                    yield pending
-                    pending = ""
-                self._comment_offset = start
-                yield treestring[start:end]
+                if self.parse_meta:
+                    if pending:
+                        yield pending
+                        pending = ""
+                    self._comment_offset = start
+                    yield treestring[start:end]
+                else:
+                    # Check the source span without copying a potentially large skipped payload.
+                    declaration = self._declaration.fullmatch(treestring, start, end)
+                    if declaration is not None:
+                        self._comment_offset = start
+                        yield "[&R]" if declaration[1] in "Rr" else "[&U]"
             pos = end
 
     def _handle_comment(self, comment, state):

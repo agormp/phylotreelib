@@ -6619,6 +6619,21 @@ class Test_AnnotatedNewickParser_tokenize:
         assert tree.child_dict[tree.root]['AB'].length == 1.5
         assert tree.root_suffix.label == 'Root'
 
+    def test_metadata_disabled_does_not_copy_skipped_annotation_payload(self):
+        payload = '[&R=' + ('uninterpreted_payload' * 10000) + ']'
+        text = '[& R ](A' + payload + ',B);'
+        start = text.index(payload)
+        end = start + len(payload)
+        class WithoutPayloadSlice(str):
+            def __getitem__(self, item):
+                if isinstance(item, slice) and item.start == start and item.stop == end:
+                    raise AssertionError('metadata-disabled parsing copied its skipped payload')
+                return super().__getitem__(item)
+        tree = pt.Tree.from_string(WithoutPayloadSlice(text))
+        assert tree.leaves == {'A', 'B'} and tree.rooted is True
+        assert tree.nodedict == {}
+
+
     def test_duplicate_block_error_reports_the_second_occurrence(self):
         text = '(A[&x=1][&x=1],B);'
         with pytest.raises(pt.TreeError) as caught:
