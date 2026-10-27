@@ -413,3 +413,7 @@ The remaining classes are useful, but many of them are better regarded as advanc
 ### Branch removal and length redistribution
 
 `remove_branch()` removes an internal edge and its child node, adding an equal share of the removed structural length to each reattached descendant edge. Total tree length is conserved; pairwise distances generally change. The reattached edges have new endpoints and fresh non-length fields even when the removed length is zero. The deleted node's metadata is removed. Unrelated edges and surviving-node data are retained; no statistic or annotation named `length` is numerically redistributed.
+
+### Input branch accumulation
+
+`TreeSummary.add_tree()` reads observed structural branch lengths into its own bipartition accumulators. It does not use input branches as accumulators or inherit sample labels, annotations or pre-existing statistics. Each newly observed bipartition gets one fresh record; later observations update that record using the existing numerical algorithms. Lazy summary finalization therefore leaves input branch data unchanged. Optional retained representative Trees have the separate storage contract below.

@@ -6462,7 +6462,8 @@ class TreeSummary():
             length = branchstruct.length
             s = bipartsummary.get(bipart)
             if s is None:
-                s = branchstruct
+                # The observation supplies length, never its own mutable record.
+                s = Branchstruct()
                 bipartsummary[bipart] = s
                 if do_ci:
                     s.quantiles = QuantileAccumulator(k=self.quantile_k)

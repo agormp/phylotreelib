@@ -4855,3 +4855,79 @@ class Test_remove_branch:
         assert untouched.extra_meta == {"keep": [1]}
         assert tree.nodedict["A"].state == "survives"
         assert node not in tree.nodedict and node not in tree.nodes
+
+
+class Test__add_bips_TreeSummary:
+
+    def test_fresh_accumulators_ignore_sample_statistics_and_leave_inputs_unchanged(self):
+        first = pt.Tree.from_string("(A:1,B:2,C:3);")
+        observed = first.child_dict[first.root]["A"]
+        observed.label = "sample label"
+        observed.posterior = 0.25
+        observed.length_sd = 11.0
+        observed.mean, observed.M2, observed.n = 99.0, 12.0, 17
+        observed.extra_meta = {"sample_only": ["keep"]}
+        observed.quantiles = pt.QuantileAccumulator(k=7)
+        observed.quantiles.add(99.0)
+        sample_quantiles = observed.quantiles
+        sample_counts = observed.quantiles.counts.copy()
+        assert first.nodedist("A", "B") == 3.0
+        summary = pt.TreeSummary(trackbips=True, trackblen=True,
+                                 trackci=True, ci_probs=(0.95,))
+        bip = pt.Bipartition.from_leafset({"A"}, first)
+
+        summary.add_tree(first)
+        accumulator = summary._bipartsummary[bip]
+        assert accumulator is not observed
+        assert accumulator.n == 1
+        assert accumulator.mean == 1.0
+        assert accumulator.M2 == 0.0
+        assert accumulator.label == ""
+        assert accumulator.extra_meta is None
+        assert accumulator.quantiles is not sample_quantiles
+        assert accumulator.quantiles.n == 1
+        accumulator_quantiles = accumulator.quantiles
+
+        summary.add_tree(pt.Tree.from_string("(A:3,B:4,C:5);"))
+        result = summary.bipartsummary[bip]
+
+        assert result is accumulator
+        assert result.quantiles is accumulator_quantiles
+        assert result.n == result.quantiles.n == 2
+        assert result.length == result.mean == pytest.approx(2.0)
+        assert result.M2 == pytest.approx(2.0)
+        assert result.length_sd == pytest.approx(math.sqrt(2.0))
+        assert result.posterior == 1.0
+        assert set(result.extra_meta) == {"length_95%_CI"}
+        assert observed.length == 1.0
+        assert observed.label == "sample label"
+        assert observed.posterior == 0.25
+        assert observed.length_sd == 11.0
+        assert (observed.mean, observed.M2, observed.n) == (99.0, 12.0, 17)
+        assert observed.extra_meta == {"sample_only": ["keep"]}
+        assert observed.quantiles is sample_quantiles
+        assert sample_quantiles.n == 1
+        assert sample_quantiles.counts == sample_counts
+        assert first.nodedist("A", "B") == 3.0
+
+    def test_count_only_accumulation_does_not_inherit_sample_records(self):
+        sample = pt.Tree.from_string("(A:1,B:2,C:3);")
+        observed = sample.child_dict[sample.root]["A"]
+        observed.n, observed.mean, observed.M2 = 17, 99.0, 12.0
+        observed.label = "sample label"
+        observed.extra_meta = {"sample_only": pt.MISSING}
+        summary = pt.TreeSummary(trackbips=True)
+        bip = pt.Bipartition.from_leafset({"A"}, sample)
+
+        summary.add_tree(sample)
+        result = summary.bipartsummary[bip]
+
+        assert result is not observed
+        assert result.n == 1
+        assert result.posterior == 1.0
+        assert result.mean == result.M2 == 0.0
+        assert result.quantiles is None
+        assert result.extra_meta is None
+        assert result.label == ""
+        assert (observed.n, observed.mean, observed.M2) == (17, 99.0, 12.0)
+        assert observed.extra_meta["sample_only"] is pt.MISSING
