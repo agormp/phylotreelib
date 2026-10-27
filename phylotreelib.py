@@ -4031,6 +4031,9 @@ class Tree:
         No automatic donor copy/reset, guard, cache synchronization or rollback
         guarantee is added. Leaf strings create no donor Tree to maintain.
 
+        Successful grafting preserves recipient rootedness at entry, independently
+        of donor state, suffix information and connecting length.
+
         Returns the graft point node ID.
         """
 

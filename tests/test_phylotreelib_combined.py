@@ -2673,6 +2673,43 @@ class TestGraft:
         assert basal.extra_meta == {"rate": 0.7}
         assert recipient.root_suffix is None
 
+    @pytest.mark.parametrize("recipient_state", [True, False, None])
+    @pytest.mark.parametrize("donor_state", [True, False, None])
+    def test_graft_preserves_recipient_state_independently_of_donor(self, recipient_state, donor_state):
+        recipient = pt.Tree.from_string("(A:2,B:4,C:6);")
+        recipient.rooted = recipient_state
+        recipient.root_suffix = pt.Branchstruct(length=0.8, label="recipient")
+        suffix = recipient.root_suffix
+        old_root = recipient.root
+        donor = pt.Tree.from_string("(D:1,(E:2,F:3):4);")
+        donor.rooted = donor_state
+        donor.root_suffix = pt.Branchstruct(length=10.0, label="donor")
+
+        recipient.graft(donor, recipient.root, "A", frac_from_parent=0.5)
+
+        assert recipient.rooted is recipient_state
+        assert recipient.root == old_root
+        assert recipient.root_suffix is suffix
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_leaf_graft_preserves_recipient_state(self, state):
+        tree = pt.Tree.from_string("(A:2,B:4,C:6);")
+        tree.rooted = state
+        tree.graft("D", tree.root, "A", frac_from_parent=0.5, connect_length=0.7)
+        assert tree.rooted is state
+
+    def test_graft_uses_state_after_prior_structural_root_collapse(self):
+        recipient = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        recipient.rooted = True
+        recipient.collapse_bifurcating_root()
+        assert recipient.rooted is None  # Separate 4v structural-collapse contract.
+        donor = pt.Tree.from_string("(D:1,E:2,F:3);")
+        donor.rooted = True
+
+        recipient.graft(donor, recipient.root, "A", frac_from_parent=0.5)
+
+        assert recipient.rooted is None
+
 ###################################################################################################
 
 class TestPrune:

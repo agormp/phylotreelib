@@ -463,3 +463,5 @@ A successful `recipient.graft(donor, ...)` consumes donor contents: ID/name rena
 ### Graft connections and donor suffixes
 
 A supplied `connect_branchstruct` defines the connection and takes precedence over `connect_length`; otherwise a fresh branch uses `connect_length`, defaulting to 0.0. A donor label, stem length or stem annotations never transfers implicitly to the connection or recipient root. To reuse a donor suffix deliberately, supply it as the connecting struct after setting an actual numeric structural length. Supplying `connect_length` too does not fill a missing length in that struct. The recipient retains its root/suffix, and donor root-node annotations stay with the surviving donor-root node. Detached basal branches remain separate and can also be supplied explicitly.
+
+Successful grafts preserve the recipient's True/False/None interpretation at actual graft entry, for both Tree and leaf-name donors. Donor state, root degree, stem data and connecting length do not select a new interpretation. In a compound operation, graft preserves the state left by earlier steps; it does not restore an older historical state.
