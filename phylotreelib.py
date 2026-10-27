@@ -6131,7 +6131,14 @@ class TreeSummary():
                        tracktopo=False, track_subcladepairs=False,
                        store_trees=False,
                        trackci=False, ci_probs=None, quantile_k=7):
-        """TreeSummary constructor. Initializes relevant data structures"""
+        """Initialize requested tracking, optionally retaining first representatives.
+
+        With topology tracking and store_trees=True, a first representative Tree
+        is retained by reference. Leave its topology, names, lengths, rootedness
+        and metadata unchanged while any summary retains it; copy it before edits.
+        Read-only queries, printing and derived-cache work remain allowed.
+        store_trees=False imposes no representative-storage lifetime restriction.
+        """
         self.leaves = None
         self.transdict = None
         self.translateblock = None
@@ -6373,7 +6380,13 @@ class TreeSummary():
     ###############################################################################################
 
     def add_tree(self, curtree):
-        """Add tree object to treesummary, update all relevant summaries"""
+        """Add structural observations to this summary's own accumulators.
+
+        With topology tracking and store_trees=True, the supplied Tree may become
+        the topology's first retained representative, by reference. Do not edit its
+        retained data; use copy_treeobject() for an independently editable Tree.
+        The same Tree may represent a topology in both topology dictionaries.
+        """
 
         # Main interface to TreeSummary.
         # Takes tree object, updates relevant measures

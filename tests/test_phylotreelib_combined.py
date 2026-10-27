@@ -5761,3 +5761,25 @@ class Test_hipstr_tree_SummaryTreeBuilder:
         summary, representative = rootedness_constructor_summary
         assert pt.SummaryTreeBuilder(summary).hipstr_tree(majrule=majrule).rooted is True
         assert representative.rooted is None
+
+
+class Test_add_tree_TreeSummary:
+
+    def test_first_representative_is_retained_by_reference_without_data_mutation(self):
+        first = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        first.rooted = True
+        first.set_node_attribute("A", "extra_meta", {"sample_only": ["keep"]})
+        snapshot = first.newick(print_meta=True)
+        summary = pt.TreeSummary(trackbips=True, trackclades=True, trackblen=True,
+                                 trackheight=True, tracktopo=True, store_trees=True)
+
+        summary.add_tree(first)
+        summary.add_tree(pt.Tree.from_string("((A:3,B:4):5,C:6,D:7);"))
+        # Finalizing computed statistics must not rewrite the retained sample.
+        _ = summary.bipartsummary, summary.cladesummary
+
+        assert next(iter(summary.biptoposummary.values())).tree is first
+        assert next(iter(summary.cladetoposummary.values())).tree is first
+        assert first.rooted is True
+        assert first.newick(print_meta=True) == snapshot
+        assert first.nodedict["A"].extra_meta == {"sample_only": ["keep"]}
