@@ -1315,12 +1315,11 @@ class NewickStringParser:
     def _current_branch(self):
         if not self.node_stack:
             raise TreeError("Branch or label after the root topology was closed")
-        if len(self.node_stack) == 1:
+        if self.node_stack[-1] == 0:
             if self.treeobj.root_suffix is None:
                 self.treeobj.root_suffix = Branchstruct(length=None)
             return self.treeobj.root_suffix
-        parent, child = self.node_stack[-2:]
-        return self.treeobj.child_dict[parent][child]
+        return self.treeobj.child_dict[self.node_stack[-2]][self.node_stack[-1]]
 
     def _handle_add_brlen(self, brlen_string):
         try:
@@ -1328,8 +1327,10 @@ class NewickStringParser:
         except ValueError:
             raise TreeError(f"Expected branch length: {brlen_string}") from None
         stack = self.node_stack
-        if len(stack) > 1:
-            self.treeobj.child_dict[stack[-2]][stack[-1]].length = brlen
+        child = stack[-1]
+        # This parser numbers the root 0, internal descendants positively, and leaves as strings.
+        if child != 0:
+            self.treeobj.child_dict[stack[-2]][child].length = brlen
         else:
             self._current_branch().length = brlen
 
@@ -8001,6 +8002,8 @@ _NEXUS_TREE_NAME_RE = re.compile(r"\s*(?:\*\s*)?[\w./-]+\s*\Z")
 
 def _without_envelope_comments(text):
     """Remove complete header comments without splitting a containing word."""
+    if "[" not in text:
+        return text
     parts = []
     position = 0
     while True:
