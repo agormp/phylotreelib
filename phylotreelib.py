@@ -7087,7 +7087,7 @@ class TreePostProcessor():
             if sumtree.bipart_is_present(bip):
                 # Only reroot if tree not already rooted correctly
                 if (cur_rootbip is None) or (bip != cur_rootbip):
-                    parent,child = sumtree.find_bipart_nodes(bip)
+                    parent,child = sumtree.find_bipart_nodes(*bip)
                     sumtree.collapse_bifurcating_root()
                     sumtree.reroot(child, parent)
 

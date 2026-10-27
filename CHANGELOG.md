@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Root-frequency selection now passes both bipartition sides to the current edge-lookup API, repairing a TypeError when the selected root must move. Its existing numerical positioning algorithm is unchanged.
 - Summary builders and branch annotation write-back now materialize independent output branches and mutable annotations, leaving quantile accumulators and scratch statistics in the summary. Repeated outputs can be edited independently.
 - Bipartition accumulation now owns fresh records instead of adopting input branches, leaving sample lengths, annotations and existing accumulator state unchanged. Later observations reuse the accumulator.
 - Selected invalid `extra_meta` containers now raise an owner-specific `TreeError`; metadata-disabled or empty-selection output bypasses annotation validation.

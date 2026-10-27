@@ -5218,3 +5218,16 @@ class Test_deroot:
         tree.rooted = True
         tree.deroot()
         assert tree.rooted is None
+
+
+class Test_root_maxfreq:
+
+    def test_selects_a_different_observed_root_with_current_bipartition_api(self):
+        sample = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        summary = pt.TreeSummary(trackroot=True)
+        summary.add_tree(sample)
+        target = pt.Tree.from_string("((A:1,B:1):1,C:2,D:2);")
+        result = pt.TreePostProcessor(summary).root_maxfreq(target)
+        assert result is target
+        assert target.rootbip() == sample.rootbip()
+        assert target.rooted is True
