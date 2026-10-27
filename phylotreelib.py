@@ -4014,7 +4014,13 @@ class Tree:
           - else use `frac_from_parent` if given
           - else choose a random fraction in (0, 1)
 
-        `connect_branchstruct` overrides `connect_length` if provided.
+        `connect_branchstruct` is installed directly and overrides connect_length.
+        Otherwise use a fresh connecting branch with connect_length (default 0.0).
+        Donor root_suffix data never contributes implicitly to that branch or the
+        recipient root, which stays in place with its own suffix. Donor root-node
+        metadata stays on its surviving node. To use a donor suffix deliberately,
+        supply it as connect_branchstruct after assigning a numeric structural
+        length; connect_length does not fill a missing length on a supplied struct.
         If `graftlabel` is given, it is prefixed to leaf names in `other` (mutates `other`).
 
         A successful Tree graft transfers ownership of donor child dictionaries,

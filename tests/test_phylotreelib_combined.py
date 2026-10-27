@@ -2597,6 +2597,82 @@ class TestGraft:
         assert connection.length == pytest.approx(0.7)
         assert connection.extra_meta == {"note": ["original"]}
 
+    @pytest.mark.parametrize("suffix_kind", ["absent", "label_only", "stem"])
+    @pytest.mark.parametrize("connection_length", [None, 0.7])
+    def test_donor_suffix_does_not_supply_an_implicit_connection(self, suffix_kind, connection_length):
+        recipient = pt.Tree.from_string("(A:2,B:4,C:6);")
+        recipient.root_suffix = pt.Branchstruct(length=0.8, label="recipient")
+        recipient.root_suffix.extra_meta = {"stem_note": "retained"}
+        recipient_suffix = recipient.root_suffix
+        recipient_root = recipient.root
+        recipient.set_node_attribute(recipient_root, "height", 10.0)
+        recipient_root_metadata = recipient.nodedict[recipient_root]
+        donor = pt.Tree.from_string("(D:1,(E:2,F:3):4);")
+        donor.set_node_attribute(donor.root, "height", 5.0)
+        donor_root_metadata = donor.nodedict[donor.root]
+        if suffix_kind != "absent":
+            length = None if suffix_kind == "label_only" else 0.4
+            donor.root_suffix = pt.Branchstruct(length=length, label="donor")
+            donor.root_suffix.extra_meta = {"donor_stem_note": "omitted"}
+        kwargs = {} if connection_length is None else {"connect_length": connection_length}
+
+        graftpoint = recipient.graft(donor, recipient_root, "A", frac_from_parent=0.5, **kwargs)
+
+        inserted_root = recipient.parent("D")
+        connection = recipient.child_dict[graftpoint][inserted_root]
+        assert connection.length == pytest.approx(0.0 if connection_length is None else connection_length)
+        assert connection.label == ""
+        assert connection.extra_meta is None
+        assert recipient.root == recipient_root
+        assert recipient.root_suffix is recipient_suffix
+        assert recipient.nodedict[recipient_root] is recipient_root_metadata
+        assert recipient.nodedict[inserted_root] is donor_root_metadata
+        assert recipient.child_dict[recipient_root][graftpoint].length + recipient.child_dict[graftpoint]["A"].length == pytest.approx(2)
+
+    @pytest.mark.parametrize("reuse_suffix", [False, True])
+    def test_explicit_connection_struct_has_precedence_and_transfers_directly(self, reuse_suffix):
+        recipient = pt.Tree.from_string("(A:2,B:4,C:6);")
+        donor = pt.Tree.from_string("(D:1,E:2,F:3);")
+        donor.root_suffix = pt.Branchstruct(length=None, label="deliberate")
+        donor.root_suffix.extra_meta = {"note": ["kept"]}
+        if reuse_suffix:
+            # A label-only suffix needs an explicitly assigned intended length first.
+            connection = donor.root_suffix
+            connection.length = 0.4
+        else:
+            connection = pt.Branchstruct(length=0.9, label="explicit")
+            connection.extra_meta = {"note": ["kept"]}
+        expected_length = connection.length
+
+        graftpoint = recipient.graft(donor, recipient.root, "A", frac_from_parent=0.5,
+                                     connect_length=99.0, connect_branchstruct=connection)
+
+        inserted_root = recipient.parent("D")
+        assert recipient.child_dict[graftpoint][inserted_root] is connection
+        assert connection.length == expected_length
+        assert connection.extra_meta == {"note": ["kept"]}
+        assert recipient.root_suffix is None
+
+    def test_leaf_extraction_basal_branch_can_be_reused_explicitly(self):
+        source = pt.Tree.from_string("(D:1,(E:2,F:3):4);")
+        source.root_suffix = pt.Branchstruct(length=5.0, label="not_the_basal_branch")
+        parent = source.parent("D")
+        source.child_dict[parent]["D"].label = "basal"
+        source.child_dict[parent]["D"].extra_meta = {"rate": 0.7}
+        leaf, basal = source.subtree("D")
+        assert leaf == "D" and isinstance(leaf, str)
+        assert basal is not source.child_dict[parent]["D"]
+        recipient = pt.Tree.from_string("(A:2,B:4,C:6);")
+
+        graftpoint = recipient.graft(leaf, recipient.root, "A", frac_from_parent=0.5,
+                                     connect_branchstruct=basal)
+
+        assert recipient.child_dict[graftpoint]["D"] is basal
+        assert basal.length == pytest.approx(1)
+        assert basal.label == "basal"
+        assert basal.extra_meta == {"rate": 0.7}
+        assert recipient.root_suffix is None
+
 ###################################################################################################
 
 class TestPrune:

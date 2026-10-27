@@ -459,3 +459,7 @@ With topology tracking and `store_trees=True`, the first Tree for each topology 
 ### Grafting transfers donor ownership
 
 A successful `recipient.graft(donor, ...)` consumes donor contents: ID/name renaming and direct adoption of child dictionaries, branches and node metadata remain. Continue using the recipient; the donor is neither an independently usable Tree nor a synchronized subtree view. Pass `donor.copy_treeobject()` to retain an independent original. An explicit connecting Branchstruct transfers directly too; copy it first when retaining an independent original. No automatic copy/reset, ownership guard, donor-cache synchronization or new rollback guarantee is added. Leaf strings create no separately maintained donor Tree.
+
+### Graft connections and donor suffixes
+
+A supplied `connect_branchstruct` defines the connection and takes precedence over `connect_length`; otherwise a fresh branch uses `connect_length`, defaulting to 0.0. A donor label, stem length or stem annotations never transfers implicitly to the connection or recipient root. To reuse a donor suffix deliberately, supply it as the connecting struct after setting an actual numeric structural length. Supplying `connect_length` too does not fill a missing length in that struct. The recipient retains its root/suffix, and donor root-node annotations stay with the surviving donor-root node. Detached basal branches remain separate and can also be supplied explicitly.
