@@ -4691,3 +4691,70 @@ class Test_annotate_sumtree_TreePostProcessor:
         tree.set_node_attribute("A", "extra_meta", replacement)
         assert tree.nodedict["A"].extra_meta is replacement
         assert "old" not in replacement
+
+
+class Test_merge_Branchstruct:
+
+    def test_length_only_result_keeps_inputs_unchanged(self):
+        first = pt.Branchstruct(length=2, label="same")
+        second = pt.Branchstruct(length=3, label="same")
+        first.posterior = second.posterior = 0.9
+        first.extra_meta = {"length": 100, "empty": (), "missing": pt.MISSING}
+        second.extra_meta = {"length_95%_CI": (1, 4)}
+        first.n = 7
+        first.mean = 2
+        merged = first.merge(second)
+        assert merged.length == 5
+        assert merged.label == ""
+        assert merged.posterior is merged.length_sd is merged.extra_meta is None
+        assert merged.n == 0 and merged.mean == 0 and merged.quantiles is None
+        assert first.label == second.label == "same"
+        assert first.n == 7 and first.extra_meta["length"] == 100
+        assert second.extra_meta == {"length_95%_CI": (1, 4)}
+
+    def test_removed_compatibility_argument_fails(self):
+        with pytest.raises(TypeError):
+            pt.Branchstruct().merge(pt.Branchstruct(), check_compat=True)
+
+
+class Test_iter_bipinfo:
+
+    def test_root_merge_discards_annotations_only_on_combined_edge(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
+        for child in tree.children(tree.root):
+            branch = tree.child_dict[tree.root][child]
+            branch.label = "root side"
+            branch.extra_meta = {"side": [1]}
+        tip_branch = tree.child_dict[tree.parent("A")]["A"]
+        tip_branch.extra_meta = {"untouched": True}
+        result = dict(tree.iter_bipinfo())
+        merged = result[tree.rootbip()]
+        assert merged.length == 9
+        assert merged.label == "" and merged.extra_meta is None
+        assert result[pt.Bipartition.from_leafset({"A"}, tree)] is tip_branch
+        assert all(tree.child_dict[tree.root][child].extra_meta == {"side": [1]}
+                   for child in tree.children(tree.root))
+
+
+class Test_remove_leaf:
+
+    def test_serial_join_uses_length_only_branch(self):
+        tree = pt.Tree.from_string("((A:2,B:3):5,C:7,D:11);")
+        parent = tree.parent("A")
+        tree.child_dict[tree.root][parent].label = "upper"
+        tree.child_dict[tree.root][parent].extra_meta = {"upper": pt.MISSING}
+        tree.child_dict[parent]["B"].extra_meta = {"lower": [1]}
+        untouched = tree.child_dict[tree.root]["C"]
+        untouched.extra_meta = {"keep": "yes"}
+        tree.set_node_attribute(parent, "state", "deleted")
+        tree.set_node_attribute("B", "state", "survives")
+        _ = tree.rootdist
+        tree.remove_leaf("A")
+        joined = tree.child_dict[tree.root]["B"]
+        assert joined.length == 8
+        assert joined.label == "" and joined.extra_meta is None
+        assert joined.length_sd is None
+        assert tree.child_dict[tree.root]["C"] is untouched
+        assert tree.nodedict["B"].state == "survives"
+        assert parent not in tree.nodedict
+        assert tree.rootdist["B"] == 8

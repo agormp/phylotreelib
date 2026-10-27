@@ -400,3 +400,8 @@ For everyday use, it is reasonable to treat the following as the stable public i
 - `build_sumtree`
 
 The remaining classes are useful, but many of them are better regarded as advanced helpers or implementation-level infrastructure unless they are explicitly needed by your workflow.
+
+
+### Branch merging
+
+`Branchstruct.merge(other)` returns a fresh branch whose structural length is the sum of both lengths. Labels, statistics, intervals, extras and accumulator state start from normal defaults; neither input changes. The unused `check_compat` argument has been removed. Root-edge combination and the serial join after removing a non-root bifurcating parent follow this same length-only rule. Node data stays with surviving nodes; deleted-node data is removed. Callers may explicitly assign justified annotations to the result.

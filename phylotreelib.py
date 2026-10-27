@@ -516,16 +516,13 @@ class Branchstruct:
 
     ###############################################################################################
 
-    def merge(self, other, check_compat=False):
-        """Merges two Branchstructs and returns new Branchstruct, e.g. for collapsing root branches.
-        lengths are summed, all other attributes are ignored (no easy way to combine)"""
+    def merge(self, other):
+        """Return a fresh branch with summed length and default non-length fields.
 
-        # Python note: non-length attributes difficult to manage, since they may differ on two
-        # branches, and there is no way of combining them (e.g. clade cred-derived support values)
-        # Consider whether this will ever impact callers
-
-        obj = Branchstruct(length = self.length + other.length)
-        return obj
+        Labels, statistics and extra annotations are not combined or retained.
+        Neither input is changed.
+        """
+        return Branchstruct(length=self.length + other.length)
 
 ###################################################################################################
 ###################################################################################################
@@ -3462,7 +3459,7 @@ class Tree:
             rootbip = self.rootbip()
             branch1 = child_dict[root][kid1]
             branch2 = child_dict[root][kid2]
-            branch_merged = branch1.merge(branch2, check_compat=True)
+            branch_merged = branch1.merge(branch2)
             yield rootbip, branch_merged
 
         if not keep_remchild_dict:
@@ -4401,15 +4398,14 @@ class Tree:
         # If leaf is part of bifurcation but NOT attached directly to root, then parent
         # must also be removed from tree, and the remaining child needs to be grafted
         # onto grandparent with proper cumulated distance
-        # Keep branch label (if any) of the branch from grandparent to parent
+        # The new serially joined edge retains only the summed structural length.
         elif len(childset) == 2:
             [child2] = childset - {leaf}                    # Remaining item is other child
-            child2dist = self.child_dict[parent][child2].length   # Remember dist to other child
             grandparent = self.parent(parent)
 
-            # Add remaining child to grandparent
-            self.child_dict[grandparent][child2] = self.child_dict[grandparent][parent]
-            self.child_dict[grandparent][child2].length += child2dist   # Cumulated distance
+            # Add remaining child to grandparent on a fresh length-only branch.
+            self.child_dict[grandparent][child2] = self.child_dict[grandparent][parent].merge(
+                self.child_dict[parent][child2])
             del self.child_dict[parent]                      # Delete parent and leaf
             del self.child_dict[grandparent][parent]         # Also remove pointer from gp to p
             if self._parent_dict is not None:
@@ -5005,7 +5001,7 @@ class Tree:
         If the root is not a bifurcation: do nothing
 
         The merged branch length is the sum of the two root branch lengths;
-        non-length attributes are merged via Branchstruct.merge(check_compat=True).
+        all non-length attributes start from fresh defaults.
         """
 
         oldroot = self.root
@@ -5017,7 +5013,7 @@ class Tree:
         kid1, kid2 = rootkids
         branch1 = self.child_dict[oldroot][kid1]
         branch2 = self.child_dict[oldroot][kid2]
-        branch_merged = branch1.merge(branch2, check_compat=True)   # Sums up branch lengths, merges attributes
+        branch_merged = branch1.merge(branch2)
 
         if kid1 in self.intnodes:
             newroot, other = kid1, kid2
