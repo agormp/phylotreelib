@@ -3942,8 +3942,9 @@ class Tree:
         - If `basenode` is a leaf: `subtree` is the leaf name (str).
         - Otherwise: `subtree` is a new Tree whose root is `basenode`.
 
-        `basal_branch` is a copy of the Branchstruct on the incoming edge to `basenode`
-        in the original tree. (or None if basenode=root)
+        A returned Tree inherits the source's rootedness interpretation at extraction.
+        The source is unchanged. The leaf result remains a string without Tree state.
+        `basal_branch` is a copy of the incoming Branchstruct, or None at the source root.
         """
 
         if basenode == self.root:
@@ -3959,6 +3960,7 @@ class Tree:
         # Create empty Tree object. Transfer relevant subset of self's data structure to other
         other = Tree()
         other.root = basenode
+        other.rooted = self.rooted
         curlevel = [basenode]
         while curlevel:
             nextlevel = []

@@ -5289,3 +5289,69 @@ class Test_root_maxfreq:
         assert result is target
         assert target.rootbip() == sample.rootbip()
         assert target.rooted is True
+
+
+class Test_subtree:
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    @pytest.mark.parametrize("at_source_root", [False, True])
+    def test_returned_tree_inherits_interpretation(self, state, at_source_root):
+        source = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        source.rooted = state
+        node = source.root if at_source_root else source.find_mrca({"A", "B"})
+        before = source.newick()
+
+        extracted, basal = source.subtree(node)
+
+        assert isinstance(extracted, pt.Tree)
+        assert extracted.rooted is state
+        assert extracted.root == node
+        assert source.rooted is state
+        assert source.newick() == before
+        assert (basal is None) is at_source_root
+
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_leaf_result_remains_name_and_independent_basal_branch(self, state):
+        source = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        source.rooted = state
+        original_branch = source.child_dict[source.parent("A")]["A"]
+        original_branch.label = "leaf-edge"
+        original_branch.extra_meta = {"colors": ["red", "blue"]}
+
+        extracted, basal = source.subtree("A")
+
+        assert extracted == "A"
+        assert isinstance(extracted, str)
+        assert basal is not original_branch
+        assert basal.length == 1.0
+        assert basal.label == "leaf-edge"
+        basal.extra_meta["colors"].append("green")
+        assert original_branch.extra_meta == {"colors": ["red", "blue"]}
+        assert source.rooted is state
+
+
+class Test_prune_subtree:
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_extracted_tree_inherits_state_before_source_mutation(self, state):
+        source = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        source.rooted = state
+        node = source.find_mrca({"A", "B"})
+        source.set_node_attribute(node, "extra_meta", {"node": ["own"]})
+        source.root_suffix = pt.Branchstruct(length=0.0, label="retained-root")
+        suffix = source.root_suffix
+
+        extracted, basal = source.prune_subtree(node)
+
+        assert extracted.rooted is state
+        assert extracted.leaves == {"A", "B"}
+        assert extracted.root_suffix is None
+        assert basal.length == 3.0
+        assert source.rooted is state
+        assert source.leaves == {"C", "D"}
+        assert source.root_suffix is suffix
+        source.rooted = (state is not True)
+        assert extracted.rooted is state
+        extracted.nodedict[node].extra_meta["node"].append("new")
+        assert node not in source.nodedict
