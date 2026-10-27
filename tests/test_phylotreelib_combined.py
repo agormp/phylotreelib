@@ -4299,6 +4299,23 @@ class Test_copy_Nodestruct:
 
 class Test_metadata_pairs:
 
+    @pytest.mark.parametrize("owner_kind", ["node", "branch"])
+    @pytest.mark.parametrize("invalid", [pt.MISSING, [], "bad"])
+    def test_invalid_selected_container_has_owner_diagnostic(self, owner_kind, invalid):
+        owner = pt.Nodestruct() if owner_kind == "node" else pt.Branchstruct()
+        owner.extra_meta = invalid
+        assert pt._metadata_pairs(owner, (), owner_kind, None) == []
+        for selection in (None, ("height" if owner_kind == "node" else "length_sd",)):
+            with pytest.raises(pt.TreeError, match=owner_kind + r" extra_meta.*dictionary or None"):
+                pt._metadata_pairs(owner, selection, owner_kind, None)
+
+    def test_disabled_metadata_does_not_validate_container(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.set_node_attribute("A", "extra_meta", pt.MISSING)
+        tree.child_dict[tree.root]["A"].extra_meta = []
+        assert "[&" not in tree.newick(print_meta=False)
+        assert "[&" not in tree.newick(print_meta=True, node_attributes=(), branch_attributes=())
+
     def test_absent_and_explicitly_empty_mapping_do_not_gain_entries(self):
         node = pt.Nodestruct()
         assert node.extra_meta is None

@@ -225,9 +225,11 @@ def _metadata_pairs(owner, attributes, owner_kind, precision):
     selection includes nothing. Accumulator exclusions apply to automatic native
     enumeration; explicitly requested native fields keep their existing meaning.
     """
-    if owner is None:
+    if owner is None or attributes is not None and not attributes:
         return []
     extra = owner.extra_meta
+    if extra is not None and not isinstance(extra, dict):
+        raise TreeError(f"{owner_kind} extra_meta must be a dictionary or None; got {extra!r}")
     scalar_keys = _NATIVE_META_SCALARS[owner_kind]
     automatic = attributes is None
     seen = set()
