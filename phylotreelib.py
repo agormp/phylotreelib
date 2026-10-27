@@ -915,6 +915,24 @@ class TreeError(Exception):
 ###################################################################################################
 ###################################################################################################
 
+# Shared outer-comment helper. Insert at module scope before parser definitions.
+# Quotes never change bracket nesting here; value decoding is a separate layer.
+_COMMENT_BRACKET_RE = re.compile(r"[\[\]]")
+
+
+def _comment_end(text, start):
+    """Return exclusive end for a comment starting at '[', or None if incomplete."""
+    depth = 1
+    for match in _COMMENT_BRACKET_RE.finditer(text, start + 1):
+        if match.group() == "[":
+            depth += 1
+        else:
+            depth -= 1
+            if depth == 0:
+                return match.end()
+    return None
+
+
 class MetacommentParser:
     """Decode one key/value metacomment, without owner or topology knowledge.
 
@@ -1221,7 +1239,11 @@ class NewickStringParser:
                 if not token_value:
                     continue
                 if has_comments and token_value[0] == "[":
-                    self._handle_comment(token_value, state)
+                    try:
+                        self._handle_comment(token_value, state)
+                    except TreeError as error:
+                        offset = self._comment_offset
+                        raise TreeError(f"Tree offset {offset}: {error}") from None
                     continue
                 token_type = token_value if token_value in delimset else "NUM_NAME"
                 try:
@@ -1354,6 +1376,130 @@ class NewickStringParser:
 
 ###################################################################################################
 ###################################################################################################
+
+class AnnotatedNewickParser(NewickStringParser):
+    """Newick state machine extended with complete Nexus comments and typed annotations."""
+
+    _declaration = re.compile(r"\[&\s*([rRuU])\s*\]")
+
+    def __init__(self, transdict=None, label_attr_name="label", label_type=str, *, parse_meta=False):
+        super().__init__(transdict, label_attr_name, label_type)
+        self.parse_meta = parse_meta
+        self.meta_parser = MetacommentParser() if parse_meta else None
+        self._command_kind = None
+
+    def parse(self, treeobj, treestring, *, command_kind=None):
+        self._command_kind = command_kind
+        try:
+            return super().parse(treeobj, treestring)
+        finally:
+            self._command_kind = None
+
+    def _prepare_parse(self, treeobj, treestring):
+        super()._prepare_parse(treeobj, treestring)
+        treeobj.rooted = False if self._command_kind == "UTREE" else None
+        self._declaration_seen = False
+        self._meta_owner = None
+        self._meta_seen = None
+
+    def _clear_parse(self):
+        super()._clear_parse()
+        self._meta_owner = None
+        self._meta_seen = None
+        self._declaration_seen = False
+        self._comment_offset = None
+
+    def _tokenize(self, treestring):
+        if "[" not in treestring and "]" not in treestring:
+            return super()._tokenize(treestring)
+        self._has_comments = True
+        return self._commented_tokens(treestring)
+
+    def _commented_tokens(self, treestring):
+        # Carry an unfinished ordinary token across skipped comments: A[note]B is AB.
+        # Metadata-enabled ampersand comments instead require a completed owner token.
+        pos = 0
+        pending = ""
+        while True:
+            bracket = _COMMENT_BRACKET_RE.search(treestring, pos)
+            start = len(treestring) if bracket is None else bracket.start()
+            parts = super()._tokenize(treestring[pos:start])
+            parts[0] = pending + parts[0]
+            pending = parts.pop()
+            yield from parts
+            if bracket is None:
+                if pending:
+                    yield pending
+                return
+            if bracket[0] == "]":
+                raise TreeError(f"Unexpected closing comment bracket at offset {start}")
+            end = _comment_end(treestring, start)
+            if end is None:
+                raise TreeError(f"Unterminated comment at offset {start}")
+            if treestring.startswith("[&", start):
+                if self.parse_meta and pending:
+                    yield pending
+                    pending = ""
+                self._comment_offset = start
+                yield treestring[start:end]
+            pos = end
+
+    def _handle_comment(self, comment, state):
+        if not comment.startswith("[&"):
+            return
+        declaration = self._declaration.fullmatch(comment)
+        if declaration is not None:
+            if state != "TREE_START":
+                raise TreeError("Rootedness declaration must precede the topology")
+            if self._declaration_seen:
+                raise TreeError("Repeated rootedness declaration in one tree description")
+            rooted = declaration[1] in "Rr"
+            if rooted and self._command_kind == "UTREE":
+                raise TreeError("UTREE contradicts a rooted [&R] declaration")
+            self.treeobj.rooted = rooted
+            self._declaration_seen = True
+            return
+        if not self.parse_meta:
+            return
+        if state == "TREE_START":
+            self.meta_parser.parse(comment)
+            raise TreeError("Leading key/value annotations have no supported tree-level owner")
+        if state in ("EXPECTING_BRLEN", "BRLEN"):
+            owner_kind = "branch"
+            owner = self._current_branch()
+            owner_id = (owner_kind, self.node_stack[-1])
+        elif state in ("LEAF", "INTNODE_END", "LABEL"):
+            owner_kind = "node"
+            node = self.node_stack[-1]
+            if node not in self.treeobj.nodedict:
+                self.treeobj.nodedict[node] = Nodestruct()
+            owner = self.treeobj.nodedict[node]
+            owner_id = (owner_kind, node)
+        else:
+            raise TreeError(f"Unsupported annotation position in parser state {state}")
+        if self._meta_owner != owner_id:
+            self._meta_owner = owner_id
+            self._meta_seen = set()
+        try:
+            assignments = self.meta_parser.parse(comment)
+        except TreeError as error:
+            raise TreeError(f"Invalid annotation on {owner_kind} {owner_id[1]!r}: {error}") from None
+        for key, value in assignments.items():
+            if key in self._meta_seen:
+                raise TreeError(f"Duplicate annotation key {key!r} on {owner_kind} {owner_id[1]!r}")
+            self._meta_seen.add(key)
+            try:
+                _validate_mapped_metadata_value(owner_kind, key, value)
+            except TreeError as error:
+                raise TreeError(f"Invalid annotation {key!r} on {owner_kind} "
+                                f"{owner_id[1]!r}: {error}") from None
+            if key in _NATIVE_META_SCALARS[owner_kind]:
+                setattr(owner, key, value)
+            else:
+                if owner.extra_meta is None:
+                    owner.extra_meta = {}
+                owner.extra_meta[key] = value
+
 
 def build_sumtree(treesummary, treetype="con", blen="biplen", rooting=None, og=None,
                   count_burnin_filename_list=None):
@@ -1543,10 +1689,15 @@ class Tree:
 
     @classmethod
     def from_string(cls, orig_treestring, transdict=None, format="newick",
-                    label_attr_name="label", label_type=str):
-        """Constructor: Tree object from tree-string in specified format"""
+                    label_attr_name="label", label_type=str, *, parse_meta=False):
+        """Construct from Newick; optionally decode positional key/value annotations."""
 
-        if format.lower() == "newick":
+        if format.lower() != "newick":
+            raise TreeError(f"Unsupported tree string format: {format!r}")
+        if parse_meta or "[" in orig_treestring or "]" in orig_treestring:
+            parser_obj = AnnotatedNewickParser(transdict, label_attr_name, label_type,
+                                               parse_meta=parse_meta)
+        else:
             parser_obj = NewickStringParser(transdict, label_attr_name, label_type)
         treeobj = cls._from_string_private(parser_obj, orig_treestring)
         del parser_obj
@@ -1555,7 +1706,7 @@ class Tree:
     ###############################################################################################
 
     @classmethod
-    def _from_string_private(cls, parser_obj, orig_treestring):
+    def _from_string_private(cls, parser_obj, orig_treestring, *, command_kind=None):
         """Constructor: Tree object from tree-string.
         This version is meant to be used by e.g. treefile objects that will use same parser
         for a lot of tree-strings, and can then instantiate parser once and reuse with this method.
@@ -1564,8 +1715,9 @@ class Tree:
 
         # All action is in parser_obj
         treeobj = cls()
-        treeobj = parser_obj.parse(treeobj, orig_treestring)
-        return treeobj
+        if command_kind is None:
+            return parser_obj.parse(treeobj, orig_treestring)
+        return parser_obj.parse(treeobj, orig_treestring, command_kind=command_kind)
 
     ###############################################################################################
 

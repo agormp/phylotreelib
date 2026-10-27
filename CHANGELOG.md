@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- `Tree.from_string(..., parse_meta=True)` imports typed positional node/branch/stem annotations into native fields and lazy `extra_meta`. Both metadata modes retain one leading R/U declaration, skip ordinary comments, and preserve structural root labels/stems. Same-owner repeated keys and unsupported metadata positions/directives raise `TreeError`.
 - Added a reusable typed key/value metacomment decoder with exact-key duplicate rejection, recursive tuple collections, explicit missing values and doubled-quote strings. It has no topology or owner interpretation.
 - Active API, README and recipes now document implemented ownership/root/edit contracts and explicit-copy workflows, correct the Nexus-default and summary-method descriptions, and keep parser/reader migrations distinct from completed behavior.
 - Documented and verified direct length assignment, caller scaling loops and height-to-length conversion: retain stored annotations/rootedness/suffixes without statistical rescaling, and refresh length-derived caches. Raw slot writes require explicit invalidation.

@@ -6384,3 +6384,101 @@ class Test_MetacommentParser_parse:
             pt.MetacommentParser().parse('[&height=1,"height"=2]')
         message = str(caught.value)
         assert 'offset' in message and "'height'" in message and 'near' in message
+
+
+class Test_AnnotatedNewickParser_parse:
+    def test_positional_ownership_native_fields_and_suffix(self):
+        text = '[&R] ((A[&height=2,location="north coast"]:[&length=7]0.5[&rate=0.7],B:1)Inner[&height_95%_HPD={?,2.5}]:2,C:3)Root[&height=4]:0[&posterior=0.9];'
+        tree = pt.Tree.from_string(text, parse_meta=True)
+        assert tree.rooted is True and tree.root_suffix.label == 'Root'
+        assert tree.root_suffix.length == 0.0 and tree.root_suffix.posterior == 0.9
+        assert tree.nodedict['A'].height == 2
+        assert tree.nodedict['A'].extra_meta == {'location': 'north coast'}
+        branch = tree.child_dict[tree.parent('A')]['A']
+        assert branch.length == 0.5 and branch.extra_meta == {'length': 7, 'rate': 0.7}
+        inner = tree.parent('A')
+        assert tree.nodedict[inner].extra_meta == {'height_95%_HPD': (pt.MISSING, 2.5)}
+        assert tree.nodedict[tree.root].height == 4
+        assert tree._nodeheightdict is None
+
+    @pytest.mark.parametrize('parse_meta', [False, True])
+    def test_declarations_are_structural_in_both_modes(self, parse_meta):
+        tree = pt.Tree.from_string('[ordinary [nested];] [& r ] (A,B)Root:1;', parse_meta=parse_meta)
+        assert tree.rooted is True and tree.root_suffix.label == 'Root'
+        assert tree.root_suffix.length == 1
+        for text in ('[&R][&R](A,B);', '[&R][&U](A,B);', '(A[&U],B);', '(A,B):1[&R];'):
+            with pytest.raises(pt.TreeError):
+                pt.Tree.from_string(text, parse_meta=parse_meta)
+
+    def test_disabled_payloads_are_not_decoded(self, monkeypatch):
+        def forbidden(*args):
+            raise AssertionError('metadata decoder called')
+        monkeypatch.setattr(pt.MetacommentParser, 'parse', forbidden)
+        tree = pt.Tree.from_string('[&U][&W 0.5](A[&x=bad grammar],B)[&R=1]:2[&&NHX:x];')
+        assert tree.rooted is False and tree.nodedict == {}
+        assert tree.root_suffix.length == 2 and tree.root_suffix.extra_meta is None
+
+    @pytest.mark.parametrize('text', ['(A[&x=1][&x=1],B);', '(A[&height=1,"height"=2],B);', '(A:[&x=1]1[&x=2],B);', '(A[&height="2"],B);', '(A[&height_95%_HPD={1}],B);', '(A[&W 0.5],B);', '[&lnP=-12](A,B);'])
+    def test_metadata_errors_are_not_silently_dropped(self, text):
+        with pytest.raises(pt.TreeError):
+            pt.Tree.from_string(text, parse_meta=True)
+
+    def test_disjoint_keys_merge_and_node_branch_names_remain_distinct(self):
+        tree = pt.Tree.from_string('(A[&x=1][ordinary][&y=2]:1[&x=3],B);', parse_meta=True)
+        assert tree.nodedict['A'].extra_meta == {'x': 1, 'y': 2}
+        assert tree.child_dict[tree.root]['A'].extra_meta == {'x': 3}
+
+    def test_node_branch_mapping_is_owner_specific(self):
+        tree = pt.Tree.from_string('(A[&length_median=2,height=1]:3[&height=4,length_median=5],B);', parse_meta=True)
+        assert tree.nodedict['A'].height == 1
+        assert tree.nodedict['A'].extra_meta == {'length_median': 2}
+        branch = tree.child_dict[tree.root]['A']
+        assert branch.length_median == 5 and branch.extra_meta == {'height': 4}
+
+    def test_reusable_parser_clears_declaration_and_duplicate_state(self):
+        parser = pt.AnnotatedNewickParser(parse_meta=True)
+        first = parser.parse(pt.Tree(), '[&U](A[&x=1],B);')
+        with pytest.raises(pt.TreeError):
+            parser.parse(pt.Tree(), '[&R](A[&x=1,x=2],B);')
+        last = parser.parse(pt.Tree(), '(A[&x=2],B);')
+        assert first.rooted is False and last.rooted is None
+        assert parser.treeobj is None and parser._meta_seen is None
+        assert parser.meta_parser._text == ''
+
+    def test_balanced_comment_brackets_are_not_quote_shielded(self):
+        text = '(A[&left="[",right="]"],B);'
+        assert pt.Tree.from_string(text).nodedict == {}
+        with pytest.raises(pt.TreeError, match='brackets'):
+            pt.Tree.from_string(text, parse_meta=True)
+        for text in ('(A[nested [unfinished],B);', '(A],B);'):
+            with pytest.raises(pt.TreeError):
+                pt.Tree.from_string(text)
+
+    def test_full_precision_roundtrip_preserves_types_owners_and_state(self):
+        tree = pt.Tree.from_string('[&U](A[&i=1,f=1.0,b=false,s="true",empty="",seq={1,?,{}}]:0.10000000000000002[&length=9],B:2)Root[&height=2.0000000000000004]:0.5[&rate=1e-10];', parse_meta=True)
+        encoded = tree.newick(printlabels=True, print_meta=True,
+                             node_attributes=('i','f','b','s','empty','seq','height'),
+                             branch_attributes=('length','rate'))
+        decoded = pt.Tree.from_string("[&U]" + encoded, parse_meta=True)
+        assert decoded.rooted is False and decoded.root_suffix.label == 'Root'
+        assert decoded.root_suffix.extra_meta['rate'] == 1e-10
+        assert decoded.nodedict['A'].extra_meta == tree.nodedict['A'].extra_meta
+        assert type(decoded.nodedict['A'].extra_meta['f']) is float
+        assert type(decoded.nodedict['A'].extra_meta['i']) is int
+        assert decoded.nodedict[decoded.root].height == 2.0000000000000004
+        assert decoded.child_dict[decoded.root]['A'].length == 0.10000000000000002
+
+
+class Test_AnnotatedNewickParser_tokenize:
+    @pytest.mark.parametrize('parse_meta', [False, True])
+    def test_ordinary_comments_within_words_do_not_split_tokens(self, parse_meta):
+        tree = pt.Tree.from_string('(A[note; [nested]]B:1[note].5,C:2)Ro[note]ot;', parse_meta=parse_meta)
+        assert tree.leaves == {'AB', 'C'}
+        assert tree.child_dict[tree.root]['AB'].length == 1.5
+        assert tree.root_suffix.label == 'Root'
+
+    def test_duplicate_block_error_reports_the_second_occurrence(self):
+        text = '(A[&x=1][&x=1],B);'
+        with pytest.raises(pt.TreeError) as caught:
+            pt.Tree.from_string(text, parse_meta=True)
+        assert f'Tree offset {text.rindex("[&x=1]")}' in str(caught.value)
