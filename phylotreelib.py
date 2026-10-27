@@ -267,6 +267,19 @@ def _metadata_pairs(owner, attributes, owner_kind, precision):
     return pairs
 
 
+def _write_interval_annotations(owner, values, keys):
+    """Write only produced non-None interval values, retaining all other target keys."""
+    if values is None:
+        return
+    for key in keys:
+        value = values.get(key)
+        if value is None:
+            continue
+        if owner.extra_meta is None:
+            owner.extra_meta = {}
+        owner.extra_meta[key] = _copy_annotation_value(value)
+
+
 # Compiled regular expression for comment removal, stored on the module
 _COMMENT_NONNESTED_RE = re.compile(r"\[[^\[\]]*\]")
 
@@ -7239,11 +7252,11 @@ class TreePostProcessor():
                         sumtree.set_node_attribute(node, "height_sd", nd.height_sd)
                         node_attrs.update({"height", "height_sd"})
                         if self.treesum.trackci:
-                            # these attributes may or may not exist; set if present
-                            for attr in ("extra_meta", "height_median"):
-                                if hasattr(nd, attr):
-                                    sumtree.set_node_attribute(node, attr, getattr(nd, attr))
-                                    node_attrs.add(attr)
+                            _write_interval_annotations(
+                                sumtree.nodedict[node], nd.extra_meta,
+                                ("height_" + label for label in self.treesum.ci_labels))
+                            sumtree.set_node_attribute(node, "height_median", nd.height_median)
+                            node_attrs.add("height_median")
 
         # Branch annotations from bipartsummary
         if self.treesum.trackbips:
@@ -7261,10 +7274,11 @@ class TreePostProcessor():
                         sumtree.set_branch_attribute(parent, child, "length_sd", br.length_sd)
                         branch_attrs.update({"length", "length_sd"})
                         if self.treesum.trackci:
-                            for attr in ("extra_meta", "length_median"):
-                                if hasattr(br, attr):
-                                    sumtree.set_branch_attribute(parent, child, attr, getattr(br, attr))
-                                    branch_attrs.add(attr)
+                            _write_interval_annotations(
+                                sumtree.child_dict[parent][child], br.extra_meta,
+                                ("length_" + label for label in self.treesum.ci_labels))
+                            sumtree.set_branch_attribute(parent, child, "length_median", br.length_median)
+                            branch_attrs.add("length_median")
 
         # Set Newick internal node labels (numbers after ')')
         # For each internal node (except root), set the label on its incoming branch.
@@ -7518,7 +7532,7 @@ class CAHeightEstimator():
                 ci = {}
                 for i, lab in enumerate(ci_labels):
                     ci["height_" + lab] = (qvals[2*i], qvals[2*i + 1])
-                sumtree.set_node_attribute(node, "extra_meta", ci)
+                _write_interval_annotations(sumtree.nodedict[node], ci, ci)
                 sumtree.set_node_attribute(node, "height_median", qvals[-1])
 
         return sumtree

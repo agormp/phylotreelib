@@ -3332,6 +3332,20 @@ class Test_cladesummary_TreeSummary:
 
 class Test_write_into_CAHeightEstimator:
 
+    def test_preserves_unwritten_extra_metadata(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.set_node_attribute("A", "extra_meta", {
+            "height_95%_CI": (-1, -1), "height_80%_CI": (0, 10), "custom": ["keep"],
+        })
+        plan = pt.CAHeightEstimator.build_plan(tree, trackci=True, ci_probs=(0.95,))
+        estimator = pt.CAHeightEstimator(plan, trackci=True)
+        estimator.add_tree(pt.Tree.from_string("(A:1,B:2);"))
+        estimator.write_into(tree)
+        extra = tree.nodedict["A"].extra_meta
+        assert extra["height_95%_CI"] == (tree.nodedict["A"].height,) * 2
+        assert extra["height_80%_CI"] == (0, 10)
+        assert extra["custom"] == ["keep"]
+
     def test_single_observation_preserves_undefined_sd(self):
         sumtree = pt.Tree.from_string("(A:1,B:2);")
         plan = pt.CAHeightEstimator.build_plan(
@@ -4613,3 +4627,67 @@ class Test_print_rootedness:
                 tree.nexus(rooted=False)
         with pytest.raises(TypeError):
             trees.nexus(rooted=None)
+
+
+class Test_annotate_sumtree_TreePostProcessor:
+
+    def test_writes_only_produced_interval_keys_and_isolates_values(self):
+        sample = pt.Tree.from_string("(A:1,B:2);")
+        summary = pt.TreeSummary(trackclades=True, trackheight=True, trackbips=True,
+                                 trackblen=True, trackci=True, ci_probs=(0.95,))
+        summary.add_tree(sample)
+        source_node = summary.cladesummary[pt.Clade.from_leafset({"A"}, sample)]
+        source_branch = summary.bipartsummary[
+            pt.Bipartition.from_leafset({"A"}, sample)]
+        source_node.extra_meta = {"height_95%_CI": [1, 2], "source_only": "ignore"}
+        source_branch.extra_meta = {"length_95%_CI": [pt.MISSING, 3]}
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.set_node_attribute("A", "extra_meta", {
+            "height_95%_CI": (-1, -1), "height_80%_CI": (0, 10), "custom": "keep",
+        })
+        target_branch = tree.child_dict[tree.root]["A"]
+        target_branch.extra_meta = {"length_95%_CI": (-1, -1),
+                                    "length_80%_CI": (0, 10), "custom": "keep"}
+        postprocessor = pt.TreePostProcessor(summary)
+        postprocessor.annotate_sumtree(tree)
+        node_extra = tree.nodedict["A"].extra_meta
+        branch_extra = target_branch.extra_meta
+        assert node_extra == {"height_95%_CI": [1, 2], "height_80%_CI": (0, 10),
+                              "custom": "keep"}
+        assert branch_extra == {"length_95%_CI": [pt.MISSING, 3],
+                                "length_80%_CI": (0, 10), "custom": "keep"}
+        assert node_extra["height_95%_CI"] is not source_node.extra_meta["height_95%_CI"]
+        assert branch_extra["length_95%_CI"] is not source_branch.extra_meta["length_95%_CI"]
+        assert branch_extra["length_95%_CI"][0] is pt.MISSING
+        node_extra["height_95%_CI"][0] = 99
+        assert source_node.extra_meta["height_95%_CI"] == [1, 2]
+
+        source_node.extra_meta["height_95%_CI"] = None
+        source_branch.extra_meta = None
+        postprocessor.annotate_sumtree(tree)
+        assert node_extra["height_95%_CI"] == [99, 2]
+        assert branch_extra["length_95%_CI"] == [pt.MISSING, 3]
+
+        source_node.extra_meta["height_95%_CI"] = pt.MISSING
+        source_branch.extra_meta = {"length_95%_CI": pt.MISSING}
+        postprocessor.annotate_sumtree(tree)
+        assert node_extra["height_95%_CI"] is pt.MISSING
+        assert branch_extra["length_95%_CI"] is pt.MISSING
+
+        # No result must not allocate a mapping on an otherwise fresh target.
+        for owner in summary.cladesummary.values():
+            owner.extra_meta = {}
+        source_branch.extra_meta = {}
+        fresh = pt.Tree.from_string("(A:1,B:2);")
+        postprocessor.annotate_sumtree(fresh)
+        assert all(owner.extra_meta is None for owner in fresh.nodedict.values())
+        assert all(owner.extra_meta is None for children in fresh.child_dict.values()
+                   for owner in children.values())
+
+    def test_explicit_whole_field_setters_still_replace_the_mapping(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.set_node_attribute("A", "extra_meta", {"old": 1})
+        replacement = {"new": 2}
+        tree.set_node_attribute("A", "extra_meta", replacement)
+        assert tree.nodedict["A"].extra_meta is replacement
+        assert "old" not in replacement
