@@ -5220,7 +5220,65 @@ class Test_deroot:
         assert tree.rooted is None
 
 
+class Test_rootminvar:
+
+    @pytest.mark.parametrize("state", [False, None])
+    def test_already_optimal_root_establishes_true_without_replacement(self, state):
+        tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        tree.rooted = state
+        tree.root_suffix = pt.Branchstruct(length=0.0, label="optimal")
+        suffix, root = tree.root_suffix, tree.root
+        before = tree.newick()
+        tree.rootminvar()
+        assert tree.rooted is True
+        assert tree.root == root
+        assert tree.root_suffix is suffix
+        assert tree.newick() == before
+
+
+class Test_rootmid:
+
+    def test_successful_midpoint_selection_establishes_true(self, treedata):
+        tree = pt.Tree.from_string(treedata["simplestring"])
+        tree.rooted = False
+        tree.rootmid()
+        assert tree.rooted is True
+
+
+class Test_rootout:
+
+    def test_successful_outgroup_selection_establishes_true(self):
+        tree = pt.Tree.from_string("((A:1,B:1):1,C:2,D:2);")
+        tree.rooted = None
+        tree.rootout("A")
+        assert tree.rooted is True
+
+
 class Test_root_maxfreq:
+
+    @pytest.mark.parametrize("already_matching", [True, False])
+    def test_success_establishes_true_even_when_current_root_matches(self, already_matching):
+        sample = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        summary = pt.TreeSummary(trackroot=True)
+        summary.add_tree(sample)
+        target = sample.copy_treeobject() if already_matching else pt.Tree.from_string(
+            "((A:1,B:1):1,C:2,D:2);"
+        )
+        target.rooted = False
+        target.root_suffix = pt.Branchstruct(length=0.0, label="root-label")
+        suffix, oldroot = target.root_suffix, target.root
+
+        result = pt.TreePostProcessor(summary).root_maxfreq(target)
+
+        assert result is target
+        assert target.rooted is True
+        assert target.rootbip() == sample.rootbip()
+        if already_matching:
+            assert target.root == oldroot
+            assert target.root_suffix is suffix
+        else:
+            assert target.root_suffix is None
+        assert sample.rooted is None
 
     def test_selects_a_different_observed_root_with_current_bipartition_api(self):
         sample = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")

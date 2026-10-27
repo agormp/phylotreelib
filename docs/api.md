@@ -429,3 +429,5 @@ A successful public `reroot()` selects a rooted interpretation, including when s
 ### Unrooting and structural root collapse
 
 `unroot()` establishes False after successful structural preparation. A multifurcating or two-leaf traversal root remains in place, preserving its suffix and node data. `collapse_bifurcating_root()` is mechanical: actual removal clears the suffix and deleted-root node data and changes True to None; False/None remain unchanged. A non-bifurcating no-op preserves all states. Direct structural collapse of a two-leaf tree still raises TreeError. The deprecated `deroot()` alias continues to mean structural collapse; use `unroot()` to declare an unrooted interpretation.
+
+Root selectors (`rootmid()`, `rootminvar()`, `rootout()` and successful `TreePostProcessor.root_maxfreq()`) establish True, including success paths that keep the current root. A genuine no-op retains its suffix; an actual remove/recreate step clears it even if the final geometric position is equivalent. `root_maxfreq()` retains its existing root-position calculation; its unfinished length-fraction/rootcred work remains separate.

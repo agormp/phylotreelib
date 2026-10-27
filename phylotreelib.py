@@ -5246,6 +5246,7 @@ class Tree:
         else:
             # Minpardist == 0: Do nothing. Current root is minimal variance root
             if minpardist == 0.0:
+                self.rooted = True
                 return
             # Minpardist != 0: Do something, depending on whether root is at bifurcation or not
             else:
@@ -7104,6 +7105,7 @@ class TreePostProcessor():
                 #     sumtree.child_dict[sumtree.root][kid2].length = dist_to_kid2
                 # REWRITE TO USE NEW ROOTBIP!!!!!
 
+                sumtree.rooted = True
                 return sumtree
 
         # If we did not return by now, then bipart not in contree
