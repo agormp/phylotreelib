@@ -4017,6 +4017,14 @@ class Tree:
         `connect_branchstruct` overrides `connect_length` if provided.
         If `graftlabel` is given, it is prefixed to leaf names in `other` (mutates `other`).
 
+        A successful Tree graft transfers ownership of donor child dictionaries,
+        branches and node metadata to the recipient. The donor may be renamed and
+        is no longer an independently usable Tree or synchronized subtree view.
+        To preserve it, pass donor.copy_treeobject(). A supplied connecting struct
+        also transfers directly; copy it first to retain an independent original.
+        No automatic donor copy/reset, guard, cache synchronization or rollback
+        guarantee is added. Leaf strings create no donor Tree to maintain.
+
         Returns the graft point node ID.
         """
 

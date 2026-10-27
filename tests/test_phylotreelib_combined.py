@@ -2554,6 +2554,49 @@ class TestGraft:
         assert "D" not in recipient.nodedict
         assert set(recipient.nodedict) <= recipient.nodes
 
+    def test_explicit_copies_preserve_reusable_donor_and_connection_originals(self):
+        recipient = pt.Tree.from_string("(A:2,B:4,C:6);")
+        donor = pt.Tree.from_string("(X:1,(Y:2,Z:3):4);")
+        donor.rooted = True
+        donor.root_suffix = pt.Branchstruct(length=0.4, label="original root")
+        donor.root_suffix.extra_meta = {"stem": ["original"]}
+        original_root = donor.root
+        original_suffix = donor.root_suffix
+        donor.set_node_attribute(original_root, "height", 5.0)
+        donor.set_node_attribute("X", "extra_meta", {"node": ["original"]})
+        donor_edge = donor.child_dict[donor.parent("X")]["X"]
+        donor_edge.extra_meta = {"rate": [1, 2]}
+        assert donor.nodedist("X", "Y") == pytest.approx(7)
+        assert donor.rootdist["X"] == pytest.approx(1)
+        connection = pt.Branchstruct(length=0.7, label="connecting")
+        connection.extra_meta = {"note": ["original"]}
+        transferred_connection = connection.copy()
+
+        graftpoint = recipient.graft(
+            donor.copy_treeobject(), recipient.root, "A", frac_from_parent=0.5,
+            connect_branchstruct=transferred_connection, graftlabel="g_")
+
+        grafted_root = recipient.parent("g_X")
+        assert recipient.child_dict[graftpoint][grafted_root] is transferred_connection
+        recipient.setlength(grafted_root, "g_X", 9.0)
+        recipient.nodedict["g_X"].extra_meta["node"].append("recipient edit")
+        recipient.child_dict[grafted_root]["g_X"].extra_meta["rate"].append(3)
+        recipient.child_dict[graftpoint][grafted_root].extra_meta["note"].append("recipient edit")
+
+        # These are preserved originals, not the consumed copies supplied above.
+        assert donor.leaves == {"X", "Y", "Z"}
+        assert donor.root == original_root and donor.rooted is True
+        assert donor.root_suffix is original_suffix
+        assert donor.root_suffix.extra_meta == {"stem": ["original"]}
+        assert donor.nodedict[original_root].height == 5.0
+        assert donor.nodedict["X"].extra_meta == {"node": ["original"]}
+        assert donor_edge.length == pytest.approx(1)
+        assert donor_edge.extra_meta == {"rate": [1, 2]}
+        assert donor.nodedist("X", "Y") == pytest.approx(7)
+        assert donor.rootdist["X"] == pytest.approx(1)
+        assert connection.length == pytest.approx(0.7)
+        assert connection.extra_meta == {"note": ["original"]}
+
 ###################################################################################################
 
 class TestPrune:

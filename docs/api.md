@@ -455,3 +455,7 @@ Complete per-file statistics and diagnostics before `recipient.update(donor)`. M
 ### Retained representative Trees
 
 With topology tracking and `store_trees=True`, the first Tree for each topology is retained by reference, potentially in both topology dictionaries. Leave its topology, names, lengths, rootedness and stored metadata unchanged while any summary retains it, including after a consuming merge. Read-only queries, printing and normal derived-cache work remain allowed. Edit an explicit `copy_treeobject()` instead. No automatic snapshot, mutation guard or ownership registry is added. The default `store_trees=False` imposes no representative-storage lifetime restriction. Representatives are retained input samples; their arbitrary annotations do not become aggregate statistics. Constructed summary outputs have a separate independent ownership contract.
+
+### Grafting transfers donor ownership
+
+A successful `recipient.graft(donor, ...)` consumes donor contents: ID/name renaming and direct adoption of child dictionaries, branches and node metadata remain. Continue using the recipient; the donor is neither an independently usable Tree nor a synchronized subtree view. Pass `donor.copy_treeobject()` to retain an independent original. An explicit connecting Branchstruct transfers directly too; copy it first when retaining an independent original. No automatic copy/reset, ownership guard, donor-cache synchronization or new rollback guarantee is added. Leaf strings create no separately maintained donor Tree.
