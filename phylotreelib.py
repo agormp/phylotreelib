@@ -955,7 +955,8 @@ class NewickStringParser:
                                     ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
                                     ")":        (self._handle_intnode_end,          "INTNODE_END")      },
             "EXPECTING_BRLEN":  {   "NUM_NAME": (self._handle_add_brlen,            "BRLEN")            },
-            "BRLEN":            {   ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
+            "BRLEN":            {   ";":        (self._handle_transition_tree_end,  "TREE_END"),
+                                    ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
                                     ")":        (self._handle_intnode_end,          "INTNODE_END")      },
             "EXPECTING_CHILD":  {   "(":        (self._handle_add_intnode,          "INTNODE_START"),
                                     "NUM_NAME": (self._handle_add_leaf,             "LEAF")             },
@@ -963,8 +964,9 @@ class NewickStringParser:
                                     ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
                                     ":":        (self._handle_transition_brlen,     "EXPECTING_BRLEN"),
                                     "NUM_NAME": (self._handle_label,                "LABEL"),
-                                    ";":        (self._handle_transition_tree_end,  "TREE_START")       },
-            "LABEL":            {   ")":        (self._handle_intnode_end,          "INTNODE_END"),
+                                    ";":        (self._handle_transition_tree_end,  "TREE_END")       },
+            "LABEL":            {   ";":        (self._handle_transition_tree_end,  "TREE_END"),
+                                    ")":        (self._handle_intnode_end,          "INTNODE_END"),
                                     ",":        (self._handle_transition_child,     "EXPECTING_CHILD"),
                                     ":":        (self._handle_transition_brlen,     "EXPECTING_BRLEN")  }
         }
@@ -1004,52 +1006,57 @@ class NewickStringParser:
 
     ###############################################################################################
 
-    def parse(self, treeobj, treestring):
-        # Construct Tree object that is filled out while parsing
-        # Tree is represented as a dictionary of dictionaries.
-        # The keys in the top dictionary are the internal nodes which are numbered consecutively.
-        # Each intnode key has an associated value that is itself a dictionary listing the children:
-        # Keys are child nodes, values are Branchstructs which contain two attributes:
-        #   (1) "length" (float, parsed from numbers after colons in input newick string)
-        #   (2) label_attr_name (by default "label", but is specified at runtime) from before :
-        #       input string for this attribute is converted using label_type() (e.g. float or str)
-        # Leafs are identified by a string instead of a number
-
-        # NOTE: interprets non-leaf labels as belonging to an internal branch (not to
-        # an internal node). The label is attached to the same branch as the branch length
+    def _prepare_parse(self, treeobj, treestring):
         self.treeobj = treeobj
-        self.treeobj.root = 0
+        treeobj.root = 0
+        self.node_stack = []
+        self.ntips = 0
+        self.nodeno = None
+        self._complete = False
+        self._has_comments = False
 
-        # These variables are only used while parsing, and should be in parserobj (not treeobj)
-        # Values are reset each time new treestring is parsed
+    def _tokenize(self, treestring):
+        return self.regex.split("".join(treestring.split()))
+
+    def _clear_parse(self):
+        # Reusable parsers must not retain a completed/failed Tree or token stream.
+        self.treeobj = None
         self.node_stack = []
         self.ntips = 0
         self.nodeno = None
 
-        treestring = "".join(treestring.split()) # Hack to remove whitespace from treestring
-        dispatch = self.dispatch
-        delimset = self.delimset
-        state = "TREE_START"
-        tree_parts_list = self.regex.split(treestring)
-        for token_value in tree_parts_list:
-            if token_value:
-                if token_value in delimset:
-                    token_type = token_value
-                else:
-                    token_type = "NUM_NAME"
+    def parse(self, treeobj, treestring):
+        """Build one Tree through the shared state/handler loop."""
+        self._prepare_parse(treeobj, treestring)
+        try:
+            tokens = self._tokenize(treestring)
+            dispatch = self.dispatch
+            delimset = self.delimset
+            has_comments = self._has_comments
+            state = "TREE_START"
+            for token_value in tokens:
+                if not token_value:
+                    continue
+                if has_comments and token_value[0] == "[":
+                    self._handle_comment(token_value, state)
+                    continue
+                token_type = token_value if token_value in delimset else "NUM_NAME"
                 try:
                     handler, state = dispatch[state][token_type]
                 except KeyError:
-                    self._handle_parse_error(state, token_value, token_type, treestring, tree_parts_list)
+                    self._handle_parse_error(state, token_value, token_type,
+                                             treestring, tokens)
                 handler(token_value)
-
-        self.sanitychecks(self.treeobj, treestring)
-
-        return self.treeobj
+            self.sanitychecks(treeobj, treestring)
+            return treeobj
+        finally:
+            self._clear_parse()
 
     ###############################################################################################
 
     def sanitychecks(self, treeobj, treestring):
+        if not self._complete:
+            raise TreeError("Unfinished tree description: expected a complete topology and semicolon")
         if self.node_stack:
             msg = f"Nodes remaining on stack after parsing treestring: {self.node_stack}"
             raise TreeError(msg)
@@ -1114,6 +1121,8 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_transition_child(self, token_value):
+        if len(self.node_stack) < 2:
+            raise TreeError("Unexpected comma after the root topology")
         self.node_stack.pop()
 
     ###############################################################################################
@@ -1123,32 +1132,41 @@ class NewickStringParser:
 
     ###############################################################################################
 
+    def _current_branch(self):
+        if len(self.node_stack) == 1:
+            if self.treeobj.root_suffix is None:
+                self.treeobj.root_suffix = Branchstruct(length=None)
+            return self.treeobj.root_suffix
+        parent, child = self.node_stack[-2:]
+        return self.treeobj.child_dict[parent][child]
+
     def _handle_add_brlen(self, brlen_string):
         try:
             brlen = float(brlen_string)
-            child = self.node_stack[-1]
-            parent = self.node_stack[-2]
-            self.treeobj.child_dict[parent][child].length = brlen
         except ValueError:
-            raise TreeError(f"Expected branch length: {brlen_string}")
+            raise TreeError(f"Expected branch length: {brlen_string}") from None
+        self._current_branch().length = brlen
 
     ###############################################################################################
 
     def _handle_intnode_end(self, token_value):
+        if len(self.node_stack) < 2:
+            raise TreeError("Unexpected closing parenthesis after the root topology")
         self.node_stack.pop()
 
     ###############################################################################################
 
     def _handle_label(self, label):
-        child = self.node_stack[-1]
-        parent = self.node_stack[-2]
-        branchstruct = self.treeobj.child_dict[parent][child]
+        branchstruct = self._current_branch()
         setattr(branchstruct, self.label_attr_name, self.label_type(label))
 
     ###############################################################################################
 
     def _handle_transition_tree_end(self, token_value):
+        if len(self.node_stack) != 1:
+            raise TreeError("Semicolon before the root topology is complete")
         self.node_stack.pop()
+        self._complete = True
 
 ###################################################################################################
 ###################################################################################################

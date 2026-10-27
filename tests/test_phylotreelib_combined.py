@@ -6194,3 +6194,31 @@ class Test_clear_length_caches:
         tree.clear_length_caches()
         _assert_length_edit_data(tree, before)
         assert tree.rootdist is not cached and tree.rootdist["A"] == 6
+
+
+class Test_NewickStringParser_parse:
+    @pytest.mark.parametrize('text', ['', '(A,B)', '(A:1,B:2', '(A,B));', '(A,B),(C,D);', '(A,B);(C,D);', '((A,B);'])
+    def test_rejects_incomplete_or_multiple_topologies(self, text):
+        with pytest.raises(pt.TreeError):
+            pt.NewickStringParser().parse(pt.Tree(), text)
+
+    def test_reuse_releases_tree_after_success_and_failure(self):
+        parser = pt.NewickStringParser()
+        first = parser.parse(pt.Tree(), '(A:1,B:2);')
+        with pytest.raises(pt.TreeError):
+            parser.parse(pt.Tree(), '(X,');
+        second = parser.parse(pt.Tree(), '(C:3,D:4);')
+        assert first.leaves == {'A', 'B'} and second.leaves == {'C', 'D'}
+        assert parser.treeobj is None and parser.node_stack == []
+
+    def test_root_suffix_is_structured_and_not_an_edge(self):
+        parser = pt.NewickStringParser(label_attr_name='posterior', label_type=float)
+        tree = parser.parse(pt.Tree(), '(A:1,B:2)0.95:0;')
+        assert tree.root_suffix.posterior == 0.95
+        assert tree.root_suffix.length == 0.0
+        assert tree.rooted is None and tree.parent_dict[tree.root] is None
+        assert tree.nodedict == {}
+
+    def test_label_only_root_suffix_has_no_invented_length(self):
+        tree = pt.Tree.from_string('(A,B)Root;')
+        assert tree.root_suffix.label == 'Root' and tree.root_suffix.length is None
