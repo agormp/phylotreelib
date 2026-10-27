@@ -1327,7 +1327,11 @@ class NewickStringParser:
             brlen = float(brlen_string)
         except ValueError:
             raise TreeError(f"Expected branch length: {brlen_string}") from None
-        self._current_branch().length = brlen
+        stack = self.node_stack
+        if len(stack) > 1:
+            self.treeobj.child_dict[stack[-2]][stack[-1]].length = brlen
+        else:
+            self._current_branch().length = brlen
 
     ###############################################################################################
 
