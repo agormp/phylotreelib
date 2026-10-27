@@ -79,18 +79,35 @@ The shared public `MISSING` marker retains identity through copying and pickle. 
 
 `copy_treeobject(copylengths=True, copyattr=True)` preserves rootedness under either flag and independently copies retained mutable annotation containers. `copyattr=False` omits node metadata and non-length branch/suffix fields. `copylengths=False` resets a present stem to zero while preserving an absent stem as None; a suffix with no retained information is omitted. This does not establish independent copying of unrelated accumulators.
 
-**Current input limitation:** constructor and editing transitions are implemented as described below. Annotation-aware readers, declaration retention, TREE/UTREE context, raw/count/skip paths and the `sumt` `.trprobs` migration remain later work. Existing readers still expose `strip_comments`; input declarations and structured suffix data are not yet retained through the planned parser. Plain parsing without retained declaration context leaves rootedness unspecified. These implemented fields, copying and output controls do not imply that the planned `parse_meta` input API already exists. Nexus itself supplies no rootedness default when a declaration is absent; see the [recorded specification check](decisions/nexus-rootedness.md).
+#### Input parsing and complete descriptions
 
-#### `Treefile(filename, strip_comments=True)`
+```python
+Tree.from_string(orig_treestring, transdict=None, format="newick",
+                 label_attr_name="label", label_type=str, *, parse_meta=False)
+Treefile(filename, *, parse_meta=False)
+Newicktreefile(filename=None, filecontent=None, *, parse_meta=False)
+Nexustreefile(filename=None, filecontent=None, *, parse_meta=False)
+```
 
-Factory that autodetects file format and returns either a `Newicktreefile` or `Nexustreefile`.
+`Treefile` detects the file format. Concrete readers require exactly one of `filename` or `filecontent`. Normal iteration and `readtree()` return Trees; `readtree()` returns None at clean EOF. Each reader reuses its parser.
 
-Use this when you want one entry point regardless of the underlying tree-file format.
+`parse_meta=True` decodes key/value annotations at their positional owner. Before a colon they belong to the preceding leaf/internal/root node; after it they belong to that node's incoming branch, or the root's stem. Root labels use the existing configured label field/conversion. Root-node data alone creates no `root_suffix`; a root label without a supplied stem has `length=None`. Structural suffix input is retained in both metadata modes.
 
-#### `Newicktreefile(filename=None, filecontent=None, strip_comments=True)`
+Values support exact integers, decimal/scientific floats, lowercase booleans, strings, `?` as MISSING and recursively nested brace collections decoded as tuples. Single/double quoted keys and strings use doubled matching quotes; backslashes remain literal. Quoted scalar values remain strings. Bare tokens are classified completely; `nan`, `inf`, `None` and malformed numeric-looking tokens remain generic strings and fail where a recognized numeric field is required. Square brackets must balance independently within every quoted string/key. Native mappings and interval validation follow the storage rules above.
 
-Class representing a Newick tree file.
+Disjoint blocks on the same owner merge. Repeated exact decoded keys on that owner raise TreeError, including identical values; node and branch owners remain separate. With metadata enabled, malformed payloads, unsupported directives such as `[&W 0.5]`/NHX and leading key/value annotations without a supported owner raise TreeError. The parser does not infer weights, decode producer-specific dialects or broaden quoted taxon/tree-name/translation syntax.
 
+Both metadata modes interpret one standalone leading `[&R]` or `[&U]`, with case/whitespace tolerance. Repeated or misplaced declarations raise TreeError. `[&R=1]` is an ordinary assignment, never a declaration. A Nexus TREE command without a flag leaves None; UTREE establishes False and rejects a contradictory R flag. Interpretation comes from syntax/context rather than tree shape. Nexus itself leaves an undeclared TREE's interpretation unspecified; see the [recorded specification check](decisions/nexus-rootedness.md).
+
+With metadata disabled, optional payloads are skipped without decoding or annotation maps. Ordinary comments are discarded from parsed Trees in both modes. Nexus names/pre-`=` comments and unrelated application blocks are envelope material and are not stored. For example, a header `[p=0.2]` neither supplies node metadata nor weights the observation.
+
+`read_tree_text()` returns the complete original description, including its whitespace, ordinary/ampersand comments, declarations and root suffix, or None at clean EOF. Nexus results start immediately after `=` and exclude the header/block envelope. `readtree(returntree=False)` and `get_treestring()` are thin wrappers with the same result. Raw retrieval frames boundaries without validating topology, values or declarations; raw strings alone do not carry UTREE or translation context. Internal worker transport captures stable command/parser context for each corresponding description.
+
+`skip_trees(n)` skips up to a nonnegative number of descriptions and returns the actual count. `fast_treecount(filename, fileformat="nexus")` counts descriptions using the same lexical framing. These paths construct neither complete descriptions nor Trees, and do not validate annotation/topology semantics. All paths reject unfinished lexical input and unterminated/stray comment brackets; brackets nest even inside quotes in comments.
+
+**Unreleased input migration:** removed reader/factory `strip_comments` keywords and positional slots raise TypeError. Use `parse_meta=True` for decoded annotations and raw reading for original description text. Default reads now retain supported declarations. Raw wrappers retain their call/EOF shapes but deliberately preserve comments and suffixes. Removed reader/Tree `below_root` has no alias: use root-node data in `nodedict[root]`, root labels/stems in `root_suffix`, or explicitly retain raw text outside the Tree. Standalone `remove_comments()` retains its existing generic behavior and discards declarations when called explicitly.
+
+For an unchanged supported Tree, selected output and metadata-enabled reimport preserve topology/root placement, selected structural information, emitted annotation owners/keys/types/values, and finite floats at omitted/None precision. Match translation and label settings and relevant command context. Canonical Nexus declarations preserve rootedness; plain Newick or suppressed declarations intentionally omit it. This does not promise the original imported key set, Python container identity, comments/names/header history or source formatting. Native fallback may add selected fields that were never imported; scientific validity after edits is the caller's responsibility.
 
 
 ---
@@ -99,7 +116,7 @@ Class representing a Newick tree file.
 
 #### Constructor interpretation
 
-Generic `Tree()`, `from_leaves()` and `from_branchinfo()` leave rootedness None. `from_biplist()`, `from_topology()` and neighbor joining establish False. `from_cladedict()`, UPGMA and ancestral random Yule/coalescent generation establish True, including rate-varying random lengths. Consensus/all-compatible consensus/MBC inherit the unrooted construction; MCC/HIPSTR/mrHIPSTR inherit the oriented clade construction. Deliberate subsequent rooting establishes True. Estimating heights, lengths or support preserves interpretation rather than inferring one, and retained representative Trees keep their original state. Plain parsing without retained declaration context remains unspecified until the input migration.
+Generic `Tree()`, `from_leaves()` and `from_branchinfo()` leave rootedness None. `from_biplist()`, `from_topology()` and neighbor joining establish False. `from_cladedict()`, UPGMA and ancestral random Yule/coalescent generation establish True, including rate-varying random lengths. Consensus/all-compatible consensus/MBC inherit the unrooted construction; MCC/HIPSTR/mrHIPSTR inherit the oriented clade construction. Deliberate subsequent rooting establishes True. Estimating heights, lengths or support preserves interpretation rather than inferring one, and retained representative Trees keep their original state. Undeclared Newick/TREE input remains unspecified; UTREE or a supported declaration supplies interpretation.
 
 #### Rooting, unrooting and structural root collapse
 

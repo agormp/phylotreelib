@@ -58,6 +58,38 @@ with pt.Nexustreefile("primate-mtDNA.trees") as tf:
         break  # remove if you want to iterate over all trees
 ```
 
+#### Import selected positional annotations and retain raw text explicitly
+
+```python
+import phylotreelib as pt
+source = '[&R](A[&height=1.0,location="north coast"]:0.5[&rate=0.7],B:2)Root:0;'
+with pt.Newicktreefile(filecontent=source, parse_meta=True) as tf:
+    raw = tf.read_tree_text()  # Complete original description, no Tree construction.
+assert raw == source
+tree = pt.Tree.from_string(raw, parse_meta=True)
+assert tree.rooted is True
+assert tree.nodedict["A"].height == 1.0
+assert tree.nodedict["A"].extra_meta["location"] == "north coast"
+assert tree.child_dict[tree.root]["A"].extra_meta["rate"] == 0.7
+assert tree.root_suffix.label == "Root" and tree.root_suffix.length == 0.0
+print(tree.nexus(print_meta=True, node_attributes=("height", "location"),
+                 branch_attributes=("rate",)))
+```
+
+Annotations before a colon belong to the node; those after it belong to its incoming branch, or the root's stem. Default `parse_meta=False` keeps supported declarations and structural suffixes while skipping optional payloads. Ordinary comments live only in explicitly requested raw strings. Raw Nexus descriptions also need their original translation/command context for equivalent worker parsing; a bare description cannot distinguish TREE from UTREE.
+
+#### Skip burn-in without constructing discarded Trees
+
+```python
+import phylotreelib as pt
+with pt.Newicktreefile(filecontent="(A[ordinary;comment],B);[&U](C,D);") as tf:
+    assert tf.skip_trees(1) == 1
+    retained = tf.readtree()
+assert retained.leaves == {"C", "D"} and retained.rooted is False
+```
+
+`fast_treecount(filename, fileformat="newick")` uses the same lexical framing. Count/skip/raw paths do not decode payloads or validate topology/declaration semantics. Removed `strip_comments` arguments raise TypeError; `readtree(False)` and `get_treestring()` now return intact descriptions. Replace removed `below_root` with structured root-node/root-suffix fields or retained raw text; see the [input API](api.md#input-parsing-and-complete-descriptions).
+
 #### Read all trees into a TreeSet
 
 ```python
@@ -878,9 +910,9 @@ print(tree.nexus())                       # [&U]
 print(tree.nexus(print_rootedness=False))  # Omit the known declaration
 ```
 
-`tree.rooted = None` omits the declaration when interpretation is unknown. Nexus leaves rooted/unrooted interpretation unspecified without either declaration; see the [recorded specification check](decisions/nexus-rootedness.md). The boolean `print_rootedness` switch defaults to True and works independently of `print_meta`; it never changes state or geometry. `TreeSet.nexus()` uses each tree's own state. The old `nexus(rooted=...)` value argument has been removed.
+`tree.rooted = None` omits the declaration when interpretation is unknown. Nexus TREE leaves rooted/unrooted interpretation unspecified without either declaration; UTREE supplies False; see the [recorded specification check](decisions/nexus-rootedness.md). The boolean `print_rootedness` switch defaults to True and works independently of `print_meta`; it never changes state or geometry. `TreeSet.nexus()` uses each tree's own state. The old `nexus(rooted=...)` value argument has been removed.
 
-Constructor and editing rootedness transitions are implemented: clade/MCC/HIPSTR/mrHIPSTR and ancestral-model random trees are rooted, bipartition/consensus/MBC construction is unrooted, and deliberate rooting establishes True. Generic construction/current undeclared string parsing remains None. Input declaration retention, annotation-aware readers, TREE/UTREE context and raw/count/skip integration remain later work. Programmatic root labels/stem lengths and annotations use `root_suffix`; see the [API root-information notes](api.md#root-information-and-copying).
+Constructor and editing rootedness transitions are implemented: clade/MCC/HIPSTR/mrHIPSTR and ancestral-model random trees are rooted, bipartition/consensus/MBC construction is unrooted, and deliberate rooting establishes True. Generic construction and undeclared Newick/TREE input remain None. Input declarations and UTREE context now establish the supported interpretation independently of optional metadata decoding. Root labels/stem lengths and annotations use `root_suffix`; see the [API root-information notes](api.md#root-information-and-copying).
 
 #### Color leaves selected by a clade query
 

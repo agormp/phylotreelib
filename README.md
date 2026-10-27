@@ -301,7 +301,7 @@ print(tree.nexus())                        # Unknown interpretation: omit declar
 
 The former `nexus(rooted=...)` output argument has been removed. Constructors and editing operations now maintain interpretation: public rooting selects True, deliberate `unroot()` selects False, and pruning/grafting/SPR preserve their accepted entry interpretation. Generic construction and current undeclared string input remain None. Bipartition/NJ construction establishes False; clade/MCC/HIPSTR/mrHIPSTR, ancestral-model random trees and UPGMA establish True.
 
-Input declaration retention, annotation-aware readers, TREE/UTREE context and shared raw/count/skip paths remain later work; the current input parser still discards declarations. Nexus itself leaves rooted/unrooted interpretation unspecified when neither declaration is supplied; see the [recorded source check](docs/decisions/nexus-rootedness.md). The [API notes](docs/api.md#root-information-and-copying) describe the current fields; the earlier rootedness decision also records the historical explicit-value API.
+Input parsing now preserves supported leading R/U declarations and structured root suffixes. Optional key/value annotations require `parse_meta=True`; default reads skip payloads while retaining structural interpretation. `Treefile`/concrete readers expose complete `read_tree_text()` results and lexical count/skip paths. Nexus UTREE establishes an unrooted interpretation; undeclared TREE/Newick remains unspecified. See the [input API and migration guide](docs/api.md#input-parsing-and-complete-descriptions) for removed `strip_comments`/`below_root`, positional owners and supported grammar.
 
 ### Color a selected set of leaves in NEXUS output
 
