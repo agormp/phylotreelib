@@ -395,3 +395,7 @@ Recognized native scalar fields remain authoritative and cannot be duplicated in
 ### Exact output selection and keyword-only switches
 
 Select annotations by exact keys: `node_attributes=("height", "height_95%_CI")` or `branch_attributes=("length_95%_CI",)`. None selects eligible populated fields and map entries; an empty sequence selects none. Literal `ci` selects only that annotation. The writer `ci_labels` argument is removed; old keyword/positional calls raise TypeError. Parameters preceding its old slot keep their positions, and trailing metadata/declaration switches are keyword-only. Emittable branch annotations require printed lengths; use `branch_attributes=()` when suppressing lengths.
+
+### Numeric output precision
+
+All Tree/TreeSet Newick/Nexus writers use `precision=None` by default: the shortest decimal representation recovering each supported finite stored float. Explicit numeric values such as `precision=7` retain significant-digit formatting. Float-valued annotations retain a decimal point or exponent even when formatted integrally; integer annotations retain exact integer values. This preserves stored precision and numeric types, without recovering input digits or increasing statistical precision. sumt keeps its explicit `precision=7`.

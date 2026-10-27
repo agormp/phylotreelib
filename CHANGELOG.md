@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- Omitted precision and `precision=None` now emit full stored float precision in all four writers; explicit numeric precision still requests significant digits. Annotation floats retain a decimal point or exponent when reduced precision would look integral. sumt continues to request seven digits explicitly.
 - Unset `Nodestruct.state` and `Branchstruct.length_sd` now default to `None`, distinguishing unlabelled/unestimated data from an actual empty string or estimated zero. Parsimony retains its existing no-state behavior.
 - `Tree.set_branch_attribute()` now invalidates only length-derived caches for structural length writes and retains valid Tree caches for stored metadata updates, avoiding repeated topology recomputation during annotation.
 - Printing is configured at the point of export to simplify the workflow and remove dependence on earlier configuration calls. `Tree.newick()` and `Tree.nexus()` have fixed defaults: lengths and labels enabled, `labelfield="label"`, `precision=7`, and `print_meta=False`. Explicit `None` values for scalar settings use these defaults. Each output call is independent.

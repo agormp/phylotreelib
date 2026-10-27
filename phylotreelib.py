@@ -144,6 +144,10 @@ def _format_metadata_key(key):
     return _quote_metadata_string(key)
 
 
+def _format_tree_number(value, precision):
+    return str(value) if precision is None else f"{value:.{precision}g}"
+
+
 def _format_metadata_value(value, precision):
     """Format supported typed values; None is handled only at whole-entry resolution."""
     if value is MISSING:
@@ -3250,7 +3254,7 @@ class Tree:
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
+    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=None,
                transdict=None, node_attributes=None, branch_attributes=None, *,
                print_meta=False):
         """Export structural information and selected exact annotation keys.
@@ -3259,7 +3263,6 @@ class Tree:
         other annotations, including intervals, are entries in optional extra_meta maps.
         None is unset; MISSING and valid empty values remain present when selected.
         """
-        if precision is None: precision = 7
         if labelfield is None: labelfield = "label"
         if printdist is None: printdist = True
         if printlabels is None: printlabels = True
@@ -3273,7 +3276,7 @@ class Tree:
             label = getattr(branch, labelfield, None)
             if label is None:
                 return ""
-            return f"{label:.{precision}g}" if isinstance(label, float) else str(label)
+            return _format_tree_number(label, precision) if isinstance(label, float) else str(label)
 
         def append_children(parent):
             for child in self.children(parent):
@@ -3289,7 +3292,7 @@ class Tree:
                 if print_meta:
                     pieces.append(metacomment(self.nodedict.get(child), node_attributes, "node"))
                 if printdist:
-                    pieces.append(f":{branch.length:.{precision}g}")
+                    pieces.append(":" + _format_tree_number(branch.length, precision))
                 if print_meta:
                     comment = metacomment(branch, branch_attributes, "branch")
                     if comment and not printdist:
@@ -3310,7 +3313,7 @@ class Tree:
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
+    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=None,
               translateblock=False, node_attributes=None, branch_attributes=None,
               colorlist=None, colorfg="#0000FF", colorbg="#000000", *,
               print_meta=False, rooted=None):
@@ -5783,20 +5786,18 @@ class TreeSet():
 
     ###############################################################################################
 
-    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=7,
+    def nexus(self, printdist=True, printlabels=True, labelfield="label", precision=None,
                       translateblock=False, node_attributes=None, branch_attributes=None,
                       colorlist=None, colorfg="#0000FF", colorbg="#000000", *,
                       print_meta=False, rooted=None):
         """Return a NEXUS block, forwarding printing options to every tree.
 
-        Precision defaults to seven significant digits, as for Tree. An explicit
-        None uses that same default. See Tree.newick() for metadata options.
+        Omitted precision or None uses full stored precision, as for Tree.
+        Explicit numeric precision requests significant digits. See Tree.newick() for metadata options.
         rooted applies the same declaration to every tree: True emits [&R],
         False emits [&U], and None omits it. It is independent of print_meta
         and does not change any tree's root.
         """
-        if precision is None:
-            precision = 7
         if rooted is not None and not isinstance(rooted, bool):
             raise TreeError("rooted must be True, False, or None")
 
@@ -5835,16 +5836,14 @@ class TreeSet():
 
     ###############################################################################################
 
-    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=7,
+    def newick(self, printdist=True, printlabels=True, labelfield="label", precision=None,
                transdict=None, node_attributes=None, branch_attributes=None, *,
                print_meta=False):
         """Return Newick strings, forwarding printing options to every tree.
 
-        Precision defaults to seven significant digits, as for Tree. An explicit
-        None uses that same default. See Tree.newick() for metadata options.
+        Omitted precision or None uses full stored precision, as for Tree.
+        Explicit numeric precision requests significant digits. See Tree.newick() for metadata options.
         """
-        if precision is None:
-            precision = 7
         stringlist = []
         for tree in self.treelist:
             stringlist.append(tree.newick(printdist=printdist, printlabels=printlabels, labelfield=labelfield,

@@ -390,7 +390,7 @@ class TestTreeNewick:
 
     def test_defaults_and_call_independence(self, annotated_print_tree):
         tree = annotated_print_tree
-        expected = "((A:0.1234568,B:2)old:3,C:4);"
+        expected = "((A:0.123456789,B:2.0)old:3.0,C:4.0);"
         assert tree.newick() == expected
         tree.newick(printdist=False, printlabels=False, print_meta=True,
                     precision=3, node_attributes=("height", "height_95%_CI"), branch_attributes=(), )
@@ -405,6 +405,7 @@ class TestTreeNewick:
          "((1:0.1234568,2:2)old:3,3:4);"),
     ])
     def test_explicit_options(self, annotated_print_tree, options, expected):
+        options.setdefault("precision", 7)
         assert annotated_print_tree.newick(**options) == expected
 
     def test_selected_metadata_including_root(self, annotated_print_tree):
@@ -444,7 +445,7 @@ class TestTreeNewick:
         branch.kid_height = 2.0
         branch.quantiles = pt.QuantileAccumulator()
         result = tree.newick(print_meta=True)
-        assert "height=1.234568,height_sd=0.1" in result
+        assert "height=1.23456789,height_sd=0.1" in result
         assert "posterior=0.975" in result
         assert "height_80%_CI={1.0,1.4}" in result
         assert "height_95%_CI={0.8,1.5}" in result
@@ -461,7 +462,7 @@ class TestTreeNewick:
         result = annotated_print_tree.newick(
             print_meta=True, node_attributes=("height",), branch_attributes=("posterior",),
             )
-        assert "[&height=1.234568]" in result
+        assert "[&height=1.23456789]" in result
         assert "[&posterior=0.975]" in result
         assert "_CI=" not in result
         assert "height_sd=" not in result
@@ -4168,7 +4169,7 @@ class TestNodedictRefactor:
         tree.set_node_attribute("A", "height", 0.0)
         nwk = tree.newick(print_meta=True, node_attributes=("height",))
         assert isinstance(nwk, str)
-        assert "A[&height=0.0]:1" in nwk
+        assert "A[&height=0.0]:1.0" in nwk
 
     def test_cluster_no_branchstruct_heights(self):
         tree = pt.Tree.randtree(ntips=10, rate_sd=0.1)
@@ -4464,3 +4465,27 @@ class Test_writer_keyword_migration:
             writer(printdist=False, print_meta=True, branch_attributes=("rate",))
         assert "rate=" not in writer(printdist=False, print_meta=False)
         assert "rate=" not in writer(printdist=False, print_meta=True, branch_attributes=())
+
+
+class Test_full_precision_output:
+
+    @pytest.mark.parametrize("method", ["newick", "nexus"])
+    @pytest.mark.parametrize("as_set", [False, True])
+    def test_default_none_and_explicit_precision_across_writers(self, method, as_set):
+        value = 1.2345678901234567
+        tree = pt.Tree.from_string(f"(A:{value!r},B:2);")
+        tree.set_node_attribute("A", "extra_meta", {"value": value, "float": 1.0, "integer": 1})
+        target = pt.TreeSet() if as_set else tree
+        if as_set:
+            target.addtree(tree)
+        writer = getattr(target, method)
+        options = dict(print_meta=True, node_attributes=("value", "float", "integer"),
+                       branch_attributes=())
+        full = writer(**options)
+        assert full == writer(precision=None, **options)
+        assert f'value={value!r},float=1.0,integer=1]' in full
+        assert f':{value!r}' in full
+        reduced = writer(precision=3, **options)
+        assert 'value=1.23,float=1.0,integer=1]' in reduced
+        assert ':1.23' in reduced
+        assert writer(True, True, "label", 7) == writer(precision=7)
