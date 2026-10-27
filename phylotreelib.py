@@ -341,7 +341,6 @@ class Nodestruct:
         "height_median",
         "ci",
         "clade_cred",
-        "nleaves",
         "state",
         "primary_set",
         "secondary_set",
@@ -350,13 +349,12 @@ class Nodestruct:
         "wasambig",
     )
 
-    def __init__(self, height=None, nleaves=None):
+    def __init__(self, height=None):
         self.height = height
         self.height_sd = None
         self.height_median = None
         self.ci = None
         self.clade_cred = None
-        self.nleaves = nleaves
         self.state = ""
         self.primary_set = None
         self.secondary_set = None

@@ -373,3 +373,7 @@ For everyday use, it is reasonable to treat the following as the stable public i
 - `build_sumtree`
 
 The remaining classes are useful, but many of them are better regarded as advanced helpers or implementation-level infrastructure unless they are explicitly needed by your workflow.
+
+### Ordinary node records and summary counts
+
+`Nodestruct(height=None)` stores metadata for one tree node. It no longer accepts a `nleaves` argument or exposes that field. Descendant counts belong to `SummaryNodestruct` and are computed from topology by `Tree.iter_cladeinfo()`; final trees do not inherit those summary bookkeeping fields.

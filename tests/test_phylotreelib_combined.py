@@ -1507,6 +1507,34 @@ class Test_from_leaf:
 
 ###################################################################################################
 
+class Test_init_Nodestruct:
+
+    def test_leaf_count_is_not_ordinary_node_metadata(self):
+        assert not hasattr(pt.Nodestruct(), "nleaves")
+        with pytest.raises(TypeError):
+            pt.Nodestruct(nleaves=4)
+        with pytest.raises(TypeError):
+            pt.Nodestruct(1.0, 4)
+
+
+class Test_from_cladedict:
+
+    def test_summary_leaf_counts_do_not_leak_into_tree_metadata(self):
+        original = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        clades = original.cladedict()
+        root_clade = pt.Clade.from_leafset(original.leaves, original)
+        assert clades[root_clade].nleaves == 4
+
+        tree = pt.Tree.from_cladedict(clades)
+
+        assert all(not hasattr(node, "nleaves") for node in tree.nodedict.values())
+        assert "nleaves=" not in tree.newick(print_meta=True)
+        tree.remove_leaf("B")
+        remaining = tree.cladedict()
+        assert remaining[pt.Clade.from_leafset(tree.leaves, tree)].nleaves == 3
+        assert clades[root_clade].nleaves == 4
+
+
 class Test_from_branchinfo:
     """Tests from_branchinfo() constructor"""
 
