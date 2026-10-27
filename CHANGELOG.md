@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Pruning now clears the old root suffix when surviving-child promotion removes that root, while preserving the remaining Tree's rootedness and surviving node data through leaf, subtree and wrapper pruning.
 - Root-frequency selection now passes both bipartition sides to the current edge-lookup API, repairing a TypeError when the selected root must move. Its existing numerical positioning algorithm is unchanged.
 - Successful minimum-variance and root-frequency selection now establish rootedness even when the chosen root already matches and no root movement occurs. Root geometry and unfinished root-frequency calculations are unchanged.
 - Summary builders and branch annotation write-back now materialize independent output branches and mutable annotations, leaving quantile accumulators and scratch statistics in the summary. Repeated outputs can be edited independently.

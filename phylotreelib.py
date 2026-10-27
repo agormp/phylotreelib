@@ -4396,6 +4396,8 @@ class Tree:
     def remove_leaf(self, leaf):
         """Removes named leaf from tree, cleans up so remaining tree structure is sane.
         Internal nodes may be removed, but will not change their IDs
+        Successful pruning preserves rootedness, including surviving-child promotion.
+        Removing the old root clears its suffix; surviving-node data stays attached.
         Note: assumes no unary nodes (leaf has at least one sibling)"""
 
         parent = self.parent(leaf)
@@ -4409,6 +4411,7 @@ class Tree:
             [child2] = childset - {leaf}                    # Remaining item is other child
             del self.child_dict[root]                       # Remove entry for old root
             self.root = child2                              # child2 is new root
+            self.root_suffix = None
             removed_parent = root
 
         # If leaf is part of bifurcation but NOT attached directly to root, then parent

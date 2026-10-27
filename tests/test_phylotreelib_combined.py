@@ -4842,6 +4842,49 @@ class Test_remove_leaf:
         assert parent not in tree.nodedict
         assert tree.rootdist["B"] == 8
 
+    @pytest.mark.parametrize("state", [True, False, None])
+    @pytest.mark.parametrize("promote_root", [False, True])
+    def test_pruning_preserves_state_and_only_clears_a_removed_root_suffix(self, state, promote_root):
+        text = "(C:5,(A:1,B:2):3);" if promote_root else "((A:1,B:2):3,C:4,D:5);"
+        tree = pt.Tree.from_string(text)
+        tree.rooted = state
+        old_root = tree.root
+        tree.root_suffix = pt.Branchstruct(length=0.4, label="oldroot")
+        suffix = tree.root_suffix
+        removed_leaf = "C" if promote_root else "A"
+        removed_parent = tree.parent(removed_leaf)
+        tree.set_node_attribute(old_root, "state", "oldroot")
+        tree.set_node_attribute(removed_leaf, "state", "removed")
+        tree.set_node_attribute("B", "height", 12.0)
+        survivor = tree.nodedict["B"]
+        if promote_root:
+            new_root = tree.find_mrca({"A", "B"})
+            tree.set_node_attribute(new_root, "height", 20.0)
+            promoted_metadata = tree.nodedict[new_root]
+        parents = tree.parent_dict
+        distances = tree.rootdist
+
+        tree.remove_leaf(removed_leaf)
+
+        assert tree.rooted is state
+        assert tree.nodedict["B"] is survivor
+        assert survivor.height == 12.0
+        assert removed_leaf not in tree.nodedict
+        assert removed_parent not in tree.nodedict
+        assert set(tree.nodedict) <= tree.nodes
+        assert tree.parent_dict is not parents
+        assert tree.rootdist is not distances
+        if promote_root:
+            assert tree.root == new_root
+            assert tree.root_suffix is None
+            assert old_root not in tree.nodes
+            assert tree.nodedict[new_root] is promoted_metadata
+            assert tree.rootdist["B"] == pytest.approx(2)
+        else:
+            assert tree.root == old_root
+            assert tree.root_suffix is suffix
+            assert tree.rootdist["B"] == pytest.approx(5)
+
 
 class Test_reroot:
 
@@ -5411,3 +5454,83 @@ class Test_prune_subtree:
         assert extracted.rooted is state
         extracted.nodedict[node].extra_meta["node"].append("new")
         assert node not in source.nodedict
+
+    @pytest.mark.parametrize("state", [True, False, None])
+    @pytest.mark.parametrize("promote_root", [False, True])
+    def test_remaining_tree_keeps_state_and_suffix_follows_root_survival(self, state, promote_root):
+        text = "((A:1,B:2):3,(C:4,D:5):6);" if promote_root else "(X:7,(A:1,B:2):3,Y:8,Z:9);"
+        tree = pt.Tree.from_string(text)
+        tree.rooted = state
+        old_root = tree.root
+        basenode = tree.find_mrca({"A", "B"})
+        tree.root_suffix = pt.Branchstruct(length=0.4, label="oldroot")
+        suffix = tree.root_suffix
+        tree.set_node_attribute(old_root, "state", "root")
+        tree.set_node_attribute(basenode, "height", 10.0)
+        survivor = "C" if promote_root else "X"
+        tree.set_node_attribute(survivor, "state", "retained")
+        metadata = tree.nodedict[survivor]
+
+        extracted, basal = tree.prune_subtree(basenode)
+
+        assert tree.rooted is state
+        assert isinstance(extracted, pt.Tree)
+        assert extracted.leaves == {"A", "B"}
+        assert basal.length == pytest.approx(3)
+        assert basenode not in tree.nodes
+        assert basenode not in tree.nodedict
+        assert tree.nodedict[survivor] is metadata
+        assert set(tree.nodedict) <= tree.nodes
+        if promote_root:
+            assert tree.root != old_root
+            assert old_root not in tree.nodedict
+            assert tree.root_suffix is None
+        else:
+            assert tree.root == old_root
+            assert tree.root_suffix is suffix
+
+
+class Test_remove_leaves:
+    @pytest.mark.parametrize("state", [True, False, None])
+    def test_batch_removals_preserve_interpretation_through_root_promotion(self, state):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4,D:5);")
+        tree.rooted = state
+        old_root = tree.root
+        new_root = tree.find_mrca({"A", "B"})
+        tree.root_suffix = pt.Branchstruct(length=0.4, label="oldroot")
+        tree.set_node_attribute("A", "state", "retained")
+        retained = tree.nodedict["A"]
+
+        tree.remove_leaves(["C", "D"])
+
+        assert tree.rooted is state
+        assert tree.root == new_root
+        assert old_root not in tree.nodes
+        assert tree.root_suffix is None
+        assert tree.leaves == {"A", "B"}
+        assert tree.nodedict["A"] is retained
+
+
+class Test_prune_maxlen:
+    @pytest.mark.parametrize("state", [True, False, None])
+    @pytest.mark.parametrize("select_only", [False, True])
+    def test_wrapper_preserves_state_and_selection_only_preserves_suffix(self, state, select_only):
+        tree = pt.Tree.from_string("(C:5,(A:1,B:2):3);")
+        tree.rooted = state
+        old_root = tree.root
+        tree.root_suffix = pt.Branchstruct(length=0.4, label="oldroot")
+        suffix = tree.root_suffix
+
+        result = tree.prune_maxlen(nkeep=2, keeplist=["A", "B"], return_leaves=select_only)
+
+        assert tree.rooted is state
+        if select_only:
+            assert result == {"A", "B"}
+            assert tree.root == old_root
+            assert tree.root_suffix is suffix
+            assert tree.leaves == {"A", "B", "C"}
+        else:
+            assert result is None
+            assert tree.root != old_root
+            assert tree.root_suffix is None
+            assert tree.leaves == {"A", "B"}

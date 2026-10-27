@@ -439,3 +439,7 @@ A Tree returned by `subtree()` inherits True, False or None from the source at e
 ### Extraction suffix and basal branch
 
 `subtree(source.root)` independently copies retained source suffix data and returns `basal_branch=None`. A proper internal subtree has `root_suffix=None` and returns its former incoming branch separately, including its label and annotations. Leaf extraction keeps the same string/copied-basal-branch interface. A basal branch never becomes an implicit root label or stem. Extracted node data, internal edges, the basal branch and a copied suffix isolate supported mutable annotations. `prune_subtree()` obtains the extracted result before source mutation. Pruning the entire source root is outside the existing valid-retained-Tree contract.
+
+### Pruning and root promotion
+
+Successful `remove_leaf()`, `remove_leaves()`, `prune_subtree()` and pruning wrappers preserve the remaining Tree's rootedness, including surviving-child promotion. This retains the oriented surviving clade and differs from structural root collapse retaining both sides. Actual removal of the old root clears its entire suffix and deleted-node data; surviving-node annotations stay attached. A selection-only wrapper does not mutate state or suffix. Extracted Tree state is inherited before source mutation. Existing valid-retained-Tree geometry and singleton/empty boundaries are unchanged.
