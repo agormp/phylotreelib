@@ -4336,7 +4336,9 @@ class Tree:
         """Removes branch connecting node1 and node2 (thereby possibly creating polytomy)
         Length of removed branch is distributed among descendant branches.
         This means tree length is conserved.
-        Descendant nodes will be farther apart from each other, but closer to outside nodes."""
+        Descendant nodes will be farther apart from each other, but closer to outside nodes.
+        Reattached branches start with fresh non-length fields, even for zero removed length.
+        Deleted-node metadata is removed; surviving-node and unrelated-edge data is retained."""
 
         if node1 == self.parent(node2):
             parent = node1
@@ -4358,13 +4360,13 @@ class Tree:
         grandchildren = self.children(child)
         addlen = lostlen / len(grandchildren)
         for grandchild in grandchildren :
-            newbranch = self.child_dict[child][grandchild].copy()
-            newbranch.length += addlen
+            newbranch = Branchstruct(length=self.child_dict[child][grandchild].length + addlen)
             self.child_dict[parent][grandchild] = newbranch
 
         # Delete "child" node and link from parent to child.
         del self.child_dict[child]
         del self.child_dict[parent][child]
+        self.nodedict.pop(child, None)
 
         self.clear_caches()
 

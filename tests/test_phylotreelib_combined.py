@@ -4822,3 +4822,36 @@ class Test_reroot:
         assert all(branch.label == "" and branch.extra_meta is None
                    for branch in tree.child_dict[tree.root].values())
         assert original.extra_meta == {"length_95%_CI": [1, 9]}
+
+
+class Test_remove_branch:
+
+    @pytest.mark.parametrize("removed_length", [0, 4])
+    def test_redistributed_edges_are_fresh_and_deleted_node_data_is_removed(self, removed_length):
+        tree = pt.Tree.from_string(f"((A:2,B:3):{removed_length},C:5,D:6);")
+        node = tree.parent("A")
+        tree.set_node_attribute(node, "extra_meta", {"deleted": [1]})
+        tree.set_node_attribute("A", "state", "survives")
+        for branch in tree.child_dict[node].values():
+            branch.label = "old endpoints"
+            branch.posterior = 0.9
+            branch.extra_meta = {"length": pt.MISSING, "empty": ()}
+        untouched = tree.child_dict[tree.root]["C"]
+        untouched.extra_meta = {"keep": [1]}
+        before = tree.length()
+        old_distance = tree.nodedist("A", "B")
+        _ = tree.rootdist
+        tree.remove_branch(tree.root, node)
+        assert tree.length() == before
+        assert tree.nodedist("A", "B") == old_distance + removed_length
+        assert tree.rootdist["A"] == 2 + removed_length / 2
+        assert tree.child_dict[tree.root]["A"].length == 2 + removed_length / 2
+        assert tree.child_dict[tree.root]["B"].length == 3 + removed_length / 2
+        for child in ("A", "B"):
+            branch = tree.child_dict[tree.root][child]
+            assert branch.label == "" and branch.extra_meta is branch.posterior is None
+            assert branch.n == 0 and branch.quantiles is None
+        assert tree.child_dict[tree.root]["C"] is untouched
+        assert untouched.extra_meta == {"keep": [1]}
+        assert tree.nodedict["A"].state == "survives"
+        assert node not in tree.nodedict and node not in tree.nodes

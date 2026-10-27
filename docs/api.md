@@ -409,3 +409,7 @@ The remaining classes are useful, but many of them are better regarded as advanc
 ### Branch subdivision
 
 `add_node_on_branch(..., copy_attrs="none")` divides structural length and starts both segments with fresh non-length fields by default. `copy_attrs="lower"` explicitly copies annotations to the original-child segment; `"both"` copies them independently to both segments. Copied statistics are not rescaled. `upper_branchstruct` still installs the supplied object directly and sets its length to the calculated upper length. Automatic graft and reroot subdivisions also start without source annotations. Endpoint-node data remains attached to its nodes, and the inserted node starts with normal empty data. `split_off_children()` moves existing edges and is outside this subdivision rule.
+
+### Branch removal and length redistribution
+
+`remove_branch()` removes an internal edge and its child node, adding an equal share of the removed structural length to each reattached descendant edge. Total tree length is conserved; pairwise distances generally change. The reattached edges have new endpoints and fresh non-length fields even when the removed length is zero. The deleted node's metadata is removed. Unrelated edges and surviving-node data are retained; no statistic or annotation named `length` is numerically redistributed.
