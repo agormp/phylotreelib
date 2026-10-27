@@ -4199,7 +4199,7 @@ class Tree:
     ###############################################################################################
 
     def add_node_on_branch(self, parent, child, dist_from_parent=None, frac_from_parent=None,
-                           upper_branchstruct=None, copy_attrs="lower"):
+                           upper_branchstruct=None, copy_attrs="none"):
         """
         Insert a new internal node on an existing branch between `parent` and `child`.
         This subdivides the branch into:
@@ -4212,10 +4212,11 @@ class Tree:
             * Else: pick a random frac in (0,1)
 
         Branchstruct handling (copy_attrs):
-          - "lower" (default): lower keeps a copy of the original Branchstruct (including annotations);
+          - "none" (default): both segments get fresh non-length fields.
+          - "lower": lower keeps an independent copy of the original annotations;
             upper uses a fresh Branchstruct (or `upper_branchstruct` if provided).
-          - "both": both segments get copies of the original Branchstruct (annotations duplicated).
-          - "none": both segments get fresh Branchstructs (no annotations copied).
+          - "both": both segments get independent copies of the original annotations.
+        Retained statistics are not rescaled or scientifically reinterpreted.
 
         Parameters
         ----------
@@ -5076,9 +5077,9 @@ class Tree:
                     raise TreeError(msg)
             dist_from_parent = dist_from_node1 if node1_is_parent else (origlen - dist_from_node1)
 
-            # Insert new root on the branch. Duplicate original branch annotations onto both halves.
+            # Insert a new root with fresh non-length fields on both branch segments.
             newroot = self.add_node_on_branch(parent, child, dist_from_parent=dist_from_parent,
-                                              copy_attrs="both")
+                                              copy_attrs="none")
 
         # Things that were already downstream of newroot do not need to be moved, but things that
         # were previously upstream need to be moved downstream, which is done by reversing the

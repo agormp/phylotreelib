@@ -2398,6 +2398,16 @@ class TestSPR:
 ###################################################################################################
 
 class TestGraft:
+
+    def test_subdivided_target_edge_starts_without_source_annotations(self):
+        tree = pt.Tree.from_string("(A:8,B:2,C:3);")
+        original = tree.child_dict[tree.root]["A"]
+        original.label = "old segment"
+        original.extra_meta = {"custom": [1]}
+        node = tree.graft("D", tree.root, "A", frac_from_parent=0.25)
+        for branch in (tree.child_dict[tree.root][node], tree.child_dict[node]["A"]):
+            assert branch.label == "" and branch.extra_meta is None
+        assert original.extra_meta == {"custom": [1]}
     def test_graft_leaf_on_edge_preserves_edge_length_and_adds_connecting_branch(self):
         tree = pt.Tree.from_string("(A:1,B:2,C:3);")
         total_len_before = tree.length()
@@ -2613,6 +2623,46 @@ class TestSubtreeAndPruneSubtree:
 ###################################################################################################
 
 class TestAddNodeOnBranch:
+
+    @pytest.mark.parametrize("mode", [None, "lower", "both"])
+    def test_annotation_copy_choices_and_node_attachment(self, mode):
+        tree = pt.Tree.from_string("(A:8,B:2);")
+        tree.set_node_attribute("A", "state", "tip")
+        original = tree.child_dict[tree.root]["A"]
+        original.label = "support"
+        original.posterior = 0.9
+        original.extra_meta = {"length": [100], "length_95%_CI": [3, 9]}
+        options = {} if mode is None else {"copy_attrs": mode}
+        node = tree.add_node_on_branch(tree.root, "A", frac_from_parent=0.25, **options)
+        upper = tree.child_dict[tree.root][node]
+        lower = tree.child_dict[node]["A"]
+        assert upper.length == 2 and lower.length == 6
+        assert tree.nodedict["A"].state == "tip"
+        assert tree.nodedict[node].state is tree.nodedict[node].extra_meta is None
+        if mode == "both":
+            assert upper.extra_meta == lower.extra_meta == original.extra_meta
+            assert upper.extra_meta is not lower.extra_meta
+            upper.extra_meta["length"][0] = 7
+            assert lower.extra_meta["length"] == original.extra_meta["length"] == [100]
+        else:
+            assert upper.label == "" and upper.posterior is upper.extra_meta is None
+        if mode == "lower":
+            assert lower.label == "support" and lower.posterior == 0.9
+            assert lower.extra_meta == original.extra_meta
+            lower.extra_meta["length_95%_CI"][0] = 5
+            assert original.extra_meta["length_95%_CI"] == [3, 9]
+        elif mode is None:
+            assert lower.label == "" and lower.posterior is lower.extra_meta is None
+
+    def test_explicit_upper_branch_overrides_default_without_copying(self):
+        tree = pt.Tree.from_string("(A:8,B:2);")
+        supplied = pt.Branchstruct(length=99, label="intentional")
+        supplied.extra_meta = {"keep": [1]}
+        node = tree.add_node_on_branch(tree.root, "A", frac_from_parent=0.25,
+                                       upper_branchstruct=supplied)
+        assert tree.child_dict[tree.root][node] is supplied
+        assert supplied.length == 2 and supplied.extra_meta == {"keep": [1]}
+        assert tree.child_dict[node]["A"].extra_meta is None
     def test_add_node_on_branch_splits_length_by_dist(self):
         tree = pt.Tree.from_string("(A:2,B:2);")
         # root has children A and B; pick edge root->A
@@ -4758,3 +4808,17 @@ class Test_remove_leaf:
         assert tree.nodedict["B"].state == "survives"
         assert parent not in tree.nodedict
         assert tree.rootdist["B"] == 8
+
+
+class Test_reroot:
+
+    def test_subdivided_root_edge_starts_without_source_annotations(self):
+        tree = pt.Tree.from_string("(A:8,B:2,C:3);")
+        original = tree.child_dict[tree.root]["A"]
+        original.label = "old segment"
+        original.extra_meta = {"length_95%_CI": [1, 9]}
+        tree.reroot(tree.root, "A", frac_from_node1=0.25)
+        assert sorted(branch.length for branch in tree.child_dict[tree.root].values()) == [2, 6]
+        assert all(branch.label == "" and branch.extra_meta is None
+                   for branch in tree.child_dict[tree.root].values())
+        assert original.extra_meta == {"length_95%_CI": [1, 9]}

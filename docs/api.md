@@ -405,3 +405,7 @@ The remaining classes are useful, but many of them are better regarded as advanc
 ### Branch merging
 
 `Branchstruct.merge(other)` returns a fresh branch whose structural length is the sum of both lengths. Labels, statistics, intervals, extras and accumulator state start from normal defaults; neither input changes. The unused `check_compat` argument has been removed. Root-edge combination and the serial join after removing a non-root bifurcating parent follow this same length-only rule. Node data stays with surviving nodes; deleted-node data is removed. Callers may explicitly assign justified annotations to the result.
+
+### Branch subdivision
+
+`add_node_on_branch(..., copy_attrs="none")` divides structural length and starts both segments with fresh non-length fields by default. `copy_attrs="lower"` explicitly copies annotations to the original-child segment; `"both"` copies them independently to both segments. Copied statistics are not rescaled. `upper_branchstruct` still installs the supplied object directly and sets its length to the calculated upper length. Automatic graft and reroot subdivisions also start without source annotations. Endpoint-node data remains attached to its nodes, and the inserted node starts with normal empty data. `split_off_children()` moves existing edges and is outside this subdivision rule.
