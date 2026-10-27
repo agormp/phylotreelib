@@ -1110,7 +1110,7 @@ class NewickStringParser:
         self.regex = self.create_compiled_regex(self.delimiters)
 
         # If transdict was supplied: use corresponding handler when adding leaves
-        # Also store transdict in parser (at class level! this is so staticmethods can access)
+        # Keep the shared translation mapping on this reusable parser.
         if transdict:
             self.transdict = transdict
             self._handle_add_leaf = self._handle_add_leaf_with_transdict
@@ -1224,10 +1224,10 @@ class NewickStringParser:
                 token_type = token_value if token_value in delimset else "NUM_NAME"
                 try:
                     handler, state = dispatch[state][token_type]
-                except KeyError:
+                    handler(token_value)
+                except (KeyError, IndexError):
                     self._handle_parse_error(state, token_value, token_type,
                                              treestring, tokens)
-                handler(token_value)
             self.sanitychecks(treeobj, treestring)
             return treeobj
         finally:
@@ -1303,8 +1303,6 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_transition_child(self, token_value):
-        if len(self.node_stack) < 2:
-            raise TreeError("Unexpected comma after the root topology")
         self.node_stack.pop()
 
     ###############################################################################################
@@ -1315,6 +1313,8 @@ class NewickStringParser:
     ###############################################################################################
 
     def _current_branch(self):
+        if not self.node_stack:
+            raise TreeError("Branch or label after the root topology was closed")
         if len(self.node_stack) == 1:
             if self.treeobj.root_suffix is None:
                 self.treeobj.root_suffix = Branchstruct(length=None)
@@ -1336,8 +1336,6 @@ class NewickStringParser:
     ###############################################################################################
 
     def _handle_intnode_end(self, token_value):
-        if len(self.node_stack) < 2:
-            raise TreeError("Unexpected closing parenthesis after the root topology")
         self.node_stack.pop()
 
     ###############################################################################################

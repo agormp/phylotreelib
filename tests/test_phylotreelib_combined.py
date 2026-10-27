@@ -6339,7 +6339,7 @@ class Test_clear_length_caches:
 
 
 class Test_NewickStringParser_parse:
-    @pytest.mark.parametrize('text', ['', '(A,B)', '(A:1,B:2', '(A,B));', '(A,B),(C,D);', '(A,B);(C,D);', '((A,B);'])
+    @pytest.mark.parametrize('text', ['', '(A,B)', '(A:1,B:2', '(A,B));', '(A,B),(C,D);', '(A,B);(C,D);', '((A,B);', '(A,B),C;', '(A,B))R;', '(A,B)):1;', '(A,B)),;'])
     def test_rejects_incomplete_or_multiple_topologies(self, text):
         with pytest.raises(pt.TreeError):
             pt.NewickStringParser().parse(pt.Tree(), text)

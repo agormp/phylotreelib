@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- Shared parsing checks completion once and reports failed token/stack operations locally, avoiding redundant bounds checks on every successful child transition while retaining malformed-root rejection.
 - Verified supported BEAST/MrBayes input ownership and selected semantic round trips, including explicit translation/label settings, typed values and Nexus rootedness versus intentionally undeclared Newick output.
 - Ordinary branch-length parsing keeps direct structural lookup; only actual root stems use the suffix helper, avoiding a helper call and temporary stack slice for every represented edge.
 - File readers now share buffered nested-comment framing, reusable annotation-aware parsers and lexical count/skip paths. `read_tree_text()` and legacy raw wrappers return complete descriptions; Nexus TREE/UTREE and translation context remain stable across blocks.
