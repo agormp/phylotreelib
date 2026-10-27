@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- Constructors/builders now establish rootedness from their semantics: bipartition/NJ/consensus/MBC outputs are unrooted; clade/random-ancestral/UPGMA/MCC/HIPSTR outputs are rooted. Generic Tree/star/branch-table construction remains unspecified. Height estimation alone does not select a root.
 - Extraction at the source root now independently copies its root suffix; proper subtrees have no suffix and keep the copied former incoming branch separate. Copy/extraction reuse the same suffix retention rules.
 - Tree results from `subtree()` and `prune_subtree()` inherit source rootedness at extraction time. Leaf extraction retains the existing string-plus-basal-branch interface.
 - Successful public `reroot()` establishes rootedness, including a current-root no-op; computational root movement and `match_nodes()` use shared mechanics without selecting an interpretation. Actual root replacement clears the old suffix while node data stays attached.

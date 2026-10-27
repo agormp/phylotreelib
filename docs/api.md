@@ -443,3 +443,7 @@ A Tree returned by `subtree()` inherits True, False or None from the source at e
 ### Pruning and root promotion
 
 Successful `remove_leaf()`, `remove_leaves()`, `prune_subtree()` and pruning wrappers preserve the remaining Tree's rootedness, including surviving-child promotion. This retains the oriented surviving clade and differs from structural root collapse retaining both sides. Actual removal of the old root clears its entire suffix and deleted-node data; surviving-node annotations stay attached. A selection-only wrapper does not mutate state or suffix. Extracted Tree state is inherited before source mutation. Existing valid-retained-Tree geometry and singleton/empty boundaries are unchanged.
+
+### Constructor and summary interpretation
+
+Generic `Tree()`, `from_leaves()` and `from_branchinfo()` leave rootedness None. `from_biplist()`, `from_topology()` and neighbor joining establish False. `from_cladedict()`, UPGMA and ancestral random Yule/coalescent generation establish True, including rate-varying random lengths. Consensus/all-compatible consensus/MBC inherit the unrooted construction; MCC/HIPSTR/mrHIPSTR inherit the oriented clade construction. Deliberate subsequent rooting establishes True. Estimating heights, lengths or support preserves interpretation rather than inferring one, and retained representative Trees keep their original state. Plain parsing without retained declaration context remains unspecified until the input migration.

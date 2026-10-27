@@ -1523,6 +1523,14 @@ class Test_from_biplist:
         assert mytree.parent("A") == mytree.parent("B")
         assert mytree.parent("C") == mytree.parent("D")
 
+    def test_bipartition_construction_establishes_unrooted_state(self):
+        source = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        source.rooted = True
+        result = pt.Tree.from_biplist(source.bipdict())
+        assert result.rooted is False
+        assert result.topology_bipart == source.topology_bipart
+        assert source.rooted is True
+
 ###################################################################################################
 
 class Test_from_topology:
@@ -1543,6 +1551,12 @@ class Test_from_topology:
         assert mytree.parent("A") == mytree.parent("B")
         assert mytree.parent("C") == mytree.parent("D")
 
+    def test_bipartition_topology_establishes_unrooted_state(self):
+        source = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        result = pt.Tree.from_topology(source.topology_bipart)
+        assert result.rooted is False
+        assert result.topology_bipart == source.topology_bipart
+
 ###################################################################################################
 
 class Test_from_leaf:
@@ -1557,6 +1571,9 @@ class Test_from_leaf:
         assert mytree.children(mytree.root) == {"A", "B", "C", "D", "E"}
         assert len(mytree.intnodes) == 1
         assert len(mytree.leaves) == 5
+
+    def test_generic_star_construction_is_unspecified(self):
+        assert pt.Tree.from_leaves(["A", "B", "C"]).rooted is None
 
 ###################################################################################################
 
@@ -1631,6 +1648,14 @@ class Test_from_cladedict:
         assert remaining[pt.Clade.from_leafset(tree.leaves, tree)].nleaves == 3
         assert clades[root_clade].nleaves == 4
 
+    def test_clade_hierarchy_establishes_rooted_state(self):
+        source = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+        source.rooted = False
+        result = pt.Tree.from_cladedict(source.cladedict())
+        assert result.rooted is True
+        assert result.topology_clade == source.topology_clade
+        assert source.rooted is False
+
 
 class Test_from_branchinfo:
     """Tests from_branchinfo() constructor"""
@@ -1654,6 +1679,12 @@ class Test_from_branchinfo:
             newtree = pt.Tree.from_branchinfo(parentlist, childlist, lenlist, label=lablist)
             assert origtree == newtree
 
+    def test_directed_branch_table_does_not_imply_rootedness(self):
+        tree = pt.Tree.from_branchinfo(
+            ["r", "r", "x", "x"], ["x", "C", "A", "B"], [2.0, 3.0, 1.0, 1.0],
+        )
+        assert tree.rooted is None
+
 ###################################################################################################
 
 class Test_randtree:
@@ -1671,6 +1702,19 @@ class Test_randtree:
                 length = mytree.child_dict[parent][child].length
                 assert length >= 0   # since lognormvariate will always produce positive values
                 assert isinstance(length, float)
+
+    @pytest.mark.parametrize("model", ["yule", "coalescent"])
+    @pytest.mark.parametrize("rate_sd", [0.0, 0.5])
+    def test_ancestral_generation_is_rooted_despite_rate_variation(self, model, rate_sd):
+        # Deterministic local draws without leaking RNG state into unrelated tests.
+        before_rng = random.getstate()
+        try:
+            random.seed(411)
+            tree = pt.Tree.randtree(ntips=6, model=model, tree_height=10.0, rate_sd=rate_sd)
+        finally:
+            random.setstate(before_rng)
+        assert tree.rooted is True
+        assert len(tree.leaves) == 6
 
 ###################################################################################################
 
@@ -4328,6 +4372,9 @@ class Test_init_Tree:
         assert tree.rooted is None
         assert tree.root_suffix is None
 
+    def test_generic_empty_construction_is_unspecified(self):
+        assert pt.Tree().rooted is None
+
 
 class Test_copy_Nodestruct:
 
@@ -5137,6 +5184,15 @@ class Test_contree_SummaryTreeBuilder:
         output.extra_meta["custom"][0].add("output")
         assert source.extra_meta["custom"] == [{"summary"}]
 
+    @pytest.mark.parametrize("allcompat", [False, True])
+    def test_consensus_interpretation_is_unrooted(self, rootedness_constructor_summary, allcompat):
+        summary, representative = rootedness_constructor_summary
+        before = representative.newick()
+        tree = pt.SummaryTreeBuilder(summary).contree(allcompat=allcompat)
+        assert tree.rooted is False
+        assert representative.rooted is None
+        assert representative.newick() == before
+
 
 class Test_max_bipart_cred_tree_SummaryTreeBuilder:
 
@@ -5149,6 +5205,11 @@ class Test_max_bipart_cred_tree_SummaryTreeBuilder:
         bip = next(iter(outputs))
         outputs[bip].extra_meta["length_95%_CI"][0] = -99.0
         assert summary.bipartsummary[bip].extra_meta["length_95%_CI"][0] != -99.0
+
+    def test_bipartition_summary_is_unrooted(self, rootedness_constructor_summary):
+        summary, representative = rootedness_constructor_summary
+        assert pt.SummaryTreeBuilder(summary).max_bipart_cred_tree().rooted is False
+        assert representative.rooted is None
 
 
 class Test_move_root:
@@ -5534,3 +5595,54 @@ class Test_prune_maxlen:
             assert tree.root != old_root
             assert tree.root_suffix is None
             assert tree.leaves == {"A", "B"}
+
+
+class Test_nj:
+
+    def test_neighbor_joining_establishes_unrooted_state(self):
+        matrix = pt.Distmatrix.from_numpy_array(
+            np.array([[0., 2., 4., 4.], [2., 0., 4., 4.],
+                      [4., 4., 0., 2.], [4., 4., 2., 0.]]),
+            ["A", "B", "C", "D"],
+        )
+        assert matrix.nj().rooted is False
+
+
+class Test_upgma:
+
+    def test_upgma_establishes_rooted_hierarchy(self):
+        matrix = pt.Distmatrix.from_numpy_array(
+            np.array([[0., 2., 4., 4.], [2., 0., 4., 4.],
+                      [4., 4., 0., 2.], [4., 4., 2., 0.]]),
+            ["A", "B", "C", "D"],
+        )
+        assert matrix.upgma().rooted is True
+
+
+@pytest.fixture
+def rootedness_constructor_summary():
+    summary = pt.TreeSummary(
+        trackbips=True, trackclades=True, trackblen=True, trackheight=True,
+        tracktopo=True, track_subcladepairs=True, store_trees=True,
+    )
+    sample = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
+    sample.rooted = None
+    summary.add_tree(sample)
+    return summary, sample
+
+
+class Test_max_clade_cred_tree_SummaryTreeBuilder:
+
+    def test_clade_summary_is_rooted(self, rootedness_constructor_summary):
+        summary, representative = rootedness_constructor_summary
+        assert pt.SummaryTreeBuilder(summary).max_clade_cred_tree().rooted is True
+        assert representative.rooted is None
+
+
+class Test_hipstr_tree_SummaryTreeBuilder:
+
+    @pytest.mark.parametrize("majrule", [False, True])
+    def test_ancestral_summary_is_rooted(self, rootedness_constructor_summary, majrule):
+        summary, representative = rootedness_constructor_summary
+        assert pt.SummaryTreeBuilder(summary).hipstr_tree(majrule=majrule).rooted is True
+        assert representative.rooted is None

@@ -1450,6 +1450,7 @@ class Tree:
                 # Note: this method calls clear_caches
                 obj.split_off_children(insertpoint, movelist, branchstruct)
 
+        obj.rooted = False
         return obj
 
     ###############################################################################################
@@ -1508,6 +1509,7 @@ class Tree:
                 # Attach empty Branchstruct to newly created branch (no blen info in topology)
                 obj.split_off_children(insertpoint, movelist, Branchstruct())
 
+        obj.rooted = False
         return obj
 
     ###############################################################################################
@@ -1545,6 +1547,7 @@ class Tree:
                 # Reset obj caches which are now obsolete
                 obj.clear_caches()
 
+        obj.rooted = True
         return obj
 
     ###############################################################################################
@@ -1718,6 +1721,7 @@ class Tree:
             lengths = [l * random.lognormvariate(mu, sigma) for l in lengths]
 
         tree = cls.from_branchinfo(parents, children, lengths)
+        tree.rooted = True
 
         return tree
 
@@ -8194,8 +8198,9 @@ class Distmatrix(object):
         # After loop. Set length of branch conecting final two nodes
         nb1, nb2 = unresolved_nodes[0], unresolved_nodes[1]
         dist = dmat[0, 1]
-        njtree.deroot()
+        njtree.collapse_bifurcating_root()
         njtree.setlength(nb1, nb2, dist)
+        njtree.rooted = False
 
         return njtree
 
@@ -8292,6 +8297,7 @@ class Distmatrix(object):
         upgmatree.setlength(rootnode, n1, dist_new1)
         upgmatree.setlength(rootnode, n2, dist_new2)
 
+        upgmatree.rooted = True
         return upgmatree
 
 
