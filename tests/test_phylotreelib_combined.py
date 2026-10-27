@@ -1620,6 +1620,18 @@ class Test_set_blens_from_heights:
         assert tree.newick() == before
         assert tree.get_node_attribute(node, "height") is pt.MISSING
 
+    def test_explicit_height_conversion_preserves_other_stored_data(self, length_edit_tree):
+        tree = length_edit_tree
+        for record in tree.nodedict.values():
+            record.height = record.height * 2 + 1
+        before = _length_edit_data(tree)
+        _ = tree.rootdist, tree.nodeheightdict
+        tree.set_blens_from_heights()
+        _assert_length_edit_data(tree, before)
+        assert tree.rootdist["A"] == 6
+        assert tree.nodeheightdict[tree.root] == 6
+        assert tree.nodedict[tree.root].height == 7
+
 
 class Test_init_Nodestruct:
 
@@ -4468,6 +4480,14 @@ class Test_set_branch_attribute:
         assert tree.get_branch_attribute(parent, "A", "posterior") == 0.9
         assert tree.get_node_attribute("A", "height") == 42.0
 
+    def test_native_length_assignment_retains_stored_data(self, length_edit_tree):
+        tree = length_edit_tree
+        before = _length_edit_data(tree)
+        _ = tree.rootdist
+        tree.set_branch_attribute(tree.parent("A"), "A", "length", 4)
+        _assert_length_edit_data(tree, before)
+        assert tree.rootdist["A"] == 6
+
 
 class TestNodedictRefactor:
     def test_fresh_tree_has_empty_nodedict(self):
@@ -6084,3 +6104,80 @@ class Test_add_tree_TreeSummary:
         assert first.rooted is True
         assert first.newick(print_meta=True) == snapshot
         assert first.nodedict["A"].extra_meta == {"sample_only": ["keep"]}
+
+
+@pytest.fixture
+def length_edit_tree():
+    tree = pt.Tree.from_string("((A:1,B:1):2,C:3,D:3);")
+    tree.rooted = True
+    tree.root_suffix = pt.Branchstruct(length=0.5, label="root")
+    tree.root_suffix.extra_meta = {"stem": [pt.MISSING]}
+    heights = tree.nodeheightdict.copy()
+    for node in tree.nodes:
+        tree.set_node_attribute(node, "height", heights[node])
+        tree.set_node_attribute(node, "state", "")
+        tree.set_node_attribute(node, "extra_meta", {"height_80%_CI": [0, pt.MISSING]})
+    for children in tree.child_dict.values():
+        for branch in children.values():
+            branch.label = "support"
+            branch.length_sd = branch.length_median = 0.0
+            branch.extra_meta = {"length": [17], "length_80%_CI": [0, pt.MISSING]}
+    return tree
+
+
+def _length_edit_data(tree):
+    return (tree.root, tree.nodes.copy(), tree.root_suffix,
+            {node: (nd, nd.height, nd.state, copy.deepcopy(nd.extra_meta))
+             for node, nd in tree.nodedict.items()},
+            [(branch, branch.label, branch.length_sd, branch.length_median,
+              copy.deepcopy(branch.extra_meta))
+             for children in tree.child_dict.values() for branch in children.values()])
+
+
+def _assert_length_edit_data(tree, before):
+    root, nodes, suffix, node_data, branch_data = before
+    assert tree.root == root and tree.nodes == nodes and tree.rooted is True
+    assert tree.root_suffix is suffix
+    assert suffix.length == 0.5 and suffix.label == "root"
+    assert suffix.extra_meta == {"stem": [pt.MISSING]}
+    for node, (record, height, state, extra) in node_data.items():
+        assert tree.nodedict[node] is record
+        assert (record.height, record.state, record.extra_meta) == (height, state, extra)
+    for record, label, sd, median, extra in branch_data:
+        assert (record.label, record.length_sd, record.length_median, record.extra_meta) == (label, sd, median, extra)
+
+
+class Test_setlength:
+
+    def test_length_assignment_retains_annotations_and_refreshes_length_queries(self, length_edit_tree):
+        tree = length_edit_tree
+        before = _length_edit_data(tree)
+        parents, distances = tree.parent_dict, tree.rootdist
+        tree.setlength(tree.parent("A"), "A", 4)
+        _assert_length_edit_data(tree, before)
+        assert tree.rootdist is not distances and tree.rootdist["A"] == 6
+        assert tree.parent_dict is parents
+
+    def test_caller_scaling_loop_changes_only_structural_lengths(self, length_edit_tree):
+        tree = length_edit_tree
+        before = _length_edit_data(tree)
+        total = tree.length()
+        _ = tree.rootdist
+        for parent, children in list(tree.child_dict.items()):
+            for child in list(children):
+                tree.setlength(parent, child, tree.child_dict[parent][child].length * 2)
+        _assert_length_edit_data(tree, before)
+        assert tree.length() == total * 2 and tree.rootdist["A"] == 6
+
+
+class Test_clear_length_caches:
+
+    def test_raw_length_assignment_requires_explicit_invalidation(self, length_edit_tree):
+        tree = length_edit_tree
+        before = _length_edit_data(tree)
+        cached = tree.rootdist
+        tree.child_dict[tree.parent("A")]["A"].length = 4
+        assert tree.rootdist is cached and cached["A"] == 3
+        tree.clear_length_caches()
+        _assert_length_edit_data(tree, before)
+        assert tree.rootdist is not cached and tree.rootdist["A"] == 6

@@ -473,3 +473,7 @@ Successful `spr()` preserves rootedness through its pruning/graft components. It
 ### Existing-edge reversal
 
 Reversing an existing edge retains its Branchstruct and annotation values unchanged. Its endpoints, length and unrooted split remain, so reversal does not copy or reinterpret annotations. Directional values and rooted-clade support labels may no longer describe the descending side; callers must reassess/recompute them where needed. This attachment rule does not restore data already discarded by a separate merge or subdivision, nor does it guarantee scientific validity after rerooting.
+
+### Direct numerical length edits
+
+`setlength()` and native structural `set_branch_attribute(..., "length", value)` retain node/branch annotations and clear length-derived caches. Caller scaling loops have the same contract; statistical annotations are neither scaled nor recomputed automatically. `set_blens_from_heights()` reads explicitly stored node heights and writes represented lengths only. Rootedness, node IDs and the external root suffix remain unchanged. An extra annotation named `length` is separate data, not a structural write. Raw `.length` assignments require `clear_length_caches()` before derived queries; no watched fields or automatic annotation conversion is added.

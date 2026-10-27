@@ -3857,7 +3857,12 @@ class Tree:
     ###############################################################################################
 
     def setlength(self, node1, node2, length):
-        """Sets length of branch connecting node1 and node2"""
+        """Set structural length and clear length-derived caches.
+
+        Stored node/branch/suffix annotations and rootedness are retained without
+        rescaling or recomputing their scientific meaning. Raw slot assignments
+        require an explicit clear_length_caches() before derived-length queries.
+        """
 
         # Python note: maybe deprecate and use set_branch_attribute for all such problems?
 
@@ -3924,6 +3929,8 @@ class Tree:
         """Set all branch lengths using explicitly assigned nodedict[node].height values.
 
         This reads from tree.nodedict, not from tree.nodeheightdict.
+        Only represented structural lengths are written; stored annotations,
+        rootedness and the external root suffix are retained unchanged.
         """
 
         # Ensure presence of nodedict and that height attribute exists for all nodes

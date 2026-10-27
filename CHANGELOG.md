@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
 
 #### Changed
+- Documented and verified direct length assignment, caller scaling loops and height-to-length conversion: retain stored annotations/rootedness/suffixes without statistical rescaling, and refresh length-derived caches. Raw slot writes require explicit invalidation.
 - Documented and verified annotation attachment on existing reversed edges: objects and values are retained without transformation, while directional/rooted-clade statistics remain the caller's scientific responsibility. Merge/subdivision rules apply separately.
 - Documented and verified complete SPR preservation of rootedness and surviving node/edge attachment, suffix retention only while the old root survives, and fresh merged/split/connecting fields. Qualified its existing root-adjacent connection-length adjustment.
 - Documented and tested graft preservation of recipient rootedness at actual graft entry, independently of donor state, suffix information and connection length, including leaf grafts.
