@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Translated Newick input now rejects duplicate decoded taxon names just as untranslated input does, including distinct translation IDs naming the same leaf.
 - Shared Newick parsing now requires one completed topology, releases reusable parse state after errors, and preserves structural root labels/stem lengths in `root_suffix` without adding graph edges.
 - Pruning now clears the old root suffix when surviving-child promotion removes that root, while preserving the remaining Tree's rootedness and surviving node data through leaf, subtree and wrapper pruning.
 - Root-frequency selection now passes both bipartition sides to the current edge-lookup API, repairing a TypeError when the selected root must move. Its existing numerical positioning algorithm is unchanged.

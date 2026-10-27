@@ -6211,6 +6211,11 @@ class Test_NewickStringParser_parse:
         assert first.leaves == {'A', 'B'} and second.leaves == {'C', 'D'}
         assert parser.treeobj is None and parser.node_stack == []
 
+    def test_duplicate_translated_taxa(self):
+        parser = pt.NewickStringParser({'1': 'A', '2': 'A'})
+        with pytest.raises(pt.TreeError, match='Duplicated leafnames'):
+            parser.parse(pt.Tree(), '(1,2);')
+
     def test_root_suffix_is_structured_and_not_an_edge(self):
         parser = pt.NewickStringParser(label_attr_name='posterior', label_type=float)
         tree = parser.parse(pt.Tree(), '(A:1,B:2)0.95:0;')

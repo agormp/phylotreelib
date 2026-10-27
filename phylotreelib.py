@@ -1117,6 +1117,7 @@ class NewickStringParser:
         treeobj.child_dict[parent][child] = Branchstruct()
         self.node_stack.append(child)
         treeobj.leaves.add(child)
+        self.ntips += 1
 
     ###############################################################################################
 
