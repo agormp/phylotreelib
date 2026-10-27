@@ -509,31 +509,39 @@ class TestTreeNexus:
     def test_rootedness_declaration(self, annotated_print_tree, rooted, declaration,
                                    translateblock, print_meta):
         tree = annotated_print_tree
+        tree.rooted = rooted
         plain = tree.nexus()
         root = tree.root
-        result = tree.nexus(rooted=rooted, translateblock=translateblock, print_meta=print_meta)
+        result = tree.nexus(translateblock=translateblock, print_meta=print_meta)
         expected = tree.newick(print_meta=print_meta,
                               transdict=tree.transdict() if translateblock else None)
         assert "    tree nexus_tree = " + declaration + expected in result
         assert tree.root == root
         assert tree.nexus() == plain
-        assert "[&R]" not in plain and "[&U]" not in plain
+        if rooted is None:
+            assert "[&R]" not in plain and "[&U]" not in plain
+        assert tree.rooted is rooted
         assert ("height=" in result) == print_meta
         parsed = next(pt.Nexustreefile(filecontent=result))
         assert parsed.equals(tree, rooted=True)
+
 
     @pytest.mark.parametrize("sample", ["((A:1,B:1):1,C:2);", "(A:1,B:1,C:1);"])
     def test_rootedness_is_not_inferred(self, sample):
         tree = pt.Tree.from_string(sample)
         assert "[&R]" not in tree.nexus()
         assert "[&U]" not in tree.nexus()
-        assert "[&R] " in tree.nexus(rooted=True)
-        assert "[&U] " in tree.nexus(rooted=False)
+        tree.rooted = True
+        assert "[&R] " in tree.nexus()
+        tree.rooted = False
+        assert "[&U] " in tree.nexus()
+
 
     @pytest.mark.parametrize("rooted", [0, 1, "true", [], {}])
     def test_invalid_rootedness(self, annotated_print_tree, rooted):
-        with pytest.raises(pt.TreeError, match="rooted must be True, False, or None"):
-            annotated_print_tree.nexus(rooted=rooted)
+        with pytest.raises(pt.TreeError, match="print_rootedness must be a boolean"):
+            annotated_print_tree.nexus(print_rootedness=rooted)
+
 
     def test_automatic_metadata(self, annotated_print_tree):
         tree = annotated_print_tree
@@ -604,11 +612,12 @@ class TestTreeSetNexus:
     def test_rootedness_declaration(self, annotated_print_tree, rooted, declaration,
                                    translateblock, print_meta):
         tree = annotated_print_tree
+        tree.rooted = rooted
         trees = pt.TreeSet()
         trees.addtree(tree)
         trees.addtree(tree.copy_treeobject())
         plain = trees.nexus()
-        result = trees.nexus(rooted=rooted, translateblock=translateblock, print_meta=print_meta)
+        result = trees.nexus(translateblock=translateblock, print_meta=print_meta)
         expected = tree.newick(print_meta=print_meta,
                               transdict=tree.transdict() if translateblock else None)
         for i in (1, 2):
@@ -617,12 +626,16 @@ class TestTreeSetNexus:
         assert len(parsed) == 2
         assert all(t.equals(tree, rooted=True) for t in parsed)
         assert trees.nexus() == plain
-        assert "[&R]" not in plain and "[&U]" not in plain
+        if rooted is None:
+            assert "[&R]" not in plain and "[&U]" not in plain
+        assert tree.rooted is rooted
+
 
     @pytest.mark.parametrize("rooted", [0, 1, "false", [], {}])
     def test_invalid_rootedness(self, rooted):
-        with pytest.raises(pt.TreeError, match="rooted must be True, False, or None"):
-            pt.TreeSet().nexus(rooted=rooted)
+        with pytest.raises(pt.TreeError, match="print_rootedness must be a boolean"):
+            pt.TreeSet().nexus(print_rootedness=rooted)
+
 
     def test_metadata_ci_and_translate_forwarding(self, annotated_print_tree):
         tree = annotated_print_tree
@@ -4489,3 +4502,66 @@ class Test_full_precision_output:
         assert 'value=1.23,float=1.0,integer=1]' in reduced
         assert ':1.23' in reduced
         assert writer(True, True, "label", 7) == writer(precision=7)
+
+
+class Test_root_suffix_output:
+
+    def test_label_root_node_and_stem_keep_their_owners_and_controls(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.root_suffix = pt.Branchstruct(length=0.5, label="RootName")
+        tree.root_suffix.extra_meta = {"rate": 1.1, "length": 9.0}
+        tree.set_node_attribute(tree.root, "height", 2.0)
+        before_length = tree.length()
+        result = tree.newick(print_meta=True, node_attributes=("height",),
+                             branch_attributes=("rate", "length"))
+        assert ')RootName[&height=2.0]:0.5[&rate=1.1,length=9.0];' in result
+        assert tree.length() == before_length
+        assert tree.nodedist("A", "B") == 3.0
+        assert ')RootName:0.5;' in tree.newick()
+        assert ')RootName;' in tree.newick(printdist=False)
+        assert ')RootName' not in tree.newick(printlabels=False)
+        tree.root_suffix.posterior = 0.975
+        assert ')0.975:0.5;' in tree.newick(labelfield="posterior")
+
+    @pytest.mark.parametrize("stem_length,printdist", [(None, True), (0.0, False)])
+    def test_emitted_stem_metadata_needs_a_printed_stem(self, stem_length, printdist):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.root_suffix = pt.Branchstruct(length=stem_length, label="RootName")
+        tree.root_suffix.extra_meta = {"rate": pt.MISSING, "unset": None}
+        with pytest.raises(pt.TreeError, match="stem.*length"):
+            tree.newick(printdist=printdist, print_meta=True, branch_attributes=("rate",))
+        assert "RootName" in tree.newick(printdist=printdist, print_meta=False)
+        assert "RootName" in tree.newick(printdist=printdist, print_meta=True,
+                                         branch_attributes=("unset",))
+        assert tree.root_suffix.extra_meta["rate"] is pt.MISSING
+
+    def test_automatic_label_metadata_and_zero_stem_are_explicit(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        tree.root_suffix = pt.Branchstruct(length=None, label="RootName")
+        with pytest.raises(pt.TreeError, match="stem.*length"):
+            tree.newick(print_meta=True)
+        assert 'RootName;' in tree.newick(print_meta=True, branch_attributes=())
+        tree.root_suffix.length = 0.0
+        assert 'RootName:0.0[&' in tree.newick(print_meta=True)
+
+
+class Test_print_rootedness:
+
+    def test_mixed_tree_states_and_suppression_do_not_mutate_interpretation(self):
+        trees = pt.TreeSet()
+        for state in (True, False, None):
+            tree = pt.Tree.from_string("(A:1,B:2);")
+            tree.rooted = state
+            trees.addtree(tree)
+        output = trees.nexus()
+        assert 'tree t.1 = [&R] ' in output
+        assert 'tree t.2 = [&U] ' in output
+        assert 'tree t.3 = (' in output
+        assert '[&R]' not in trees.nexus(print_rootedness=False)
+        assert '[&U]' not in trees.nexus(print_rootedness=False)
+        assert [tree.rooted for tree in trees] == [True, False, None]
+        for tree in trees:
+            with pytest.raises(TypeError):
+                tree.nexus(rooted=False)
+        with pytest.raises(TypeError):
+            trees.nexus(rooted=None)

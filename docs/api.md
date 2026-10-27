@@ -399,3 +399,9 @@ Select annotations by exact keys: `node_attributes=("height", "height_95%_CI")` 
 ### Numeric output precision
 
 All Tree/TreeSet Newick/Nexus writers use `precision=None` by default: the shortest decimal representation recovering each supported finite stored float. Explicit numeric values such as `precision=7` retain significant-digit formatting. Float-valued annotations retain a decimal point or exponent even when formatted integrally; integer annotations retain exact integer values. This preserves stored precision and numeric types, without recovering input digits or increasing statistical precision. sumt keeps its explicit `precision=7`.
+
+### Root information output
+
+Set `tree.rooted` to True, False or None to record its interpretation. `tree.nexus(print_rootedness=True)` emits a known state; `print_rootedness=False` omits it. This replaces the old `rooted` value argument: False now suppresses output rather than declaring an unrooted tree. TreeSet uses each tree's own state; Newick has no declaration switch. Printing never changes interpretation or geometry.
+
+A programmatically populated `root_suffix` prints its configured label through `printlabels`/`labelfield`, a present stem through `printdist`, and selected stem entries through `branch_attributes`. Root-node metadata remains before the root colon. Stem metadata without an emitted length raises TreeError, including a label selected as automatic native metadata; selecting no branch metadata still allows an ordinary root label without a stem. Parser retention and constructor/edit state transitions are subsequent implementation stages.
