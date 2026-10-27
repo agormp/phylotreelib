@@ -6567,7 +6567,17 @@ class TreeSummary():
     ###############################################################################################
 
     def update(self, other):
-        """Merge this object with external treesummary"""
+        """Consume a completed donor summary into this recipient.
+
+        Matching branch, clade, root and topology records combine into existing
+        recipient records; previously unseen mutable records may transfer directly.
+        Quantile histograms, interval maps and child-clade pairs follow that ownership.
+        After success, use the recipient for accumulation and statistical results.
+        Do not update or query donor statistics or merge it into an independent result:
+        recipient updates and lazy finalization can change transferred records.
+        len(other) remains available for immediate scalar progress reporting.
+        The donor is not automatically copied, reset or guarded against reuse.
+        """
 
         # If we haven't seen any trees yet, adopt leaf universe from other treesummary
         # Useful when using an empty global TreeSummary object to accumulate smaller TreeSummaries

@@ -3364,6 +3364,121 @@ class Test_update_TreeSummary:
         assert [n for n, _, _ in recipient.sorted_rootbips] == [3, 2]
         assert [bip for _, bip, _ in recipient.sorted_rootbips] == [root_b, root_a]
 
+    def test_merge_keeps_matching_and_transfers_unseen_records_across_all_summaries(self):
+        flags = dict(trackbips=True, trackclades=True, trackroot=True, trackblen=True,
+                     trackheight=True, trackrootblen=True, tracktopo=True,
+                     track_subcladepairs=True, store_trees=True,
+                     trackci=True, ci_probs=(0.8, 0.95))
+        a = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
+        a_again = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
+        b = pt.Tree.from_string("((A:2,C:3):4,(B:5,D:6):7);")
+        recipient = pt.TreeSummary(**flags)
+        recipient.add_tree(a)
+        donor = pt.TreeSummary(**flags)
+        donor.add_tree(a_again)
+        donor.add_tree(b)
+        serial = pt.TreeSummary(**flags)
+        for sample in (a, a_again, b):
+            serial.add_tree(sample)
+
+        families = (
+            ("_bipartsummary", "bipartsummary"),
+            ("_cladesummary", "cladesummary"),
+            ("_rootbip_summary", "rootbipsummary"),
+            ("_biptoposummary", "biptoposummary"),
+            ("_cladetoposummary", "cladetoposummary"),
+        )
+        # Warm lazy results, then capture references BEFORE consuming donor.
+        for _, public in families:
+            getattr(recipient, public)
+            getattr(donor, public)
+        kept = {}
+        adopted = {}
+        histograms = {}
+        interval_maps = {}
+        child_pairs = {}
+        for private, _ in families:
+            recipient_records = getattr(recipient, private)
+            donor_records = getattr(donor, private)
+            common = recipient_records.keys() & donor_records.keys()
+            unseen = donor_records.keys() - recipient_records.keys()
+            assert common and unseen
+            kept[private] = {key: recipient_records[key] for key in common}
+            adopted[private] = {key: donor_records[key] for key in unseen}
+            if private in ("_bipartsummary", "_cladesummary"):
+                for key, record in {**kept[private], **adopted[private]}.items():
+                    histograms[private, key] = record.quantiles
+                for key, record in adopted[private].items():
+                    interval_maps[private, key] = record.extra_meta
+            if private == "_cladesummary":
+                for key, record in {**kept[private], **adopted[private]}.items():
+                    child_pairs[key] = record.subcladepairs
+        donor_count = len(donor)
+
+        recipient.update(donor)
+
+        assert len(recipient) == 3
+        assert len(donor) == donor_count == 2  # Permitted scalar progress read only.
+        for private, _ in families:
+            records = getattr(recipient, private)
+            for key, reference in kept[private].items():
+                assert records[key] is reference
+            for key, reference in adopted[private].items():
+                assert records[key] is reference
+        for (private, key), histogram in histograms.items():
+            assert getattr(recipient, private)[key].quantiles is histogram
+        # Check transferred map identity before recipient's lazy finalization can replace it.
+        for (private, key), interval_map in interval_maps.items():
+            assert getattr(recipient, private)[key].extra_meta is interval_map
+        for key, pair_set in child_pairs.items():
+            assert recipient._cladesummary[key].subcladepairs is pair_set
+
+        def check_recipient_against_serial():
+            for _, public in families:
+                actual = getattr(recipient, public)
+                expected = getattr(serial, public)
+                assert actual.keys() == expected.keys()
+                for key, result in actual.items():
+                    reference = expected[key]
+                    assert result.n == reference.n
+                    if public in ("bipartsummary", "cladesummary"):
+                        assert result.mean == pytest.approx(reference.mean)
+                        assert result.M2 == pytest.approx(reference.M2)
+                        assert result.freq == pytest.approx(reference.freq)
+                        assert result.quantiles.counts == reference.quantiles.counts
+                        assert result.extra_meta.keys() == reference.extra_meta.keys()
+                        for annotation in result.extra_meta:
+                            assert result.extra_meta[annotation] == pytest.approx(reference.extra_meta[annotation])
+                        if public == "cladesummary":
+                            assert result.subcladepairs == reference.subcladepairs
+                    elif public == "rootbipsummary":
+                        assert result.freq == pytest.approx(reference.freq)
+                        assert result.mean_frac_to_canon() == pytest.approx(reference.mean_frac_to_canon())
+                    else:
+                        assert result.posterior == pytest.approx(reference.posterior)
+
+        check_recipient_against_serial()
+        root_clade = pt.Clade.from_leafset(a.leaves, a)
+        assert len(recipient.cladesummary[root_clade].subcladepairs) == 2
+        a_bip = pt.Bipartition.from_leafset({"A"}, a)
+        assert recipient.bipartsummary[a_bip].length == pytest.approx(4 / 3)
+
+        # A later chunk combines into the already adopted records, without donor reuse.
+        tail = pt.TreeSummary(**flags)
+        tail.add_tree(b)
+        tail_count = len(tail)
+        recipient.update(tail)
+        serial.add_tree(b)
+        assert len(recipient) == 4
+        assert len(tail) == tail_count == 1
+        assert len(donor) == donor_count
+        for private, _ in families:
+            for key, reference in adopted[private].items():
+                assert getattr(recipient, private)[key] is reference
+        for (private, key), histogram in histograms.items():
+            assert getattr(recipient, private)[key].quantiles is histogram
+        check_recipient_against_serial()
+
 
 class Test_cladesummary_TreeSummary:
 
