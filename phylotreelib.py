@@ -3676,10 +3676,14 @@ class Tree:
     def set_branch_attribute(self, node1, node2, attrname, attrvalue):
         """Set the value of any branch attribute.
         attrname: Name of attribute (e.g., "length")
-        attrvalue: Value of attribute (e.g. 0.153)"""
+        attrvalue: Value of attribute (e.g. 0.153)
+
+        Structural length changes invalidate length-derived caches; stored annotations do not.
+        """
 
         setattr(self.child_dict[node1][node2], attrname, attrvalue)
-        self.clear_caches()
+        if attrname == "length":
+            self.clear_length_caches()
 
     ###############################################################################################
 

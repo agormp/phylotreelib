@@ -3631,6 +3631,66 @@ class TestParsimony:
             tree.parsimony_assign_fits(fitpref=("X",))
 
 
+class Test_set_branch_attribute:
+
+    @pytest.mark.parametrize("attribute,value", [
+        ("posterior", 0.9), ("length_sd", 0.2), ("ci", {"95%_CI": (0.1, 0.9)}),
+    ])
+    def test_metadata_updates_retain_valid_caches(self, attribute, value):
+        tree = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
+        parent = tree.parent("A")
+        parents = tree.parent_dict
+        bipartitions = tree.topology_bipart
+        clades = tree.topology_clade
+        order = tree.sorted_intnodes()
+        distances = tree.rootdist
+        heights = tree.nodeheightdict
+        assert tree.nodedist("A", "B") == pytest.approx(3)
+
+        tree.set_branch_attribute(parent, "A", attribute, value)
+
+        assert tree.get_branch_attribute(parent, "A", attribute) == value
+        assert tree.parent_dict is parents
+        assert tree.topology_bipart is bipartitions
+        assert tree.topology_clade is clades
+        assert tree.sorted_intnodes() is order
+        assert tree.rootdist is distances
+        assert tree.nodeheightdict is heights
+        assert tree.nodedist("A", "B") == pytest.approx(3)
+
+    def test_length_updates_refresh_distances_without_clearing_topology(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,(C:4,D:5):6);")
+        parent = tree.parent("A")
+        tree.set_branch_attribute(parent, "A", "posterior", 0.9)
+        tree.set_node_attribute("A", "height", 42.0)
+        parents = tree.parent_dict
+        bipartitions = tree.topology_bipart
+        clades = tree.topology_clade
+        order = tree.sorted_intnodes()
+        distances = tree.rootdist
+        heights = tree.nodeheightdict
+        assert distances["A"] == pytest.approx(4)
+        assert heights["A"] == pytest.approx(7)
+        assert tree.nodedist("A", "B") == pytest.approx(3)
+        tree.build_dist_dict()
+
+        tree.set_branch_attribute(parent, "A", "length", 8.0)
+
+        assert tree.parent_dict is parents
+        assert tree.topology_bipart is bipartitions
+        assert tree.topology_clade is clades
+        assert tree.sorted_intnodes() is order
+        assert tree.rootdist is not distances
+        assert tree.nodeheightdict is not heights
+        assert tree.rootdist["A"] == pytest.approx(11)
+        assert tree.nodeheightdict["A"] == pytest.approx(0)
+        assert tree.nodedist("A", "B") == pytest.approx(10)
+        tree.build_dist_dict()
+        assert tree.dist_dict["A"]["B"] == pytest.approx(10)
+        assert tree.get_branch_attribute(parent, "A", "posterior") == 0.9
+        assert tree.get_node_attribute("A", "height") == 42.0
+
+
 class TestNodedictRefactor:
     def test_fresh_tree_has_empty_nodedict(self):
         tree = pt.Tree.from_string("((A:1,B:1):1,(C:1,D:1):1);")
