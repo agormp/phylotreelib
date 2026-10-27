@@ -693,23 +693,23 @@ mcctree.set_blens_from_heights()
 tpp = pt.TreePostProcessor(ts)
 tpp.annotate_sumtree(mcctree)
 
+# Record this rooted-clock interpretation after construction/processing.
+mcctree.rooted = True
 # Export all annotations, including root heights, medians, and credible intervals.
 with open("mcc_ca_intervals.nexus", "w") as out:
-    out.write(mcctree.nexus(print_meta=True, rooted=True))
+    out.write(mcctree.nexus(print_meta=True))
 ```
 
 The exported intervals are named `height_80%_CI` and `height_95%_CI`; each holds `{lower,upper}`. They are central, equal-tailed credible intervals, not HPD intervals. `CAHeightEstimator` uses MRCA heights from every sampled tree, including trees where the target clade was not monophyletic. Quantiles are approximate unless a node's height is effectively constant, in which case its mean, median, and interval endpoints coincide.
 
-For a restricted export, include `"ci"` in the selected node fields:
+For a restricted export, select the complete interval key alongside the desired scalar fields:
 
 ```python
 with open("mcc_ca_heights_only.nexus", "w") as out:
     out.write(mcctree.nexus(
         print_meta=True,
-        rooted=True,
-        node_attributes=("height", "height_median", "ci"),
+        node_attributes=("height", "height_median", "height_95%_CI"),
         branch_attributes=(),
-        ci_labels=("95%_CI",),
     ))
 ```
 
@@ -753,7 +753,9 @@ print(mbctree.newick(
 
 ### 10. Exporting with labels, metadata, and color
 
-Pass options directly to each `newick()` or `nexus()` call. Output calls do not change the tree's formatting defaults. `tree.nexus(print_meta=True)` includes all populated annotations and stored intervals automatically, excluding internal accumulators and temporary caches. Supply `node_attributes` or `branch_attributes` to restrict that kind of metadata; use an empty tuple to suppress it. An explicit selection must include `"ci"` to print intervals. `ci_labels=None` includes all intervals, a sequence selects particular labels, and `()` suppresses intervals. Both `Tree` and `TreeSet` default to seven significant digits. Omit `print_meta` for plain output.
+Pass options directly to each `newick()` or `nexus()` call. Output calls do not store formatting preferences. `tree.nexus(print_meta=True)` includes eligible populated native fields and `extra_meta` entries, including intervals. Supply exact `node_attributes`/`branch_attributes` keys to restrict output, for example `("height", "height_95%_CI")`; use an empty tuple to suppress metadata for that owner. The former `.ci` mapping, `"ci"` group and writer `ci_labels` argument have been removed. Both Tree and TreeSet use full stored precision by default (`precision=None`); pass `precision=7` for seven significant digits. Omit `print_meta` for plain output.
+
+Whole-value None is unset, `pt.MISSING` emits `?`, and valid empty values, zero and False are retained. Use MISSING rather than None inside collections. Branch annotations require printed lengths: with `printdist=False`, pass `branch_attributes=()` or disable metadata. This restriction does not suppress ordinary internal labels. See the [API storage notes](api.md#annotation-storage-and-ordinary-node-records) for native-field mappings, dictionary access and selected-value validation.
 
 #### Plain Newick output
 
@@ -785,7 +787,7 @@ begin trees;
         3     C,
         4     D
     ;
-	tree nexus_tree = ((1:1,2:1):1,(3:1,4:1):1);
+	tree nexus_tree = ((1:1.0,2:1.0):1.0,(3:1.0,4:1.0):1.0);
 end;
 ```
 
@@ -813,7 +815,19 @@ Output:
 
 #### Declare rooted or unrooted interpretation
 
-For a tree whose root has a biological interpretation, use `tree.nexus(rooted=True)` to write `[&R]`. For an unrooted tree represented using an arbitrary traversal root, use `tree.nexus(rooted=False)` to write `[&U]`. The default `rooted=None` omits the declaration; it does not mean unrooted. These options do not change topology, branch lengths, or stored heights, and they work with `print_meta=False`. `TreeSet.nexus()` uses the same declaration for every tree in the set.
+Set the tree's known interpretation before export; its traversal root alone does not establish biological rootedness:
+
+```python
+tree.rooted = True
+print(tree.nexus())                       # [&R]
+tree.rooted = False
+print(tree.nexus())                       # [&U]
+print(tree.nexus(print_rootedness=False))  # Omit the known declaration
+```
+
+`rooted=None` on the Tree omits the declaration when its interpretation is unknown. The boolean `print_rootedness` switch defaults to True and works independently of `print_meta`; it never changes state or geometry. `TreeSet.nexus()` uses each tree's own state. The old `nexus(rooted=...)` value argument has been removed.
+
+Input declaration retention and automatic constructor/edit rootedness transitions are still pending in this development checkout. Set known state after those operations. Programmatic root labels/stem lengths and annotations use `root_suffix`; see the [API root-information notes](api.md#root-information-and-copying).
 
 #### Color leaves selected by a clade query
 
@@ -886,8 +900,8 @@ multi-site examples are shown below.
 #### Set up a tree with observed states on leaves
 
 Parsimony methods read `.state` from each node's `Nodestruct` in `tree.nodedict`.
-Leaves must have a non-empty `.state`; internal nodes may be left empty (to be inferred)
-or given an observed state (which the algorithm will respect).
+Leaves must have a non-empty `.state`; internal nodes may retain the default None (to be inferred)
+or receive an observed state (which the algorithm will respect). An explicitly assigned empty string remains valid annotation data, but does not supply an observed parsimony state.
 ```python
 import phylotreelib as pt
 

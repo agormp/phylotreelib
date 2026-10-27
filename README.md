@@ -237,17 +237,17 @@ for sample in samples:
     ts.add_tree(pt.Tree.from_string(sample))
 
 sumtree = pt.build_sumtree(ts, treetype="mcc", blen="cladeheight")
+sumtree.rooted = True  # This workflow summarizes rooted clock trees.
 
 # All populated annotations, including the intervals, are exported automatically.
 with open("posterior_summary.nexus", "w") as out:
-    out.write(sumtree.nexus(print_meta=True, rooted=True))
+    out.write(sumtree.nexus(print_meta=True))
 
 # A smaller export: heights, medians, and only the 95% interval.
 print(sumtree.newick(
     print_meta=True,
-    node_attributes=("height", "height_median", "ci"),
+    node_attributes=("height", "height_median", "height_95%_CI"),
     branch_attributes=(),
-    ci_labels=("95%_CI",),
 ))
 ```
 
@@ -279,17 +279,23 @@ print(tree.newick())  # Plain output; previous calls do not change its defaults
 
 ### Declare rootedness in Nexus output
 
-Every `Tree` has an internal root for traversal; that alone does not establish that the phylogeny is biologically rooted. State the intended interpretation explicitly when exporting Nexus:
+Every `Tree` has an internal root for traversal; that alone does not establish biological rootedness. Set the known interpretation on `tree.rooted` before exporting Nexus:
 
 ```python
 import phylotreelib as pt
 tree = pt.Tree.from_string("(A:1,B:1,C:1);")
-print(tree.nexus(rooted=True))   # tree nexus_tree = [&R] ...
-print(tree.nexus(rooted=False))  # tree nexus_tree = [&U] ...
-print(tree.nexus())             # No declaration; same as rooted=None
+tree.rooted = True
+print(tree.nexus())                        # tree nexus_tree = [&R] ...
+tree.rooted = False
+print(tree.nexus())                        # tree nexus_tree = [&U] ...
+print(tree.nexus(print_rootedness=False))   # Omit the known declaration
+tree.rooted = None
+print(tree.nexus())                        # Unknown interpretation: omit declaration
 ```
 
-`TreeSet.nexus()` accepts the same argument and applies it to every tree. The declaration is independent of `print_meta`, does not move the root, and is not inferred from the number of root children. Plain Newick output is unchanged. Omitting a declaration leaves interpretation to the reader; it does not explicitly declare the tree unrooted. The current input parser still discards these comments rather than storing rootedness. See the [design and compatibility notes](docs/decisions/nexus-rootedness.md).
+`TreeSet.nexus()` uses each tree's own `rooted` state. The boolean `print_rootedness` switch defaults to `True` and is independent of `print_meta`; printing does not move the root or change its interpretation. Plain Newick output has no declaration. Omitting a declaration does not explicitly declare a tree unrooted.
+
+The former `nexus(rooted=...)` output argument has been removed. Input declaration retention and automatic rootedness transitions in constructors/editing operations are still pending, so set known state explicitly after those operations. The current input parser still discards declarations. See the [API notes](docs/api.md#root-information-and-copying) for the implemented state and root-suffix fields; the earlier [rootedness decision](docs/decisions/nexus-rootedness.md) records the historical explicit-value API.
 
 ### Color a selected set of leaves in NEXUS output
 
@@ -636,7 +642,7 @@ print(tree.nexus(precision=7, print_meta=True, node_attributes=(), branch_attrib
 
 The helper arguments `node_attrs` and `branch_attrs` become `node_attributes` and `branch_attributes` on the output methods. For summary trees, `sumtree.nexus(print_meta=True)` is enough to include all populated annotations; knowing their individual names is optional.
 
-`Tree.newick()` and `Tree.nexus()` default to printing lengths and labels, using `labelfield="label"`, `precision=7`, and `print_meta=False`. `TreeSet` uses the same defaults, including seven significant digits (previously six).
+`Tree.newick()` and `Tree.nexus()` default to printing lengths and labels, using `labelfield="label"`, `precision=None`, and `print_meta=False`. `TreeSet` uses the same defaults. Omitted precision or `precision=None` retains the shortest decimal representation recovering each supported finite stored float; pass `precision=7` for seven significant digits. This preserves stored precision, not additional statistical precision. sumt continues to request seven digits explicitly.
 
 With `print_meta=True`, attribute selections work independently for nodes and branches:
 
@@ -644,8 +650,10 @@ With `print_meta=True`, attribute selections work independently for nodes and br
 |---|---|
 | Omitted or `None` | All populated annotation fields, including stored intervals |
 | `()` or `[]` | No metadata of that kind |
-| A sequence of names | Only those attributes; include `"ci"` to emit intervals |
+| A sequence of exact keys | Only those annotations, for example `"height_95%_CI"` |
 
-Internal accumulators and temporary branch-height caches are excluded from automatic output. Missing/`None` values and empty strings or collections are skipped; zero and `False` are retained. `ci_labels=None` includes all stored intervals, an empty sequence suppresses intervals, and a sequence of labels selects those present.
+Internal accumulators, temporary branch-height caches and the `extra_meta` container itself are excluded from automatic native-field output; dictionary entries remain selectable by their own keys. `None` means unset. The public `pt.MISSING` marker emits `?`; empty strings/collections, zero and `False` are retained. Use `MISSING`, rather than None, for unavailable collection elements. Float-valued annotations retain a decimal point or exponent, and integer annotations retain exact integer values.
 
-An explicit `None` for a scalar option uses its fixed default. `print_meta=False` always suppresses node and branch metadata, even if attributes are selected. These settings never persist on the tree. When migrating selective exports, use empty tuples for unwanted metadata and include `"ci"` in explicit attribute selections that should print intervals.
+Public `.ci` has been removed from node, branch and summary records. Intervals now live in the optional `extra_meta` dictionary under complete keys, for example `node.extra_meta["height_95%_CI"]`. The writer `ci_labels` argument and `"ci"` group shortcut are removed: select complete keys through `node_attributes` or `branch_attributes`. A literal annotation named `ci` is still an ordinary annotation. `print_meta` and Nexus `print_rootedness` are keyword-only, so old positional interval filters fail clearly instead of binding to a different option.
+
+An explicit `None` for an existing scalar printing setting uses its fixed default, including full precision for `precision=None`. `print_meta=False` suppresses optional node and branch metadata. When suppressing branch lengths with `printdist=False`, use `branch_attributes=()` or disable metadata: emitted branch annotations require lengths to preserve positional ownership. Internal labels remain independently controlled. Fresh `Nodestruct.state` and unestimated `Branchstruct.length_sd` are None, distinct from an explicitly assigned empty state or zero SD. These data defaults do not create stored formatting preferences.
