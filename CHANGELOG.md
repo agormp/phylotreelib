@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## Unreleased
 
 #### Fixed
+- Summary builders and branch annotation write-back now materialize independent output branches and mutable annotations, leaving quantile accumulators and scratch statistics in the summary. Repeated outputs can be edited independently.
 - Bipartition accumulation now owns fresh records instead of adopting input branches, leaving sample lengths, annotations and existing accumulator state unchanged. Later observations reuse the accumulator.
 - Selected invalid `extra_meta` containers now raise an owner-specific `TreeError`; metadata-disabled or empty-selection output bypasses annotation validation.
 - Tree copies retain nondefault root-suffix fields, including root labels selected through a configured native field.

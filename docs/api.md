@@ -417,3 +417,7 @@ The remaining classes are useful, but many of them are better regarded as advanc
 ### Input branch accumulation
 
 `TreeSummary.add_tree()` reads observed structural branch lengths into its own bipartition accumulators. It does not use input branches as accumulators or inherit sample labels, annotations or pre-existing statistics. Each newly observed bipartition gets one fresh record; later observations update that record using the existing numerical algorithms. Lazy summary finalization therefore leaves input branch data unchanged. Optional retained representative Trees have the separate storage contract below.
+
+### Constructed summary output ownership
+
+Consensus, compatible-bipartition insertion, MBC and branch annotation write-back materialize independently editable output branches and retained mutable annotations. Output branches contain the resulting lengths and intended annotations, with fresh accumulator/scratch fields and no quantile histograms. Repeated outputs are independent of one another and the summary. Annotation write-back can replace target Branchstruct objects; reacquire branch references from the returned Tree after a call. The low-level `from_biplist()` and `split_off_children()` direct-assignment contracts are unchanged. Exact-key interval write-back still preserves target entries that the calculation does not write.

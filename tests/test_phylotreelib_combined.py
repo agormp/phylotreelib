@@ -4700,6 +4700,7 @@ class Test_annotate_sumtree_TreePostProcessor:
                                     "length_80%_CI": (0, 10), "custom": "keep"}
         postprocessor = pt.TreePostProcessor(summary)
         postprocessor.annotate_sumtree(tree)
+        target_branch = tree.child_dict[tree.root]["A"]
         node_extra = tree.nodedict["A"].extra_meta
         branch_extra = target_branch.extra_meta
         assert node_extra == {"height_95%_CI": [1, 2], "height_80%_CI": (0, 10),
@@ -4715,12 +4716,18 @@ class Test_annotate_sumtree_TreePostProcessor:
         source_node.extra_meta["height_95%_CI"] = None
         source_branch.extra_meta = None
         postprocessor.annotate_sumtree(tree)
+        target_branch = tree.child_dict[tree.root]["A"]
+        node_extra = tree.nodedict["A"].extra_meta
+        branch_extra = target_branch.extra_meta
         assert node_extra["height_95%_CI"] == [99, 2]
         assert branch_extra["length_95%_CI"] == [pt.MISSING, 3]
 
         source_node.extra_meta["height_95%_CI"] = pt.MISSING
         source_branch.extra_meta = {"length_95%_CI": pt.MISSING}
         postprocessor.annotate_sumtree(tree)
+        target_branch = tree.child_dict[tree.root]["A"]
+        node_extra = tree.nodedict["A"].extra_meta
+        branch_extra = target_branch.extra_meta
         assert node_extra["height_95%_CI"] is pt.MISSING
         assert branch_extra["length_95%_CI"] is pt.MISSING
 
@@ -4741,6 +4748,32 @@ class Test_annotate_sumtree_TreePostProcessor:
         tree.set_node_attribute("A", "extra_meta", replacement)
         assert tree.nodedict["A"].extra_meta is replacement
         assert "old" not in replacement
+
+    def test_existing_tree_is_detached_before_summary_branch_writeback(self):
+        summary = _ownership_output_summary()
+        # The generic low-level constructor retains its existing ownership policy.
+        tree = pt.Tree.from_biplist(summary.bipartsummary)
+        before = dict(tree.iter_bipinfo())
+        assert any(branch is summary.bipartsummary[bip] for bip, branch in before.items())
+        source_values = {bip: (record.length, record.mean, record.M2, record.n,
+                               record.quantiles)
+                         for bip, record in summary.bipartsummary.items()}
+        original_topology = tree.topology_bipart
+        original_distance = tree.nodedist("A", "B")
+
+        pt.TreePostProcessor(summary).annotate_sumtree(tree)
+
+        outputs = _assert_owned_output_branches(tree, summary)
+        assert tree.topology_bipart == original_topology
+        assert tree.nodedist("A", "B") == original_distance
+        for bip, record in summary.bipartsummary.items():
+            assert (record.length, record.mean, record.M2, record.n,
+                    record.quantiles) == source_values[bip]
+        bip = next(iter(outputs))
+        outputs[bip].extra_meta["custom"][0].add("output")
+        assert summary.bipartsummary[bip].extra_meta["custom"] == [{"summary"}]
+        summary.bipartsummary[bip].extra_meta["custom"][0].add("summary changed")
+        assert outputs[bip].extra_meta["custom"] == [{"summary", "output"}]
 
 
 class Test_merge_Branchstruct:
@@ -4931,3 +4964,104 @@ class Test__add_bips_TreeSummary:
         assert result.label == ""
         assert (observed.n, observed.mean, observed.M2) == (17, 99.0, 12.0)
         assert observed.extra_meta["sample_only"] is pt.MISSING
+
+
+def _ownership_output_summary():
+    summary = pt.TreeSummary(trackbips=True, trackblen=True, tracktopo=True,
+                             trackci=True, ci_probs=(0.95,))
+    for text in ("((A:1,B:2):3,C:4,D:5);", "((A:3,B:4):5,C:6,D:7);"):
+        summary.add_tree(pt.Tree.from_string(text))
+    for record in summary.bipartsummary.values():
+        record.extra_meta["custom"] = [{"summary"}]
+        record.extra_meta["length_95%_CI"] = list(record.extra_meta["length_95%_CI"])
+    return summary
+
+
+def _assert_owned_output_branches(tree, summary):
+    result = dict(tree.iter_bipinfo())
+    for bip, branch in result.items():
+        source = summary.bipartsummary[bip]
+        assert branch is not source
+        assert branch.length == source.length
+        assert branch.length_sd == source.length_sd
+        assert branch.length_median == source.length_median
+        assert branch.posterior == source.posterior
+        assert branch.freq == source.freq
+        assert branch.bipartition_cred == source.bipartition_cred
+        assert branch.extra_meta == source.extra_meta
+        assert branch.extra_meta is not source.extra_meta
+        assert branch.extra_meta["custom"] is not source.extra_meta["custom"]
+        assert branch.extra_meta["length_95%_CI"] is not source.extra_meta["length_95%_CI"]
+        assert branch.quantiles is None
+        assert branch.mean == branch.M2 == 0.0
+        assert branch.n == 0
+        assert branch.parent_height is branch.kid_height is None
+        assert source.quantiles is not None
+        assert source.n == 2
+    return result
+
+
+class Test_contree_SummaryTreeBuilder:
+
+    def test_repeated_consensus_outputs_are_independent_of_summary_and_each_other(self):
+        summary = _ownership_output_summary()
+        builder = pt.SummaryTreeBuilder(summary)
+
+        first = builder.contree()
+        second = builder.contree()
+
+        first_bips = _assert_owned_output_branches(first, summary)
+        second_bips = _assert_owned_output_branches(second, summary)
+        bip = next(iter(first_bips))
+        source = summary.bipartsummary[bip]
+        first_bips[bip].length = 99.0
+        first_bips[bip].extra_meta["custom"][0].add("first")
+        assert second_bips[bip].length == source.length
+        assert second_bips[bip].extra_meta["custom"] == [{"summary"}]
+        assert source.extra_meta["custom"] == [{"summary"}]
+        source.extra_meta["custom"][0].add("source")
+        assert second_bips[bip].extra_meta["custom"] == [{"summary"}]
+
+    def test_compatible_bipartition_insertion_owns_its_branch_and_metadata(self):
+        summary = pt.TreeSummary(trackbips=True, trackblen=True,
+                                 trackci=True, ci_probs=(0.95,))
+        # The later EF candidate exercises the existing allcompat insertion path.
+        # This test does not change the current candidate-selection algorithm.
+        texts = (
+            ["((A:1,B:1):1,C:1,D:1,(E:1,F:1):2,G:1);"] * 3
+            + ["((A:1,B:1):1,C:1,D:1,E:1,F:1,G:1);"] * 3
+            + ["(A:1,B:1,(C:1,D:1):3,E:1,F:1,G:1);"] * 4
+        )
+        first = None
+        for text in texts:
+            tree = pt.Tree.from_string(text)
+            if first is None:
+                first = tree
+            summary.add_tree(tree)
+        ef = pt.Bipartition.from_leafset({"E", "F"}, first)
+        source = summary.bipartsummary[ef]
+        source.extra_meta["custom"] = [{"summary"}]
+
+        result = pt.SummaryTreeBuilder(summary).contree(allcompat=True)
+        output = dict(result.iter_bipinfo())[ef]
+
+        assert output is not source
+        assert output.length == source.length == 2.0
+        assert output.extra_meta is not source.extra_meta
+        assert output.quantiles is None
+        assert output.n == 0
+        output.extra_meta["custom"][0].add("output")
+        assert source.extra_meta["custom"] == [{"summary"}]
+
+
+class Test_max_bipart_cred_tree_SummaryTreeBuilder:
+
+    def test_mbc_output_owns_branches_without_accumulation_bookkeeping(self):
+        summary = _ownership_output_summary()
+
+        result = pt.SummaryTreeBuilder(summary).max_bipart_cred_tree()
+
+        outputs = _assert_owned_output_branches(result, summary)
+        bip = next(iter(outputs))
+        outputs[bip].extra_meta["length_95%_CI"][0] = -99.0
+        assert summary.bipartsummary[bip].extra_meta["length_95%_CI"][0] != -99.0

@@ -6809,6 +6809,15 @@ class TreeSummary():
 ###################################################################################################
 ###################################################################################################
 
+def _copy_summary_output_branch(source):
+    """Materialize retained output data without summary accumulators or scratch values."""
+    branch = Branchstruct(length=source.length)
+    for field in ("label", "extra_meta", "length_median", "length_sd",
+                  "posterior", "freq", "bipartition_cred", "rootcred"):
+        setattr(branch, field, _copy_annotation_value(getattr(source, field)))
+    return branch
+
+
 class SummaryTreeBuilder():
     """Class handling construction of summary tree topology.
     Input: TreeSummary object with accumulated stats"""
@@ -6866,7 +6875,7 @@ class SummaryTreeBuilder():
             branch = self.treesum.bipartsummary[bip]
             if branch.freq < cutoff:
                 break
-            conbipdict[bip] = branch
+            conbipdict[bip] = _copy_summary_output_branch(branch)
         contree = Tree.from_biplist(conbipdict)
 
         # If allcompat has been requested: add remaining, compatible bipartitions to contree
@@ -6879,7 +6888,8 @@ class SummaryTreeBuilder():
                 is_present, is_compatible, insert_tuple = contree.check_bip_compatibility(bip)
                 if is_compatible and (not is_present):
                     parentnode, childnodes = insert_tuple
-                    contree.split_off_children(parentnode, childnodes, branch)
+                    contree.split_off_children(parentnode, childnodes,
+                                               _copy_summary_output_branch(branch))
 
         logcred = self.log_bipart_credibility(contree.topology())
         contree.logcred = logcred
@@ -6902,7 +6912,7 @@ class SummaryTreeBuilder():
         maxcredbipdict = {}
         for bipartition in maxlogcredbiptopo:
             branch = self.treesum.bipartsummary[bipartition]
-            maxcredbipdict[bipartition] = branch
+            maxcredbipdict[bipartition] = _copy_summary_output_branch(branch)
 
         # Build tree from bipartitions in new bipdict, annotate with logcred and type
         maxcredtree = Tree.from_biplist(maxcredbipdict)
@@ -7262,6 +7272,9 @@ class TreePostProcessor():
         if self.treesum.trackbips:
             for parent in sumtree.sorted_intnodes():
                 for child in sumtree.children(parent):
+                    # Own the target before writing, including low-level constructor aliases.
+                    sumtree.child_dict[parent][child] = _copy_summary_output_branch(
+                        sumtree.child_dict[parent][child])
                     halfmask = sumtree.remotechildren_mask_dict[child]
                     bip = Bipartition.from_halfmask_unknown_leafuniverse(halfmask, sumtree)
                     br = self.treesum.bipartsummary[bip]
