@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Grafting and `TreeSummary.update()` transfer donor records. Continue with the recipient afterward. Retained input representatives must remain unchanged while a summary uses them. See the API ownership rules.
 - Length edits retain annotations without rescaling their statistical meaning. Interval write-back replaces only the exact produced keys and preserves unrelated metadata. Low-level length-slot writes require explicit cache invalidation.
 - Unset `Nodestruct.state` and unestimated `Branchstruct.length_sd` now default to None, distinct from an empty state or zero SD.
-- Reduced ordinary parsing and scanning overhead. Parsing with metadata disabled removes flat comments together and tokenizes each tree once.
+- Faster parsing, reading, counting and burn-in skipping, including annotation-heavy files with metadata parsing off.
 - Shortened the README and moved detailed upgrade examples to recipes. The API reference includes an unreleased migration table.
 
 #### Removed

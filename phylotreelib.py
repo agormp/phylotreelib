@@ -8016,30 +8016,13 @@ class CAHeightEstimator():
 ###################################################################################################
 ###################################################################################################
 
-_INPUT_SPECIAL_RE = re.compile(r"[;\[\]]")
-_INPUT_HEADER_SPECIAL_RE = re.compile(r"[;=\[\]]")
-_INPUT_NONSPACE_RE = re.compile(r"\S")
+_INPUT_FLAT_RUN_RE = re.compile(r"[^;\[\]]*(?:\[[^\[\]]*\][^;\[\]]*)*")
+_INPUT_HEADER_FLAT_RUN_RE = re.compile(r"[^;=\[\]]*(?:\[[^\[\]]*\][^;=\[\]]*)*")
+_INPUT_COMMENT_SPACE_RE = re.compile(r"\s*(?:\[[^\[\]]*\]\s*)*")
+_INPUT_NESTED_RE = re.compile(r"\[[^\]]*\[")
 _INPUT_SPACE_RE = re.compile(r"\s*")
 _NEXUS_COMMAND_PART_RE = re.compile(r"[A-Za-z0-9_./-]+")
 _NEXUS_TREE_NAME_RE = re.compile(r"\s*(?:\*\s*)?[\w./-]+\s*\Z")
-
-
-def _without_envelope_comments(text):
-    """Remove complete header comments without splitting a containing word."""
-    if "[" not in text:
-        return text
-    parts = []
-    position = 0
-    while True:
-        start = text.find("[", position)
-        if start < 0:
-            parts.append(text[position:])
-            return "".join(parts)
-        parts.append(text[position:start])
-        end = _comment_end(text, start)
-        if end is None:
-            raise TreeError("Unterminated Nexus header comment")
-        position = end
 
 
 class TreefileBase:
@@ -8150,44 +8133,60 @@ class TreefileBase:
         self._eof = False
 
     def _read_to_delimiter(self, *, header=False, retain=True):
-        """Return (text-or-True, delimiter), or (None, None) at clean EOF.
+        """Read to a delimiter outside comments, optionally keeping the text.
 
-        Ordinary runs are skipped by regex. Nested comments track brackets only;
-        quotes inside comments do not suspend nesting. General quoted-name syntax
-        outside comments remains deferred. Discarding paths never assemble text.
+        Complete comments without nesting are skipped together. Nested comments
+        and comments split across buffers retain their bracket depth. Discarding
+        input does not assemble complete descriptions.
         """
         pieces = [] if retain else None
         depth = 0
         content = False
-        outside_pattern = _INPUT_HEADER_SPECIAL_RE if header else _INPUT_SPECIAL_RE
+        flat_pattern = _INPUT_HEADER_FLAT_RUN_RE if header else _INPUT_FLAT_RUN_RE
         while self._fill_buffer():
             piece_start = self._position
-            if not header and not depth and not self._buffer_has_brackets:
+            if not header and not depth:
                 end = self._buffer.find(";", self._position)
                 if end >= 0:
-                    self._position = end + 1
-                    if retain:
-                        pieces.append(self._buffer[piece_start:self._position])
-                    return ("".join(pieces) if retain else True), ";"
-                # Missing delimiters retain the general EOF/content checks below.
+                    flat = not self._buffer_has_brackets
+                    if not flat:
+                        # Equal counts, no nesting and a final close prove complete flat pairs.
+                        opens = self._buffer.count("[", self._position, end)
+                        flat = opens == self._buffer.count("]", self._position, end) and (
+                            not opens or (
+                                self._buffer.rfind("[", self._position, end)
+                                < self._buffer.rfind("]", self._position, end)
+                                and _INPUT_NESTED_RE.search(self._buffer, self._position, end) is None))
+                    if flat:
+                        self._position = end + 1
+                        if retain:
+                            pieces.append(self._buffer[piece_start:self._position])
+                        return ("".join(pieces) if retain else True), ";"
             while self._position < len(self._buffer):
-                pattern = _COMMENT_BRACKET_RE if depth else outside_pattern
-                match = pattern.search(self._buffer, self._position)
-                end = match.start() if match is not None else len(self._buffer)
-                if not depth and not content:
-                    content = _INPUT_NONSPACE_RE.search(self._buffer, self._position, end) is not None
-                if match is None:
-                    self._position = end
-                    break
-                char = match.group()
-                self._position = match.end()
                 if depth:
-                    depth += 1 if char == "[" else -1
-                elif char == "[":
+                    match = _COMMENT_BRACKET_RE.search(self._buffer, self._position)
+                    if match is None:
+                        self._position = len(self._buffer)
+                        break
+                    self._position = match.end()
+                    depth += 1 if match.group() == "[" else -1
+                    continue
+
+                start = self._position
+                end = flat_pattern.match(self._buffer, start).end()
+                if not content:
+                    content = _INPUT_COMMENT_SPACE_RE.match(self._buffer, start, end).end() != end
+                self._position = end
+                if end == len(self._buffer):
+                    break
+                char = self._buffer[end]
+                self._position = end + 1
+                if char == "[":
+                    # This comment is nested or incomplete in the current buffer.
                     depth = 1
                 elif char == "]":
                     raise TreeError("Stray ']' outside a comment at input character "
-                                    + str(self._buffer_offset + match.start()))
+                                    + str(self._buffer_offset + end))
                 else:
                     if retain:
                         pieces.append(self._buffer[piece_start:self._position])
@@ -8277,6 +8276,24 @@ class Newicktreefile(TreefileBase):
 class Nexustreefile(TreefileBase):
     """Nexus envelope processing; original post-'=' descriptions stay intact."""
 
+    @staticmethod
+    def _without_envelope_comments(text):
+        """Remove complete header comments without splitting a containing word."""
+        if "[" not in text:
+            return text
+        parts = []
+        position = 0
+        while True:
+            start = text.find("[", position)
+            if start < 0:
+                parts.append(text[position:])
+                return "".join(parts)
+            parts.append(text[position:start])
+            end = _comment_end(text, start)
+            if end is None:
+                raise TreeError("Unterminated Nexus header comment")
+            position = end
+
     def __init__(self, filename=None, filecontent=None, *, parse_meta=False):
         super().__init__(filename, filecontent, parse_meta=parse_meta)
         self.transdict = None
@@ -8325,7 +8342,7 @@ class Nexustreefile(TreefileBase):
         self.parser_obj = AnnotatedNewickParser(transdict=mapping, parse_meta=self.parse_meta)
 
     def _read_translation(self):
-        table = _without_envelope_comments(self._command_rest(retain=True)[:-1])
+        table = self._without_envelope_comments(self._command_rest(retain=True)[:-1])
         mapping = {}
         for entry in table.split(","):
             words = entry.split()
@@ -8347,7 +8364,7 @@ class Nexustreefile(TreefileBase):
                 return False
             if self._block_name is None:
                 if keyword == "BEGIN":
-                    words = _without_envelope_comments(self._command_rest(retain=True)[:-1]).split()
+                    words = self._without_envelope_comments(self._command_rest(retain=True)[:-1]).split()
                     if not words:
                         raise TreeError("Expected a Nexus block name after BEGIN")
                     self._block_name = words[0].upper()
@@ -8366,7 +8383,7 @@ class Nexustreefile(TreefileBase):
                 header, delimiter = self._read_to_delimiter(header=True)
                 if delimiter != "=":
                     raise TreeError("Expected '=' after Nexus tree name")
-                name = _without_envelope_comments(header[:-1])
+                name = self._without_envelope_comments(header[:-1])
                 if not _NEXUS_TREE_NAME_RE.fullmatch(name):
                     raise TreeError("Expected a supported Nexus tree name before '='")
                 self._last_command_kind = keyword

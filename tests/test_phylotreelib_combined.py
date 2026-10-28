@@ -6680,6 +6680,17 @@ class Test_read_tree_text_Newicktreefile:
 
 class Test_read_tree_text_Nexustreefile:
 
+    def test_nested_to_flat_header_comments_preserve_raw_text_and_context(self):
+        description = ' [&U](1[&note=";=" ]:1,2:2);'
+        text = ('#NEXUS begin trees; translate 1 A,2 B;'
+                'utree first [outer [nested] tail][flat ; =][another = ;] ='
+                + description + 'end;')
+        with pt.Nexustreefile(filecontent=text) as reader:
+            assert reader.read_tree_text() == description
+            assert reader._last_command_kind == "UTREE"
+            assert reader.transdict == {"1": "A", "2": "B"}
+            assert reader.read_tree_text() is None
+
     def test_concatenated_complete_nexus_documents_remain_supported(self):
         first = pt.Tree.from_string("(A:1,B:2);")
         first.rooted = True
@@ -6811,6 +6822,18 @@ class Test_skip_trees_TreefileBase:
             assert reader.skip_trees(5) == 0
 
 
+    @pytest.mark.parametrize("outside,error", [("", None), ("word", "Unfinished input")])
+    def test_skip_nested_to_flat_comment_tail_at_eof(self, outside, error):
+        tail = ' [outer [nested] tail][flat ; =][last] ' + outside
+        with pt.Newicktreefile(filecontent='(A,B);' + tail) as reader:
+            assert reader.skip_trees(1) == 1
+            if error is None:
+                assert reader.skip_trees(1) == 0
+            else:
+                with pytest.raises(pt.TreeError, match=error):
+                    reader.skip_trees(1)
+
+
 class Test_fast_treecount:
 
     @pytest.mark.parametrize("fileformat", ["newick", "nexus"])
@@ -6897,6 +6920,8 @@ class Test_read_to_delimiter_TreefileBase:
         pytest.param(True, None, "[unfinished", "Unterminated input comment", id="open-comment-default"),
         pytest.param(True, 7, "];", "Stray", id="stray-close-small"),
         pytest.param(False, None, "stray]text;", "Stray", id="stray-close-default"),
+        pytest.param(False, None, "][note][;", "Stray", id="balanced-misordered-prefix"),
+        pytest.param(True, None, "][[];", "Stray", id="balanced-nested-invalid-prefix"),
     ])
     def test_buffer_transitions_preserve_comments_and_eof_checks(
             self, monkeypatch, retain, buffer_size, tail, error):
