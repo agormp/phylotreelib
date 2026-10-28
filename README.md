@@ -33,11 +33,11 @@ python3 -m pip install --upgrade phylotreelib
 ## Documentation
 
 - This README gives a quickstart and common examples.
-- [Recipes](docs/recipes.md) give worked examples for reading, editing, comparing and summarizing trees.
-- The [API reference](docs/api.md) describes arguments, data fields and copying/ownership rules.
-- The [changelog](CHANGELOG.md) records notable changes.
+- [Recipes](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md) give worked examples for reading, editing, comparing and summarizing trees.
+- The [API reference](https://github.com/agormp/phylotreelib/blob/main/docs/api.md) describes arguments, data fields and copying/ownership rules.
+- The [changelog](https://github.com/agormp/phylotreelib/blob/main/CHANGELOG.md) records notable changes.
 
-If you are updating scripts, see the [3.0 migration guide](docs/api.md#upgrading-to-30) and the [older 1.x upgrade examples](docs/recipes.md#13-upgrading-existing-1x-scripts).
+If you are updating scripts, see the [3.0 migration guide](https://github.com/agormp/phylotreelib/blob/main/docs/api.md#upgrading-to-30) and the [older 1.x upgrade examples](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#13-upgrading-existing-1x-scripts).
 
 ## Quick start
 
@@ -55,7 +55,7 @@ print("Descendant leaves:", tree.remote_children(mrca))
 print("Human–Bonobo distance:", tree.nodedist("Human", "Bonobo"))
 ```
 
-Node height means distance from the most recent tips to the node. Version 1 called this depth. See the [upgrade examples](docs/recipes.md#13-upgrading-existing-1x-scripts) for renamed methods and arguments.
+Node height means distance from the most recent tips to the node. Version 1 called this depth. See the [upgrade examples](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#13-upgrading-existing-1x-scripts) for renamed methods and arguments.
 
 ### Read trees from a file
 
@@ -70,7 +70,7 @@ with pt.Treefile("posterior.trees") as treefile:
         print(tree.length())
 ```
 
-Use `Newicktreefile` or `Nexustreefile` when the format is known. `readtree()` returns one Tree, or None at the end of the file. More input examples, including raw tree text, are in the [reading recipes](docs/recipes.md#1-reading-trees).
+Use `Newicktreefile` or `Nexustreefile` when the format is known. `readtree()` returns one Tree, or None at the end of the file. More input examples, including raw tree text, are in the [reading recipes](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#1-reading-trees).
 
 ### Root and prune a tree
 
@@ -83,7 +83,7 @@ tree.remove_leaves(["B", "D"])
 print(tree.newick())
 ```
 
-See the recipes for [other rooting methods](docs/recipes.md#4-rooting-and-rerooting), [grafting](docs/recipes.md#graft-one-tree-onto-another) and [SPR moves](docs/recipes.md#spr-with-specified-prune-and-regraft-points).
+See the recipes for [other rooting methods](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#4-rooting-and-rerooting), [grafting](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#graft-one-tree-onto-another) and [SPR moves](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#spr-with-specified-prune-and-regraft-points).
 
 ### Read and write annotations
 
@@ -99,7 +99,7 @@ print(tree.nexus(print_meta=True))
 
 Printing options apply to each call. `print_meta=True` includes populated annotations. Select particular keys with `node_attributes` and `branch_attributes`, or use an empty tuple to omit that kind of annotation. Output uses full stored precision unless a numeric `precision` is requested.
 
-`tree.rooted` is True, False or None. Nexus output declares known state with `[&R]` or `[&U]`. Plain Newick does not include a declaration. See the [input and output API](docs/api.md#2-tree-input-and-output) for positional annotation rules, missing values and output controls.
+`tree.rooted` is True, False or None. Nexus output declares known state with `[&R]` or `[&U]`. Plain Newick does not include a declaration. See the [input and output API](https://github.com/agormp/phylotreelib/blob/main/docs/api.md#2-tree-input-and-output) for positional annotation rules, missing values and output controls.
 
 ### Summarize posterior tree samples
 
@@ -135,20 +135,20 @@ print(sumtree.nexus(print_meta=True))
 
 For a real analysis, read samples from a file and exclude burn-in before adding observations. Specify both `trackci=True` and `ci_probs`. These are central, equal-tailed intervals. Variable-height quantiles are approximate, while effectively constant node heights retain the observed value.
 
-See the [summary-tree recipes](docs/recipes.md#9-consensus-trees-and-other-tree-summaries) for consensus trees, common-ancestor heights and selected interval output. If you merge partial summaries or retain input representatives, follow the [ownership guidance](docs/api.md#5-summary-ownership).
+See the [summary-tree recipes](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#9-consensus-trees-and-other-tree-summaries) for consensus trees, common-ancestor heights and selected interval output. If you merge partial summaries or retain input representatives, follow the [ownership guidance](https://github.com/agormp/phylotreelib/blob/main/docs/api.md#5-summary-ownership).
 
 ## More examples
 
-- [Extract and prune subtrees](docs/recipes.md#extract-a-subtree)
-- [Compare trees](docs/recipes.md#7-comparing-trees)
-- [Build trees from distance matrices](docs/recipes.md#8-distance-matrices)
-- [Export labels, annotations and colors](docs/recipes.md#10-exporting-with-labels-metadata-and-color)
-- [Parsimony calculations](docs/recipes.md#12-parsimony)
+- [Extract and prune subtrees](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#extract-a-subtree)
+- [Compare trees](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#7-comparing-trees)
+- [Build trees from distance matrices](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#8-distance-matrices)
+- [Export labels, annotations and colors](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#10-exporting-with-labels-metadata-and-color)
+- [Parsimony calculations](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#12-parsimony)
 
 ## Upgrading existing scripts
 
-Version 3.0 removes stored printing settings, reader `strip_comments`, `below_root` and public `.ci` storage. Printing and interval selection are now explicit. Read the [migration table](docs/api.md#upgrading-to-30) before updating callers.
+Version 3.0 removes stored printing settings, reader `strip_comments`, `below_root` and public `.ci` storage. Printing and interval selection are now explicit. Read the [migration table](https://github.com/agormp/phylotreelib/blob/main/docs/api.md#upgrading-to-30) before updating callers.
 
-The [older upgrade recipes](docs/recipes.md#13-upgrading-existing-1x-scripts) cover the 1.x-to-2.x height renames, grafting/SPR arguments and subtree return values.
+The [older upgrade recipes](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#13-upgrading-existing-1x-scripts) cover the 1.x-to-2.x height renames, grafting/SPR arguments and subtree return values.
 
-Known development work is recorded in the [maintenance notes](docs/maintenance.md).
+Known development work is recorded in the [maintenance notes](https://github.com/agormp/phylotreelib/blob/main/docs/maintenance.md).
