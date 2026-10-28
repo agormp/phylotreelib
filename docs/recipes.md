@@ -910,7 +910,7 @@ print(tree.nexus())                       # [&U]
 print(tree.nexus(print_rootedness=False))  # Omit the known declaration
 ```
 
-`tree.rooted = None` omits the declaration when interpretation is unknown. Nexus TREE leaves rooted/unrooted interpretation unspecified without either declaration; UTREE supplies False; see the [recorded specification check](decisions/nexus-rootedness.md). The boolean `print_rootedness` switch defaults to True and works independently of `print_meta`; it never changes state or geometry. `TreeSet.nexus()` uses each tree's own state. The old `nexus(rooted=...)` value argument has been removed.
+`tree.rooted = None` omits the declaration when interpretation is unknown. Nexus TREE leaves rooted/unrooted interpretation unspecified without either declaration. See the [Nexus TREES specification, p. 615](https://www.phylo.org/sub_sections/nexus_document.pdf#page=26) (accessed 2026-10-28). UTREE supplies False. The boolean `print_rootedness` switch defaults to True and works independently of `print_meta`; it never changes state or geometry. `TreeSet.nexus()` uses each tree's own state. The old `nexus(rooted=...)` value argument has been removed.
 
 Constructor and editing rootedness transitions are implemented: clade/MCC/HIPSTR/mrHIPSTR and ancestral-model random trees are rooted, bipartition/consensus/MBC construction is unrooted, and deliberate rooting establishes True. Generic construction and undeclared Newick/TREE input remain None. Input declarations and UTREE context now establish the supported interpretation independently of optional metadata decoding. Root labels/stem lengths and annotations use `root_suffix`; see the [API root-information notes](api.md#root-information-and-copying).
 

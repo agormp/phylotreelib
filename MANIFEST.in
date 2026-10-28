@@ -1,0 +1,4 @@
+include CHANGELOG.md CITATION.cff pytest.ini
+include docs/api.md docs/recipes.md docs/maintenance.md
+include tests/conftest.py
+recursive-include tests/data *
