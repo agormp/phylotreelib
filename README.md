@@ -18,6 +18,8 @@ Main capabilities include:
 
 ## Installation
 
+This README describes phylotreelib 3.0.0, which requires Python 3.10 or newer.
+
 ```bash
 python3 -m pip install phylotreelib
 ```
@@ -28,8 +30,6 @@ To upgrade an existing installation:
 python3 -m pip install --upgrade phylotreelib
 ```
 
-The annotation and API changes described here are unreleased. The published 2.3.1 package does not yet include them. Use the matching development checkout when trying these features.
-
 ## Documentation
 
 - This README gives a quickstart and common examples.
@@ -37,7 +37,7 @@ The annotation and API changes described here are unreleased. The published 2.3.
 - The [API reference](docs/api.md) describes arguments, data fields and copying/ownership rules.
 - The [changelog](CHANGELOG.md) records notable changes.
 
-If you are updating scripts, see the [unreleased API migration](docs/api.md#unreleased-api-migration) and the [older 1.x upgrade examples](docs/recipes.md#13-upgrading-existing-1x-scripts).
+If you are updating scripts, see the [3.0 migration guide](docs/api.md#upgrading-to-30) and the [older 1.x upgrade examples](docs/recipes.md#13-upgrading-existing-1x-scripts).
 
 ## Quick start
 
@@ -147,7 +147,7 @@ See the [summary-tree recipes](docs/recipes.md#9-consensus-trees-and-other-tree-
 
 ## Upgrading existing scripts
 
-The unreleased API removes stored printing settings, reader `strip_comments`, `below_root` and public `.ci` storage. Printing and interval selection are now explicit. Read the [migration table](docs/api.md#unreleased-api-migration) before updating callers.
+Version 3.0 removes stored printing settings, reader `strip_comments`, `below_root` and public `.ci` storage. Printing and interval selection are now explicit. Read the [migration table](docs/api.md#upgrading-to-30) before updating callers.
 
 The [older upgrade recipes](docs/recipes.md#13-upgrading-existing-1x-scripts) cover the 1.x-to-2.x height renames, grafting/SPR arguments and subtree return values.
 

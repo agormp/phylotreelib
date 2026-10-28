@@ -1176,7 +1176,7 @@ For low-level batch writes directly to `tree.child_dict[parent][child].length`, 
 
 ### 13. Upgrading existing 1.x scripts
 
-These examples describe the changes introduced in 2.0. For subsequent unreleased changes, including removal of stored printing settings, read the [current API migration](api.md#unreleased-api-migration).
+These examples describe the changes introduced in 2.0. For the 3.0 changes, including removal of stored printing settings, read the [3.0 migration guide](api.md#upgrading-to-30).
 
 phylotreelib 2.0 introduced a few intentional API breaks to make tree editing, summary trees, and printing more explicit and less "magic".
 

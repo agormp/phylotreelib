@@ -30,4 +30,4 @@ These items are deferred from the parser work. The original [parser plan](plans/
 
 ## Before release
 
-Choose the library release version, update sumt's dependency bounds, and verify the built distributions together in a fresh environment. Source-checkout tests do not establish compatibility of published packages. See sumt's dependency-compatibility decision for the release sequence. Version changes, publication and pushes require their separate authorization.
+Release preparation targets phylotreelib 3.0.0 and sumt 4.2.0, with Python 3.10 or newer and `phylotreelib>=3.0.0,<4`. Verify the built distributions together in fresh environments before publication. Source-checkout tests do not establish compatibility of published packages. See sumt's dependency-compatibility decision for the release sequence.

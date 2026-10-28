@@ -21,9 +21,9 @@ The main public entry points are:
 
 Helper classes such as `Bipartition`, `Clade`, `Branchstruct`, `Nodestruct`, `SummaryTreeBuilder`, `TreePostProcessor`, `CAHeightEstimator`, and `QuantileAccumulator` are also part of the module, but most users do not need them for ordinary scripting.
 
-#### Unreleased API migration
+#### Upgrading to 3.0
 
-These changes follow 2.3.1 and require updating some callers. The linked sections describe the full behavior.
+Version 3.0.0 changes the public API and requires updating some 2.x callers. The linked sections describe the full behavior.
 
 | Earlier use | Replacement or changed behavior |
 |---|---|
@@ -84,7 +84,7 @@ Tree.nexus(self, printdist=True, printlabels=True, labelfield="label", precision
 
 `TreeSet.newick()` and `TreeSet.nexus()` forward the same controls and full-precision default to each tree. Nexus uses each tree's own rootedness state.
 
-**Unreleased migration:** `PrintSpec`, the `configure_*_printing()` helpers and Tree's stored-print-setting methods have been removed. Pass options directly; former helper `node_attrs`/`branch_attrs` become `node_attributes`/`branch_attributes`. Public `.ci`, the `"ci"` interval-group shortcut and writer `ci_labels` are also removed. Select complete interval keys instead; a literal `ci` annotation selects only itself. Parameters preceding the removed interval-filter slot retain their positions; the following `print_meta`/`print_rootedness` switches are keyword-only. Old keyword or positional interval filters raise TypeError. See the [migration table](#unreleased-api-migration).
+**3.0 migration:** `PrintSpec`, the `configure_*_printing()` helpers and Tree's stored-print-setting methods have been removed. Pass options directly; former helper `node_attrs`/`branch_attrs` become `node_attributes`/`branch_attributes`. Public `.ci`, the `"ci"` interval-group shortcut and writer `ci_labels` are also removed. Select complete interval keys instead; a literal `ci` annotation selects only itself. Parameters preceding the removed interval-filter slot retain their positions; the following `print_meta`/`print_rootedness` switches are keyword-only. Old keyword or positional interval filters raise TypeError. See the [migration table](#upgrading-to-30).
 
 #### Annotation storage and ordinary node records
 
@@ -141,7 +141,7 @@ With metadata disabled, optional payloads are skipped without decoding or annota
 
 `skip_trees(n)` skips up to a nonnegative number of descriptions and returns the actual count. `fast_treecount(filename, fileformat="nexus")` counts descriptions using the same lexical framing. These paths construct neither complete descriptions nor Trees, and do not validate annotation/topology semantics. All paths reject unfinished lexical input and unterminated/stray comment brackets; brackets nest even inside quotes in comments.
 
-**Unreleased input migration:** removed reader/factory `strip_comments` keywords and positional slots raise TypeError. Use `parse_meta=True` for decoded annotations and raw reading for original description text. Default reads now retain supported declarations. Raw wrappers retain their call/EOF shapes but deliberately preserve comments and suffixes. Removed reader/Tree `below_root` has no alias: use root-node data in `nodedict[root]`, root labels/stems in `root_suffix`, or explicitly retain raw text outside the Tree. Standalone `remove_comments()` retains its existing generic behavior and discards declarations when called explicitly.
+**3.0 input migration:** removed reader/factory `strip_comments` keywords and positional slots raise TypeError. Use `parse_meta=True` for decoded annotations and raw reading for original description text. Default reads now retain supported declarations. Raw wrappers retain their call/EOF shapes but deliberately preserve comments and suffixes. Removed reader/Tree `below_root` has no alias: use root-node data in `nodedict[root]`, root labels/stems in `root_suffix`, or explicitly retain raw text outside the Tree. Standalone `remove_comments()` retains its existing generic behavior and discards declarations when called explicitly.
 
 For an unchanged supported Tree, selected output and metadata-enabled reimport preserve topology/root placement, selected structural information, emitted annotation owners/keys/types/values, and finite floats at omitted/None precision. Match translation and label settings and relevant command context. Canonical Nexus declarations preserve rootedness; plain Newick or suppressed declarations intentionally omit it. This does not promise the original imported key set, Python container identity, comments/names/header history or source formatting. Native fallback may add selected fields that were never imported; scientific validity after edits is the caller's responsibility.
 

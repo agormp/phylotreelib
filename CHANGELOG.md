@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## Unreleased
+## [3.0.0] - 2026 October 28
 
 #### Added
 - Read typed node, branch and root-stem annotations with `parse_meta=True`. Unknown keys are retained in `extra_meta`. Repeated keys on the same node or branch raise `TreeError`.
@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Tree.unroot()` explicitly declares a tree unrooted. `collapse_bifurcating_root()` remains a structural operation, with `deroot()` as its deprecated alias.
 
 #### Changed
+- Requires Python 3.10 or newer.
 - Consolidated duplicate tests and corrected an invalid quantile-error expectation.
 - Nexus output uses the Tree's rootedness and `print_rootedness=True` to emit known R/U declarations. False suppresses the declaration. Printing does not reroot the tree.
 - Printing options are passed directly to `newick()` or `nexus()`. Omitted precision or `precision=None` retains full stored float precision. Use a numeric precision for significant-digit output.
@@ -28,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Length edits retain annotations without rescaling their statistical meaning. Interval write-back replaces only the exact produced keys and preserves unrelated metadata. Low-level length-slot writes require explicit cache invalidation.
 - Unset `Nodestruct.state` and unestimated `Branchstruct.length_sd` now default to None, distinct from an empty state or zero SD.
 - Faster parsing, reading, counting and burn-in skipping, including annotation-heavy files with metadata parsing off.
-- Shortened the README and moved detailed upgrade examples to recipes. The API reference includes an unreleased migration table.
+- Shortened the README and moved detailed upgrade examples to recipes. The API reference includes a 3.0 migration table.
 
 #### Removed
 - `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()` and `Tree.get_print_spec()`. Pass options to each output call.
@@ -51,7 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Merging root counts refreshes cached root frequencies and sorted summaries.
 - Branch-length write-back refreshes derived length caches after assigning the root edges. Metadata setters retain valid topology caches.
 
-See the [API migration table](docs/api.md#unreleased-api-migration) and [recipes](docs/recipes.md) for replacement calls and ownership examples.
+See the [API migration table](docs/api.md#upgrading-to-30) and [recipes](docs/recipes.md) for replacement calls and ownership examples.
 
 ---
 
