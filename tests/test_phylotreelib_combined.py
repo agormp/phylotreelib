@@ -5725,6 +5725,72 @@ def _assert_owned_output_branches(tree, summary):
 
 class Test_contree_SummaryTreeBuilder:
 
+    @pytest.mark.parametrize("weighted_trees", [
+        pytest.param((
+            ("((A:1,B:1):1,(C:1,D:1):1);", 4),
+            ("((A:1,C:1):1,(B:1,D:1):1);", 3),
+            ("((A:1,D:1):1,(B:1,C:1):1);", 3),
+        ), id="highest-frequency-before-lower-alternatives"),
+        pytest.param((
+            ("((A:1,B:1):1,C:1,D:1);", 1),
+            ("(A:1,B:1,C:1,D:1);", 2),
+        ), id="only-below-cutoff-candidate"),
+    ])
+    def test_allcompatible_considers_highest_below_cutoff_candidate(self, weighted_trees):
+        summary = pt.TreeSummary(trackbips=True)
+        for text, count in weighted_trees:
+            for _ in range(count):
+                summary.add_tree(pt.Tree.from_string(text))
+        builder = pt.SummaryTreeBuilder(summary)
+        majority = builder.contree()
+        result = builder.contree(allcompat=True)
+        wanted = pt.Bipartition.from_leafset({"A", "B"}, result)
+
+        assert summary.bipartsummary[wanted].freq < 0.5
+        assert wanted not in majority.topology()
+        assert not majority.is_resolved()
+        assert wanted in result.topology()
+        assert result.is_resolved()
+        assert result.rooted is False
+
+    def test_allcompatible_continues_after_an_incompatible_candidate(self):
+        weighted_trees = (
+            ("((A:1,B:1):1,C:1,D:1,(E:1,F:1):1);", 3),
+            ("((A:1,B:1):1,C:1,D:1,E:1,F:1);", 3),
+            ("((A:1,C:1):1,B:1,D:1,E:1,F:1);", 4),
+        )
+        summary = pt.TreeSummary(trackbips=True)
+        for text, count in weighted_trees:
+            for _ in range(count):
+                summary.add_tree(pt.Tree.from_string(text))
+        result = pt.SummaryTreeBuilder(summary).contree(allcompat=True)
+        majority = pt.Bipartition.from_leafset({"A", "B"}, result)
+        incompatible = pt.Bipartition.from_leafset({"A", "C"}, result)
+        later = pt.Bipartition.from_leafset({"E", "F"}, result)
+
+        assert summary.bipartsummary[majority].freq == pytest.approx(0.6)
+        assert summary.bipartsummary[incompatible].freq == pytest.approx(0.4)
+        assert summary.bipartsummary[later].freq == pytest.approx(0.3)
+        assert majority in result.topology()
+        assert incompatible not in result.topology()
+        assert later in result.topology()
+
+    @pytest.mark.parametrize("text", [
+        pytest.param("(A:1,B:1,C:1,D:1);", id="unresolved-with-no-extra-candidates"),
+        pytest.param("((A:1,B:1):1,C:1,D:1);", id="already-resolved"),
+    ])
+    def test_allcompatible_keeps_input_when_all_candidates_are_majority(self, text):
+        sample = pt.Tree.from_string(text)
+        summary = pt.TreeSummary(trackbips=True)
+        summary.add_tree(sample)
+
+        result = pt.SummaryTreeBuilder(summary).contree(allcompat=True)
+
+        assert all(branch.freq == 1 for branch in summary.bipartsummary.values())
+        assert result.topology() == sample.topology()
+        assert result.is_resolved() == sample.is_resolved()
+        assert result.rooted is False
+
     def test_repeated_consensus_outputs_are_independent_of_summary_and_each_other(self):
         summary = _ownership_output_summary()
         builder = pt.SummaryTreeBuilder(summary)
@@ -5747,8 +5813,7 @@ class Test_contree_SummaryTreeBuilder:
     def test_compatible_bipartition_insertion_owns_its_branch_and_metadata(self):
         summary = pt.TreeSummary(trackbips=True, trackblen=True,
                                  trackci=True, ci_probs=(0.95,))
-        # The later EF candidate exercises the existing allcompat insertion path.
-        # This test does not change the current candidate-selection algorithm.
+        # Check ownership of a later compatible insertion as well.
         texts = (
             ["((A:1,B:1):1,C:1,D:1,(E:1,F:1):2,G:1);"] * 3
             + ["((A:1,B:1):1,C:1,D:1,E:1,F:1,G:1);"] * 3

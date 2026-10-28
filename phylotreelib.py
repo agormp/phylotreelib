@@ -7333,11 +7333,11 @@ class SummaryTreeBuilder():
         conbipdict = {}
         i = 0
         for _, bip in self.treesum.sorted_biplist:
-            i += 1
             branch = self.treesum.bipartsummary[bip]
             if branch.freq < cutoff:
                 break
             conbipdict[bip] = _copy_summary_output_branch(branch)
+            i += 1
         contree = Tree.from_biplist(conbipdict)
 
         # If allcompat has been requested: add remaining, compatible bipartitions to contree
