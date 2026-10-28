@@ -2,7 +2,7 @@
 
 Updated: 2026-10-28.
 
-These items are deferred from the parser work. The [historical parser plan](https://github.com/agormp/phylotreelib/blob/4ffca97637156a992b8c80c191ce0fd763a21e3e/docs/plans/nexus-metacomment-parser.md) records the initial design. The [API reference](api.md) describes current supported behavior.
+These items are deferred from the parser work. The [API reference](api.md) describes current supported behavior.
 
 ## Caches and retained memory
 
