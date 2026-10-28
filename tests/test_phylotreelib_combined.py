@@ -6881,3 +6881,37 @@ def annotation_producer_input(data_dir):
         return tree.group(1).strip(), translation
 
     return first
+
+
+class Test_read_to_delimiter_TreefileBase:
+
+    @pytest.mark.parametrize("retain,buffer_size,tail,error", [
+        pytest.param(True, 7, "", None, id="retained-small-clean-eof"),
+        pytest.param(False, 7, " [tail; [nested]] ", None, id="discarded-small-comment-eof"),
+        pytest.param(True, None, "", None, id="retained-default-clean-eof"),
+        pytest.param(False, None, " [tail] ", None, id="discarded-default-comment-eof"),
+        pytest.param(True, 7, "word[note]", "Unfinished input", id="text-before-comment-eof"),
+        pytest.param(False, None, "[note]word", "Unfinished input", id="text-after-comment-eof"),
+        pytest.param(False, 7, "[unfinished; inside", "Unterminated input comment", id="open-comment-small"),
+        pytest.param(True, None, "[unfinished", "Unterminated input comment", id="open-comment-default"),
+        pytest.param(True, 7, "];", "Stray", id="stray-close-small"),
+        pytest.param(False, None, "stray]text;", "Stray", id="stray-close-default"),
+    ])
+    def test_buffer_transitions_preserve_comments_and_eof_checks(
+            self, monkeypatch, retain, buffer_size, tail, error):
+        if buffer_size is not None:
+            monkeypatch.setattr(pt.TreefileBase, "_BUFFER_SIZE", buffer_size)
+        size = pt.TreefileBase._BUFFER_SIZE
+        # Force a bracket-free middle buffer inside the comment, including at the
+        # default size, then return to ordinary complete records after it closes.
+        comment = "[outer " + "interior; " * (2 * size // len("interior; ") + 2) + "]"
+        records = ("(A:1,B:2);", comment + "(C:3,D:4);", " " * size + "(E:5,F:6);")
+        with pt.TreefileBase(filename=None, filecontent="".join(records) + tail) as reader:
+            for record in records:
+                assert reader._read_to_delimiter(retain=retain) == (
+                    record if retain else True, ";")
+            if error is None:
+                assert reader._read_to_delimiter(retain=retain) == (None, None)
+            else:
+                with pytest.raises(pt.TreeError, match=error):
+                    reader._read_to_delimiter(retain=retain)

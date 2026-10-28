@@ -8037,6 +8037,7 @@ class TreefileBase:
                          else open(filename, mode="rt", encoding="UTF-8"))
         self.parse_meta = parse_meta
         self._buffer = ""
+        self._buffer_has_brackets = False
         self._position = 0
         self._buffer_offset = 0
         self._eof = False
@@ -8064,6 +8065,7 @@ class TreefileBase:
             return False
         self._buffer_offset += len(self._buffer)
         self._buffer = self.treefile.read(self._BUFFER_SIZE)
+        self._buffer_has_brackets = "[" in self._buffer or "]" in self._buffer
         self._position = 0
         if not self._buffer:
             self._eof = True
@@ -8126,6 +8128,7 @@ class TreefileBase:
     def _reset_after_signature_probe(self):
         self.treefile.seek(0)
         self._buffer = ""
+        self._buffer_has_brackets = False
         self._position = self._buffer_offset = 0
         self._eof = False
 
@@ -8142,6 +8145,14 @@ class TreefileBase:
         outside_pattern = _INPUT_HEADER_SPECIAL_RE if header else _INPUT_SPECIAL_RE
         while self._fill_buffer():
             piece_start = self._position
+            if not header and not depth and not self._buffer_has_brackets:
+                end = self._buffer.find(";", self._position)
+                if end >= 0:
+                    self._position = end + 1
+                    if retain:
+                        pieces.append(self._buffer[piece_start:self._position])
+                    return ("".join(pieces) if retain else True), ";"
+                # Missing delimiters retain the general EOF/content checks below.
             while self._position < len(self._buffer):
                 pattern = _COMMENT_BRACKET_RE if depth else outside_pattern
                 match = pattern.search(self._buffer, self._position)
