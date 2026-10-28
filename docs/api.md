@@ -21,6 +21,42 @@ The main public entry points are:
 
 Helper classes such as `Bipartition`, `Clade`, `Branchstruct`, `Nodestruct`, `SummaryTreeBuilder`, `TreePostProcessor`, `CAHeightEstimator`, and `QuantileAccumulator` are also part of the module, but most users do not need them for ordinary scripting.
 
+#### Unreleased API migration
+
+These changes follow 2.3.1 and require updating some callers. The linked sections describe the full behavior.
+
+| Earlier use | Replacement or changed behavior |
+|---|---|
+| `PrintSpec`, `configure_*_printing()`, stored print-setting methods | Pass options directly to each `newick()` or `nexus()` call. |
+| Public `.ci`, writer `ci_labels`, `"ci"` output group | Store intervals in `extra_meta` under complete keys such as `height_95%_CI`, and select exact keys. Literal `ci` remains ordinary metadata. |
+| Reader/factory `strip_comments` | Use keyword-only `parse_meta=True` for decoded annotations, or raw reading for original text. |
+| Reader/Tree `below_root` | Use root-node data in `nodedict[root]`, root-label/stem data in `root_suffix`, or retain raw text explicitly. |
+| `nexus(rooted=...)` | Set `tree.rooted`, then use `print_rootedness` to include or suppress its declaration. False suppresses output, rather than declaring unrooted. |
+| Omitted printing precision | Full stored precision is now the default. Pass `precision=7` for seven significant digits. |
+| Positional metadata/declaration switches | Pass `print_meta` and `print_rootedness` by keyword. Removed interval-filter calls raise TypeError. |
+| `Nodestruct.nleaves` | Use summary records or topology-derived descendant counts. |
+| Branch subdivision copying attributes by default | The default is `copy_attrs="none"`. Request `"lower"` or `"both"` explicitly when needed. |
+| `Branchstruct.merge(check_compat=...)` | Remove the unused argument. Merging retains summed length and fresh non-length fields. |
+| `copy_treeobject(copyattr=False)` retaining node data | Node metadata is now omitted too. |
+
+Before, in 2.x:
+
+```python
+pt.configure_basic_printing(tree, precision=7, print_meta=True, branch_attrs=("posterior",))
+print(tree.nexus())
+```
+
+Now:
+
+```python
+print(tree.nexus(precision=7, print_meta=True,
+                 node_attributes=(), branch_attributes=("posterior",)))
+```
+
+The sections below cover [input/output](#2-tree-input-and-output), [editing](#3-tree-construction-and-editing) and [summary ownership](#5-summary-ownership). Graft donors and merged partial summaries transfer their records. Retained input representatives must remain unchanged while a summary uses them.
+
+For older changes, see the [1.x upgrade recipes](recipes.md#13-upgrading-existing-1x-scripts).
+
 ---
 
 ### 2. Tree input and output
@@ -48,7 +84,7 @@ Tree.nexus(self, printdist=True, printlabels=True, labelfield="label", precision
 
 `TreeSet.newick()` and `TreeSet.nexus()` forward the same controls and full-precision default to each tree. Nexus uses each tree's own rootedness state.
 
-**Unreleased migration:** `PrintSpec`, the `configure_*_printing()` helpers and Tree's stored-print-setting methods have been removed. Pass options directly; former helper `node_attrs`/`branch_attrs` become `node_attributes`/`branch_attributes`. Public `.ci`, the `"ci"` interval-group shortcut and writer `ci_labels` are also removed. Select complete interval keys instead; a literal `ci` annotation selects only itself. Parameters preceding the removed interval-filter slot retain their positions; the following `print_meta`/`print_rootedness` switches are keyword-only. Old keyword or positional interval filters raise TypeError. See the [README migration guide](../README.md#printing-without-stored-defaults-unreleased).
+**Unreleased migration:** `PrintSpec`, the `configure_*_printing()` helpers and Tree's stored-print-setting methods have been removed. Pass options directly; former helper `node_attrs`/`branch_attrs` become `node_attributes`/`branch_attributes`. Public `.ci`, the `"ci"` interval-group shortcut and writer `ci_labels` are also removed. Select complete interval keys instead; a literal `ci` annotation selects only itself. Parameters preceding the removed interval-filter slot retain their positions; the following `print_meta`/`print_rootedness` switches are keyword-only. Old keyword or positional interval filters raise TypeError. See the [migration table](#unreleased-api-migration).
 
 #### Annotation storage and ordinary node records
 

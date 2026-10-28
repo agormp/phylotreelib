@@ -12,7 +12,7 @@ Accordingly, it uses:
 
 - **height(node)** = distance from the **tips (leaves)** to the node (i.e., "time before most recent leaf")
 
-In v1.x, this concept was called **depth**. All depth-based names were renamed to height-based names in v2.0.0. See [Upgrading from 1.x to 2.x](#upgrading-from-1x-to-2x) for the full rename table.
+In v1.x, this concept was called **depth**. All depth-based names were renamed to height-based names in v2.0.0. See [older upgrade examples](#13-upgrading-existing-1x-scripts) for the full rename table.
 
 ---
 
@@ -1085,8 +1085,9 @@ pass the state as a tuple of strings instead of a single string. The Hartigan al
 then runs independently at each site in a single tree traversal, and the parsimony score
 and change counts are aggregated across all sites.
 
-All labelled nodes must use tuples of the same length. Unlabelled nodes use the default
-empty string `""` as usual.
+All labelled nodes must use tuples of the same length. Unlabelled nodes use None by default.
+An explicit empty string `""` is also treated as unlabelled.
+
 ```python
 import phylotreelib as pt
 
@@ -1172,3 +1173,214 @@ does not change the parsimony score when the reconstruction is unambiguous.
 For low-level batch writes directly to `tree.child_dict[parent][child].length`, call `tree.clear_length_caches()` after the batch. Ordinary metadata assignments do not invalidate topology caches or silently recalibrate statistics. Reassess retained scientific annotations explicitly after topology or length edits.
 
 `Branchstruct.merge(other)` creates a fresh length-only result, and its unused `check_compat` argument has been removed. `remove_branch()` redistributes the removed structural length equally onto fresh descendant-edge records, retaining unrelated edges and surviving-node data. Existing edges that only reverse during rerooting keep their labels/annotations, whose directional or rooted-clade meaning may need reassessment.
+
+### 13. Upgrading existing 1.x scripts
+
+These examples describe the changes introduced in 2.0. For subsequent unreleased changes, including removal of stored printing settings, read the [current API migration](api.md#unreleased-api-migration).
+
+phylotreelib 2.0 introduced a few intentional API breaks to make tree editing, summary trees, and printing more explicit and less "magic".
+
+If you maintain scripts that call phylotreelib directly, the sections below show the key signature/return changes and how to update call sites.
+
+#### Terminology rename: `depth` → `height`
+
+In v1.x, the distance from the tips to an internal node was called **depth**. In v2.0.0 this has been renamed to **height** throughout the library. The rename is purely mechanical: a search-and-replace across your scripts using the table below is sufficient.
+
+| v1.x name | v2.x name |
+|---|---|
+| `TreeSummary(..., trackdepth=True, ...)` | `TreeSummary(..., trackheight=True, ...)` |
+| `Tree.nodedepth(node)` | `Tree.nodeheight(node)` |
+| `Tree.set_blens_from_depths()` | `Tree.set_blens_from_heights()` |
+| `TreePostProcessor.set_mean_node_depths(tree)` | `TreePostProcessor.set_mean_node_heights(tree)` |
+| `CADepthEstimator` | `CAHeightEstimator` |
+| `build_sumtree(..., blen="meandepth", ...)` | `build_sumtree(..., blen="cladeheight", ...)` |
+| `build_sumtree(..., blen="cadepth", ...)` | `build_sumtree(..., blen="caheight", ...)` |
+| Node attribute `depth` | Node attribute `height` |
+| Node attribute `depth_sd` | Node attribute `height_sd` |
+| Node attribute `depth_median` | Node attribute `height_median` |
+
+#### Summary trees
+
+`TreeSummary.compute_sumtree(...)` is still available as a convenience wrapper (so many 1.x workflows continue to work), but the preferred style is now the explicit pipeline:
+
+- `TreeSummary` --> `SummaryTreeBuilder` --> `TreePostProcessor` (+ optional `CAHeightEstimator`) --> `Tree.newick()` / `Tree.nexus()`
+
+See the [README summary example](../README.md#summarize-posterior-tree-samples) and the summary-tree recipes above.
+
+#### Tree.graft: signature change
+
+**Old (1.x):**
+
+```python
+Tree.graft(self, other, node1, node2=None, blen1=0, blen2=0,
+           graftlabel=None, graft_with_other_root=False)
+```
+
+Meaning (1.x): attach `other` on incoming branch to `node1` (possibly re-rooting `other` around `node2`): insert a new internal node on the incoming branch to `node1` with length `blen1`, and connect `other` below that (meaning closer to the tips) with length `blen2` (or optionally skip the extra basal branch).
+
+**New (2.x):**
+
+```python
+Tree.graft(self, other, parent, child,
+           dist_from_parent=None, frac_from_parent=None,
+           connect_length=0.0, connect_branchstruct=None, graftlabel=None)
+```
+
+Meaning (2.x): insert the graft point on an *existing edge* `(parent -> child)` and then attach `other` (or a single leaf name) below that graft point via a *separate connecting branch*.
+
+**How to convert typical 1.x calls**
+
+1) **Grafting on incoming edge to node1 (typical old usage)**
+
+Old:
+
+```python
+tree.graft(other, node1=X, blen1=blen1, blen2=blen2)
+```
+
+New (equivalent intent):
+
+```python
+parent = tree.parent(X)
+tree.graft(
+    other,
+    parent=parent, child=X,
+    # place graftpoint on the incoming edge to X:
+    dist_from_parent=blen1,           # if you want a specific distance
+    # or frac_from_parent=0.5,        # if you just want "midway"
+    connect_length=blen2,
+)
+```
+
+2) **Old `graft_with_other_root=True`**
+
+In 2.x, the caller should explicitly decide what `other` is before calling `graft(...)`:
+- If you want to attach a *single leaf*, pass a string `other="TaxonName"`.
+- If you want to attach a Tree with a specific root, re-root `other` first (e.g. `other.reroot(...)`) and then call `graft(...)`.
+
+#### Tree.spr: signature change (and length preservation)
+
+**Old (1.x):**
+
+```python
+Tree.spr(self, prune_node=None, regraft_node=None)
+```
+
+**New (2.x):**
+
+```python
+Tree.spr(self, prune_node=None, regraft_node=None,
+         dist_from_parent=None, frac_from_parent=None)
+```
+
+New behaviour highlights:
+
+- Regrafting happens by inserting a graft point on the incoming edge to `regraft_node`.
+- If `dist_from_parent` and `frac_from_parent` are both `None`, the placement is randomized (uniform frac in (0,1)).
+- Total tree length is preserved by default (the regraft edge is split according to `dist_from_parent` or `frac_from_parent`; the length of the incoming basal branch to the prune_node is reused as the connecting branch length).
+
+**How to convert**
+
+Old:
+
+```python
+tree.spr(prune_node=P, regraft_node=R)
+```
+
+New (same defaults):
+
+```python
+tree.spr(prune_node=P, regraft_node=R)
+```
+
+New (explicit placement on incoming edge to `regraft_node`):
+
+```python
+# parent = tree.parent(R)
+tree.spr(prune_node=P, regraft_node=R, frac_from_parent=0.25)
+# (places the graftpoint 25% down the edge parent->R)
+```
+
+#### Tree.subtree / Tree.prune_subtree: return value change
+
+**Old (1.x):**
+
+```python
+Tree.subtree(self, basenode, return_basalbranch=False) -> Tree
+Tree.prune_subtree(self, basenode) -> Tree
+```
+
+**New (2.x):**
+
+```python
+Tree.subtree(self, basenode) -> (subtree, basal_branch)
+Tree.prune_subtree(self, basenode) -> (subtree, basal_branch)
+```
+
+Notes (2.x):
+
+- `basal_branch` is a **copy** of the Branchstruct on the incoming edge to `basenode`.
+- If `basenode` is a leaf: `subtree` is the **leaf name** (`str`), not a mini tree.
+
+**How to convert**
+
+Old:
+
+```python
+sub = tree.subtree(node)
+```
+
+New:
+
+```python
+sub, basal = tree.subtree(node)
+```
+
+Old:
+
+```python
+sub = tree.prune_subtree(node)
+```
+
+New:
+
+```python
+sub, basal = tree.prune_subtree(node)
+# basal.length is the length removed when detaching the subtree
+```
+
+#### Tree.reroot: signature change
+
+**Old (1.x):**
+
+```python
+Tree.reroot(self, node1, node2=None, polytomy=False, node1dist=0.0)
+```
+
+**New (2.x):**
+
+```python
+Tree.reroot(self, node1, node2=None, polytomy=False,
+            dist_from_node1=None, frac_from_node1=0.5)
+```
+
+Conversion:
+
+- If you previously used `node1dist`, rename it to `dist_from_node1`.
+- If you previously relied on the default placement, you can now do that via `frac_from_node1` (default 0.5).
+
+#### Root-collapsing helper rename
+
+**Old (1.x):**
+
+```python
+Tree.deroot(self)
+```
+
+**New (2.x):**
+
+```python
+Tree.collapse_bifurcating_root(self)
+```
+
+(And `Tree.deroot()` is kept as a deprecated alias.)

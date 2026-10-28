@@ -8,77 +8,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## Unreleased
 
-#### Fixed
-- Metadata-disabled parsing checks declaration spans directly in the source text and skips other ampersand payloads without copying them into tokens. Raw descriptions remain intact.
-- An annotation following an extra root-closing parenthesis now raises `TreeError` instead of leaking an empty-stack `IndexError`.
-- Translated Newick input now rejects duplicate decoded taxon names just as untranslated input does, including distinct translation IDs naming the same leaf.
-- Shared Newick parsing now requires one completed topology, releases reusable parse state after errors, and preserves structural root labels/stem lengths in `root_suffix` without adding graph edges.
-- Pruning now clears the old root suffix when surviving-child promotion removes that root, while preserving the remaining Tree's rootedness and surviving node data through leaf, subtree and wrapper pruning.
-- Root-frequency selection now passes both bipartition sides to the current edge-lookup API, repairing a TypeError when the selected root must move. Its existing numerical positioning algorithm is unchanged.
-- Successful minimum-variance and root-frequency selection now establish rootedness even when the chosen root already matches and no root movement occurs. Root geometry and unfinished root-frequency calculations are unchanged.
-- Summary builders and branch annotation write-back now materialize independent output branches and mutable annotations, leaving quantile accumulators and scratch statistics in the summary. Repeated outputs can be edited independently.
-- Bipartition accumulation now owns fresh records instead of adopting input branches, leaving sample lengths, annotations and existing accumulator state unchanged. Later observations reuse the accumulator.
-- Selected invalid `extra_meta` containers now raise an owner-specific `TreeError`; metadata-disabled or empty-selection output bypasses annotation validation.
-- Tree copies retain nondefault root-suffix fields, including root labels selected through a configured native field.
-- Struct and Tree copies now isolate retained nested mutable annotation data. `copyattr=False` omits node metadata as well as branch attributes.
-- Single-leaf SPR now preserves an independent copy of the moved node metadata, including when it was the tree's only annotated node, without changing leaf extraction or branch-length calculations.
-- Grafting now retains donor node metadata even when the recipient initially has none, and initializes the inserted graftpoint with default node data.
-- Leaf and internal-node renaming now moves node metadata to the final identifier, including duplicate-name resolution and donor renaming during grafting.
-- Merging `TreeSummary` root counts now refreshes cached root frequencies and sorted root summaries, including newly observed root positions.
-- `TreePostProcessor.set_biplen_on_existing_tree()` now invalidates length-derived caches after its final root-edge assignments, so warmed distance queries reflect the new lengths.
-
-#### Removed
-- Removed reader/factory `strip_comments` arguments and reader/Tree `below_root` storage. Use keyword-only `parse_meta`, explicit raw descriptions and structured root-node/root-suffix fields.
-- Removed writer `ci_labels` and the `"ci"` output-group shortcut. Select complete exact annotation keys; literal `ci` is ordinary metadata. Trailing metadata/declaration switches are keyword-only, so removed positional calls fail instead of rebinding silently.
-- Removed public `.ci` storage from ordinary and summary structs. Intervals now use complete keys such as `height_95%_CI` or `length_95%_CI` in lazy `extra_meta` dictionaries, alongside unknown annotations.
-- Removed `Nodestruct.nleaves` and its constructor argument. Descendant counts remain in `SummaryNodestruct` and topology-derived calculations; summary construction no longer leaks bookkeeping into exported tree metadata.
-- Breaking API change: removed `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()`, and `Tree.get_print_spec()`. Specify printing options directly in `Tree.newick()` and `Tree.nexus()`; the tree no longer stores formatting defaults.
+#### Added
+- Read typed node, branch and root-stem annotations with `parse_meta=True`. Unknown keys are retained in `extra_meta`. Repeated keys on the same node or branch raise `TreeError`.
+- `MISSING` represents an explicitly missing annotation value, distinct from unset None. It retains its identity through copying and multiprocessing.
+- `Tree.rooted` records True, False or unspecified rootedness. `Tree.root_suffix` holds root labels and optional stem data separately from the topology.
+- `read_tree_text()` returns complete original tree descriptions. `skip_trees()` discards burn-in without constructing Trees.
+- `Tree.unroot()` explicitly declares a tree unrooted. `collapse_bifurcating_root()` remains a structural operation, with `deroot()` as its deprecated alias.
 
 #### Changed
-- Shared lexical framing uses a fast semicolon search only in buffers proven free of both brackets and outside any active comment. Headers, bracket-bearing buffers and missing delimiters retain the general scanner and its validation; raw text and count/skip behavior are unchanged.
-- Active input API/migration notes and runnable recipes now describe `parse_meta`, declaration and suffix retention, lexical raw/count/skip paths, supported grammar and selected semantic round-trip limits.
-- Branch/stem dispatch now uses the parser's fixed root identifier rather than checking stack length on every edge; comment-free Nexus headers return directly without temporary assembly.
-- Shared parsing checks completion once and reports failed token/stack operations locally, avoiding redundant bounds checks on every successful child transition while retaining malformed-root rejection.
-- Verified supported BEAST/MrBayes input ownership and selected semantic round trips, including explicit translation/label settings, typed values and Nexus rootedness versus intentionally undeclared Newick output.
-- Ordinary branch-length parsing keeps direct structural lookup; only actual root stems use the suffix helper, avoiding a helper call and temporary stack slice for every represented edge.
-- File readers now share buffered nested-comment framing, reusable annotation-aware parsers and lexical count/skip paths. `read_tree_text()` and legacy raw wrappers return complete descriptions; Nexus TREE/UTREE and translation context remain stable across blocks.
-- `Tree.from_string(..., parse_meta=True)` imports typed positional node/branch/stem annotations into native fields and lazy `extra_meta`. Both metadata modes retain one leading R/U declaration, skip ordinary comments, and preserve structural root labels/stems. Same-owner repeated keys and unsupported metadata positions/directives raise `TreeError`.
-- Added a reusable typed key/value metacomment decoder with exact-key duplicate rejection, recursive tuple collections, explicit missing values and doubled-quote strings. It has no topology or owner interpretation.
-- Active API, README and recipes now document implemented ownership/root/edit contracts and explicit-copy workflows, correct the Nexus-default and summary-method descriptions, and keep parser/reader migrations distinct from completed behavior.
-- Documented and verified direct length assignment, caller scaling loops and height-to-length conversion: retain stored annotations/rootedness/suffixes without statistical rescaling, and refresh length-derived caches. Raw slot writes require explicit invalidation.
-- Documented and verified annotation attachment on existing reversed edges: objects and values are retained without transformation, while directional/rooted-clade statistics remain the caller's scientific responsibility. Merge/subdivision rules apply separately.
-- Documented and verified complete SPR preservation of rootedness and surviving node/edge attachment, suffix retention only while the old root survives, and fresh merged/split/connecting fields. Qualified its existing root-adjacent connection-length adjustment.
-- Documented and tested graft preservation of recipient rootedness at actual graft entry, independently of donor state, suffix information and connection length, including leaf grafts.
-- Documented and verified explicit graft connection precedence: donor suffix data never contributes implicitly; a deliberately prepared suffix Branchstruct can be transferred through the existing connection argument.
-- Documented consuming graft ownership for donor contents and supplied connecting Branchstructs, with verified explicit-copy usage when callers retain independently usable originals.
-- Documented first-representative reference retention with `store_trees=True`, including the caller's no-edit lifetime through summary transfers and explicit-copy editing workflow. Read-only/cache work remains allowed.
-- Documented consuming `TreeSummary.update()` ownership across branch, clade, root and topology records. Donor scalar counts remain available for progress; independent statistical reuse after transfer is unsupported.
-- Constructors/builders now establish rootedness from their semantics: bipartition/NJ/consensus/MBC outputs are unrooted; clade/random-ancestral/UPGMA/MCC/HIPSTR outputs are rooted. Generic Tree/star/branch-table construction remains unspecified. Height estimation alone does not select a root.
-- Extraction at the source root now independently copies its root suffix; proper subtrees have no suffix and keep the copied former incoming branch separate. Copy/extraction reuse the same suffix retention rules.
-- Tree results from `subtree()` and `prune_subtree()` inherit source rootedness at extraction time. Leaf extraction retains the existing string-plus-basal-branch interface.
-- Successful public `reroot()` establishes rootedness, including a current-root no-op; computational root movement and `match_nodes()` use shared mechanics without selecting an interpretation. Actual root replacement clears the old suffix while node data stays attached.
-- `remove_branch()` now gives reattached branches fresh non-length fields and removes the deleted internal node's metadata, while preserving its existing length redistribution and unrelated data.
-- Branch subdivision now defaults to `copy_attrs="none"`, including automatic graft/reroot subdivisions. Explicit `"lower"` and `"both"` retain independent annotation copies without rescaling statistics; an explicit upper Branchstruct still overrides the upper segment.
-- Serial branch joins now consistently retain only summed structural lengths, including non-root parent removal in `remove_leaf()`. `Branchstruct.merge()` returns fresh non-length defaults; its unused `check_compat` argument has been removed.
-- Computational interval write-back updates only the exact produced non-None height/length keys, preserving unrelated target metadata and copying retained mutable result values. Generic whole-field setters still replace `extra_meta`.
-- Nexus output now reads `Tree.rooted` and uses keyword-only `print_rootedness=True` to include known state; False suppresses it. The removed `rooted` value argument is not a direct keyword rename. TreeSet output supports mixed states.
-- Omitted precision and `precision=None` now emit full stored float precision in all four writers; explicit numeric precision still requests significant digits. Annotation floats retain a decimal point or exponent when reduced precision would look integral. sumt continues to request seven digits explicitly.
-- Unset `Nodestruct.state` and `Branchstruct.length_sd` now default to `None`, distinguishing unlabelled/unestimated data from an actual empty string or estimated zero. Parsimony retains its existing no-state behavior.
-- `Tree.set_branch_attribute()` now invalidates only length-derived caches for structural length writes and retains valid Tree caches for stored metadata updates, avoiding repeated topology recomputation during annotation.
-- Printing is configured at the point of export to simplify the workflow and remove dependence on earlier configuration calls. `Tree.newick()` and `Tree.nexus()` have fixed defaults: lengths and labels enabled, `labelfield="label"`, `precision=None`, and `print_meta=False`. Omitted precision and `None` retain full stored float precision; the other scalar settings retain their explicit-None default behavior. Each output call is independent.
-- With `print_meta=True`, omitted or `None` attribute selections now include all populated annotations, excluding internal accumulators and temporary branch-height caches. Empty sequences suppress that kind of metadata; explicit selections include only the named fields. Use complete interval keys in explicit selections; missing requested keys are skipped.
-- Metadata strings are quoted, booleans use `true`/`false`, and collections use braces with deterministic ordering for sets. Unset None values are omitted; explicit MISSING, empty strings/collections, zero and `False` are retained.
+- Nexus output uses the Tree's rootedness and `print_rootedness=True` to emit known R/U declarations. False suppresses the declaration. Printing does not reroot the tree.
+- Printing options are passed directly to `newick()` or `nexus()`. Omitted precision or `precision=None` retains full stored float precision. Use a numeric precision for significant-digit output.
+- With `print_meta=True`, None selections include populated annotations, empty selections omit them, and explicit selections use complete keys. TreeSet forwards the same controls. Branch/stem annotations require a printed length.
+- Readers, counting and burn-in skipping share nested-comment handling. Raw wrappers retain comments and suffixes. TREE/UTREE declarations and translation tables are handled consistently across blocks.
+- Rooting, construction, pruning, extraction, grafting and SPR now maintain rootedness and root-suffix data according to the documented editing rules.
+- Copies isolate retained mutable annotations. `copyattr=False` also omits node metadata. Extracting at the root copies its suffix, while proper subtrees keep the former incoming branch separate.
+- Merged branches retain summed lengths and fresh non-length fields. Subdivision defaults to `copy_attrs="none"`. Explicit `"lower"` and `"both"` retain independent annotation copies.
+- Grafting and `TreeSummary.update()` transfer donor records. Continue with the recipient afterward. Retained input representatives must remain unchanged while a summary uses them. See the API ownership rules.
+- Length edits retain annotations without rescaling their statistical meaning. Interval write-back replaces only the exact produced keys and preserves unrelated metadata. Low-level length-slot writes require explicit cache invalidation.
+- Unset `Nodestruct.state` and unestimated `Branchstruct.length_sd` now default to None, distinct from an empty state or zero SD.
+- Reduced ordinary parsing and scanning overhead, including faster scanning of comment-free buffers. Metadata-disabled input avoids unnecessary annotation decoding and copying.
+- Shortened the README and moved detailed upgrade examples to recipes. The API reference includes an unreleased migration table.
 
-#### Added
-- Regression coverage for explicit no-copy branch subdivision and root-ID-only renaming, preserving suffix/state/node attachment without treating a rename as root replacement.
-- `Tree.unroot()` deliberately establishes an unrooted interpretation, including two-leaf and unchanged-root cases. Structural collapse clears a displaced rooted interpretation to None; the deprecated `deroot()` alias keeps structural semantics.
-- Programmatic `root_suffix` label/stem output under the existing explicit controls. Selected stem metadata requires an emitted stem length; an absent length never becomes an invented zero. Root-node annotations remain separate.
-- Exact metadata-key resolution and selected owner/key value validation, typed float/MISSING/empty-value output, quoted keys and independently balanced brackets in annotation strings. Emitted branch annotations require emitted structural lengths.
-- `Tree.rooted` and optional `Tree.root_suffix` data fields and copy support, preserving absent versus explicit-zero stem lengths. Constructor/edit transitions follow the contracts above; input interpretation remains part of the parser migration.
-- Shared public `MISSING` annotation marker, preserving identity through copying and multiprocessing serialization. `None` continues to mean unset; required explicit node heights reject either missing state before changing lengths.
-- `TreeSet.newick()` and `TreeSet.nexus()` accept and forward explicit metadata selections and `print_meta`.
-- Regression tests for explicit and automatic printing options, metadata and CI output, independent calls, and TreeSet forwarding.
-- Complete credible-interval computation and Nexus metadata export examples in the README, API reference, and recipes. The README example now specifies `ci_probs` as well as `trackci=True` to actually request intervals.
+#### Removed
+- `PrintSpec`, `configure_basic_printing()`, `configure_sumtree_printing()`, `Tree.set_print_spec()` and `Tree.get_print_spec()`. Pass options to each output call.
+- Reader/factory `strip_comments` and reader/Tree `below_root`. Use keyword-only `parse_meta`, raw reading, root-node metadata and `root_suffix` as appropriate.
+- Public `.ci`, writer `ci_labels` and the `"ci"` output-group shortcut. Store/select complete keys such as `height_95%_CI` in `extra_meta`. Literal `ci` remains ordinary metadata. Metadata/declaration switches are keyword-only.
+- `Nodestruct.nleaves` and its constructor argument. Descendant counts remain in summary records and topology-derived results.
+- The unused `Branchstruct.merge(check_compat=...)` argument.
+
+#### Fixed
+- Malformed completed roots raise `TreeError`, and reusable parsers recover after errors. Duplicate translated taxon names are rejected.
+- Pruning clears the old root suffix when the root is removed, while retaining the remaining Tree's rootedness and node data.
+- Root-frequency selection no longer raises a TypeError when the selected root moves. Minimum-variance and root-frequency selection establish rootedness even when the chosen root is unchanged.
+- Summary outputs have independent branches and mutable annotations. Accumulating bipartitions leaves input branches and their statistics unchanged.
+- Selected invalid `extra_meta` containers raise an informative `TreeError`. Suppressed metadata is not validated.
+- Copies retain nested mutable annotations and nondefault root-suffix fields, including labels selected through a custom field.
+- Leaf SPR retains moved node metadata, including when it was the only annotated node.
+- Grafting retains donor metadata when the recipient initially has none and gives the graftpoint default node data.
+- Renaming leaves or internal nodes moves their metadata to the final identifier, including renaming during grafting.
+- Merging root counts refreshes cached root frequencies and sorted summaries.
+- Branch-length write-back refreshes derived length caches after assigning the root edges. Metadata setters retain valid topology caches.
+
+See the [API migration table](docs/api.md#unreleased-api-migration) and [recipes](docs/recipes.md) for replacement calls and ownership examples.
 
 ---
 
