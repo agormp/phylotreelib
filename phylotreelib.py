@@ -1360,6 +1360,7 @@ class AnnotatedNewickParser(NewickStringParser):
     """Newick state machine extended with complete Nexus comments and typed annotations."""
 
     _declaration = re.compile(r"\[&\s*([rRuU])\s*\]")
+    _leading_comments = re.compile(r"\s*(?:\[[^\[\]]*\]\s*)*")
 
     def __init__(self, transdict=None, label_attr_name="label", label_type=str, *, parse_meta=False):
         super().__init__(transdict, label_attr_name, label_type)
@@ -1391,6 +1392,22 @@ class AnnotatedNewickParser(NewickStringParser):
     def _tokenize(self, treestring):
         if "[" not in treestring and "]" not in treestring:
             return super()._tokenize(treestring)
+        if not self.parse_meta:
+            without_comments = _COMMENT_NONNESTED_RE.sub("", treestring)
+            if "[" not in without_comments and "]" not in without_comments:
+                declaration = self._declaration.search(treestring)
+                if declaration is None or (
+                        self._declaration.search(treestring, declaration.end()) is None
+                        and self._leading_comments.fullmatch(treestring, 0, declaration.start())):
+                    if declaration is not None:
+                        self._comment_offset = declaration.start()
+                        try:
+                            self._handle_comment(declaration[0], "TREE_START")
+                        except TreeError as error:
+                            raise TreeError(f"Tree offset {self._comment_offset}: {error}") from None
+                    # Tokenize the text once after removing complete flat comments.
+                    self._has_comments = False
+                    return super()._tokenize(without_comments)
         self._has_comments = True
         return self._commented_tokens(treestring)
 

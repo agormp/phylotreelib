@@ -6613,8 +6613,9 @@ class Test_AnnotatedNewickParser_parse:
 
 class Test_AnnotatedNewickParser_tokenize:
     @pytest.mark.parametrize('parse_meta', [False, True])
-    def test_ordinary_comments_within_words_do_not_split_tokens(self, parse_meta):
-        tree = pt.Tree.from_string('(A[note; [nested]]B:1[note].5,C:2)Ro[note]ot;', parse_meta=parse_meta)
+    @pytest.mark.parametrize('first_comment', ['[note]', '[note; [nested]]'], ids=['flat', 'nested'])
+    def test_ordinary_comments_within_words_do_not_split_tokens(self, parse_meta, first_comment):
+        tree = pt.Tree.from_string(f'(A{first_comment}B:1[note].5,C:2)Ro[note]ot;', parse_meta=parse_meta)
         assert tree.leaves == {'AB', 'C'}
         assert tree.child_dict[tree.root]['AB'].length == 1.5
         assert tree.root_suffix.label == 'Root'
