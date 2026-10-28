@@ -113,7 +113,7 @@ _INTERVAL_META_KEYS = {
     "branch": re.compile(r"length_[0-9]+(?:\.[0-9]+)?%_(?:CI|HPD)"),
 }
 _AUTO_BRANCH_META_EXCLUDED = frozenset((
-    "mean", "M2", "n", "_mean_correction", "quantiles", "parent_height", "kid_height", "extra_meta",
+    "mean", "M2", "n", "quantiles", "parent_height", "kid_height", "extra_meta",
 ))
 _BARE_META_KEY = re.compile(r"[^\s,={}\[\]'\"]+")
 
@@ -389,7 +389,7 @@ class Branchstruct:
     """Class that emulates a struct. Keeps branch-related info"""
 
     __slots__ = ("length", "label",
-                 "mean", "M2", "n", "_mean_correction",
+                 "mean", "M2", "n",
                  "quantiles", "extra_meta", "length_median", "length_sd",
                  "posterior", "freq", "bipartition_cred", "rootcred",
                  "parent_height", "kid_height")
@@ -399,7 +399,6 @@ class Branchstruct:
         "length": 0.0,
         "label": "",
         "mean": 0.0,
-        "_mean_correction": 0.0,
         "M2": 0.0,
         "n": 0,
         "quantiles": None,
@@ -418,7 +417,6 @@ class Branchstruct:
         self.length = length
         self.label = label
         self.mean = 0.0
-        self._mean_correction = 0.0
         self.M2 = 0.0
         self.n = 0
         self.quantiles = None
@@ -438,7 +436,7 @@ class Branchstruct:
     @classmethod
     def printable_attrs(cls):
         """Attrs eligible to appear as extra columns (excludes 'length' because it's printed as branchlen)."""
-        return tuple(a for a in cls.__slots__ if a != "length" and not a.startswith("_"))
+        return tuple(a for a in cls.__slots__ if a != "length")
 
     @classmethod
     def default_for(cls, attr: str):
@@ -600,7 +598,6 @@ class SummaryNodestruct:
         "height",
         "nleaves",
         "mean",
-        "_mean_correction",
         "M2",
         "n",
         "quantiles",
@@ -619,7 +616,6 @@ class SummaryNodestruct:
         self.height = height
         self.nleaves = nleaves
         self.mean = 0.0
-        self._mean_correction = 0.0
         self.M2 = 0.0
         self.n = 0
         self.quantiles = None
@@ -6585,21 +6581,15 @@ class TreeSummary():
         Online update of mean + M2 (sum of squared deviations).
             x: value whose mean and variance will be computed (e.g. branch length or node height)
 
-        Expects a Branchstruct or SummaryNodestruct accumulator.
+        Assumes struct has attributes: mean, M2, n
         """
 
         # I am interested in being able to compute mean and variance of various
         # node and branch attributes, and to do this "online" in a single pass.
         struct.n += 1
-        delta = (x - struct.mean) - struct._mean_correction
-        increment = struct._mean_correction + delta / struct.n
-        mean = struct.mean + increment
-        part = mean - struct.mean
-        # Keep the rounding remainder when adding the mean increment.
-        correction = (struct.mean - (mean - part)) + (increment - part)
-        struct.M2 += delta * ((x - mean) - correction)
-        struct.mean = mean
-        struct._mean_correction = correction
+        delta = x - struct.mean
+        struct.mean += delta / struct.n
+        struct.M2 += delta * (x - struct.mean)
 
     ###############################################################################################
 
@@ -7033,21 +7023,16 @@ class TreeSummary():
 
     def _merge_online_accumulators(self, a, b):
         """Merges n, mean, M2 for two online accumulators, enabling computation of mean and var
-        Expects Branchstruct or SummaryNodestruct accumulators"""
+        Expects attributes: n, mean, M2"""
         if b.n == 0:
             return
         if a.n == 0:
-            a.mean, a._mean_correction, a.M2, a.n = b.mean, b._mean_correction, b.M2, b.n
+            a.mean, a.M2, a.n = b.mean, b.M2, b.n
             return
-        delta = (b.mean - a.mean) + (b._mean_correction - a._mean_correction)
+        delta = b.mean - a.mean
         ntot = a.n + b.n
-        increment = a._mean_correction + delta * (b.n / ntot)
-        mean = a.mean + increment
-        part = mean - a.mean
-        correction = (a.mean - (mean - part)) + (increment - part)
-        a.M2 += b.M2 + delta * (delta * (a.n * b.n / ntot))
-        a.mean = mean
-        a._mean_correction = correction
+        a.mean = a.mean + delta * (b.n / ntot)
+        a.M2 = a.M2 + b.M2 + delta * (delta * (a.n * b.n / ntot))
         a.n = ntot
 
     ###############################################################################################
@@ -7938,15 +7923,9 @@ class CAHeightEstimator():
     @staticmethod
     def _online_update(s, x: float):
         s.n += 1
-        delta = (x - s.mean) - s._mean_correction
-        increment = s._mean_correction + delta / s.n
-        mean = s.mean + increment
-        part = mean - s.mean
-        # Keep the rounding remainder when adding the mean increment.
-        correction = (s.mean - (mean - part)) + (increment - part)
-        s.M2 += delta * ((x - mean) - correction)
-        s.mean = mean
-        s._mean_correction = correction
+        delta = x - s.mean
+        s.mean += delta / s.n
+        s.M2 += delta * (x - s.mean)
 
     ###############################################################################################
 
@@ -7956,17 +7935,12 @@ class CAHeightEstimator():
         if b.n == 0:
             return
         if a.n == 0:
-            a.mean, a._mean_correction, a.M2, a.n = b.mean, b._mean_correction, b.M2, b.n
+            a.mean, a.M2, a.n = b.mean, b.M2, b.n
             return
-        delta = (b.mean - a.mean) + (b._mean_correction - a._mean_correction)
+        delta = b.mean - a.mean
         ntot = a.n + b.n
-        increment = a._mean_correction + delta * (b.n / ntot)
-        mean = a.mean + increment
-        part = mean - a.mean
-        correction = (a.mean - (mean - part)) + (increment - part)
-        a.M2 += b.M2 + delta * (delta * (a.n * b.n / ntot))
-        a.mean = mean
-        a._mean_correction = correction
+        a.mean = a.mean + delta * (b.n / ntot)
+        a.M2 = a.M2 + b.M2 + delta * (delta * (a.n * b.n / ntot))
         a.n = ntot
 
     ###############################################################################################

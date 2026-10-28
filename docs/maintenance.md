@@ -26,7 +26,7 @@ These items are deferred from the parser work. The [historical parser plan](http
 
 ## Numerical precision
 
-Version 3.0.0 retains the rounding remainder when updating online means. This corrects the near-zero node-height SD discrepancy found between serial and parallel summaries.
+Online mean and SD calculations use floating-point approximations. Serial and parallel SDs can differ near zero. Comparisons allow for rounding at the scale of the underlying heights or branch lengths.
 
 ## Before release
 

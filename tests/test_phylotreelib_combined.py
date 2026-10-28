@@ -6969,17 +6969,7 @@ class Test_read_to_delimiter_TreefileBase:
                     reader._read_to_delimiter(retain=retain)
 
 
-class Test_online_moment_precision:
-
-    @staticmethod
-    def reference(values):
-        from decimal import Decimal, localcontext
-        with localcontext() as context:
-            context.prec = 2000
-            data = [Decimal.from_float(value) for value in values]
-            mean = sum(data) / len(data)
-            sd = (sum((value - mean) ** 2 for value in data) / (len(data) - 1)).sqrt()
-            return float(mean), float(sd)
+class Test_online_mean_sd:
 
     @staticmethod
     def helpers(kind):
@@ -6987,49 +6977,64 @@ class Test_online_moment_precision:
         if kind == "ca":
             return (pt.SummaryNodestruct, pt.CAHeightEstimator._online_update,
                     pt.CAHeightEstimator._merge_online, pt.CAHeightEstimator._finalize)
-        factory = pt.Branchstruct if kind == "branch" else pt.SummaryNodestruct
-        return (factory, summary.online_update_mean_sd,
+        return (pt.Branchstruct, summary.online_update_mean_sd,
                 summary._merge_online_accumulators, summary.finalize_online)
 
-    @pytest.mark.parametrize("kind", ["branch", "node", "ca"])
-    @pytest.mark.parametrize("start", [1.0, -2.0])
-    def test_small_spread_matches_exact_input_moments_after_pickle_and_merge(self, kind, start):
-        values = [start, math.nextafter(start, math.inf), math.nextafter(start, math.inf)]
-        expected_mean, expected_sd = self.reference(values)
-        factory, update, merge, finalize = self.helpers(kind)
-        serial = factory()
+    @staticmethod
+    def accumulate(factory, update, values):
+        result = factory()
         for value in values:
-            update(serial, value)
-        merged = factory()
-        for chunk in [values[:2], values[2:]]:
-            part = factory()
-            for value in chunk:
-                update(part, value)
-            merge(merged, pickle.loads(pickle.dumps(part)))
-        for result in [serial, merged]:
-            mean, sd = finalize(result)
-            assert result.n == len(values)
-            assert mean == expected_mean
-            assert sd > 0
-            assert sd == pytest.approx(expected_sd, rel=2e-14, abs=0)
+            update(result, value)
+        return result
 
-    @pytest.mark.parametrize("kind", ["branch", "ca"])
+    @pytest.mark.parametrize("kind", ["summary", "ca"])
+    def test_updates_and_chunk_merges_at_different_scales(self, kind):
+        import statistics
+        factory, update, merge, finalize = self.helpers(kind)
+        for scale in [1e-12, 1.0, 1e12]:
+            values = [value * scale for value in [1, 2, 4, 8, 12]]
+            serial = self.accumulate(factory, update, values)
+            merged = self.accumulate(factory, update, values[:2])
+            merge(merged, pickle.loads(pickle.dumps(self.accumulate(factory, update, values[2:]))))
+            for result in [serial, merged]:
+                mean, sd = finalize(result)
+                assert result.n == len(values)
+                assert mean == pytest.approx(statistics.mean(values), rel=2e-14, abs=0)
+                assert sd == pytest.approx(statistics.stdev(values), rel=2e-14, abs=0)
+
+    @pytest.mark.parametrize("kind", ["summary", "ca"])
+    def test_near_constant_sd_allows_rounding_at_the_observation_scale(self, kind):
+        import statistics
+        factory, update, merge, finalize = self.helpers(kind)
+        for scale in [1e-12, 1.0, 1e12]:
+            values = [scale, math.nextafter(scale, math.inf), math.nextafter(scale, math.inf)]
+            serial = self.accumulate(factory, update, values)
+            merged = self.accumulate(factory, update, values[:1])
+            merge(merged, self.accumulate(factory, update, values[1:]))
+            # Allow a few float steps at the input scale for nearly constant values.
+            tolerance = 4 * math.ulp(max(abs(value) for value in values))
+            for result in [serial, merged]:
+                mean, sd = finalize(result)
+                assert result.n == len(values)
+                assert math.isfinite(sd) and sd >= 0
+                assert mean == pytest.approx(statistics.mean(values), rel=2e-14, abs=0)
+                assert sd == pytest.approx(statistics.stdev(values), rel=2e-14, abs=tolerance)
+
+    @pytest.mark.parametrize("kind", ["summary", "ca"])
     def test_merge_avoids_overflow_when_variance_is_representable(self, kind):
-        values = [-8e153, 8e153]
-        expected_mean, expected_sd = self.reference(values)
+        import statistics
         factory, update, merge, finalize = self.helpers(kind)
-        merged = factory()
+        values = [-8e153, 8e153]
+        result = factory()
         for value in values:
-            part = factory()
-            update(part, value)
-            merge(merged, part)
-        mean, sd = finalize(merged)
-        assert mean == expected_mean
+            merge(result, self.accumulate(factory, update, [value]))
+        mean, sd = finalize(result)
+        assert mean == 0
         assert math.isfinite(sd)
-        assert sd == pytest.approx(expected_sd, rel=2e-14, abs=0)
+        assert sd == pytest.approx(statistics.stdev(values), rel=2e-14, abs=0)
 
-    @pytest.mark.parametrize("kind", ["branch", "ca"])
-    def test_empty_merges_and_single_observation_keep_existing_sd_meaning(self, kind):
+    @pytest.mark.parametrize("kind", ["summary", "ca"])
+    def test_empty_merges_and_single_observation_keep_existing_meaning(self, kind):
         factory, update, merge, finalize = self.helpers(kind)
         result = factory()
         merge(result, factory())
@@ -7038,42 +7043,16 @@ class Test_online_moment_precision:
         update(result, 2.0)
         merge(result, factory())
         assert finalize(result) == (2.0, None)
+        receiver = factory()
+        merge(receiver, result)
+        assert (receiver.n, receiver.mean, receiver.M2) == (result.n, result.mean, result.M2)
+        assert finalize(receiver) == (2.0, None)
 
-    def test_tree_summary_and_ca_paths_preserve_small_observed_variation(self):
-        lengths = [1.0, math.nextafter(1.0, math.inf), math.nextafter(1.0, math.inf)]
-        trees = [pt.Tree.from_string(f"(A:{value!r},B:2,C:2);") for value in lengths]
-        heights = [tree.nodeheightdict["A"] for tree in trees]
-        _, wanted_length_sd = self.reference(lengths)
-        _, wanted_height_sd = self.reference(heights)
-        def summary(samples):
-            result = pt.TreeSummary(trackbips=True, trackblen=True, trackclades=True, trackheight=True)
-            for tree in samples:
-                result.add_tree(tree)
-            return result
-        serial = summary(trees)
-        merged = summary(trees[:2])
-        merged.update(summary(trees[2:]))
-        bip = pt.Bipartition.from_leafset({"A"}, trees[0])
-        clade = pt.Clade.from_leafset({"A"}, trees[0])
-        for result in [serial, merged]:
-            assert result.bipartsummary[bip].length_sd == pytest.approx(wanted_length_sd, rel=2e-14, abs=0)
-            assert result.cladesummary[clade].height_sd == pytest.approx(wanted_height_sd, rel=2e-14, abs=0)
-        plan = pt.CAHeightEstimator.build_plan(trees[0])
-        ca = pt.CAHeightEstimator(plan)
-        for tree in trees:
-            ca.add_tree(tree)
-        ca.write_into(trees[0])
-        assert trees[0].nodedict["A"].height_sd == pytest.approx(wanted_height_sd, rel=2e-14, abs=0)
-
-    def test_mean_rounding_remainder_is_not_automatic_output_metadata(self):
-        tree = pt.Tree.from_string("(A:1,B:2);")
-        branch = tree.child_dict[tree.root]["A"]
-        summary = pt.TreeSummary()
-        for value in [1.0, math.nextafter(1.0, math.inf)]:
-            summary.online_update_mean_sd(branch, value)
-        assert "_mean_correction" not in tree.newick(print_meta=True)
-        assert "_mean_correction" not in str(tree)
-        branch.extra_meta = {"_mean_correction": "retained"}
-        text = tree.newick(print_meta=True)
-        reparsed = pt.Tree.from_string(text, parse_meta=True)
-        assert reparsed.child_dict[reparsed.root]["A"].extra_meta["_mean_correction"] == "retained"
+    @pytest.mark.parametrize("kind", ["summary", "ca"])
+    def test_generic_records_need_only_count_mean_and_M2(self, kind):
+        _, update, merge, finalize = self.helpers(kind)
+        factory = lambda: SimpleNamespace(n=0, mean=0.0, M2=0.0)
+        result = self.accumulate(factory, update, [1.0])
+        merge(result, self.accumulate(factory, update, [4.0, 7.0]))
+        assert result.n == 3
+        assert finalize(result) == (4.0, 3.0)

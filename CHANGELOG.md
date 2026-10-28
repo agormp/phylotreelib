@@ -40,7 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 #### Fixed
 - Source distributions include the public documentation and the fixtures needed to run the tests. README documentation links also work on PyPI.
-- Online means and standard deviations retain small differences between nearly equal observations, including when parallel summaries are merged.
+- Online summary merges handle empty accumulators and avoid unnecessary intermediate overflow.
 - All-compatible consensus now considers the highest-frequency below-cutoff bipartition instead of skipping it.
 - Malformed completed roots raise `TreeError`, and reusable parsers recover after errors. Duplicate translated taxon names are rejected.
 - Pruning clears the old root suffix when the root is removed, while retaining the remaining Tree's rootedness and node data.
