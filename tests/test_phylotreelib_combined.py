@@ -6967,3 +6967,113 @@ class Test_read_to_delimiter_TreefileBase:
             else:
                 with pytest.raises(pt.TreeError, match=error):
                     reader._read_to_delimiter(retain=retain)
+
+
+class Test_online_moment_precision:
+
+    @staticmethod
+    def reference(values):
+        from decimal import Decimal, localcontext
+        with localcontext() as context:
+            context.prec = 2000
+            data = [Decimal.from_float(value) for value in values]
+            mean = sum(data) / len(data)
+            sd = (sum((value - mean) ** 2 for value in data) / (len(data) - 1)).sqrt()
+            return float(mean), float(sd)
+
+    @staticmethod
+    def helpers(kind):
+        summary = pt.TreeSummary()
+        if kind == "ca":
+            return (pt.SummaryNodestruct, pt.CAHeightEstimator._online_update,
+                    pt.CAHeightEstimator._merge_online, pt.CAHeightEstimator._finalize)
+        factory = pt.Branchstruct if kind == "branch" else pt.SummaryNodestruct
+        return (factory, summary.online_update_mean_sd,
+                summary._merge_online_accumulators, summary.finalize_online)
+
+    @pytest.mark.parametrize("kind", ["branch", "node", "ca"])
+    @pytest.mark.parametrize("start", [1.0, -2.0])
+    def test_small_spread_matches_exact_input_moments_after_pickle_and_merge(self, kind, start):
+        values = [start, math.nextafter(start, math.inf), math.nextafter(start, math.inf)]
+        expected_mean, expected_sd = self.reference(values)
+        factory, update, merge, finalize = self.helpers(kind)
+        serial = factory()
+        for value in values:
+            update(serial, value)
+        merged = factory()
+        for chunk in [values[:2], values[2:]]:
+            part = factory()
+            for value in chunk:
+                update(part, value)
+            merge(merged, pickle.loads(pickle.dumps(part)))
+        for result in [serial, merged]:
+            mean, sd = finalize(result)
+            assert result.n == len(values)
+            assert mean == expected_mean
+            assert sd > 0
+            assert sd == pytest.approx(expected_sd, rel=2e-14, abs=0)
+
+    @pytest.mark.parametrize("kind", ["branch", "ca"])
+    def test_merge_avoids_overflow_when_variance_is_representable(self, kind):
+        values = [-8e153, 8e153]
+        expected_mean, expected_sd = self.reference(values)
+        factory, update, merge, finalize = self.helpers(kind)
+        merged = factory()
+        for value in values:
+            part = factory()
+            update(part, value)
+            merge(merged, part)
+        mean, sd = finalize(merged)
+        assert mean == expected_mean
+        assert math.isfinite(sd)
+        assert sd == pytest.approx(expected_sd, rel=2e-14, abs=0)
+
+    @pytest.mark.parametrize("kind", ["branch", "ca"])
+    def test_empty_merges_and_single_observation_keep_existing_sd_meaning(self, kind):
+        factory, update, merge, finalize = self.helpers(kind)
+        result = factory()
+        merge(result, factory())
+        with pytest.raises(pt.TreeError):
+            finalize(result)
+        update(result, 2.0)
+        merge(result, factory())
+        assert finalize(result) == (2.0, None)
+
+    def test_tree_summary_and_ca_paths_preserve_small_observed_variation(self):
+        lengths = [1.0, math.nextafter(1.0, math.inf), math.nextafter(1.0, math.inf)]
+        trees = [pt.Tree.from_string(f"(A:{value!r},B:2,C:2);") for value in lengths]
+        heights = [tree.nodeheightdict["A"] for tree in trees]
+        _, wanted_length_sd = self.reference(lengths)
+        _, wanted_height_sd = self.reference(heights)
+        def summary(samples):
+            result = pt.TreeSummary(trackbips=True, trackblen=True, trackclades=True, trackheight=True)
+            for tree in samples:
+                result.add_tree(tree)
+            return result
+        serial = summary(trees)
+        merged = summary(trees[:2])
+        merged.update(summary(trees[2:]))
+        bip = pt.Bipartition.from_leafset({"A"}, trees[0])
+        clade = pt.Clade.from_leafset({"A"}, trees[0])
+        for result in [serial, merged]:
+            assert result.bipartsummary[bip].length_sd == pytest.approx(wanted_length_sd, rel=2e-14, abs=0)
+            assert result.cladesummary[clade].height_sd == pytest.approx(wanted_height_sd, rel=2e-14, abs=0)
+        plan = pt.CAHeightEstimator.build_plan(trees[0])
+        ca = pt.CAHeightEstimator(plan)
+        for tree in trees:
+            ca.add_tree(tree)
+        ca.write_into(trees[0])
+        assert trees[0].nodedict["A"].height_sd == pytest.approx(wanted_height_sd, rel=2e-14, abs=0)
+
+    def test_mean_rounding_remainder_is_not_automatic_output_metadata(self):
+        tree = pt.Tree.from_string("(A:1,B:2);")
+        branch = tree.child_dict[tree.root]["A"]
+        summary = pt.TreeSummary()
+        for value in [1.0, math.nextafter(1.0, math.inf)]:
+            summary.online_update_mean_sd(branch, value)
+        assert "_mean_correction" not in tree.newick(print_meta=True)
+        assert "_mean_correction" not in str(tree)
+        branch.extra_meta = {"_mean_correction": "retained"}
+        text = tree.newick(print_meta=True)
+        reparsed = pt.Tree.from_string(text, parse_meta=True)
+        assert reparsed.child_dict[reparsed.root]["A"].extra_meta["_mean_correction"] == "retained"

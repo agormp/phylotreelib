@@ -24,9 +24,9 @@ These items are deferred from the parser work. The original [parser plan](plans/
 - TreeAnnotator fixture provenance, reruns and possible upstream reports remain separate investigations. Existing parser fixtures do not establish the scientific correctness of producer statistics.
 - The separate `--date` feature remains future work.
 
-## Numerical reproducibility
+## Numerical precision
 
-- Serial and parallel summaries have differed by about `4.1e-16` in node-height SDs around `2.47e-13`, including in the pre-parser code. Some repeated parallel runs also differ in their final printed digits. Investigate stable accumulation and merge order with the existing comparison rule unchanged.
+Version 3.0.0 retains the rounding remainder when updating online means. This corrects the near-zero node-height SD discrepancy found between serial and parallel summaries.
 
 ## Before release
 

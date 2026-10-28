@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The unused `Branchstruct.merge(check_compat=...)` argument.
 
 #### Fixed
+- Online means and standard deviations retain small differences between nearly equal observations, including when parallel summaries are merged.
 - All-compatible consensus now considers the highest-frequency below-cutoff bipartition instead of skipping it.
 - Malformed completed roots raise `TreeError`, and reusable parsers recover after errors. Duplicate translated taxon names are rejected.
 - Pruning clears the old root suffix when the root is removed, while retaining the remaining Tree's rootedness and node data.
