@@ -150,3 +150,5 @@ See the [summary-tree recipes](docs/recipes.md#9-consensus-trees-and-other-tree-
 The unreleased API removes stored printing settings, reader `strip_comments`, `below_root` and public `.ci` storage. Printing and interval selection are now explicit. Read the [migration table](docs/api.md#unreleased-api-migration) before updating callers.
 
 The [older upgrade recipes](docs/recipes.md#13-upgrading-existing-1x-scripts) cover the 1.x-to-2.x height renames, grafting/SPR arguments and subtree return values.
+
+Known development work is recorded in the [maintenance notes](docs/maintenance.md).

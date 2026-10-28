@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Tree.unroot()` explicitly declares a tree unrooted. `collapse_bifurcating_root()` remains a structural operation, with `deroot()` as its deprecated alias.
 
 #### Changed
+- Consolidated duplicate tests and corrected an invalid quantile-error expectation.
 - Nexus output uses the Tree's rootedness and `print_rootedness=True` to emit known R/U declarations. False suppresses the declaration. Printing does not reroot the tree.
 - Printing options are passed directly to `newick()` or `nexus()`. Omitted precision or `precision=None` retains full stored float precision. Use a numeric precision for significant-digit output.
 - With `print_meta=True`, None selections include populated annotations, empty selections omit them, and explicit selections use complete keys. TreeSet forwards the same controls. Branch/stem annotations require a printed length.

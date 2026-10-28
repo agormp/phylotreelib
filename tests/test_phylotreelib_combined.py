@@ -3702,12 +3702,12 @@ class Test_precision_quantiles_vs_exact_order_statistic:
         relative error <= 2^(-(k+1)) with respect to any value in that bucket.
         In particular, the returned value should be within this distance from the target order statistic x_(j).
         """
-        rng = random.Random()
+        rng = random.Random(0)
         data = [rng.lognormvariate(0.0, 1.0) for _ in range(4000)]
         data_sorted = sorted(data)
         probs = [0.0, 0.01, 0.05, 0.1, 0.5, 0.9, 0.95, 0.99, 1.0]
 
-        for k in [4, 7, 10, 12]:
+        for k in [4, 7, 10, 12, 14]:
             qa = pt.QuantileAccumulator(k=k)
             for x in data:
                 qa.add(x)
@@ -3727,33 +3727,6 @@ class Test_precision_quantiles_vs_exact_order_statistic:
                     f"k={k}, p={p}, j={j}, xj={xj}, q_approx={q_approx}, "
                     f"band=[{lo},{hi}]"
                 )
-
-    def test_error_bound_monotone_in_k_against_target_order_statistic(self):
-        """
-        Stronger + stable than comparing to numpy: compare to the target order statistic x_(j)
-        under your definition. The worst-case bound shrinks as k increases.
-        Observed relative error should typically not increase when k increases.
-        """
-        rng = random.Random()
-        data = [rng.lognormvariate(0.0, 1.0) for _ in range(8000)]
-        data_sorted = sorted(data)
-        p = 0.99
-        j = self.ceil_rank(p, len(data_sorted))
-        xj = data_sorted[j - 1]
-
-        def relerr_for_k(k):
-            qa = pt.QuantileAccumulator(k=k)
-            for x in data:
-                qa.add(x)
-            q_approx = qa.quantile(p)
-            return abs(q_approx - xj) / xj
-
-        err_k4  = relerr_for_k(4)
-        err_k10 = relerr_for_k(10)
-        err_k14 = relerr_for_k(14)
-
-        assert err_k10 <= err_k4 + 1e-15
-        assert err_k14 <= err_k10 + 1e-15
 
 
 ###################################################################################################
@@ -4923,8 +4896,7 @@ def _copy_foundation_payload():
 
 class Test_pickle_MISSING:
 
-    def test_identity_survives_direct_and_struct_pickle_roundtrips(self):
-        assert pickle.loads(pickle.dumps(pt.MISSING)) is pt.MISSING
+    def test_identity_survives_nested_struct_pickle_roundtrip(self):
         node = pt.Nodestruct()
         node.extra_meta = {"missing": pt.MISSING, "nested": (pt.MISSING,)}
 
@@ -4940,9 +4912,6 @@ class Test_init_Tree:
         tree = pt.Tree()
         assert tree.rooted is None
         assert tree.root_suffix is None
-
-    def test_generic_empty_construction_is_unspecified(self):
-        assert pt.Tree().rooted is None
 
 
 class Test_copy_Nodestruct:
@@ -5352,14 +5321,6 @@ class Test_annotate_sumtree_TreePostProcessor:
         assert all(owner.extra_meta is None for owner in fresh.nodedict.values())
         assert all(owner.extra_meta is None for children in fresh.child_dict.values()
                    for owner in children.values())
-
-    def test_explicit_whole_field_setters_still_replace_the_mapping(self):
-        tree = pt.Tree.from_string("(A:1,B:2);")
-        tree.set_node_attribute("A", "extra_meta", {"old": 1})
-        replacement = {"new": 2}
-        tree.set_node_attribute("A", "extra_meta", replacement)
-        assert tree.nodedict["A"].extra_meta is replacement
-        assert "old" not in replacement
 
     def test_existing_tree_is_detached_before_summary_branch_writeback(self):
         summary = _ownership_output_summary()
@@ -6520,7 +6481,7 @@ class Test_MetacommentParser_parse:
     @pytest.mark.parametrize('text', [
         '[&x={1 2}]', '[&x=1 y=2]', '[&x={,1}]', '[&,x=1]',
         '[&x={1,,2}]', '[&x=1,,y=2]', '[&x={1,}]', '[&x=1,y=2,]',
-        '[&x={{1,}}]', '[&x=]', '[&x={1,}]', '[&x={1,',
+        '[&x={{1,}}]', '[&x=]', '[&x={1,',
         '[&x=1,,]', '[&x={1],y=2]',
     ])
     def test_strict_value_and_separator_positions(self, text):
