@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+---
+
+## [3.0.1] - 2026 October 29
+
 #### Fixed
 - Length-only edits no longer discard cached edge-count distances.
 - Querying internal nodes no longer prevents pickling or deep-copying a Tree.

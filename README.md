@@ -18,7 +18,7 @@ Main capabilities include:
 
 ## Installation
 
-This README describes phylotreelib 3.0.0, which requires Python 3.10 or newer.
+This README describes phylotreelib 3.0.1, which requires Python 3.10 or newer.
 
 ```bash
 python3 -m pip install phylotreelib
