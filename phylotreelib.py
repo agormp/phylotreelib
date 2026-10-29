@@ -1640,14 +1640,10 @@ class Tree:
         self._remotechildren_dict = None
         self._remotechildren_indices_dict = None
         self._remotechildren_mask_dict = None
-        self._frozenset_leaves = None
-        self._leaf2index = None
         self.dist_dict = None
         self._nodedist_cache = None
         self._pathdist_dict = None
         self._pathdist_dict_unroot = None
-        self._pathdist_as_ndarray = None
-        self._pathdist_as_ndarray_unroot = None
         self.path_dict = None
         self._sorted_intnodes_deep = None
         self._sorted_intnodes_shallow = None
@@ -1660,17 +1656,20 @@ class Tree:
     ###############################################################################################
 
     def clear_caches(self, preserve=[]):
-        """Clears set of computed attributes. Use when tree structure is changed, and these
-        are no longer reliable. Does not clear attributes listed in preserve"""
+        """Clear computed attributes after a change in tree structure.
+
+        Names in preserve apply to structural caches. Length caches are always cleared.
+        """
 
         # structure/topology derived
         for attr in {
             "_parent_dict", "_remotechildren_dict", "_remotechildren_indices_dict",
             "_remotechildren_mask_dict",
-            "_cached_attributes", "_leaf2index",
+            "_cached_attributes",
             "path_dict", "_nodes",
             "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
             "_topology_bipart", "_topology_clade",
+            "_pathdist_dict", "_pathdist_dict_unroot",
         } - set(preserve):
             setattr(self, attr, None)
 
@@ -1683,8 +1682,7 @@ class Tree:
         """Clear only length-related caches - leave topology related caches alone"""
 
         for attr in {
-            "dist_dict", "_nodedist_cache", "_rootdist", "_nodeheightdict", "_pathdist_dict",
-            "_pathdist_dict_unroot", "_pathdist_as_ndarray", "_pathdist_as_ndarray_unroot",
+            "dist_dict", "_nodedist_cache", "_rootdist", "_nodeheightdict",
         }:
             setattr(self, attr, None)
 
@@ -2593,22 +2591,15 @@ class Tree:
     ###############################################################################################
 
     def pathdist_as_ndarray(self, rooted=False):
-        """Return flattened version of pathdist_dict (in alphabetical leaf-pair order)"""
+        """Return a fresh edge-count array in alphabetical leaf-pair order."""
 
-        if rooted:
-            dictarray = self._pathdist_as_ndarray
-        else:
-            dictarray = self._pathdist_as_ndarray_unroot
-        if dictarray is None:
-            distdict = self.pathdist_dict(rooted)
-            leafnames = self.sorted_leaf_tup
-            namepairs = itertools.combinations(leafnames, 2)
-            nleaves = len(leafnames)
-            npairs = nleaves * (nleaves - 1) // 2
-            distiter = (distdict[n1][n2] for n1, n2 in namepairs)
-            dictarray = np.fromiter(distiter, dtype=float, count=npairs)
-
-        return dictarray
+        distdict = self.pathdist_dict(rooted)
+        leafnames = self.sorted_leaf_tup
+        namepairs = itertools.combinations(leafnames, 2)
+        nleaves = len(leafnames)
+        npairs = nleaves * (nleaves - 1) // 2
+        distiter = (distdict[n1][n2] for n1, n2 in namepairs)
+        return np.fromiter(distiter, dtype=float, count=npairs)
 
     ###############################################################################################
 

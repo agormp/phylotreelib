@@ -208,6 +208,8 @@ Successful `spr()` preserves rootedness through its pruning/graft components. It
 
 `nodedist()` keeps computed distances on each Tree. Discarding a Tree releases its distance cache. Length or structural edits clear that Tree's distances, and `clear_length_caches()` does the same after raw length writes. Clearing one Tree does not clear another Tree's distances. Use `clear_length_caches()` in place of `nodedist.cache_clear()`. The method no longer provides the `functools` attributes `cache_info()` and `cache_parameters()`.
 
+`pathdist_dict()` caches edge counts. Branch-length changes retain them, while structural changes and renaming clear them. `pathdist_as_ndarray()` returns a fresh writable array, so changing it does not affect later results. `clear_caches(preserve=...)` preserves listed structural caches and always clears length caches.
+
 ---
 
 ### 4. Building summary trees

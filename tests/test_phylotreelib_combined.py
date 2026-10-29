@@ -7214,3 +7214,65 @@ class Test_Tree_intnodes:
         assert node in nodes
         assert list(nodes) == list(tree.child_dict)
         assert nodes | tree.leaves == tree.nodes
+
+
+class Test_Tree_pathdist_dict:
+
+    @pytest.mark.parametrize("rooted", [False, True])
+    def test_length_changes_retain_edge_counts(self, rooted):
+        tree = pt.Tree.from_string("((A:1,B:1):2,(C:1,D:1):3);")
+        distances = tree.pathdist_dict(rooted)
+        expected = 4 if rooted else 3
+        assert distances["A"]["C"] == expected
+
+        tree.setlength(tree.parent("A"), "A", 10)
+        assert tree.pathdist_dict(rooted) is distances
+        assert distances["A"]["C"] == expected
+        assert tree.nodedist("A", "C") == 16
+
+        tree.child_dict[tree.parent("B")]["B"].length = 4
+        tree.clear_length_caches()
+        assert tree.pathdist_dict(rooted) is distances
+        assert distances["B"]["D"] == expected
+        assert tree.nodedist("B", "D") == 10
+
+    @pytest.mark.parametrize("rooted", [False, True])
+    @pytest.mark.parametrize("edit", ["rename", "subdivide", "reroot"])
+    def test_structure_and_name_changes_refresh_edge_counts(self, rooted, edit):
+        tree = pt.Tree.from_string("((A:1,B:1):2,(C:1,D:1):3);")
+        before = tree.pathdist_dict(rooted)
+
+        if edit == "rename":
+            tree.rename_leaf("A", "Z")
+            after = tree.pathdist_dict(rooted)
+            assert "A" not in after and "Z" in after
+            assert after["Z"]["C"] == (4 if rooted else 3)
+            assert tree.nodedist("Z", "C") == 7
+        elif edit == "subdivide":
+            tree.add_node_on_branch(tree.parent("A"), "A", frac_from_parent=0.5)
+            after = tree.pathdist_dict(rooted)
+            assert after["A"]["B"] == 3
+            assert tree.nodedist("A", "B") == 2
+        else:
+            tree.reroot(tree.parent("A"), "A", frac_from_node1=0.5)
+            after = tree.pathdist_dict(rooted)
+            assert after["A"]["B"] == (3 if rooted else 2)
+            assert after["A"]["C"] == (5 if rooted else 4)
+            assert tree.nodedist("A", "C") == 7
+        assert after is not before
+
+
+class Test_Tree_pathdist_as_ndarray:
+
+    @pytest.mark.parametrize("rooted", [False, True])
+    def test_returned_arrays_are_independent(self, rooted):
+        tree = pt.Tree.from_string("((A:1,B:1):2,(C:1,D:1):3);")
+        expected = [2, 4, 4, 4, 4, 2] if rooted else [2, 3, 3, 3, 3, 2]
+        distances = tree.pathdist_as_ndarray(rooted)
+        assert distances.tolist() == expected
+        assert distances.flags.writeable
+        distances[0] = -999
+        assert tree.pathdist_as_ndarray(rooted).tolist() == expected
+
+        other = pt.Tree.from_string("((A:1,C:1):2,(B:1,D:1):3);")
+        assert tree.treedist_pathdiff(other, rooted) == (4 if rooted else 2)
