@@ -150,5 +150,3 @@ See the [summary-tree recipes](https://github.com/agormp/phylotreelib/blob/main/
 Version 3.0 removes stored printing settings, reader `strip_comments`, `below_root` and public `.ci` storage. Printing and interval selection are now explicit. Read the [migration table](https://github.com/agormp/phylotreelib/blob/main/docs/api.md#upgrading-to-30) before updating callers.
 
 The [older upgrade recipes](https://github.com/agormp/phylotreelib/blob/main/docs/recipes.md#13-upgrading-existing-1x-scripts) cover the 1.x-to-2.x height renames, grafting/SPR arguments and subtree return values.
-
-Known development work is recorded in the [maintenance notes](https://github.com/agormp/phylotreelib/blob/main/docs/maintenance.md).
