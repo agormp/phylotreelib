@@ -3,7 +3,6 @@
 # Section for Bioinformatics, DTU Health Technology, Technical University of Denmark
 # agpe@dtu.dk
 import copy
-import functools
 import itertools
 import math
 import random
@@ -1645,6 +1644,7 @@ class Tree:
         self._frozenset_leaves = None
         self._leaf2index = None
         self.dist_dict = None
+        self._nodedist_cache = None
         self._pathdist_dict = None
         self._pathdist_dict_unroot = None
         self._pathdist_as_ndarray = None
@@ -1684,11 +1684,10 @@ class Tree:
         """Clear only length-related caches - leave topology related caches alone"""
 
         for attr in {
-            "dist_dict", "_rootdist", "_nodeheightdict", "_pathdist_dict",
+            "dist_dict", "_nodedist_cache", "_rootdist", "_nodeheightdict", "_pathdist_dict",
             "_pathdist_dict_unroot", "_pathdist_as_ndarray", "_pathdist_as_ndarray_unroot",
         }:
             setattr(self, attr, None)
-        self.nodedist.cache_clear()
 
     ###############################################################################################
 
@@ -3311,14 +3310,24 @@ class Tree:
 
     ###############################################################################################
 
-    @functools.lru_cache(maxsize=None)
     def nodedist(self,node1,node2=None):
-        """Returns distance between node1 and node2 along tree (patristic distance)"""
+        """Returns distance between node1 and node2 along tree (patristic distance).
+        Computed distances are cached on this Tree until its lengths or structure change."""
 
-        # Python note: make recursive to gain advantage of keeping intermediate nodedists in cache?
+        try:
+            cache = self._nodedist_cache
+        except AttributeError:
+            cache = None
+        if cache is None:
+            cache = self._nodedist_cache = {}
+        key = (node1, node2)
+        distance = cache.get(key)
+        if distance is not None:
+            return distance
 
         # Special case when node1 == node2:
         if node1 == node2:
+            cache[key] = 0.0
             return 0.0
 
         # Node2 defaults to root if not given
@@ -3348,7 +3357,9 @@ class Tree:
             child2 = parent2
 
         # Compute combined distance
-        return cumdist2 + node1_ancdist[child2]
+        distance = cumdist2 + node1_ancdist[child2]
+        cache[key] = distance
+        return distance
 
     ###############################################################################################
 

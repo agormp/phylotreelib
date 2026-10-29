@@ -1,10 +1,12 @@
 import copy
 import csv
+import gc
 import itertools
 import math
 import pickle
 import random
 import textwrap
+import weakref
 from dataclasses import dataclass
 from string import ascii_lowercase, digits
 from types import SimpleNamespace
@@ -275,6 +277,79 @@ class TestRelationShipMethods:
         treestring = self.treedata["simplestring"]
         mytree = pt.Tree.from_string(treestring)
         assert {"s1", "s2", "s3"} == mytree.remote_children(1)
+
+
+class TestNodedistCache:
+    def test_queried_tree_can_be_collected(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        assert tree.nodedist("A", "C") == 8.0
+        reference = weakref.ref(tree)
+        del tree
+        gc.collect()
+        assert reference() is None
+
+    def test_clearing_another_tree_keeps_cached_distances(self, monkeypatch):
+        original_parent_dict = pt.Tree.parent_dict.fget
+        lookups = {}
+
+        def parent_dict(tree):
+            identity = id(tree)
+            lookups[identity] = lookups.get(identity, 0) + 1
+            return original_parent_dict(tree)
+
+        monkeypatch.setattr(pt.Tree, "parent_dict", property(parent_dict))
+        first = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        second = pt.Tree.from_string("((A:5,B:6):7,C:8);")
+        assert first.nodedist("A", "C") == 8.0
+        assert second.nodedist("A", "C") == 20.0
+        first_lookups = lookups[id(first)]
+        second.setlength(second.parent("A"), "A", 9.0)
+        assert second.nodedist("A", "C") == 24.0
+        assert first.nodedist("A", "C") == 8.0
+        assert lookups[id(first)] == first_lookups
+
+    def test_length_edit_discards_old_distances(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        assert tree.nodedist("A", "C") == 8.0
+        tree.setlength(tree.parent("A"), "A", 5.0)
+        assert tree.nodedist("A", "C") == 12.0
+
+    def test_structural_edit_discards_old_distances(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        assert tree.nodedist("A", "B") == 3.0
+        internal = tree.parent("A")
+        tree.remove_branch(tree.root, internal)
+        assert tree.nodedist("A", "B") == 6.0
+
+    def test_raw_length_write_requires_explicit_invalidation(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        assert tree.nodedist("A", "C") == 8.0
+        tree.child_dict[tree.parent("A")]["A"].length = 5.0
+        assert tree.nodedist("A", "C") == 8.0
+        tree.clear_length_caches()
+        assert tree.nodedist("A", "C") == 12.0
+
+    def test_copy_does_not_keep_computed_distances(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        assert tree.nodedist("A", "C") == 8.0
+        copied = tree.copy_treeobject(copylengths=False)
+        assert copied.nodedist("A", "C") == 0.0
+        copied.setlength(copied.parent("A"), "A", 5.0)
+        assert copied.nodedist("A", "C") == 5.0
+        assert tree.nodedist("A", "C") == 8.0
+
+    def test_same_node_root_default_and_reverse_order(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        assert tree.nodedist("A") == tree.nodedist("A", None) == 4.0
+        assert tree.nodedist("A", tree.root) == 4.0
+        assert tree.nodedist("A", "A") == tree.nodedist(tree.root) == 0.0
+        assert tree.nodedist("A", "C") == tree.nodedist("C", "A") == 8.0
+
+    def test_old_pickled_state_without_distance_cache(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        tree.__dict__.pop("_nodedist_cache", None)
+        restored = pickle.loads(pickle.dumps(tree))
+        assert restored.nodedist("A", "C") == 8.0
 
 
 class TestPathMethods:

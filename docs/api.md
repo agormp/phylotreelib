@@ -204,6 +204,8 @@ Successful `spr()` preserves rootedness through its pruning/graft components. It
 
 `setlength()` and native structural `set_branch_attribute(..., "length", value)` retain node/branch annotations and clear length-derived caches. Caller scaling loops have the same contract; statistical annotations are neither scaled nor recomputed automatically. `set_blens_from_heights()` reads explicitly stored node heights and writes represented lengths only. Rootedness, node IDs and the external root suffix remain unchanged. An extra annotation named `length` is separate data, not a structural write. Raw `.length` assignments require `clear_length_caches()` before derived queries; no watched fields or automatic annotation conversion is added.
 
+`nodedist()` keeps computed distances on each Tree. Discarding a Tree releases its distance cache. Length or structural edits clear that Tree's distances, and `clear_length_caches()` does the same after raw length writes. Clearing one Tree does not clear another Tree's distances. Use `clear_length_caches()` in place of `nodedist.cache_clear()`. The method no longer provides the `functools` attributes `cache_info()` and `cache_parameters()`.
+
 ---
 
 ### 4. Building summary trees
