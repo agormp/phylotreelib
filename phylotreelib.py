@@ -1635,7 +1635,6 @@ class Tree:
         self.rooted = None
         self.root_suffix = None
         self.leaves = set()
-        self._intnodes = None
         self._nodes = None
         self._parent_dict = None
         self._remotechildren_dict = None
@@ -1669,7 +1668,7 @@ class Tree:
             "_parent_dict", "_remotechildren_dict", "_remotechildren_indices_dict",
             "_remotechildren_mask_dict",
             "_cached_attributes", "_leaf2index",
-            "path_dict", "_intnodes", "_nodes",
+            "path_dict", "_nodes",
             "_sorted_intnodes_deep", "_sorted_intnodes_shallow",
             "_topology_bipart", "_topology_clade",
         } - set(preserve):
@@ -2321,10 +2320,8 @@ class Tree:
 
     @property
     def intnodes(self):
-        """Lazy evaluation of intnodes"""
-        if self._intnodes is None:
-            self._intnodes = self.child_dict.keys()
-        return self._intnodes
+        """Return a live view of internal node IDs."""
+        return self.child_dict.keys()
 
     ###############################################################################################
 

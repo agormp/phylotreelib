@@ -150,6 +150,8 @@ For an unchanged supported Tree, selected output and metadata-enabled reimport p
 
 ### 3. Tree construction and editing
 
+`Tree.intnodes` returns a live view of internal node IDs in dictionary order. The view is not stored in the Tree.
+
 #### Constructor interpretation
 
 Generic `Tree()`, `from_leaves()` and `from_branchinfo()` leave rootedness None. `from_biplist()`, `from_topology()` and neighbor joining establish False. `from_cladedict()`, UPGMA and ancestral random Yule/coalescent generation establish True, including rate-varying random lengths. Consensus/all-compatible consensus/MBC inherit the unrooted construction; MCC/HIPSTR/mrHIPSTR inherit the oriented clade construction. Deliberate subsequent rooting establishes True. Estimating heights, lengths or support preserves interpretation rather than inferring one, and retained representative Trees keep their original state. Undeclared Newick/TREE input remains unspecified; UTREE or a supported declaration supplies interpretation.

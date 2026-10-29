@@ -7169,3 +7169,48 @@ class Test_online_mean_sd:
         merge(result, self.accumulate(factory, update, [4.0, 7.0]))
         assert result.n == 3
         assert finalize(result) == (4.0, 3.0)
+
+
+class Test_Tree_intnodes:
+
+    @pytest.mark.parametrize("copy_method", ["pickle", "deepcopy"])
+    def test_warmed_tree_can_be_copied(self, copy_method):
+        tree = pt.Tree.from_string(
+            '[&R]((A[&note={1,?,2}]:[&rate=0.5]1,B:2)Inner[&height=3]:4,'
+            'C:5)Root:0[&stem={?,4}];', parse_meta=True)
+        tree.nodedict["A"].extra_meta["history"] = [["sample"]]
+        assert tree.nodedist("A", "C") == 10
+        tree.pathdist_dict(rooted=True)
+        before = tree.newick(print_meta=True)
+
+        if copy_method == "pickle":
+            other = pickle.loads(pickle.dumps(tree))
+        else:
+            other = copy.deepcopy(tree)
+
+        assert other.newick(print_meta=True) == before
+        assert other.rooted is True
+        assert other.root_suffix.label == "Root" and other.root_suffix.length == 0
+        assert other.root_suffix.extra_meta["stem"][0] is pt.MISSING
+        assert other.nodedict["A"].extra_meta["note"][1] is pt.MISSING
+        assert other.nodedist("A", "C") == 10
+        assert other.child_dict is not tree.child_dict
+        other.nodedict["A"].extra_meta["history"][0][0] = "changed"
+        other.child_dict[other.parent("A")]["A"].extra_meta["rate"] = 7
+        assert tree.nodedict["A"].extra_meta["history"] == [["sample"]]
+        assert tree.child_dict[tree.parent("A")]["A"].extra_meta["rate"] == 0.5
+        assert tree.newick(print_meta=True) == before
+
+    def test_live_view_keeps_order_and_set_operations(self):
+        tree = pt.Tree.from_string("((A:1,B:1):2,C:3);")
+        nodes = tree.intnodes
+        assert isinstance(nodes, type({}.keys()))
+        assert list(nodes) == list(tree.child_dict)
+        assert nodes | tree.leaves == tree.nodes
+        assert nodes - {tree.root} == set(tree.child_dict) - {tree.root}
+        assert nodes & {tree.root} == {tree.root}
+
+        node = tree.add_node_on_branch(tree.parent("A"), "A", frac_from_parent=0.5)
+        assert node in nodes
+        assert list(nodes) == list(tree.child_dict)
+        assert nodes | tree.leaves == tree.nodes

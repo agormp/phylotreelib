@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 #### Fixed
+- Querying internal nodes no longer prevents pickling or deep-copying a Tree.
 - Cached node distances no longer keep discarded Trees alive. Clearing one Tree's caches leaves other Trees' cached distances intact. Use `clear_length_caches()` in place of `nodedist.cache_clear()`.
 - Iterating over a Tree now yields proper internal subtrees with copied basal branches. The source root and individual leaves are excluded. Previously, iteration raised an error.
 
