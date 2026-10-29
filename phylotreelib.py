@@ -2085,31 +2085,17 @@ class Tree:
     ###############################################################################################
 
     def __iter__(self):
-        """Returns iterator object for Tree object. Yields subtrees with .basalbranch attribute"""
+        """Yield proper internal subtrees with a copied .basalbranch attribute.
 
-        # Basal branch struct may contain useful information: e.g., label and length below subtree
-        # Single node trees consisting of leaves are also considered subtrees (REMOVE????)
-        class SubtreeIterator():
-            def __init__(self, fulltree):
-                self.basenodes = fulltree.sorted_intnodes()
-                self.basenodes.extend(fulltree.leaflist())
-                self.basenodes.remove(fulltree.root)
-                self.i = 0
-                self.fulltree = fulltree
+        Excludes the source root and individual leaves. The order follows
+        sorted_intnodes(), and a star tree yields no subtrees.
+        """
 
-            def __iter__(self):
-                return self
-
-            def __next__(self):
-                if self.i >= len(self.basenodes):
-                    raise StopIteration
-                self.i += 1
-                basenode = self.basenodes[self.i - 1]
-                subtree, basalbranch = self.fulltree.subtree(basenode)
+        for basenode in self.sorted_intnodes():
+            if basenode != self.root:
+                subtree, basalbranch = self.subtree(basenode)
                 subtree.basalbranch = basalbranch
-                return subtree
-
-        return SubtreeIterator(self)
+                yield subtree
 
     ###############################################################################################
 

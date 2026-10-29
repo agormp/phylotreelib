@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [Unreleased]
+
+#### Fixed
+- Iterating over a Tree now yields proper internal subtrees with copied basal branches. The source root and individual leaves are excluded. Previously, iteration raised an error.
+
+---
+
 ## [3.0.0] - 2026 October 28
 
 #### Added

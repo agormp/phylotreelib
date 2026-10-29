@@ -1889,6 +1889,44 @@ class Test_randtree:
 
 ###################################################################################################
 
+class Test_iter_Tree:
+    def test_internal_subtrees_in_order_without_changing_cached_nodes(self):
+        tree = pt.Tree.from_string("(((A:1,B:2):3,C:4):5,(D:6,E:7):8);")
+        cached = tree.sorted_intnodes()
+        before = tuple(cached)
+        expected = [{"A", "B", "C"}, {"D", "E"}, {"A", "B"}]
+
+        for _ in range(2):
+            subtrees = list(tree)
+            assert all(isinstance(subtree, pt.Tree) for subtree in subtrees)
+            assert [subtree.leaves for subtree in subtrees] == expected
+            assert all(subtree.root != tree.root for subtree in subtrees)
+            assert tree.sorted_intnodes() is cached
+            assert cached == before
+
+    def test_star_has_no_proper_internal_subtrees(self):
+        tree = pt.Tree.from_string("(A:1,B:2,C:3);")
+        assert list(tree) == []
+
+    def test_basal_branch_data_is_copied_for_each_result(self):
+        tree = pt.Tree.from_string("((A:1,B:2):3,C:4);")
+        basenode = next(node for node in tree.intnodes if node != tree.root)
+        original = tree.child_dict[tree.root][basenode]
+        original.label = "AB"
+        original.extra_meta = {"note": ["original"]}
+
+        first = next(iter(tree))
+        second = next(iter(tree))
+        assert first.basalbranch.length == 3
+        assert first.basalbranch.label == "AB"
+        assert first.basalbranch is not original
+        assert first.basalbranch is not second.basalbranch
+        first.basalbranch.extra_meta["note"][0] = "changed"
+        assert original.extra_meta == second.basalbranch.extra_meta == {"note": ["original"]}
+
+
+###################################################################################################
+
 class Test_TreeIteration:
     """Tests iteration over file with several trees"""
 

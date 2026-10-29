@@ -180,6 +180,8 @@ Reversing an existing edge retains its Branchstruct and annotation values unchan
 
 #### Pruning and extraction
 
+Iterating over a Tree yields proper internal subtrees in `sorted_intnodes()` order. Each result is a new Tree with its copied incoming branch in `.basalbranch`. The source root and individual leaves are excluded, so a star tree yields no subtrees. Use `subtree(leaf)` to extract an individual leaf and its basal branch.
+
 Successful `remove_leaf()`, `remove_leaves()`, `prune_subtree()` and pruning wrappers preserve the remaining Tree's rootedness, including surviving-child promotion. This retains the oriented surviving clade and differs from structural root collapse retaining both sides. Actual removal of the old root clears its entire suffix and deleted-node data; surviving-node annotations stay attached. A selection-only wrapper does not mutate state or suffix. Extracted Tree state is inherited before source mutation. Existing valid-retained-Tree geometry and singleton/empty boundaries are unchanged.
 
 A Tree returned by `subtree()` inherits True, False or None from the source at extraction time, including extraction at the source root. `prune_subtree()` obtains that result before editing the source. Selecting a traversal subtree does not infer biological rootedness. Leaf extraction still returns a name string plus its copied basal branch; it creates no Tree state or new wrapper.
